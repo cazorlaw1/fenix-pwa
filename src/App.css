@@ -1,0 +1,155 @@
+import React, { useState } from 'react';
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  Navigate,
+} from 'react-router-dom';
+import { AuthProvider } from './context/AuthContext';
+import ProtectedRoute from './components/ProtectedRoute';
+import Header from './components/Header';
+import Sidebar from './components/Sidebar';
+import MobileNavigation from './components/MobileNavigation';
+
+// Páginas
+import Dashboard from './pages/Dashboard';
+import Login from './pages/Login';
+import PendingApproval from './pages/PendingApproval';
+import Profile from './pages/Profile';
+import Users from './pages/Users';
+
+function Layout({ children, activeTab, setActiveTab }) {
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  return (
+    <div
+      style={{
+        display: 'flex',
+        minHeight: '100vh',
+        backgroundColor: '#f9fafb',
+      }}
+    >
+      {/* Sidebar de Escritorio */}
+      <div className="desktop-sidebar">
+        <Sidebar />
+      </div>
+
+      <div
+        style={{
+          flex: 1,
+          display: 'flex',
+          flexDirection: 'column',
+          minWidth: 0,
+        }}
+      >
+        <Header
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          onOpenMobileMenu={() => setIsMobileMenuOpen(true)}
+        />
+        <main style={{ flex: 1 }}>{children}</main>
+      </div>
+
+      {/* Menú Desplegable Lateral Móvil */}
+      <MobileNavigation
+        isOpen={isMobileMenuOpen}
+        onClose={() => setIsMobileMenuOpen(false)}
+      />
+
+      <style>{`
+        @media (max-width: 768px) {
+          .desktop-sidebar { display: none !important; }
+        }
+        @media (min-width: 769px) {
+          .desktop-sidebar { display: block !important; }
+        }
+      `}</style>
+    </div>
+  );
+}
+
+function DashboardWrapper() {
+  const [activeTab, setActiveTab] = useState('administrador');
+  return (
+    <Layout activeTab={activeTab} setActiveTab={setActiveTab}>
+      <Dashboard overrideRole={activeTab} />
+    </Layout>
+  );
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <Router>
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route path="/pending" element={<PendingApproval />} />
+
+          <Route element={<ProtectedRoute />}>
+            <Route path="/" element={<Navigate to="/dashboard" replace />} />
+            <Route path="/dashboard" element={<DashboardWrapper />} />
+            <Route
+              path="/inventario"
+              element={
+                <Layout>
+                  <div style={{ padding: '24px' }}>
+                    <h2>3.2. Módulo de Inventario (Catálogo y Registro)</h2>
+                  </div>
+                </Layout>
+              }
+            />
+            <Route
+              path="/usuarios"
+              element={
+                <Layout>
+                  <Users />
+                </Layout>
+              }
+            />
+            <Route
+              path="/administrativo"
+              element={
+                <Layout>
+                  <div style={{ padding: '24px' }}>
+                    <h2>
+                      3.4. Módulo Administrativo (Aprobaciones, Cobranza, Vales
+                      y Cierre Quincenal)
+                    </h2>
+                  </div>
+                </Layout>
+              }
+            />
+            <Route
+              path="/vendedores"
+              element={
+                <Layout>
+                  <div style={{ padding: '24px' }}>
+                    <h2>3.5. Tabla de Desempeño de Vendedores</h2>
+                  </div>
+                </Layout>
+              }
+            />
+            <Route
+              path="/ventas"
+              element={
+                <Layout>
+                  <div style={{ padding: '24px' }}>
+                    <h2>3.6. Módulo de Ventas (Clientes y Notas de Entrega)</h2>
+                  </div>
+                </Layout>
+              }
+            />
+            <Route
+              path="/profile"
+              element={
+                <Layout>
+                  <Profile />
+                </Layout>
+              }
+            />
+          </Route>
+        </Routes>
+      </Router>
+    </AuthProvider>
+  );
+}
