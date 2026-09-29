@@ -18,12 +18,10 @@ import {
 export default function Dashboard({ overrideRole }) {
   const { profile, user } = useAuth();
   const [loading, setLoading] = useState(true);
-
+  
   // Determinar rol efectivo
-  const userRole =
-    profile?.role?.toString().toLowerCase().trim() || 'pendiente';
-  const effectiveRole =
-    userRole === 'tecnico' ? overrideRole || 'administrador' : userRole;
+  const userRole = profile?.role?.toString().toLowerCase().trim() || 'pendiente';
+  const effectiveRole = userRole === 'tecnico' ? overrideRole || 'administrador' : userRole;
 
   // Estados Generales
   const [metrics, setMetrics] = useState({
@@ -33,12 +31,15 @@ export default function Dashboard({ overrideRole }) {
     myClients: 0,
     myPotentials: 0,
   });
+  
   const [recentActivities, setRecentActivities] = useState([]);
+  
   const [inventoryStats, setInventoryStats] = useState({
     bombillos: 0,
     fluidos: 0,
     total: 0,
   });
+  
   const [adminAlerts, setAdminAlerts] = useState({
     pendingUsers: 0,
     pendingNE: 0,
@@ -71,6 +72,7 @@ export default function Dashboard({ overrideRole }) {
       const { data: products } = await supabase
         .from('products')
         .select('category, stock_current');
+      
       if (products) {
         const bombillos = products
           .filter((p) => p.category?.toLowerCase() === 'bombillos')
@@ -103,7 +105,7 @@ export default function Dashboard({ overrideRole }) {
     }
   };
 
-  // --- LÓGICA ADMINISTRADOR ---
+  // --- LÓGICA ADMINISTRADOR (INTACTA) ---
   const fetchAdminData = async () => {
     const { count: pendingUsersCount } = await supabase
       .from('profiles')
@@ -128,7 +130,7 @@ export default function Dashboard({ overrideRole }) {
 
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-
+    
     const { data: sales } = await supabase
       .from('sales_orders')
       .select('final_price_usd, created_at, payment_status, balance_due_usd')
@@ -157,18 +159,26 @@ export default function Dashboard({ overrideRole }) {
       totalClients: 0,
     });
 
+    // Obtener últimas 5 transacciones para mostrar
     const { data: recentNotes } = await supabase
       .from('sales_orders')
       .select('*, client:client_id(name), seller:seller_id(full_name)')
       .order('created_at', { ascending: false })
       .limit(5);
+    
     setRecentActivities(recentNotes || []);
 
-    // Consulta de los últimos 7 días basada en la fecha local del día de hoy como el último día
-    const { data: allSalesLast7Days } = await supabase
+    // Consulta específica para la gráfica de los últimos 7 días
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
+    sevenDaysAgo.setHours(0, 0, 0, 0);
+    
+    const { data: last7DaysSales } = await supabase
       .from('sales_orders')
-      .select('final_price_usd, created_at, payment_status');
+      .select('final_price_usd, created_at, payment_status')
+      .gte('created_at', sevenDaysAgo.toISOString());
 
+    // Generar los últimos 7 días incluyendo hoy
     const last7Days = Array.from({ length: 7 }, (_, i) => {
       const d = new Date();
       d.setDate(d.getDate() - (6 - i));
@@ -177,7 +187,7 @@ export default function Dashboard({ overrideRole }) {
 
     const dailyData = last7Days.map((date) => {
       const daySales =
-        allSalesLast7Days
+        last7DaysSales
           ?.filter(
             (s) =>
               s.created_at?.startsWith(date) &&
@@ -187,13 +197,14 @@ export default function Dashboard({ overrideRole }) {
         0;
       return { date, amount: daySales };
     });
+    
     setDailySalesData(dailyData);
   };
 
-  // --- LÓGICA GERENTE/SUPERVISOR ---
+  // --- LÓGICA GERENTE/SUPERVISOR (FILTROS IDÉNTICOS A VENDEDORES.JSX) ---
   const fetchManagerData = async () => {
     let subordinateIds = [];
-
+    
     const { data: cfg } = await supabase
       .from('hierarchy_config')
       .select('*')
@@ -238,7 +249,6 @@ export default function Dashboard({ overrideRole }) {
       const exceptionIds = assignments
         .filter((a) => a.is_exception)
         .map((a) => String(a.target_seller_id).trim());
-
       filteredProfiles = eligibleSellers.filter(
         (p) => !exceptionIds.includes(String(p.id).trim())
       );
@@ -247,7 +257,6 @@ export default function Dashboard({ overrideRole }) {
       const assignedIds = specificAssigns.map((a) =>
         String(a.target_seller_id).trim()
       );
-
       filteredProfiles = eligibleSellers.filter((p) =>
         assignedIds.includes(String(p.id).trim())
       );
@@ -295,6 +304,7 @@ export default function Dashboard({ overrideRole }) {
       now.getDate() <= 15 ? 1 : 16
     );
 
+    // Obtener todas las ventas del equipo para cálculos
     const { data: teamSales } = await supabase
       .from('sales_orders')
       .select(
@@ -316,6 +326,7 @@ export default function Dashboard({ overrideRole }) {
     const closedNECount = fortnightSales.filter(
       (s) => s.payment_status === 'cerrada'
     ).length;
+    
     const pendingNECount =
       teamSales?.filter((s) => s.payment_status !== 'cerrada').length || 0;
 
@@ -333,8 +344,21 @@ export default function Dashboard({ overrideRole }) {
       potentials: potentialCount || 0,
     });
 
+    // Mostrar solo las últimas 5 transacciones
     setRecentActivities(teamSales?.slice(0, 5) || []);
 
+    // Consulta específica para la gráfica de los últimos 7 días
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
+    sevenDaysAgo.setHours(0, 0, 0, 0);
+    
+    const { data: last7DaysSales } = await supabase
+      .from('sales_orders')
+      .select('final_price_usd, created_at, payment_status')
+      .in('seller_id', subordinateIds)
+      .gte('created_at', sevenDaysAgo.toISOString());
+
+    // Generar los últimos 7 días incluyendo hoy
     const last7Days = Array.from({ length: 7 }, (_, i) => {
       const d = new Date();
       d.setDate(d.getDate() - (6 - i));
@@ -343,7 +367,7 @@ export default function Dashboard({ overrideRole }) {
 
     const dailyData = last7Days.map((date) => {
       const daySales =
-        teamSales
+        last7DaysSales
           ?.filter(
             (s) =>
               s.created_at?.startsWith(date) &&
@@ -353,6 +377,7 @@ export default function Dashboard({ overrideRole }) {
         0;
       return { date, amount: daySales };
     });
+    
     setDailySalesData(dailyData);
   };
 
@@ -361,6 +386,7 @@ export default function Dashboard({ overrideRole }) {
     const sellerId = profile?.id;
     if (!sellerId) return;
 
+    // Obtener todas las ventas del vendedor para cálculos
     const { data: mySales } = await supabase
       .from('sales_orders')
       .select(
@@ -374,6 +400,7 @@ export default function Dashboard({ overrideRole }) {
         (acc, curr) => acc + Number(curr.final_price_usd || 0),
         0
       ) || 0;
+
     const pendingBalance =
       mySales
         ?.filter((s) => s.payment_status !== 'cerrada')
@@ -402,8 +429,21 @@ export default function Dashboard({ overrideRole }) {
       myPotentials: myPotentialsCount || 0,
     });
 
+    // Mostrar solo las últimas 5 transacciones
     setRecentActivities(mySales?.slice(0, 5) || []);
 
+    // Consulta específica para la gráfica de los últimos 7 días
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
+    sevenDaysAgo.setHours(0, 0, 0, 0);
+    
+    const { data: last7DaysSales } = await supabase
+      .from('sales_orders')
+      .select('final_price_usd, created_at, payment_status')
+      .eq('seller_id', sellerId)
+      .gte('created_at', sevenDaysAgo.toISOString());
+
+    // Generar los últimos 7 días incluyendo hoy
     const last7Days = Array.from({ length: 7 }, (_, i) => {
       const d = new Date();
       d.setDate(d.getDate() - (6 - i));
@@ -412,7 +452,7 @@ export default function Dashboard({ overrideRole }) {
 
     const dailyData = last7Days.map((date) => {
       const daySales =
-        mySales
+        last7DaysSales
           ?.filter(
             (s) =>
               s.created_at?.startsWith(date) &&
@@ -422,6 +462,7 @@ export default function Dashboard({ overrideRole }) {
         0;
       return { date, amount: daySales };
     });
+    
     setDailySalesData(dailyData);
   };
 
@@ -495,7 +536,8 @@ export default function Dashboard({ overrideRole }) {
             {effectiveRole}
           </span>
         </div>
-
+        
+        {/* Botón de Nueva Nota de Entrega (Oculto para rol stock) */}
         {effectiveRole !== 'stock' && (
           <button
             onClick={handleCreateNE}
@@ -728,6 +770,7 @@ export default function Dashboard({ overrideRole }) {
           </>
         )}
 
+        {/* TARJETAS DE EQUIPO PARA GERENTE / SUPERVISOR */}
         {(effectiveRole === 'gerente' || effectiveRole === 'supervisor') && (
           <>
             <div
@@ -890,6 +933,7 @@ export default function Dashboard({ overrideRole }) {
           </>
         )}
 
+        {/* TARJETAS PARA VENDEDOR */}
         {effectiveRole === 'vendedor' && (
           <>
             <MetricCard
@@ -971,6 +1015,7 @@ export default function Dashboard({ overrideRole }) {
         </div>
       </div>
 
+      {/* SECCIÓN DE GRÁFICAS Y TRANSACCIONES (Oculta para rol stock) */}
       {effectiveRole !== 'stock' && (
         <div
           style={{
@@ -1015,7 +1060,7 @@ export default function Dashboard({ overrideRole }) {
                 );
                 const heightPct = (day.amount / maxVal) * 100;
                 const dayNum = day.date
-                  ? new Date(day.date + 'T00:00:00').getDate()
+                  ? new Date(day.date).getDate()
                   : idx + 1;
                 return (
                   <div
