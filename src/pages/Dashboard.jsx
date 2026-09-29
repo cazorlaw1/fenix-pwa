@@ -104,7 +104,6 @@ export default function Dashboard({ overrideRole }) {
 
   // Función auxiliar para calcular los últimos 7 días a partir de un listado de ventas general
   const calculateLast7DaysSales = (salesList) => {
-    // Generar array de los últimos 7 días en formato YYYY-MM-DD (hora local segura)
     const last7Days = Array.from({ length: 7 }, (_, i) => {
       const d = new Date();
       d.setDate(d.getDate() - (6 - i));
@@ -119,7 +118,6 @@ export default function Dashboard({ overrideRole }) {
         salesList
           ?.filter((s) => {
             if (!s.created_at) return false;
-            // Extraer la fecha YYYY-MM-DD ignorando la zona horaria UTC vs Local
             const sDate = s.created_at.split('T')[0];
             const matchesDate = sDate === dateStr;
             const isPaidOrClosed =
@@ -193,7 +191,6 @@ export default function Dashboard({ overrideRole }) {
       .limit(5);
     setRecentActivities(recentNotes || []);
 
-    // Se alimenta de todas las ventas de los últimos 30 días para asegurar precisión en la gráfica de 7 días
     const dailyData = calculateLast7DaysSales(sales);
     setDailySalesData(dailyData);
   };
