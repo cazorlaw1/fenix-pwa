@@ -74,45 +74,37 @@ export default function Login() {
 
   return (
     <>
-      {/* ESTILOS RESPONSIVOS PARA MÓVIL - PANTALLA COMPLETA */}
+      {/* ESTILOS RESPONSIVOS PARA MÓVIL */}
       <style>{`
         @media (max-width: 768px) {
           .login-main-container {
             padding: 0 !important;
-            min-height: 100vh !important;
-            height: 100vh !important;
-            width: 100vw !important;
-            overflow: hidden;
           }
-          .login-card-wrapper {
+          .login-card {
             max-width: 100% !important;
-            width: 100% !important;
-            height: 100% !important;
-            min-height: 100% !important;
+            width: 100vw !important;
+            height: 100vh !important;
+            min-height: 100vh !important;
             border-radius: 0 !important;
             border: none !important;
-            box-shadow: none !important;
             flex-direction: column !important;
             overflow-y: auto !important;
           }
           .login-left-panel {
             flex: 0 0 auto !important;
-            padding: 30px 20px !important;
+            padding: 24px 20px !important;
             border-right: none !important;
             border-bottom: 4px solid #D4AF37 !important;
             min-height: auto !important;
           }
           .login-right-panel {
             flex: 1 1 auto !important;
-            padding: 30px 20px !important;
-            justify-content: center !important;
+            padding: 24px 20px !important;
+            justify-content: flex-start !important;
           }
           .login-logo-img {
             max-width: 100px !important;
             max-height: 100px !important;
-          }
-          .login-form-wrapper {
-            max-width: 100% !important;
           }
         }
       `}</style>
@@ -131,7 +123,7 @@ export default function Login() {
         }}
       >
         <div
-          className="login-card-wrapper"
+          className="login-card"
           style={{
             width: '100%',
             maxWidth: '850px',
@@ -366,7 +358,6 @@ export default function Login() {
             )}
             <form
               onSubmit={handleAuth}
-              className="login-form-wrapper"
               style={{
                 display: 'flex',
                 flexDirection: 'column',
@@ -617,7 +608,6 @@ export default function Login() {
               ></span>
             </div>
             <div
-              className="login-form-wrapper"
               style={{
                 maxWidth: '320px',
                 margin: '0 auto',
