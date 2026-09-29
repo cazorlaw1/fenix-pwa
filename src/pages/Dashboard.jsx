@@ -492,10 +492,9 @@ export default function Dashboard({ overrideRole }) {
         minHeight: 'calc(100vh - 120px)',
         paddingBottom: '80px',
         fontFamily: 'system-ui, -apple-system, sans-serif',
-        overflowX: 'hidden',
       }}
     >
-      {/* ENCABEZADO: Nombre y rol */}
+      {/* --- ENCABEZADO: Saludo + Botones en la misma fila --- */}
       <div
         style={{
           display: 'flex',
@@ -503,13 +502,13 @@ export default function Dashboard({ overrideRole }) {
           alignItems: 'center',
           marginBottom: isMobile ? '10px' : '16px',
           flexWrap: 'wrap',
-          gap: '10px',
+          gap: '8px',
         }}
       >
         <div>
           <h1
             style={{
-              fontSize: isMobile ? '20px' : '24px',
+              fontSize: isMobile ? '18px' : '24px',
               fontWeight: '800',
               color: '#111827',
               margin: 0,
@@ -530,8 +529,8 @@ export default function Dashboard({ overrideRole }) {
           </span>
         </div>
 
-        {/* Botón de Nueva Nota de Entrega - Solo escritorio aquí */}
-        {effectiveRole !== 'stock' && !isMobile && (
+        {/* En escritorio: solo el botón de Nueva NE */}
+        {!isMobile && effectiveRole !== 'stock' && (
           <button
             onClick={handleCreateNE}
             style={{
@@ -555,7 +554,7 @@ export default function Dashboard({ overrideRole }) {
         )}
       </div>
 
-      {/* FILA MÓVIL: Accesos rápidos + Botón Crear Nota (mismo tamaño, misma fila) */}
+      {/* --- FILA MÓVIL: Accesos rápidos + Botón Nueva NE juntos --- */}
       {isMobile && effectiveRole !== 'stock' && (
         <div
           style={{
@@ -567,56 +566,46 @@ export default function Dashboard({ overrideRole }) {
             paddingBottom: '4px',
           }}
         >
-          {/* Botón Crear Nota con mismo estilo que los accesos rápidos */}
+          {/* Botón Nueva NE con mismo estilo que los accesos */}
           <button
             onClick={handleCreateNE}
             style={{
               display: 'flex',
-              flexDirection: 'column',
               alignItems: 'center',
               justifyContent: 'center',
               gap: '4px',
-              padding: '8px',
+              padding: '7px 10px',
               backgroundColor: '#DC2626',
-              border: '1px solid #DC2626',
+              color: '#fff',
+              border: 'none',
               borderRadius: '8px',
+              fontSize: '10px',
+              fontWeight: '700',
               cursor: 'pointer',
-              minWidth: '70px',
+              whiteSpace: 'nowrap',
               flex: '0 0 auto',
             }}
           >
-            <div style={{ color: '#fff' }}>
-              <Plus size={14} />
-            </div>
-            <span
-              style={{
-                fontSize: '9px',
-                textAlign: 'center',
-                color: '#fff',
-                fontWeight: '600',
-              }}
-            >
-              Nueva NE
-            </span>
+            <Plus size={13} /> Nueva NE
           </button>
 
           {effectiveRole === 'administrador' && (
             <>
               <QuickLinkMobile
                 label="Cobranza"
-                icon={<DollarSign size={14} />}
+                icon={<DollarSign size={13} />}
                 color="#059669"
                 onClick={() => (window.location.href = '/administrativo')}
               />
               <QuickLinkMobile
                 label="Usuarios"
-                icon={<Users size={14} />}
+                icon={<Users size={13} />}
                 color="#2563EB"
                 onClick={() => (window.location.href = '/usuarios')}
               />
               <QuickLinkMobile
                 label="Inventario"
-                icon={<Package size={14} />}
+                icon={<Package size={13} />}
                 color="#7c3aed"
                 onClick={() => (window.location.href = '/inventario')}
               />
@@ -626,19 +615,19 @@ export default function Dashboard({ overrideRole }) {
             <>
               <QuickLinkMobile
                 label="Visitas"
-                icon={<MapPin size={14} />}
+                icon={<MapPin size={13} />}
                 color="#2563EB"
                 onClick={() => (window.location.href = '/vendedores')}
               />
               <QuickLinkMobile
                 label="Reportes"
-                icon={<FileText size={14} />}
+                icon={<FileText size={13} />}
                 color="#7c3aed"
                 onClick={() => (window.location.href = '/vendedores')}
               />
               <QuickLinkMobile
                 label="Comisiones"
-                icon={<DollarSign size={14} />}
+                icon={<DollarSign size={13} />}
                 color="#059669"
                 onClick={() => (window.location.href = '/vendedores')}
               />
@@ -648,19 +637,19 @@ export default function Dashboard({ overrideRole }) {
             <>
               <QuickLinkMobile
                 label="Clientes"
-                icon={<Users size={14} />}
+                icon={<Users size={13} />}
                 color="#2563EB"
                 onClick={() => (window.location.href = '/ventas')}
               />
               <QuickLinkMobile
                 label="N.E."
-                icon={<FileText size={14} />}
+                icon={<FileText size={13} />}
                 color="#7c3aed"
                 onClick={() => (window.location.href = '/ventas')}
               />
               <QuickLinkMobile
                 label="Potenciales"
-                icon={<UserCheck size={14} />}
+                icon={<UserCheck size={13} />}
                 color="#16A34A"
                 onClick={() => (window.location.href = '/ventas')}
               />
@@ -669,7 +658,7 @@ export default function Dashboard({ overrideRole }) {
         </div>
       )}
 
-      {/* GRID DE TARJETAS DE MÉTRICAS */}
+      {/* --- TARJETAS DE MÉTRICAS --- */}
       <div
         style={{
           display: 'grid',
@@ -680,7 +669,7 @@ export default function Dashboard({ overrideRole }) {
           marginBottom: '20px',
         }}
       >
-        {/* --- TARJETAS ADMINISTRADOR --- */}
+        {/* ALERTAS DE ADMINISTRADOR - Diseño original en escritorio, cuadrado en móvil */}
         {effectiveRole === 'administrador' && (
           <div
             style={{
@@ -690,60 +679,83 @@ export default function Dashboard({ overrideRole }) {
                 adminAlerts.pendingUsers > 0 ? '#FECACA' : '#BBF7D0'
               }`,
               borderRadius: isMobile ? '10px' : '12px',
-              padding: isMobile ? '10px' : '14px',
+              padding: isMobile ? '8px' : '14px',
               display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
+              flexDirection: isMobile ? 'column' : 'row',
+              alignItems: isMobile ? 'center' : 'center',
               justifyContent: 'center',
-              gap: isMobile ? '6px' : '0',
+              gap: isMobile ? '4px' : '12px',
               aspectRatio: isMobile ? '1' : 'auto',
             }}
           >
-            {/* Icono al lado del título, centrados */}
             <div
               style={{
+                backgroundColor:
+                  adminAlerts.pendingUsers > 0 ? '#FEE2E2' : '#DCFCE7',
+                padding: isMobile ? '4px' : '8px',
+                borderRadius: '8px',
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'center',
-                gap: '4px',
               }}
             >
-              <div
-                style={{
-                  backgroundColor:
-                    adminAlerts.pendingUsers > 0 ? '#FEE2E2' : '#DCFCE7',
-                  padding: isMobile ? '4px' : '8px',
-                  borderRadius: '8px',
-                  display: 'flex',
-                  alignItems: 'center',
-                }}
-              >
-                <UserCheck
-                  size={isMobile ? 14 : 20}
-                  color={adminAlerts.pendingUsers > 0 ? '#DC2626' : '#16A34A'}
-                />
-              </div>
-              <div
-                style={{
-                  fontSize: isMobile ? '8px' : '11px',
-                  color: '#6b7280',
-                  fontWeight: '600',
-                  textAlign: 'center',
-                }}
-              >
-                {isMobile ? 'Pend.' : 'Usuarios Pendientes'}
-              </div>
+              <UserCheck
+                size={isMobile ? 13 : 20}
+                color={adminAlerts.pendingUsers > 0 ? '#DC2626' : '#16A34A'}
+              />
             </div>
-            <div
-              style={{
-                fontSize: isMobile ? '18px' : '18px',
-                fontWeight: '800',
-                color: adminAlerts.pendingUsers > 0 ? '#DC2626' : '#166534',
-                textAlign: 'center',
-              }}
-            >
-              {adminAlerts.pendingUsers}
-            </div>
+            {isMobile ? (
+              <>
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '4px',
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: '8px',
+                      color: '#6b7280',
+                      fontWeight: '600',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    Pend.
+                  </span>
+                </div>
+                <div
+                  style={{
+                    fontSize: '16px',
+                    fontWeight: '800',
+                    color: adminAlerts.pendingUsers > 0 ? '#DC2626' : '#166534',
+                  }}
+                >
+                  {adminAlerts.pendingUsers}
+                </div>
+              </>
+            ) : (
+              <div>
+                <div
+                  style={{
+                    fontSize: '11px',
+                    color: '#6b7280',
+                    fontWeight: '600',
+                  }}
+                >
+                  Usuarios Pendientes
+                </div>
+                <div
+                  style={{
+                    fontSize: '18px',
+                    fontWeight: '800',
+                    color: adminAlerts.pendingUsers > 0 ? '#DC2626' : '#166534',
+                  }}
+                >
+                  {adminAlerts.pendingUsers}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -757,12 +769,12 @@ export default function Dashboard({ overrideRole }) {
                 adminAlerts.pendingNE > 0 ? '#FECACA' : '#BBF7D0'
               }`,
               borderRadius: isMobile ? '10px' : '12px',
-              padding: isMobile ? '10px' : '14px',
+              padding: isMobile ? '8px' : '14px',
               display: 'flex',
-              flexDirection: 'column',
+              flexDirection: isMobile ? 'column' : 'row',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: isMobile ? '6px' : '0',
+              gap: isMobile ? '4px' : '12px',
               cursor: adminAlerts.pendingNE > 0 ? 'pointer' : 'default',
               transition: 'transform 0.2s',
               aspectRatio: isMobile ? '1' : 'auto',
@@ -770,59 +782,85 @@ export default function Dashboard({ overrideRole }) {
           >
             <div
               style={{
+                backgroundColor:
+                  adminAlerts.pendingNE > 0 ? '#FEE2E2' : '#DCFCE7',
+                padding: isMobile ? '4px' : '8px',
+                borderRadius: '8px',
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'center',
-                gap: '4px',
               }}
             >
-              <div
-                style={{
-                  backgroundColor:
-                    adminAlerts.pendingNE > 0 ? '#FEE2E2' : '#DCFCE7',
-                  padding: isMobile ? '4px' : '8px',
-                  borderRadius: '8px',
-                  display: 'flex',
-                  alignItems: 'center',
-                }}
-              >
-                <Clock
-                  size={isMobile ? 14 : 20}
-                  color={adminAlerts.pendingNE > 0 ? '#DC2626' : '#16A34A'}
-                />
-              </div>
-              <div
-                style={{
-                  fontSize: isMobile ? '8px' : '11px',
-                  color: '#6b7280',
-                  fontWeight: '600',
-                  textAlign: 'center',
-                }}
-              >
-                {isMobile ? 'N.E. Pend.' : 'N.E. por Aprobar'}
-              </div>
+              <Clock
+                size={isMobile ? 13 : 20}
+                color={adminAlerts.pendingNE > 0 ? '#DC2626' : '#16A34A'}
+              />
             </div>
-            <div
-              style={{
-                fontSize: isMobile ? '18px' : '18px',
-                fontWeight: '800',
-                color: adminAlerts.pendingNE > 0 ? '#DC2626' : '#166534',
-                textAlign: 'center',
-              }}
-            >
-              {adminAlerts.pendingNE}
-            </div>
-            {adminAlerts.pendingNE > 0 && !isMobile && (
-              <div
-                style={{
-                  fontSize: '10px',
-                  fontWeight: '700',
-                  color: '#DC2626',
-                  textDecoration: 'underline',
-                }}
-              >
-                Ver Ahora
-              </div>
+            {isMobile ? (
+              <>
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '4px',
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: '8px',
+                      color: '#6b7280',
+                      fontWeight: '600',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    N.E. Pend.
+                  </span>
+                </div>
+                <div
+                  style={{
+                    fontSize: '16px',
+                    fontWeight: '800',
+                    color: adminAlerts.pendingNE > 0 ? '#DC2626' : '#166534',
+                  }}
+                >
+                  {adminAlerts.pendingNE}
+                </div>
+              </>
+            ) : (
+              <>
+                <div style={{ flex: 1 }}>
+                  <div
+                    style={{
+                      fontSize: '11px',
+                      color: '#6b7280',
+                      fontWeight: '600',
+                    }}
+                  >
+                    N.E. por Aprobar
+                  </div>
+                  <div
+                    style={{
+                      fontSize: '18px',
+                      fontWeight: '800',
+                      color: adminAlerts.pendingNE > 0 ? '#DC2626' : '#166534',
+                    }}
+                  >
+                    {adminAlerts.pendingNE}
+                  </div>
+                </div>
+                {adminAlerts.pendingNE > 0 && (
+                  <div
+                    style={{
+                      fontSize: '10px',
+                      fontWeight: '700',
+                      color: '#DC2626',
+                      textDecoration: 'underline',
+                    }}
+                  >
+                    Ver Ahora
+                  </div>
+                )}
+              </>
             )}
           </div>
         )}
@@ -837,76 +875,100 @@ export default function Dashboard({ overrideRole }) {
                 adminAlerts.pendingPayments > 0 ? '#FDE68A' : '#BBF7D0'
               }`,
               borderRadius: isMobile ? '10px' : '12px',
-              padding: isMobile ? '10px' : '14px',
+              padding: isMobile ? '8px' : '14px',
               display: 'flex',
-              flexDirection: 'column',
+              flexDirection: isMobile ? 'column' : 'row',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: isMobile ? '6px' : '0',
-              cursor:
-                adminAlerts.pendingPayments > 0 ? 'pointer' : 'default',
+              gap: isMobile ? '4px' : '12px',
+              cursor: adminAlerts.pendingPayments > 0 ? 'pointer' : 'default',
               transition: 'transform 0.2s',
               aspectRatio: isMobile ? '1' : 'auto',
             }}
           >
             <div
               style={{
+                backgroundColor:
+                  adminAlerts.pendingPayments > 0 ? '#FEF3C7' : '#DCFCE7',
+                padding: isMobile ? '4px' : '8px',
+                borderRadius: '8px',
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'center',
-                gap: '4px',
               }}
             >
-              <div
-                style={{
-                  backgroundColor:
-                    adminAlerts.pendingPayments > 0 ? '#FEF3C7' : '#DCFCE7',
-                  padding: isMobile ? '4px' : '8px',
-                  borderRadius: '8px',
-                  display: 'flex',
-                  alignItems: 'center',
-                }}
-              >
-                <Bell
-                  size={isMobile ? 14 : 20}
-                  color={
-                    adminAlerts.pendingPayments > 0 ? '#B45309' : '#16A34A'
-                  }
-                />
-              </div>
-              <div
-                style={{
-                  fontSize: isMobile ? '8px' : '11px',
-                  color: '#6b7280',
-                  fontWeight: '600',
-                  textAlign: 'center',
-                }}
-              >
-                {isMobile ? 'Abonos' : 'Notif. Abono Pend.'}
-              </div>
+              <Bell
+                size={isMobile ? 13 : 20}
+                color={adminAlerts.pendingPayments > 0 ? '#B45309' : '#16A34A'}
+              />
             </div>
-            <div
-              style={{
-                fontSize: isMobile ? '18px' : '18px',
-                fontWeight: '800',
-                color:
-                  adminAlerts.pendingPayments > 0 ? '#B45309' : '#166534',
-                textAlign: 'center',
-              }}
-            >
-              {adminAlerts.pendingPayments}
-            </div>
-            {adminAlerts.pendingPayments > 0 && !isMobile && (
-              <div
-                style={{
-                  fontSize: '10px',
-                  fontWeight: '700',
-                  color: '#B45309',
-                  textDecoration: 'underline',
-                }}
-              >
-                Ver Ahora
-              </div>
+            {isMobile ? (
+              <>
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '4px',
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: '8px',
+                      color: '#6b7280',
+                      fontWeight: '600',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    Abonos
+                  </span>
+                </div>
+                <div
+                  style={{
+                    fontSize: '16px',
+                    fontWeight: '800',
+                    color:
+                      adminAlerts.pendingPayments > 0 ? '#B45309' : '#166534',
+                  }}
+                >
+                  {adminAlerts.pendingPayments}
+                </div>
+              </>
+            ) : (
+              <>
+                <div style={{ flex: 1 }}>
+                  <div
+                    style={{
+                      fontSize: '11px',
+                      color: '#6b7280',
+                      fontWeight: '600',
+                    }}
+                  >
+                    Notif. Abono Pend.
+                  </div>
+                  <div
+                    style={{
+                      fontSize: '18px',
+                      fontWeight: '800',
+                      color:
+                        adminAlerts.pendingPayments > 0 ? '#B45309' : '#166534',
+                    }}
+                  >
+                    {adminAlerts.pendingPayments}
+                  </div>
+                </div>
+                {adminAlerts.pendingPayments > 0 && (
+                  <div
+                    style={{
+                      fontSize: '10px',
+                      fontWeight: '700',
+                      color: '#B45309',
+                      textDecoration: 'underline',
+                    }}
+                  >
+                    Ver Ahora
+                  </div>
+                )}
+              </>
             )}
           </div>
         )}
@@ -916,286 +978,288 @@ export default function Dashboard({ overrideRole }) {
             <MetricCard
               title={isMobile ? 'Ventas (30d)' : 'Ventas Totales (30d)'}
               value={`$${metrics.totalSales?.toFixed(2) || 0}`}
-              icon={<DollarSign size={isMobile ? 14 : 18} />}
+              icon={<DollarSign size={isMobile ? 13 : 18} />}
               color="#111827"
               isMobile={isMobile}
             />
             <MetricCard
               title={isMobile ? 'Por Cobrar' : 'Por Cobrar Global'}
               value={`$${metrics.pendingCobranza?.toFixed(2) || 0}`}
-              icon={<AlertCircle size={isMobile ? 14 : 18} />}
+              icon={<AlertCircle size={isMobile ? 13 : 18} />}
               color="#DC2626"
               isMobile={isMobile}
             />
           </>
         )}
 
-        {/* --- TARJETAS DE EQUIPO PARA GERENTE / SUPERVISOR --- */}
+        {/* TARJETAS DE EQUIPO PARA GERENTE / SUPERVISOR */}
         {(effectiveRole === 'gerente' || effectiveRole === 'supervisor') && (
           <>
-            <div
-              style={{
-                backgroundColor: '#ffffff',
-                border: '1px solid #e5e7eb',
-                borderRadius: isMobile ? '10px' : '12px',
-                padding: isMobile ? '10px' : '14px',
-                boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
-                aspectRatio: isMobile ? '1' : 'auto',
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'center',
-                alignItems: 'center',
-              }}
-            >
-              <div
-                style={{
-                  fontSize: isMobile ? '9px' : '10px',
-                  color: '#6b7280',
-                  fontWeight: '700',
-                  textTransform: 'uppercase',
-                  marginBottom: '4px',
-                  textAlign: 'center',
-                }}
-              >
-                {isMobile ? 'Vend.' : 'Vendedores Activos'}
-              </div>
-              <div
-                style={{
-                  fontSize: isMobile ? '18px' : '20px',
-                  fontWeight: '800',
-                  color: '#111827',
-                }}
-              >
-                {teamStats.activeSellers}
-              </div>
-              <div
-                style={{
-                  fontSize: isMobile ? '9px' : '10px',
-                  color: '#6b7280',
-                  marginTop: '2px',
-                  textAlign: 'center',
-                }}
-              >
-                {isMobile ? 'Activos' : 'En estructura'}
-              </div>
-            </div>
-
-            <div
-              style={{
-                backgroundColor: '#ffffff',
-                border: '1px solid #e5e7eb',
-                borderRadius: isMobile ? '10px' : '12px',
-                padding: isMobile ? '10px' : '14px',
-                boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
-                aspectRatio: isMobile ? '1' : 'auto',
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'center',
-                alignItems: 'center',
-              }}
-            >
-              <div
-                style={{
-                  fontSize: isMobile ? '9px' : '10px',
-                  color: '#6b7280',
-                  fontWeight: '700',
-                  textTransform: 'uppercase',
-                  marginBottom: '4px',
-                  textAlign: 'center',
-                }}
-              >
-                {isMobile ? 'Meta' : 'Meta vs Alcanzado'}
-              </div>
-              <div
-                style={{
-                  fontSize: isMobile ? '14px' : '18px',
-                  fontWeight: '800',
-                  color: '#111827',
-                  textAlign: 'center',
-                }}
-              >
-                ${teamStats.achievedSales?.toFixed(0) || 0}{' '}
-                <span
+            {isMobile ? (
+              <>
+                <TeamCardMobile
+                  icon={<Users size={13} color="#6b7280" />}
+                  title="Vend."
+                  value={teamStats.activeSellers}
+                  subtitle="Activos"
+                  borderColor="#e5e7eb"
+                  titleColor="#6b7280"
+                  valueColor="#111827"
+                />
+                <TeamCardMobile
+                  icon={<DollarSign size={13} color="#6b7280" />}
+                  title="Meta"
+                  value={`$${teamStats.achievedSales?.toFixed(0) || 0}`}
+                  subtitle={`${teamStats.goalProgress?.toFixed(0) || 0}%`}
+                  subtitleColor="#16a34a"
+                  borderColor="#e5e7eb"
+                  titleColor="#6b7280"
+                  valueColor="#111827"
+                  valueSize="13px"
+                  extra={`/${teamStats.totalGoal}`}
+                />
+                <TeamCardMobile
+                  icon={<FileText size={13} color="#16a34a" />}
+                  title="Cerradas"
+                  value={teamStats.closedNECount}
+                  subtitle="Quincena"
+                  borderColor="#16a34a"
+                  titleColor="#16a34a"
+                  valueColor="#16a34a"
+                />
+                <TeamCardMobile
+                  icon={<Clock size={13} color="#dc2626" />}
+                  title="Pendientes"
+                  value={teamStats.pendingNECount}
+                  subtitle="Por cobrar"
+                  borderColor="#dc2626"
+                  titleColor="#dc2626"
+                  valueColor="#dc2626"
+                />
+              </>
+            ) : (
+              <>
+                <div
                   style={{
-                    color: '#9ca3af',
-                    fontWeight: '400',
-                    fontSize: isMobile ? '11px' : '14px',
+                    backgroundColor: '#ffffff',
+                    border: '1px solid #e5e7eb',
+                    borderRadius: '12px',
+                    padding: '14px',
+                    boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
                   }}
                 >
-                  / {teamStats.totalGoal}
-                </span>
-              </div>
-              <div
-                style={{
-                  fontSize: isMobile ? '9px' : '10px',
-                  color: '#16a34a',
-                  fontWeight: '600',
-                  marginTop: '2px',
-                  textAlign: 'center',
-                }}
-              >
-                {teamStats.goalProgress?.toFixed(0) || 0}%
-              </div>
-            </div>
-
-            <div
-              style={{
-                backgroundColor: '#ffffff',
-                border: '1px solid #16a34a',
-                borderRadius: isMobile ? '10px' : '12px',
-                padding: isMobile ? '10px' : '14px',
-                boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
-                aspectRatio: isMobile ? '1' : 'auto',
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'center',
-                alignItems: 'center',
-              }}
-            >
-              <div
-                style={{
-                  fontSize: isMobile ? '9px' : '10px',
-                  color: '#16a34a',
-                  fontWeight: '700',
-                  textTransform: 'uppercase',
-                  marginBottom: '4px',
-                  textAlign: 'center',
-                }}
-              >
-                {isMobile ? 'Cerradas' : 'N.E. Cerradas'}
-              </div>
-              <div
-                style={{
-                  fontSize: isMobile ? '18px' : '20px',
-                  fontWeight: '800',
-                  color: '#16a34a',
-                }}
-              >
-                {teamStats.closedNECount}
-              </div>
-              <div
-                style={{
-                  fontSize: isMobile ? '9px' : '10px',
-                  color: '#6b7280',
-                  marginTop: '2px',
-                  textAlign: 'center',
-                }}
-              >
-                {isMobile ? 'Quincena' : 'Esta quincena'}
-              </div>
-            </div>
-
-            <div
-              style={{
-                backgroundColor: '#ffffff',
-                border: '1px solid #dc2626',
-                borderRadius: isMobile ? '10px' : '12px',
-                padding: isMobile ? '10px' : '14px',
-                boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
-                aspectRatio: isMobile ? '1' : 'auto',
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'center',
-                alignItems: 'center',
-              }}
-            >
-              <div
-                style={{
-                  fontSize: isMobile ? '9px' : '10px',
-                  color: '#dc2626',
-                  fontWeight: '700',
-                  textTransform: 'uppercase',
-                  marginBottom: '4px',
-                  textAlign: 'center',
-                }}
-              >
-                {isMobile ? 'Pendientes' : 'N.E. Pendientes'}
-              </div>
-              <div
-                style={{
-                  fontSize: isMobile ? '18px' : '20px',
-                  fontWeight: '800',
-                  color: '#dc2626',
-                }}
-              >
-                {teamStats.pendingNECount}
-              </div>
-              <div
-                style={{
-                  fontSize: isMobile ? '9px' : '10px',
-                  color: '#6b7280',
-                  marginTop: '2px',
-                  textAlign: 'center',
-                }}
-              >
-                {isMobile ? 'Por cobrar' : 'Por cobrar/cerrar'}
-              </div>
-            </div>
+                  <div
+                    style={{
+                      fontSize: '10px',
+                      color: '#6b7280',
+                      fontWeight: '700',
+                      textTransform: 'uppercase',
+                      marginBottom: '4px',
+                    }}
+                  >
+                    Vendedores Activos
+                  </div>
+                  <div
+                    style={{
+                      fontSize: '20px',
+                      fontWeight: '800',
+                      color: '#111827',
+                    }}
+                  >
+                    {teamStats.activeSellers}
+                  </div>
+                  <div
+                    style={{ fontSize: '10px', color: '#6b7280', marginTop: '2px' }}
+                  >
+                    En estructura
+                  </div>
+                </div>
+                <div
+                  style={{
+                    backgroundColor: '#ffffff',
+                    border: '1px solid #e5e7eb',
+                    borderRadius: '12px',
+                    padding: '14px',
+                    boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: '10px',
+                      color: '#6b7280',
+                      fontWeight: '700',
+                      textTransform: 'uppercase',
+                      marginBottom: '4px',
+                    }}
+                  >
+                    Meta vs Alcanzado
+                  </div>
+                  <div
+                    style={{
+                      fontSize: '18px',
+                      fontWeight: '800',
+                      color: '#111827',
+                    }}
+                  >
+                    ${teamStats.achievedSales?.toFixed(2) || 0}{' '}
+                    <span
+                      style={{
+                        color: '#9ca3af',
+                        fontWeight: '400',
+                        fontSize: '14px',
+                      }}
+                    >
+                      / ${teamStats.totalGoal}
+                    </span>
+                  </div>
+                  <div
+                    style={{
+                      fontSize: '10px',
+                      color: '#16a34a',
+                      fontWeight: '600',
+                      marginTop: '2px',
+                    }}
+                  >
+                    {teamStats.goalProgress?.toFixed(0) || 0}% Completado
+                  </div>
+                </div>
+                <div
+                  style={{
+                    backgroundColor: '#ffffff',
+                    border: '1px solid #16a34a',
+                    borderRadius: '12px',
+                    padding: '14px',
+                    boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: '10px',
+                      color: '#16a34a',
+                      fontWeight: '700',
+                      textTransform: 'uppercase',
+                      marginBottom: '4px',
+                    }}
+                  >
+                    N.E. Cerradas
+                  </div>
+                  <div
+                    style={{
+                      fontSize: '20px',
+                      fontWeight: '800',
+                      color: '#16a34a',
+                    }}
+                  >
+                    {teamStats.closedNECount}
+                  </div>
+                  <div
+                    style={{ fontSize: '10px', color: '#6b7280', marginTop: '2px' }}
+                  >
+                    Esta quincena
+                  </div>
+                </div>
+                <div
+                  style={{
+                    backgroundColor: '#ffffff',
+                    border: '1px solid #dc2626',
+                    borderRadius: '12px',
+                    padding: '14px',
+                    boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: '10px',
+                      color: '#dc2626',
+                      fontWeight: '700',
+                      textTransform: 'uppercase',
+                      marginBottom: '4px',
+                    }}
+                  >
+                    N.E. Pendientes
+                  </div>
+                  <div
+                    style={{
+                      fontSize: '20px',
+                      fontWeight: '800',
+                      color: '#dc2626',
+                    }}
+                  >
+                    {teamStats.pendingNECount}
+                  </div>
+                  <div
+                    style={{ fontSize: '10px', color: '#6b7280', marginTop: '2px' }}
+                  >
+                    Por cobrar/cerrar
+                  </div>
+                </div>
+              </>
+            )}
           </>
         )}
 
-        {/* --- TARJETAS PARA VENDEDOR --- */}
+        {/* TARJETAS PARA VENDEDOR */}
         {effectiveRole === 'vendedor' && (
           <>
             <MetricCard
-              title="Mis Ventas"
+              title={isMobile ? 'Mis Ventas' : 'Mis Ventas'}
               value={`$${metrics.totalSales?.toFixed(2) || 0}`}
-              icon={<ShoppingCart size={isMobile ? 14 : 18} />}
+              icon={<ShoppingCart size={isMobile ? 13 : 18} />}
               color="#111827"
               isMobile={isMobile}
             />
             <MetricCard
               title={isMobile ? 'Saldo Pend.' : 'Saldo Pendiente'}
               value={`$${metrics.pendingBalance?.toFixed(2) || 0}`}
-              icon={<Clock size={isMobile ? 14 : 18} />}
+              icon={<Clock size={isMobile ? 13 : 18} />}
               color="#DC2626"
               isMobile={isMobile}
             />
             <MetricCard
-              title="Clientes"
+              title={isMobile ? 'Clientes' : 'Mis Clientes'}
               value={metrics.myClients || 0}
-              icon={<Users size={isMobile ? 14 : 18} />}
+              icon={<Users size={isMobile ? 13 : 18} />}
               color="#2563EB"
               isMobile={isMobile}
             />
             <MetricCard
               title="Potenciales"
               value={metrics.myPotentials || 0}
-              icon={<UserCheck size={isMobile ? 14 : 18} />}
+              icon={<UserCheck size={isMobile ? 13 : 18} />}
               color="#16A34A"
               isMobile={isMobile}
             />
           </>
         )}
 
-        {/* TARJETA DE INVENTARIO (Todos los roles) */}
+        {/* Tarjeta de Inventario (todos los roles) */}
         <div
           style={{
             backgroundColor: '#ffffff',
             border: '1px solid #e5e7eb',
             borderRadius: isMobile ? '10px' : '12px',
-            padding: isMobile ? '10px' : '14px',
+            padding: isMobile ? '8px' : '14px',
             boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
             aspectRatio: isMobile ? '1' : 'auto',
             display: 'flex',
-            flexDirection: 'column',
+            flexDirection: isMobile ? 'column' : 'column',
             justifyContent: 'center',
-            alignItems: 'center',
+            alignItems: isMobile ? 'center' : 'flex-start',
           }}
         >
           <div
             style={{
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'center',
-              gap: '4px',
-              marginBottom: '6px',
+              gap: '8px',
+              marginBottom: '8px',
+              justifyContent: isMobile ? 'center' : 'flex-start',
             }}
           >
-            <Package size={isMobile ? 14 : 18} color="#6b7280" />
+            <Package size={isMobile ? 13 : 18} color="#6b7280" />
             <span
               style={{
-                fontSize: isMobile ? '9px' : '10px',
+                fontSize: isMobile ? '8px' : '10px',
                 color: '#6b7280',
                 fontWeight: '700',
                 textTransform: 'uppercase',
@@ -1209,6 +1273,8 @@ export default function Dashboard({ overrideRole }) {
               fontSize: isMobile ? '18px' : '20px',
               fontWeight: '800',
               color: '#111827',
+              textAlign: isMobile ? 'center' : 'left',
+              width: '100%',
             }}
           >
             {inventoryStats.total}
@@ -1216,23 +1282,26 @@ export default function Dashboard({ overrideRole }) {
           <div
             style={{
               display: 'flex',
-              justifyContent: 'space-around',
-              marginTop: '6px',
-              fontSize: isMobile ? '9px' : '11px',
+              justifyContent: isMobile ? 'center' : 'space-between',
+              gap: isMobile ? '8px' : '0',
+              marginTop: '8px',
+              fontSize: isMobile ? '8px' : '11px',
               width: '100%',
             }}
           >
             <span style={{ color: '#6b7280', textAlign: 'center' }}>
-              Bomb: <strong>{inventoryStats.bombillos}</strong>
+              {isMobile ? 'Bomb' : 'Bombillos'}:{' '}
+              <strong>{inventoryStats.bombillos}</strong>
             </span>
             <span style={{ color: '#6b7280', textAlign: 'center' }}>
-              Flui: <strong>{inventoryStats.fluidos}</strong>
+              {isMobile ? 'Flui' : 'Fluidos'}:{' '}
+              <strong>{inventoryStats.fluidos}</strong>
             </span>
           </div>
         </div>
       </div>
 
-      {/* SECCIÓN DE GRÁFICAS Y TRANSACCIONES (Oculta para rol stock) */}
+      {/* --- SECCIÓN DE GRÁFICAS Y TRANSACCIONES (Oculta para rol stock) --- */}
       {effectiveRole !== 'stock' && (
         <div
           style={{
@@ -1245,7 +1314,7 @@ export default function Dashboard({ overrideRole }) {
             margin: isMobile ? '0 0 20px 0' : '0 auto 20px auto',
           }}
         >
-          {/* GRÁFICA DE VENTAS DIARIAS */}
+          {/* Gráfico de Ventas Diarias */}
           <div
             style={{
               backgroundColor: '#ffffff',
@@ -1254,7 +1323,7 @@ export default function Dashboard({ overrideRole }) {
               padding: isMobile ? '12px' : '16px',
               display: 'flex',
               flexDirection: 'column',
-              minHeight: isMobile ? '220px' : 'auto',
+              minHeight: isMobile ? '200px' : 'auto',
             }}
           >
             <h3
@@ -1277,7 +1346,6 @@ export default function Dashboard({ overrideRole }) {
                 gap: isMobile ? '6px' : '8px',
                 paddingBottom: '10px',
                 position: 'relative',
-                minHeight: isMobile ? '140px' : '120px',
               }}
             >
               {dailySalesData.map((day, idx) => {
@@ -1357,7 +1425,7 @@ export default function Dashboard({ overrideRole }) {
             </div>
           </div>
 
-          {/* ÚLTIMAS TRANSACCIONES */}
+          {/* Últimas Transacciones */}
           <div
             style={{
               backgroundColor: '#ffffff',
@@ -1366,6 +1434,7 @@ export default function Dashboard({ overrideRole }) {
               padding: isMobile ? '12px' : '16px',
               display: 'flex',
               flexDirection: 'column',
+              minHeight: isMobile ? '200px' : 'auto',
             }}
           >
             <h3
@@ -1401,7 +1470,7 @@ export default function Dashboard({ overrideRole }) {
                   flexDirection: 'column',
                   gap: '10px',
                   overflowY: 'auto',
-                  maxHeight: isMobile ? '300px' : '100%',
+                  maxHeight: '100%',
                 }}
               >
                 {recentActivities.map((act) => (
@@ -1457,7 +1526,7 @@ export default function Dashboard({ overrideRole }) {
         </div>
       )}
 
-      {/* SECCIÓN DE ACCESOS RÁPIDOS - Solo escritorio (en móvil ya están arriba) */}
+      {/* --- ACCESOS RÁPIDOS (Solo escritorio, en móvil ya están arriba) --- */}
       {!isMobile && (
         <div style={{ marginBottom: '20px' }}>
           <h3
@@ -1568,7 +1637,7 @@ function MetricCard({ title, value, icon, color, isMobile }) {
         backgroundColor: '#ffffff',
         border: '1px solid #e5e7eb',
         borderRadius: isMobile ? '10px' : '12px',
-        padding: isMobile ? '10px' : '14px',
+        padding: isMobile ? '8px' : '14px',
         boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
         aspectRatio: isMobile ? '1' : 'auto',
         display: 'flex',
@@ -1577,14 +1646,14 @@ function MetricCard({ title, value, icon, color, isMobile }) {
         alignItems: 'center',
       }}
     >
-      {/* Icono al lado del título, centrados juntos */}
+      {/* Icono + Título en la misma línea, centrados */}
       <div
         style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           gap: '4px',
-          marginBottom: '6px',
+          marginBottom: '4px',
         }}
       >
         <div style={{ color: color, display: 'flex', alignItems: 'center' }}>
@@ -1592,11 +1661,11 @@ function MetricCard({ title, value, icon, color, isMobile }) {
         </div>
         <span
           style={{
-            fontSize: isMobile ? '9px' : '10px',
+            fontSize: isMobile ? '8px' : '10px',
             color: '#6b7280',
             fontWeight: '700',
             textTransform: 'uppercase',
-            textAlign: 'center',
+            whiteSpace: 'nowrap',
           }}
         >
           {title}
@@ -1607,10 +1676,94 @@ function MetricCard({ title, value, icon, color, isMobile }) {
           fontSize: isMobile ? '16px' : '20px',
           fontWeight: '800',
           color: '#111827',
+        }}
+      >
+        {value}
+      </div>
+    </div>
+  );
+}
+
+function TeamCardMobile({
+  icon,
+  title,
+  value,
+  subtitle,
+  subtitleColor = '#6b7280',
+  borderColor,
+  titleColor,
+  valueColor,
+  valueSize = '18px',
+  extra = '',
+}) {
+  return (
+    <div
+      style={{
+        backgroundColor: '#ffffff',
+        border: `1px solid ${borderColor}`,
+        borderRadius: '10px',
+        padding: '8px',
+        boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+        aspectRatio: '1',
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'center',
+        alignItems: 'center',
+      }}
+    >
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '4px',
+          marginBottom: '4px',
+        }}
+      >
+        {icon}
+        <span
+          style={{
+            fontSize: '8px',
+            color: titleColor,
+            fontWeight: '700',
+            textTransform: 'uppercase',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {title}
+        </span>
+      </div>
+      <div
+        style={{
+          fontSize: valueSize,
+          fontWeight: '800',
+          color: valueColor,
           textAlign: 'center',
         }}
       >
         {value}
+        {extra && (
+          <span
+            style={{
+              color: '#9ca3af',
+              fontWeight: '400',
+              fontSize: '10px',
+              marginLeft: '2px',
+            }}
+          >
+            {extra}
+          </span>
+        )}
+      </div>
+      <div
+        style={{
+          fontSize: '8px',
+          color: subtitleColor,
+          marginTop: '2px',
+          textAlign: 'center',
+        }}
+      >
+        {subtitle}
       </div>
     </div>
   );
@@ -1650,11 +1803,10 @@ function QuickLinkMobile({ label, icon, color, onClick }) {
       onClick={onClick}
       style={{
         display: 'flex',
-        flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
         gap: '4px',
-        padding: '8px',
+        padding: '7px 10px',
         backgroundColor: '#f9fafb',
         border: '1px solid #e5e7eb',
         borderRadius: '8px',
@@ -1663,14 +1815,16 @@ function QuickLinkMobile({ label, icon, color, onClick }) {
         fontSize: '10px',
         fontWeight: '600',
         color: '#374151',
-        minWidth: '70px',
+        whiteSpace: 'nowrap',
         flex: '0 0 auto',
       }}
       onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f3f4f6')}
       onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#f9fafb')}
     >
-      <div style={{ color: color }}>{icon}</div>
-      <span style={{ fontSize: '9px', textAlign: 'center' }}>{label}</span>
+      <div style={{ color: color, display: 'flex', alignItems: 'center' }}>
+        {icon}
+      </div>
+      <span style={{ fontSize: '10px' }}>{label}</span>
     </button>
   );
 }
