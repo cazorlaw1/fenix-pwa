@@ -67,7 +67,7 @@ export default function Login() {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `https://www.fenixautopartes.com/auth/callback`,
+          redirectTo: `https://www.fenixautopartes.com/auth/v1/callback'`,
           queryParams: {
             access_type: 'offline',
             prompt: 'consent',
