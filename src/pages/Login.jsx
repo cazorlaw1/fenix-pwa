@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext';
 
 export default function Login() {
   const navigate = useNavigate();
-  const { loginWithGoogle, fetchProfile } = useAuth();
+  const { fetchProfile } = useAuth(); // Ya no usamos loginWithGoogle del contexto directamente aquí
   const [isRegistering, setIsRegistering] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -14,6 +14,7 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
 
+  // LÓGICA DE AUTENTICACIÓN MANUAL (EMAIL/PASSWORD)
   const handleAuth = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -23,9 +24,7 @@ export default function Login() {
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
-          options: {
-            data: { full_name: fullName },
-          },
+          options: { data: { full_name: fullName } },
         });
         if (error) throw error;
         if (data?.user) {
@@ -60,6 +59,54 @@ export default function Login() {
     }
   };
 
+  // NUEVA LÓGICA INTELIGENTE PARA GOOGLE (Basada en tu CSV de profiles)
+  const handleGoogleAuth = async () => {
+    // 1. Validar que haya un correo escrito para poder buscarlo
+    if (!email) {
+      setMessage(
+        'Por favor, ingresa tu correo electrónico antes de continuar con Google para verificar tu cuenta.'
+      );
+      return;
+    }
+
+    setLoading(true);
+    setMessage('Verificando credenciales...');
+
+    try {
+      // 2. Consultar si el correo ya existe en la tabla 'profiles'
+      // Usamos .single() y capturamos el error PGRST116 (no rows returned) como caso válido
+      const { data: existingUser, error: checkError } = await supabase
+        .from('profiles')
+        .select('id, role')
+        .eq('email', email.toLowerCase().trim())
+        .single();
+
+      if (checkError && checkError.code !== 'PGRST116') {
+        // Si es un error distinto a "no encontrado", lanzamos excepción
+        throw checkError;
+      }
+
+      // 3. Ejecutar OAuth. Supabase maneja automáticamente el merge si el email coincide
+      // con uno existente en auth.users. La consulta previa nos sirve para validar
+      // y mostrar mensajes personalizados si fuera necesario en el futuro.
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: window.location.origin + '/',
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          },
+        },
+      });
+
+      if (error) throw error;
+    } catch (err) {
+      setMessage(err.message || 'Error al conectar con Google');
+      setLoading(false);
+    }
+  };
+
   const handleResetPassword = async () => {
     if (!email) {
       setMessage('Escribe tu correo para recuperar la contraseña.');
@@ -79,15 +126,13 @@ export default function Login() {
           padding: 0;
           width: 100%;
           height: 100%;
-          overflow: hidden !important; /* Bloquea scroll en toda la app */
-          position: fixed; /* Previene rebote en iOS */
-          width: 100%;
-          height: 100%;
+          overflow: hidden !important;
+          position: fixed;
         }
         
         @media (max-width: 768px) {
           .login-main-container {
-            height: 100dvh !important; /* Altura dinámica real del viewport */
+            height: 100dvh !important;
             min-height: 100dvh !important;
             padding: 0 !important;
             overflow: hidden !important;
@@ -102,12 +147,10 @@ export default function Login() {
             overflow: hidden !important;
           }
           .login-left-panel {
-            /* AUMENTADO EL TAMAÑO DEL PANEL NEGRO EN MÓVIL */
             flex: 0 0 45% !important; 
             padding: 25px 20px !important;
             border-right: none !important;
             border-bottom: 4px solid #D4AF37 !important;
-            min-height: auto !important;
             display: flex !important;
             flex-direction: column !important;
             justify-content: center !important;
@@ -115,11 +158,11 @@ export default function Login() {
           .login-left-panel h1 {
             font-size: 22px !important;
             margin-bottom: 8px !important;
-            text-align: center !important; /* TEXTO CENTRADO */
+            text-align: center !important;
           }
           .login-left-panel p {
             font-size: 12px !important;
-            text-align: center !important; /* TEXTO CENTRADO */
+            text-align: center !important;
           }
           .login-logo-container {
             margin: 15px 0 !important;
@@ -129,7 +172,7 @@ export default function Login() {
             max-height: 110px !important;
           }
           .login-right-panel {
-            flex: 1 1 auto !important; /* Ocupa el resto del espacio exacto */
+            flex: 1 1 auto !important;
             padding: 20px 15px !important;
             justify-content: center !important;
             overflow: hidden !important;
@@ -196,7 +239,7 @@ export default function Login() {
                   margin: '0 0 10px 0',
                   color: '#ffffff',
                   textTransform: 'uppercase',
-                  textAlign: 'left', // Por defecto izquierda para escritorio
+                  textAlign: 'left',
                 }}
               >
                 {isRegistering ? 'REGISTRO' : 'INICIAR SESIÓN'}
@@ -207,7 +250,7 @@ export default function Login() {
                   color: '#9ca3af',
                   lineHeight: '1.6',
                   margin: 0,
-                  textAlign: 'left', // Por defecto izquierda para escritorio
+                  textAlign: 'left',
                 }}
               >
                 Bienvenido a{' '}
@@ -217,7 +260,7 @@ export default function Login() {
                 . Gestión de repuestos automotrices.
               </p>
             </div>
-            
+
             <div
               className="login-logo-container"
               style={{
@@ -274,7 +317,7 @@ export default function Login() {
                 </div>
               </div>
             </div>
-            
+
             <div>
               <p
                 style={{
@@ -667,7 +710,8 @@ export default function Login() {
             >
               <button
                 type="button"
-                onClick={loginWithGoogle}
+                onClick={handleGoogleAuth} // CAMBIO CLAVE: Usamos la función inteligente
+                disabled={loading}
                 style={{
                   width: '100%',
                   padding: '8px 16px',
@@ -682,6 +726,7 @@ export default function Login() {
                   justifyContent: 'center',
                   gap: '8px',
                   cursor: 'pointer',
+                  opacity: loading ? 0.7 : 1,
                 }}
               >
                 <img
