@@ -1,6 +1,7 @@
 // src/components/MobileNavigation.jsx
 import React from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import {
   X,
   LayoutDashboard,
@@ -10,20 +11,79 @@ import {
   TrendingUp,
   ShoppingCart,
   User,
+  LogOut,
 } from 'lucide-react';
 
 export default function MobileNavigation({ isOpen, onClose }) {
+  const { profile, signOut } = useAuth() || {};
+  const navigate = useNavigate();
+
+  const handleLogout = async () => {
+    onClose();
+    if (signOut) {
+      await signOut();
+    }
+    navigate('/login');
+  };
+
   if (!isOpen) return null;
 
-  const navItems = [
-    { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { to: '/inventario', label: 'Inventario', icon: Package },
-    { to: '/usuarios', label: 'Usuarios', icon: UsersIcon },
-    { to: '/administrativo', label: 'Administrativo', icon: FileText },
-    { to: '/vendedores', label: 'Vendedores', icon: TrendingUp },
-    { to: '/ventas', label: 'Ventas', icon: ShoppingCart },
-    { to: '/profile', label: 'Mi Perfil', icon: User },
+  // Todos los ítems del menú con sus roles permitidos (en minúsculas para comparación segura)
+  const allNavItems = [
+    {
+      to: '/dashboard',
+      label: 'Dashboard',
+      icon: LayoutDashboard,
+      roles: ['administrador', 'gerente', 'supervisor', 'vendedor'],
+    },
+    {
+      to: '/inventario',
+      label: 'Inventario',
+      icon: Package,
+      roles: ['administrador', 'gerente', 'supervisor'],
+    },
+    {
+      to: '/usuarios',
+      label: 'Usuarios',
+      icon: UsersIcon,
+      roles: ['administrador', 'gerente'],
+    },
+    {
+      to: '/administrativo',
+      label: 'Administrativo',
+      icon: FileText,
+      roles: ['administrador', 'gerente'],
+    },
+    {
+      to: '/vendedores',
+      label: 'Vendedores',
+      icon: TrendingUp,
+      roles: ['administrador', 'gerente', 'supervisor'],
+    },
+    {
+      to: '/ventas',
+      label: 'Ventas',
+      icon: ShoppingCart,
+      roles: ['administrador', 'gerente', 'supervisor', 'vendedor'],
+    },
+    {
+      to: '/profile',
+      label: 'Mi Perfil',
+      icon: User,
+      roles: ['administrador', 'gerente', 'supervisor', 'vendedor'],
+    },
   ];
+
+  // Obtener el rol del usuario, normalizar a minúsculas y sin espacios
+  const userRole = (profile?.role || 'Administrador')
+    .toString()
+    .toLowerCase()
+    .trim();
+
+  // Filtrar ítems según el rol del usuario
+  const navItems = allNavItems.filter((item) =>
+    item.roles.includes(userRole)
+  );
 
   return (
     <div
@@ -65,6 +125,7 @@ export default function MobileNavigation({ isOpen, onClose }) {
           zIndex: 100000,
         }}
       >
+        {/* Encabezado del menú móvil */}
         <div
           style={{
             display: 'flex',
@@ -98,6 +159,7 @@ export default function MobileNavigation({ isOpen, onClose }) {
           </button>
         </div>
 
+        {/* Navegación filtrada por rol */}
         <nav
           style={{
             display: 'flex',
@@ -133,6 +195,44 @@ export default function MobileNavigation({ isOpen, onClose }) {
             );
           })}
         </nav>
+
+        {/* Botón de Cerrar Sesión */}
+        <div
+          style={{
+            padding: '16px',
+            borderTop: '1px solid #f3f4f6',
+            backgroundColor: '#f9fafb',
+          }}
+        >
+          <button
+            onClick={handleLogout}
+            style={{
+              width: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              padding: '12px 16px',
+              backgroundColor: '#dc2626',
+              color: '#ffffff',
+              border: 'none',
+              borderRadius: '8px',
+              fontWeight: 600,
+              fontSize: '0.875rem',
+              cursor: 'pointer',
+              transition: 'background-color 0.2s',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = '#b91c1c';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = '#dc2626';
+            }}
+          >
+            <LogOut size={18} />
+            <span>Cerrar Sesión</span>
+          </button>
+        </div>
       </aside>
     </div>
   );
