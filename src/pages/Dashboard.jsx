@@ -92,7 +92,6 @@ export default function Dashboard({ overrideRole }) {
       } else if (effectiveRole === 'vendedor') {
         await fetchSellerData();
       } else if (effectiveRole === 'stock') {
-        // Rol stock no requiere fetch adicional de ventas
         setRecentActivities([]);
         setDailySalesData([]);
       }
@@ -103,7 +102,37 @@ export default function Dashboard({ overrideRole }) {
     }
   };
 
-  // --- LÓGICA ADMINISTRADOR (INTACTA) ---
+  // Función auxiliar para calcular los últimos 7 días a partir de un listado de ventas general
+  const calculateLast7DaysSales = (salesList) => {
+    // Generar array de los últimos 7 días en formato YYYY-MM-DD (hora local segura)
+    const last7Days = Array.from({ length: 7 }, (_, i) => {
+      const d = new Date();
+      d.setDate(d.getDate() - (6 - i));
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    });
+
+    return last7Days.map((dateStr) => {
+      const daySales =
+        salesList
+          ?.filter((s) => {
+            if (!s.created_at) return false;
+            // Extraer la fecha YYYY-MM-DD ignorando la zona horaria UTC vs Local
+            const sDate = s.created_at.split('T')[0];
+            const matchesDate = sDate === dateStr;
+            const isPaidOrClosed =
+              s.payment_status === 'cerrada' || s.payment_status === 'abonada';
+            return matchesDate && isPaidOrClosed;
+          })
+          .reduce((acc, curr) => acc + Number(curr.final_price_usd || 0), 0) || 0;
+
+      return { date: dateStr, amount: daySales };
+    });
+  };
+
+  // --- LÓGICA ADMINISTRADOR ---
   const fetchAdminData = async () => {
     const { count: pendingUsersCount } = await supabase
       .from('profiles')
@@ -164,28 +193,12 @@ export default function Dashboard({ overrideRole }) {
       .limit(5);
     setRecentActivities(recentNotes || []);
 
-    const last7Days = Array.from({ length: 7 }, (_, i) => {
-      const d = new Date();
-      d.setDate(d.getDate() - (6 - i));
-      return d.toISOString().split('T')[0];
-    });
-
-    const dailyData = last7Days.map((date) => {
-      const daySales =
-        recentNotes
-          ?.filter(
-            (s) =>
-              s.created_at?.startsWith(date) &&
-              (s.payment_status === 'cerrada' || s.payment_status === 'abonada')
-          )
-          .reduce((acc, curr) => acc + Number(curr.final_price_usd || 0), 0) ||
-        0;
-      return { date, amount: daySales };
-    });
+    // Se alimenta de todas las ventas de los últimos 30 días para asegurar precisión en la gráfica de 7 días
+    const dailyData = calculateLast7DaysSales(sales);
     setDailySalesData(dailyData);
   };
 
-  // --- LÓGICA GERENTE/SUPERVISOR (FILTROS IDÉNTICOS A VENDEDORES.JSX) ---
+  // --- LÓGICA GERENTE/SUPERVISOR ---
   const fetchManagerData = async () => {
     let subordinateIds = [];
 
@@ -330,24 +343,7 @@ export default function Dashboard({ overrideRole }) {
 
     setRecentActivities(teamSales?.slice(0, 5) || []);
 
-    const last7Days = Array.from({ length: 7 }, (_, i) => {
-      const d = new Date();
-      d.setDate(d.getDate() - (6 - i));
-      return d.toISOString().split('T')[0];
-    });
-
-    const dailyData = last7Days.map((date) => {
-      const daySales =
-        teamSales
-          ?.filter(
-            (s) =>
-              s.created_at?.startsWith(date) &&
-              (s.payment_status === 'cerrada' || s.payment_status === 'abonada')
-          )
-          .reduce((acc, curr) => acc + Number(curr.final_price_usd || 0), 0) ||
-        0;
-      return { date, amount: daySales };
-    });
+    const dailyData = calculateLast7DaysSales(teamSales);
     setDailySalesData(dailyData);
   };
 
@@ -399,24 +395,7 @@ export default function Dashboard({ overrideRole }) {
 
     setRecentActivities(mySales?.slice(0, 5) || []);
 
-    const last7Days = Array.from({ length: 7 }, (_, i) => {
-      const d = new Date();
-      d.setDate(d.getDate() - (6 - i));
-      return d.toISOString().split('T')[0];
-    });
-
-    const dailyData = last7Days.map((date) => {
-      const daySales =
-        mySales
-          ?.filter(
-            (s) =>
-              s.created_at?.startsWith(date) &&
-              (s.payment_status === 'cerrada' || s.payment_status === 'abonada')
-          )
-          .reduce((acc, curr) => acc + Number(curr.final_price_usd || 0), 0) ||
-        0;
-      return { date, amount: daySales };
-    });
+    const dailyData = calculateLast7DaysSales(mySales);
     setDailySalesData(dailyData);
   };
 
@@ -491,7 +470,6 @@ export default function Dashboard({ overrideRole }) {
           </span>
         </div>
 
-        {/* Botón de Nueva Nota de Entrega (Oculto para rol stock) */}
         {effectiveRole !== 'stock' && (
           <button
             onClick={handleCreateNE}
@@ -724,7 +702,6 @@ export default function Dashboard({ overrideRole }) {
           </>
         )}
 
-        {/* TARJETAS DE EQUIPO PARA GERENTE / SUPERVISOR */}
         {(effectiveRole === 'gerente' || effectiveRole === 'supervisor') && (
           <>
             <div
@@ -887,7 +864,6 @@ export default function Dashboard({ overrideRole }) {
           </>
         )}
 
-        {/* TARJETAS PARA VENDEDOR */}
         {effectiveRole === 'vendedor' && (
           <>
             <MetricCard
@@ -969,7 +945,6 @@ export default function Dashboard({ overrideRole }) {
         </div>
       </div>
 
-      {/* SECCIÓN DE GRÁFICAS Y TRANSACCIONES (Oculta para rol stock) */}
       {effectiveRole !== 'stock' && (
         <div
           style={{
@@ -1014,7 +989,7 @@ export default function Dashboard({ overrideRole }) {
                 );
                 const heightPct = (day.amount / maxVal) * 100;
                 const dayNum = day.date
-                  ? new Date(day.date).getDate()
+                  ? new Date(day.date + 'T00:00:00').getDate()
                   : idx + 1;
                 return (
                   <div
