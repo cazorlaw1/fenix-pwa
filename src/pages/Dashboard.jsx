@@ -65,8 +65,9 @@ export default function Dashboard({ overrideRole }) {
   }, [effectiveRole, profile?.id]);
 
   // --- FUNCIÓN AUXILIAR PARA FECHAS EN UTC-4 (AMERICA/CARACAS) ---
-  // Garantiza que la comparación de fechas sea consistente independientemente del navegador
-  const getUTC4DateStr = (dateObj) => {
+  // Esto evita que el navegador convierta la fecha a la zona local del usuario
+  // y cause discrepancias en los días mostrados.
+  const getLocalDateStr = (dateObj) => {
     return new Intl.DateTimeFormat('en-CA', {
       timeZone: 'America/Caracas',
       year: 'numeric',
@@ -181,14 +182,14 @@ export default function Dashboard({ overrideRole }) {
     const last7Days = Array.from({ length: 7 }, (_, i) => {
       const d = new Date();
       d.setDate(d.getDate() - (6 - i));
-      return getUTC4DateStr(d);
+      return getLocalDateStr(d);
     });
 
     const dailyData = last7Days.map((dateStr) => {
-      // Contar número de órdenes creadas en este día (UTC-4)
+      // Contar órdenes creadas en este día específico (usando UTC-4)
       const count = sales?.filter((s) => {
         if (!s.created_at) return false;
-        const orderDateStr = getUTC4DateStr(new Date(s.created_at));
+        const orderDateStr = getLocalDateStr(new Date(s.created_at));
         return orderDateStr === dateStr;
       }).length || 0;
 
@@ -345,14 +346,14 @@ export default function Dashboard({ overrideRole }) {
     const last7Days = Array.from({ length: 7 }, (_, i) => {
       const d = new Date();
       d.setDate(d.getDate() - (6 - i));
-      return getUTC4DateStr(d);
+      return getLocalDateStr(d);
     });
 
     const dailyData = last7Days.map((dateStr) => {
-      // Contar número de órdenes creadas en este día (UTC-4)
+      // Contar órdenes creadas en este día específico
       const count = teamSales?.filter((s) => {
         if (!s.created_at) return false;
-        const orderDateStr = getUTC4DateStr(new Date(s.created_at));
+        const orderDateStr = getLocalDateStr(new Date(s.created_at));
         return orderDateStr === dateStr;
       }).length || 0;
 
@@ -415,14 +416,14 @@ export default function Dashboard({ overrideRole }) {
     const last7Days = Array.from({ length: 7 }, (_, i) => {
       const d = new Date();
       d.setDate(d.getDate() - (6 - i));
-      return getUTC4DateStr(d);
+      return getLocalDateStr(d);
     });
 
     const dailyData = last7Days.map((dateStr) => {
-      // Contar número de órdenes creadas en este día (UTC-4)
+      // Contar órdenes creadas en este día específico
       const count = mySales?.filter((s) => {
         if (!s.created_at) return false;
-        const orderDateStr = getUTC4DateStr(new Date(s.created_at));
+        const orderDateStr = getLocalDateStr(new Date(s.created_at));
         return orderDateStr === dateStr;
       }).length || 0;
 
@@ -1010,31 +1011,29 @@ export default function Dashboard({ overrideRole }) {
             >
               Ventas Diarias (Últimos 7 Días)
             </h3>
-            
-            {/* CONTENEDOR DE LA GRÁFICA CORREGIDA */}
             <div
               style={{
                 display: 'flex',
                 alignItems: 'flex-end',
-                height: '140px', // Altura fija para asegurar consistencia visual
-                gap: '6px',
-                paddingBottom: '24px', // Espacio reservado para las etiquetas de fecha abajo
+                height: '120px',
+                gap: '8px',
+                paddingBottom: '10px',
                 position: 'relative',
               }}
             >
               {dailySalesData.map((day, idx) => {
-                // Calcular el máximo real de los datos actuales
+                // Calcular el máximo real de los datos
                 const maxValRaw = Math.max(...dailySalesData.map((d) => d.amount), 1);
                 
-                // Escala dinámica: Si el máximo es bajo (<5), usamos 5 como base para que las barras sean visibles
-                // pero manteniendo la proporción real. Si es >5, usamos el máximo real.
+                // Definir el valor de escala: si el máximo es bajo (<5), usamos 5 como base visual para que no se vea plano
+                // pero la barra representa el valor real.
                 const scaleBase = maxValRaw < 5 ? 5 : maxValRaw;
                 
                 // Altura porcentual basada en la escala base
                 const heightPct = (day.amount / scaleBase) * 100;
                 
-                // Formatear fecha para mostrar (ej: 27/9) usando UTC-4
-                const dateObj = new Date(day.date + 'T12:00:00'); 
+                // Formatear fecha para mostrar (ej: 27/09)
+                const dateObj = new Date(day.date + 'T12:00:00'); // Forzar mediodía para evitar problemas de DST
                 const dayLabel = `${dateObj.getDate()}/${dateObj.getMonth() + 1}`;
 
                 return (
@@ -1050,7 +1049,7 @@ export default function Dashboard({ overrideRole }) {
                       justifyContent: 'flex-end',
                     }}
                   >
-                    {/* Valor numérico sobre la barra (solo si hay dato) */}
+                    {/* Tooltip simple al hover */}
                     <div
                       style={{
                         fontSize: '10px',
@@ -1063,19 +1062,17 @@ export default function Dashboard({ overrideRole }) {
                       {day.amount}
                     </div>
                     
-                    {/* Contenedor de la barra */}
                     <div
                       style={{
                         width: '100%',
-                        backgroundColor: '#eff6ff', // Fondo tenue para mostrar el espacio "vacío" hasta el tope
+                        backgroundColor: '#eff6ff',
                         borderRadius: '4px',
-                        height: '100%', 
+                        height: '100%', // Contenedor completo
                         position: 'relative',
                         display: 'flex',
                         alignItems: 'flex-end',
                       }}
                     >
-                      {/* Barra activa */}
                       <div
                         style={{
                           width: '100%',
@@ -1087,19 +1084,7 @@ export default function Dashboard({ overrideRole }) {
                         }}
                       ></div>
                     </div>
-
-                    {/* Etiqueta de fecha posicionada absolutamente abajo */}
-                    <span 
-                      style={{ 
-                        fontSize: '9px', 
-                        color: '#6b7280', 
-                        whiteSpace: 'nowrap',
-                        position: 'absolute',
-                        bottom: '0',
-                        left: '50%',
-                        transform: 'translateX(-50%)'
-                      }}
-                    >
+                    <span style={{ fontSize: '9px', color: '#6b7280', whiteSpace: 'nowrap' }}>
                       {dayLabel}
                     </span>
                   </div>
