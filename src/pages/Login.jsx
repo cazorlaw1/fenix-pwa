@@ -29,7 +29,6 @@ export default function Login() {
         });
         if (error) throw error;
         if (data?.user) {
-          // MOSTRAR MENSAJE Y LIMPIAR CAMPOS SIN REDIRIGIR NI INICIAR SESIÓN
           setMessage(
             'Su cuenta fue registrada exitosamente. Espere la aprobación del administrador.'
           );
@@ -46,7 +45,6 @@ export default function Login() {
         if (data?.user) {
           setEmail('');
           setPassword('');
-          // REDIRIGIR SEGÚN EL ROL AL INICIAR SESIÓN
           const userProfile = await fetchProfile(data.user.id);
           if (userProfile?.role === 'pendiente' || !userProfile?.role) {
             window.location.href = '/pending';
@@ -74,73 +72,64 @@ export default function Login() {
 
   return (
     <>
-      {/* ESTILOS GLOBALES Y RESPONSIVOS */}
+      {/* ESTILOS GLOBALES PARA BLOQUEAR SCROLL Y AJUSTAR ALTURA DINÁMICA */}
       <style>{`
         html, body {
           margin: 0;
           padding: 0;
           width: 100%;
           height: 100%;
-          overflow-x: hidden; /* Evita scroll horizontal */
+          overflow: hidden !important; /* Bloquea scroll en toda la app */
+          position: fixed; /* Previene rebote en iOS */
+          width: 100%;
+          height: 100%;
         }
         
         @media (max-width: 768px) {
           .login-main-container {
+            height: 100dvh !important; /* Altura dinámica real del viewport */
+            min-height: 100dvh !important;
             padding: 0 !important;
-            min-height: 100vh !important;
-            height: 100vh !important;
-            width: 100vw !important;
-            overflow-y: auto !important;
-            overflow-x: hidden !important;
-            display: block !important; /* Cambia flex a block para permitir scroll natural si es muy largo */
+            overflow: hidden !important;
           }
           .login-card-wrapper {
-            max-width: 100% !important;
-            width: 100% !important;
-            height: auto !important;
-            min-height: 100vh !important;
+            height: 100% !important;
+            min-height: 100% !important;
             border-radius: 0 !important;
             border: none !important;
             box-shadow: none !important;
             flex-direction: column !important;
-            display: flex !important;
-            margin: 0 !important;
+            overflow: hidden !important;
           }
           .login-left-panel {
-            flex: 0 0 auto !important;
-            padding: 20px 15px !important; /* Padding reducido */
+            flex: 0 0 auto !important; /* No crece ni encoge arbitrariamente */
+            padding: 20px 15px !important; /* Padding reducido drásticamente */
             border-right: none !important;
             border-bottom: 3px solid #D4AF37 !important;
-            text-align: center !important;
-            justify-content: center !important;
-            gap: 10px !important;
+            min-height: auto !important;
           }
           .login-left-panel h1 {
-            font-size: 22px !important; /* Título más pequeño */
+            font-size: 20px !important; /* Título más pequeño */
             margin-bottom: 5px !important;
           }
           .login-left-panel p {
             font-size: 11px !important;
           }
-          .login-logo-img {
-            max-width: 100px !important; /* Logo más pequeño */
-            max-height: 100px !important;
-          }
           .login-logo-container {
             margin: 10px 0 !important;
           }
+          .login-logo-img {
+            max-width: 100px !important;
+            max-height: 100px !important;
+          }
           .login-right-panel {
-            flex: 1 1 auto !important;
+            flex: 1 1 auto !important; /* Ocupa el resto del espacio exacto */
             padding: 20px 15px !important;
-            justify-content: flex-start !important;
+            justify-content: center !important;
+            overflow: hidden !important; /* Evita scroll interno si cabe justo */
           }
           .login-form-wrapper {
             max-width: 100% !important;
-          }
-          /* Asegura que las imágenes no desborden */
-          img {
-            max-width: 100%;
-            height: auto;
           }
         }
       `}</style>
@@ -149,6 +138,7 @@ export default function Login() {
         className="login-main-container"
         style={{
           minHeight: '100vh',
+          height: '100vh', // Fallback para navegadores antiguos
           backgroundColor: '#f3f4f6',
           display: 'flex',
           alignItems: 'center',
@@ -157,7 +147,7 @@ export default function Login() {
           fontFamily: 'system-ui, -apple-system, sans-serif',
           boxSizing: 'border-box',
           width: '100%',
-          overflow: 'hidden',
+          overflow: 'hidden', // Bloqueo primario
         }}
       >
         <div
@@ -173,6 +163,7 @@ export default function Login() {
             flexWrap: 'wrap',
             border: '1px solid rgba(212, 175, 55, 0.4)',
             minHeight: '520px',
+            height: 'auto',
           }}
         >
           {/* PANEL IZQUIERDO NEGRO Y DORADO */}
