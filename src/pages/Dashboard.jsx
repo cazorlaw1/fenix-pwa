@@ -64,8 +64,9 @@ export default function Dashboard({ overrideRole }) {
     fetchDashboardData();
   }, [effectiveRole, profile?.id]);
 
-  // Función auxiliar para obtener fecha string en UTC-4 (America/Caracas)
-  const getLocalDateStr = (dateObj) => {
+  // --- FUNCIÓN AUXILIAR PARA FECHAS EN UTC-4 (AMERICA/CARACAS) ---
+  // Garantiza que la comparación de fechas sea consistente independientemente del navegador
+  const getUTC4DateStr = (dateObj) => {
     return new Intl.DateTimeFormat('en-CA', {
       timeZone: 'America/Caracas',
       year: 'numeric',
@@ -176,18 +177,18 @@ export default function Dashboard({ overrideRole }) {
 
     setRecentActivities(recentNotes || []);
 
-    // Generar datos para la gráfica basados en las ventas recuperadas (respetando filtros implícitos de admin)
+    // Generar datos para la gráfica basados en las ventas recuperadas
     const last7Days = Array.from({ length: 7 }, (_, i) => {
       const d = new Date();
       d.setDate(d.getDate() - (6 - i));
-      return getLocalDateStr(d);
+      return getUTC4DateStr(d);
     });
 
     const dailyData = last7Days.map((dateStr) => {
-      // Contar órdenes creadas en este día específico (usando UTC-4)
+      // Contar número de órdenes creadas en este día (UTC-4)
       const count = sales?.filter((s) => {
         if (!s.created_at) return false;
-        const orderDateStr = getLocalDateStr(new Date(s.created_at));
+        const orderDateStr = getUTC4DateStr(new Date(s.created_at));
         return orderDateStr === dateStr;
       }).length || 0;
 
@@ -340,18 +341,18 @@ export default function Dashboard({ overrideRole }) {
 
     setRecentActivities(teamSales?.slice(0, 5) || []);
 
-    // Generar datos para la gráfica basados en teamSales (respetando filtros de jerarquía)
+    // Generar datos para la gráfica basados en teamSales
     const last7Days = Array.from({ length: 7 }, (_, i) => {
       const d = new Date();
       d.setDate(d.getDate() - (6 - i));
-      return getLocalDateStr(d);
+      return getUTC4DateStr(d);
     });
 
     const dailyData = last7Days.map((dateStr) => {
-      // Contar órdenes creadas en este día específico
+      // Contar número de órdenes creadas en este día (UTC-4)
       const count = teamSales?.filter((s) => {
         if (!s.created_at) return false;
-        const orderDateStr = getLocalDateStr(new Date(s.created_at));
+        const orderDateStr = getUTC4DateStr(new Date(s.created_at));
         return orderDateStr === dateStr;
       }).length || 0;
 
@@ -410,18 +411,18 @@ export default function Dashboard({ overrideRole }) {
 
     setRecentActivities(mySales?.slice(0, 5) || []);
 
-    // Generar datos para la gráfica basados en mySales (respetando filtro de vendedor)
+    // Generar datos para la gráfica basados en mySales
     const last7Days = Array.from({ length: 7 }, (_, i) => {
       const d = new Date();
       d.setDate(d.getDate() - (6 - i));
-      return getLocalDateStr(d);
+      return getUTC4DateStr(d);
     });
 
     const dailyData = last7Days.map((dateStr) => {
-      // Contar órdenes creadas en este día específico
+      // Contar número de órdenes creadas en este día (UTC-4)
       const count = mySales?.filter((s) => {
         if (!s.created_at) return false;
-        const orderDateStr = getLocalDateStr(new Date(s.created_at));
+        const orderDateStr = getUTC4DateStr(new Date(s.created_at));
         return orderDateStr === dateStr;
       }).length || 0;
 
@@ -1009,45 +1010,31 @@ export default function Dashboard({ overrideRole }) {
             >
               Ventas Diarias (Últimos 7 Días)
             </h3>
+            
+            {/* CONTENEDOR DE LA GRÁFICA CORREGIDA */}
             <div
               style={{
                 display: 'flex',
                 alignItems: 'flex-end',
-                height: '120px',
-                gap: '8px',
-                paddingBottom: '10px',
+                height: '140px', // Altura fija para asegurar consistencia visual
+                gap: '6px',
+                paddingBottom: '24px', // Espacio reservado para las etiquetas de fecha abajo
                 position: 'relative',
               }}
             >
-              {/* Línea de referencia mínima (opcional para visualizar el mínimo de 5) */}
-              {dailySalesData.length > 0 && (
-                <div
-                  style={{
-                    position: 'absolute',
-                    bottom: 0,
-                    left: 0,
-                    right: 0,
-                    height: '100%',
-                    pointerEvents: 'none',
-                  }}
-                >
-                  {/* Marcadores visuales sutiles si se desea, pero mantenemos limpio */}
-                </div>
-              )}
-
               {dailySalesData.map((day, idx) => {
-                // Calcular el máximo real de los datos
+                // Calcular el máximo real de los datos actuales
                 const maxValRaw = Math.max(...dailySalesData.map((d) => d.amount), 1);
                 
-                // Definir el valor de escala: si el máximo es bajo (<5), usamos 5 como base visual para que no se vea plano
-                // pero la barra representa el valor real.
+                // Escala dinámica: Si el máximo es bajo (<5), usamos 5 como base para que las barras sean visibles
+                // pero manteniendo la proporción real. Si es >5, usamos el máximo real.
                 const scaleBase = maxValRaw < 5 ? 5 : maxValRaw;
                 
                 // Altura porcentual basada en la escala base
                 const heightPct = (day.amount / scaleBase) * 100;
                 
-                // Formatear fecha para mostrar (ej: 27/09)
-                const dateObj = new Date(day.date + 'T12:00:00'); // Forzar mediodía para evitar problemas de DST
+                // Formatear fecha para mostrar (ej: 27/9) usando UTC-4
+                const dateObj = new Date(day.date + 'T12:00:00'); 
                 const dayLabel = `${dateObj.getDate()}/${dateObj.getMonth() + 1}`;
 
                 return (
@@ -1063,7 +1050,7 @@ export default function Dashboard({ overrideRole }) {
                       justifyContent: 'flex-end',
                     }}
                   >
-                    {/* Tooltip simple al hover */}
+                    {/* Valor numérico sobre la barra (solo si hay dato) */}
                     <div
                       style={{
                         fontSize: '10px',
@@ -1076,17 +1063,19 @@ export default function Dashboard({ overrideRole }) {
                       {day.amount}
                     </div>
                     
+                    {/* Contenedor de la barra */}
                     <div
                       style={{
                         width: '100%',
-                        backgroundColor: '#eff6ff',
+                        backgroundColor: '#eff6ff', // Fondo tenue para mostrar el espacio "vacío" hasta el tope
                         borderRadius: '4px',
-                        height: '100%', // Contenedor completo
+                        height: '100%', 
                         position: 'relative',
                         display: 'flex',
                         alignItems: 'flex-end',
                       }}
                     >
+                      {/* Barra activa */}
                       <div
                         style={{
                           width: '100%',
@@ -1098,7 +1087,19 @@ export default function Dashboard({ overrideRole }) {
                         }}
                       ></div>
                     </div>
-                    <span style={{ fontSize: '9px', color: '#6b7280', whiteSpace: 'nowrap' }}>
+
+                    {/* Etiqueta de fecha posicionada absolutamente abajo */}
+                    <span 
+                      style={{ 
+                        fontSize: '9px', 
+                        color: '#6b7280', 
+                        whiteSpace: 'nowrap',
+                        position: 'absolute',
+                        bottom: '0',
+                        left: '50%',
+                        transform: 'translateX(-50%)'
+                      }}
+                    >
                       {dayLabel}
                     </span>
                   </div>
