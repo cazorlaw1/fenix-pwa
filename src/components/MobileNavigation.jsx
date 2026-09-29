@@ -34,13 +34,13 @@ export default function MobileNavigation({ isOpen, onClose }) {
       to: '/dashboard',
       label: 'Dashboard',
       icon: LayoutDashboard,
-      roles: ['administrador', 'gerente', 'supervisor', 'vendedor'],
+      roles: ['administrador', 'gerente', 'supervisor', 'vendedor', 'stock'],
     },
     {
       to: '/inventario',
       label: 'Inventario',
       icon: Package,
-      roles: ['administrador'], // ✅ Solo Administrador
+      roles: ['administrador', 'stock'],
     },
     {
       to: '/usuarios',
@@ -64,13 +64,13 @@ export default function MobileNavigation({ isOpen, onClose }) {
       to: '/ventas',
       label: 'Ventas',
       icon: ShoppingCart,
-      roles: ['administrador', 'gerente', 'supervisor', 'vendedor'],
+      roles: ['administrador', 'gerente', 'supervisor', 'vendedor', 'stock'],
     },
     {
       to: '/profile',
       label: 'Mi Perfil',
       icon: User,
-      roles: ['administrador', 'gerente', 'supervisor', 'vendedor'],
+      roles: ['administrador', 'gerente', 'supervisor', 'vendedor', 'stock'],
     },
   ];
 
