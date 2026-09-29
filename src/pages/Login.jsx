@@ -1,3 +1,4 @@
+// src/pages/Login.jsx
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
@@ -62,15 +63,13 @@ export default function Login() {
     }
   };
 
-  // LÓGICA CORREGIDA PARA GOOGLE OAUTH
- 
-const handleGoogleAuth = async () => {
+  // LÓGICA PARA GOOGLE OAUTH
+  const handleGoogleAuth = async () => {
     setLoading(true);
     try {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          // Debe coincidir exactamente con la Callback URL provista por Supabase
           redirectTo: 'https://hxlwrlzucnpdqofxjelg.supabase.co/auth/v1/callback',
           queryParams: {
             access_type: 'offline',
@@ -85,14 +84,29 @@ const handleGoogleAuth = async () => {
     }
   };
 
+  // LÓGICA DE RECUPERACIÓN DE CONTRASEÑA
   const handleResetPassword = async () => {
     if (!email) {
-      setMessage('Escribe tu correo para recuperar la contraseña.');
+      setMessage('Por favor, escribe tu correo electrónico primero para recuperar la contraseña.');
       return;
     }
-    const { error } = await supabase.auth.resetPasswordForEmail(email);
-    if (error) setMessage(error.message);
-    else setMessage('Enlace de recuperación enviado a tu correo.');
+
+    setLoading(true);
+    setMessage('');
+
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/update-password`,
+      });
+
+      if (error) throw error;
+
+      setMessage('¡Listo! Revisa tu correo electrónico. Te hemos enviado un enlace para restablecer tu contraseña.');
+    } catch (err) {
+      setMessage(err.message || 'Error al enviar el correo de recuperación.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -411,9 +425,9 @@ const handleGoogleAuth = async () => {
                   fontSize: '12px',
                   textAlign: 'center',
                   borderRadius: '10px',
-                  backgroundColor: '#fef2f2',
-                  color: '#b91c1c',
-                  border: '1px solid #fecaca',
+                  backgroundColor: message.includes('¡Listo!') ? '#f0fdf4' : '#fef2f2',
+                  color: message.includes('¡Listo!') ? '#166534' : '#b91c1c',
+                  border: `1px solid ${message.includes('¡Listo!') ? '#bbf7d0' : '#fecaca'}`,
                 }}
               >
                 {message}
