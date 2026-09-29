@@ -34,7 +34,7 @@ export default function MobileNavigation({ isOpen, onClose }) {
       to: '/dashboard',
       label: 'Dashboard',
       icon: LayoutDashboard,
-      roles: ['administrador', 'gerente', 'supervisor', 'vendedor', 'stock'],
+      roles: ['administrador', 'gerente', 'supervisor', 'vendedor'],
     },
     {
       to: '/inventario',
@@ -64,7 +64,7 @@ export default function MobileNavigation({ isOpen, onClose }) {
       to: '/ventas',
       label: 'Ventas',
       icon: ShoppingCart,
-      roles: ['administrador', 'gerente', 'supervisor', 'vendedor', 'stock'],
+      roles: ['administrador', 'gerente', 'supervisor', 'vendedor'],
     },
     {
       to: '/profile',
