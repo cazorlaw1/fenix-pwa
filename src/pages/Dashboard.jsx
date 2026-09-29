@@ -159,7 +159,7 @@ export default function Dashboard({ overrideRole }) {
       totalClients: 0,
     });
 
-    // Obtener últimas 5 transacciones para mostrar
+    // Obtener últimas 5 transacciones para mostrar en la lista
     const { data: recentNotes } = await supabase
       .from('sales_orders')
       .select('*, client:client_id(name), seller:seller_id(full_name)')
