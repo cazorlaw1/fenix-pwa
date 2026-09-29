@@ -74,37 +74,62 @@ export default function Login() {
 
   return (
     <>
-      {/* ESTILOS RESPONSIVOS PARA MÓVIL */}
+      {/* ESTILOS GLOBALES PARA EVITAR SCROLL LATERAL Y AJUSTES MÓVILES */}
       <style>{`
+        html, body {
+          margin: 0;
+          padding: 0;
+          width: 100%;
+          height: 100%;
+          overflow-x: hidden; /* Evita scroll horizontal */
+        }
+        
         @media (max-width: 768px) {
           .login-main-container {
             padding: 0 !important;
-          }
-          .login-card {
-            max-width: 100% !important;
-            width: 100vw !important;
-            height: 100vh !important;
             min-height: 100vh !important;
+            height: 100vh !important;
+            width: 100vw !important;
+            overflow-y: auto !important; /* Permite scroll vertical si es necesario */
+            overflow-x: hidden !important;
+          }
+          .login-card-wrapper {
+            max-width: 100% !important;
+            width: 100% !important;
+            height: auto !important;
+            min-height: 100% !important;
             border-radius: 0 !important;
             border: none !important;
+            box-shadow: none !important;
             flex-direction: column !important;
-            overflow-y: auto !important;
+            display: flex !important;
           }
           .login-left-panel {
             flex: 0 0 auto !important;
-            padding: 24px 20px !important;
+            padding: 40px 20px !important;
             border-right: none !important;
             border-bottom: 4px solid #D4AF37 !important;
-            min-height: auto !important;
+            text-align: center !important; /* Centra todo el contenido del panel izquierdo */
+          }
+          .login-left-panel h1, 
+          .login-left-panel p {
+            text-align: center !important;
+          }
+          .login-logo-container {
+            margin: 20px 0 !important;
           }
           .login-right-panel {
             flex: 1 1 auto !important;
-            padding: 24px 20px !important;
+            padding: 30px 20px !important;
             justify-content: flex-start !important;
           }
-          .login-logo-img {
-            max-width: 100px !important;
-            max-height: 100px !important;
+          .login-form-wrapper {
+            max-width: 100% !important;
+          }
+          /* Asegura que las imágenes no desborden */
+          img {
+            max-width: 100%;
+            height: auto;
           }
         }
       `}</style>
@@ -120,10 +145,12 @@ export default function Login() {
           padding: '20px',
           fontFamily: 'system-ui, -apple-system, sans-serif',
           boxSizing: 'border-box',
+          width: '100%',
+          overflow: 'hidden', // Previene scroll en escritorio también si es necesario
         }}
       >
         <div
-          className="login-card"
+          className="login-card-wrapper"
           style={{
             width: '100%',
             maxWidth: '850px',
@@ -161,6 +188,7 @@ export default function Login() {
                   margin: '0 0 10px 0',
                   color: '#ffffff',
                   textTransform: 'uppercase',
+                  textAlign: 'left', // Por defecto izquierda, en móvil se centra con CSS
                 }}
               >
                 {isRegistering ? 'REGISTRO' : 'INICIAR SESIÓN'}
@@ -171,6 +199,7 @@ export default function Login() {
                   color: '#9ca3af',
                   lineHeight: '1.6',
                   margin: 0,
+                  textAlign: 'left', // Por defecto izquierda
                 }}
               >
                 Bienvenido a{' '}
@@ -180,7 +209,9 @@ export default function Login() {
                 . Gestión de repuestos automotrices.
               </p>
             </div>
+            
             <div
+              className="login-logo-container"
               style={{
                 display: 'flex',
                 flexDirection: 'column',
@@ -190,7 +221,6 @@ export default function Login() {
               }}
             >
               <img
-                className="login-logo-img"
                 src="/logo.png"
                 alt="Logo Fenix Auto Part"
                 style={{
@@ -235,6 +265,7 @@ export default function Login() {
                 </div>
               </div>
             </div>
+            
             <div>
               <p
                 style={{
@@ -261,6 +292,7 @@ export default function Login() {
               </p>
             </div>
           </div>
+
           {/* PANEL DERECHO - FORMULARIO */}
           <div
             className="login-right-panel"
@@ -340,6 +372,7 @@ export default function Login() {
                 Iniciar Sesión
               </button>
             </div>
+
             {message && (
               <div
                 style={{
@@ -356,8 +389,10 @@ export default function Login() {
                 {message}
               </div>
             )}
+
             <form
               onSubmit={handleAuth}
+              className="login-form-wrapper"
               style={{
                 display: 'flex',
                 flexDirection: 'column',
@@ -410,6 +445,7 @@ export default function Login() {
                   />
                 </div>
               )}
+
               <div
                 style={{
                   display: 'flex',
@@ -451,6 +487,7 @@ export default function Login() {
                   onChange={(e) => setEmail(e.target.value)}
                 />
               </div>
+
               {/* CONTRASEÑA CON OJITO */}
               <div
                 style={{
@@ -534,6 +571,7 @@ export default function Login() {
                   )}
                 </button>
               </div>
+
               {!isRegistering && (
                 <div style={{ textAlign: 'right' }}>
                   <button
@@ -553,6 +591,7 @@ export default function Login() {
                   </button>
                 </div>
               )}
+
               <button
                 type="submit"
                 disabled={loading}
@@ -580,6 +619,7 @@ export default function Login() {
                   : 'Iniciar Sesión'}
               </button>
             </form>
+
             <div
               style={{
                 display: 'flex',
@@ -607,7 +647,9 @@ export default function Login() {
                 style={{ height: '1px', backgroundColor: '#e5e7eb', flex: 1 }}
               ></span>
             </div>
+
             <div
+              className="login-form-wrapper"
               style={{
                 maxWidth: '320px',
                 margin: '0 auto',
