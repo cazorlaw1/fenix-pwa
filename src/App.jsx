@@ -1,5 +1,5 @@
 // src/App.jsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   BrowserRouter as Router,
   Routes,
@@ -12,7 +12,6 @@ import ProtectedRoute from './components/ProtectedRoute';
 import Header from './components/Header';
 import Sidebar from './components/Sidebar';
 import MobileNavigation from './components/MobileNavigation';
-
 // Páginas
 import Dashboard from './pages/Dashboard';
 import Login from './pages/Login';
@@ -23,18 +22,64 @@ import Inventory from './pages/Inventory';
 import AdminModule from './pages/AdminModule';
 import Vendedores from './pages/Vendedores';
 import SalesModule from './pages/SalesModule';
+import { supabase } from './lib/supabase';
+
+// Componente interno para manejar el callback de Google y evitar pantalla blanca
+function AuthCallback() {
+  const navigate = useNavigate();
+  const { fetchProfile } = useAuth();
+
+  useEffect(() => {
+    const handleCallback = async () => {
+      try {
+        // Obtener sesión tras el redirect de Google
+        const { data: { session }, error } = await supabase.auth.getSession();
+        
+        if (error || !session) {
+          console.error('Error en callback de auth:', error);
+          navigate('/login');
+          return;
+        }
+
+        // Verificar perfil y redirigir según rol
+        const userProfile = await fetchProfile(session.user.id);
+        
+        if (userProfile?.role === 'pendiente' || !userProfile?.role) {
+          navigate('/pending');
+        } else {
+          navigate('/');
+        }
+      } catch (err) {
+        console.error('Error procesando callback:', err);
+        navigate('/login');
+      }
+    };
+
+    handleCallback();
+  }, [navigate, fetchProfile]);
+
+  return (
+    <div style={{ 
+      display: 'flex', 
+      alignItems: 'center', 
+      justifyContent: 'center', 
+      height: '100vh',
+      fontFamily: 'system-ui, sans-serif',
+      color: '#6b7280'
+    }}>
+      <p>Verificando credenciales de Google...</p>
+    </div>
+  );
+}
 
 function Layout({ children, activeTab, setActiveTab }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-
   const handleOpenMobileMenu = () => {
     setIsMobileMenuOpen(true);
   };
-
   const handleCloseMobileMenu = () => {
     setIsMobileMenuOpen(false);
   };
-
   return (
     <div
       style={{
@@ -52,7 +97,6 @@ function Layout({ children, activeTab, setActiveTab }) {
       <div className="desktop-sidebar-wrapper">
         <Sidebar />
       </div>
-
       <div
         style={{
           flex: 1,
@@ -79,13 +123,11 @@ function Layout({ children, activeTab, setActiveTab }) {
           {children}
         </main>
       </div>
-
       {/* Menú Lateral Desplegable en Móvil */}
       <MobileNavigation
         isOpen={isMobileMenuOpen}
         onClose={handleCloseMobileMenu}
       />
-
       <style>{`
         * {
           box-sizing: border-box;
@@ -98,7 +140,6 @@ function Layout({ children, activeTab, setActiveTab }) {
           overflow: hidden;
           font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
         }
-
         @media (max-width: 768px) {
           .desktop-sidebar-wrapper { display: none !important; }
         }
@@ -122,11 +163,9 @@ function DashboardWrapper() {
 function VendedoresWrapper() {
   const { user } = useAuth();
   const navigate = useNavigate();
-
   const handleSelectSellerHistory = (vendedor) => {
     navigate(`/ventas/historial?sellerId=${vendedor.id}`);
   };
-
   return (
     <Layout>
       <Vendedores
@@ -144,7 +183,9 @@ export default function App() {
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/pending" element={<PendingApproval />} />
-
+          {/* Ruta pública para manejar el retorno de Google */}
+          <Route path="/auth/callback" element={<AuthCallback />} />
+          
           <Route element={<ProtectedRoute />}>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard" element={<DashboardWrapper />} />

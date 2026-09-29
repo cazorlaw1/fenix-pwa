@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext';
 
 export default function Login() {
   const navigate = useNavigate();
-  const { fetchProfile } = useAuth(); // Ya no usamos loginWithGoogle del contexto directamente aquí
+  const { fetchProfile } = useAuth();
   const [isRegistering, setIsRegistering] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -14,7 +14,6 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
 
-  // LÓGICA DE AUTENTICACIÓN MANUAL (EMAIL/PASSWORD)
   const handleAuth = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -24,7 +23,9 @@ export default function Login() {
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
-          options: { data: { full_name: fullName } },
+          options: {
+            data: { full_name: fullName },
+          },
         });
         if (error) throw error;
         if (data?.user) {
@@ -59,47 +60,20 @@ export default function Login() {
     }
   };
 
-  // NUEVA LÓGICA INTELIGENTE PARA GOOGLE (Basada en tu CSV de profiles)
+  // Lógica directa para Google OAuth sin depender del contexto
   const handleGoogleAuth = async () => {
-    // 1. Validar que haya un correo escrito para poder buscarlo
-    if (!email) {
-      setMessage(
-        'Por favor, ingresa tu correo electrónico antes de continuar con Google para verificar tu cuenta.'
-      );
-      return;
-    }
-
     setLoading(true);
-    setMessage('Verificando credenciales...');
-
     try {
-      // 2. Consultar si el correo ya existe en la tabla 'profiles'
-      // Usamos .single() y capturamos el error PGRST116 (no rows returned) como caso válido
-      const { data: existingUser, error: checkError } = await supabase
-        .from('profiles')
-        .select('id, role')
-        .eq('email', email.toLowerCase().trim())
-        .single();
-
-      if (checkError && checkError.code !== 'PGRST116') {
-        // Si es un error distinto a "no encontrado", lanzamos excepción
-        throw checkError;
-      }
-
-      // 3. Ejecutar OAuth. Supabase maneja automáticamente el merge si el email coincide
-      // con uno existente en auth.users. La consulta previa nos sirve para validar
-      // y mostrar mensajes personalizados si fuera necesario en el futuro.
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: window.location.origin + '/',
+          redirectTo: `${window.location.origin}/auth/callback`,
           queryParams: {
             access_type: 'offline',
             prompt: 'consent',
           },
         },
       });
-
       if (error) throw error;
     } catch (err) {
       setMessage(err.message || 'Error al conectar con Google');
@@ -260,7 +234,7 @@ export default function Login() {
                 . Gestión de repuestos automotrices.
               </p>
             </div>
-
+            
             <div
               className="login-logo-container"
               style={{
@@ -317,7 +291,7 @@ export default function Login() {
                 </div>
               </div>
             </div>
-
+            
             <div>
               <p
                 style={{
@@ -710,7 +684,7 @@ export default function Login() {
             >
               <button
                 type="button"
-                onClick={handleGoogleAuth} // CAMBIO CLAVE: Usamos la función inteligente
+                onClick={handleGoogleAuth}
                 disabled={loading}
                 style={{
                   width: '100%',
