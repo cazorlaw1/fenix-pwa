@@ -63,14 +63,15 @@ export default function Login() {
   };
 
   // LÓGICA CORREGIDA PARA GOOGLE OAUTH
-  // Usa la ruta nativa /auth/v1/callback para coincidir con Google Cloud Console
-  const handleGoogleAuth = async () => {
+ 
+const handleGoogleAuth = async () => {
     setLoading(true);
     try {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: 'https://www.fenixautopartes.com/auth/v1/callback',
+          // Debe coincidir exactamente con la Callback URL provista por Supabase
+          redirectTo: 'https://hxlwrlzucnpdqofxjelg.supabase.co/auth/v1/callback',
           queryParams: {
             access_type: 'offline',
             prompt: 'consent',
