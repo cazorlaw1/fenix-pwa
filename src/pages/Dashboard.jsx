@@ -15,9 +15,37 @@ import {
   Clock,
 } from 'lucide-react';
 
+// Hook para detectar el tamaño de ventana
+function useWindowSize() {
+  const [windowSize, setWindowSize] = useState({
+    width: typeof window !== 'undefined' ? window.innerWidth : 0,
+    height: typeof window !== 'undefined' ? window.innerHeight : 0,
+  });
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    function handleResize() {
+      setWindowSize({
+        width: window.innerWidth,
+        height: window.innerHeight,
+      });
+    }
+
+    window.addEventListener('resize', handleResize);
+    handleResize();
+
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  return windowSize;
+}
+
 export default function Dashboard({ overrideRole }) {
   const { profile, user } = useAuth();
   const [loading, setLoading] = useState(true);
+  const { width } = useWindowSize();
+  const isMobile = width < 768;
 
   // Determinar rol efectivo
   const userRole =
@@ -44,7 +72,6 @@ export default function Dashboard({ overrideRole }) {
     pendingNE: 0,
     pendingPayments: 0,
   });
-
   // Métricas de Equipo (Gerente / Supervisor inspiradas en Vendedores.jsx)
   const [teamStats, setTeamStats] = useState({
     activeSellers: 0,
@@ -56,7 +83,6 @@ export default function Dashboard({ overrideRole }) {
     visits: 0,
     potentials: 0,
   });
-
   // Estado para Gráfica Simple (Ventas Diarias últimos 7 días)
   const [dailySalesData, setDailySalesData] = useState([]);
 
@@ -191,7 +217,6 @@ export default function Dashboard({ overrideRole }) {
         const orderDateStr = getLocalDateStr(new Date(s.created_at));
         return orderDateStr === dateStr;
       }).length || 0;
-
       return { date: dateStr, amount: count };
     });
 
@@ -201,6 +226,7 @@ export default function Dashboard({ overrideRole }) {
   // --- LÓGICA GERENTE/SUPERVISOR (FILTROS IDÉNTICOS A VENDEDORES.JSX) ---
   const fetchManagerData = async () => {
     let subordinateIds = [];
+
     const { data: cfg } = await supabase
       .from('hierarchy_config')
       .select('*')
@@ -241,6 +267,7 @@ export default function Dashboard({ overrideRole }) {
     );
 
     let filteredProfiles = [];
+
     if (globalConfig && globalConfig.is_global) {
       const exceptionIds = assignments
         .filter((a) => a.is_exception)
@@ -355,7 +382,6 @@ export default function Dashboard({ overrideRole }) {
         const orderDateStr = getLocalDateStr(new Date(s.created_at));
         return orderDateStr === dateStr;
       }).length || 0;
-
       return { date: dateStr, amount: count };
     });
 
@@ -425,7 +451,6 @@ export default function Dashboard({ overrideRole }) {
         const orderDateStr = getLocalDateStr(new Date(s.created_at));
         return orderDateStr === dateStr;
       }).length || 0;
-
       return { date: dateStr, amount: count };
     });
 
@@ -462,19 +487,21 @@ export default function Dashboard({ overrideRole }) {
   return (
     <div
       style={{
-        padding: '16px',
+        padding: isMobile ? '12px' : '16px',
         backgroundColor: '#f9fafb',
         minHeight: 'calc(100vh - 120px)',
         paddingBottom: '80px',
         fontFamily: 'system-ui, -apple-system, sans-serif',
+        overflowX: 'hidden',
       }}
     >
+      {/* ENCABEZADO: Nombre y rol */}
       <div
         style={{
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          marginBottom: '16px',
+          marginBottom: isMobile ? '10px' : '16px',
           flexWrap: 'wrap',
           gap: '10px',
         }}
@@ -482,7 +509,7 @@ export default function Dashboard({ overrideRole }) {
         <div>
           <h1
             style={{
-              fontSize: '24px',
+              fontSize: isMobile ? '20px' : '24px',
               fontWeight: '800',
               color: '#111827',
               margin: 0,
@@ -503,8 +530,8 @@ export default function Dashboard({ overrideRole }) {
           </span>
         </div>
 
-        {/* Botón de Nueva Nota de Entrega (Oculto para rol stock) */}
-        {effectiveRole !== 'stock' && (
+        {/* Botón de Nueva Nota de Entrega - Solo escritorio aquí */}
+        {effectiveRole !== 'stock' && !isMobile && (
           <button
             onClick={handleCreateNE}
             style={{
@@ -520,6 +547,7 @@ export default function Dashboard({ overrideRole }) {
               fontWeight: '700',
               cursor: 'pointer',
               boxShadow: '0 2px 4px rgba(220, 38, 38, 0.2)',
+              whiteSpace: 'nowrap',
             }}
           >
             <Plus size={16} /> Nueva Nota de Entrega
@@ -527,14 +555,132 @@ export default function Dashboard({ overrideRole }) {
         )}
       </div>
 
+      {/* FILA MÓVIL: Accesos rápidos + Botón Crear Nota (mismo tamaño, misma fila) */}
+      {isMobile && effectiveRole !== 'stock' && (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            marginBottom: '14px',
+            overflowX: 'auto',
+            paddingBottom: '4px',
+          }}
+        >
+          {/* Botón Crear Nota con mismo estilo que los accesos rápidos */}
+          <button
+            onClick={handleCreateNE}
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '4px',
+              padding: '8px',
+              backgroundColor: '#DC2626',
+              border: '1px solid #DC2626',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              minWidth: '70px',
+              flex: '0 0 auto',
+            }}
+          >
+            <div style={{ color: '#fff' }}>
+              <Plus size={14} />
+            </div>
+            <span
+              style={{
+                fontSize: '9px',
+                textAlign: 'center',
+                color: '#fff',
+                fontWeight: '600',
+              }}
+            >
+              Nueva NE
+            </span>
+          </button>
+
+          {effectiveRole === 'administrador' && (
+            <>
+              <QuickLinkMobile
+                label="Cobranza"
+                icon={<DollarSign size={14} />}
+                color="#059669"
+                onClick={() => (window.location.href = '/administrativo')}
+              />
+              <QuickLinkMobile
+                label="Usuarios"
+                icon={<Users size={14} />}
+                color="#2563EB"
+                onClick={() => (window.location.href = '/usuarios')}
+              />
+              <QuickLinkMobile
+                label="Inventario"
+                icon={<Package size={14} />}
+                color="#7c3aed"
+                onClick={() => (window.location.href = '/inventario')}
+              />
+            </>
+          )}
+          {(effectiveRole === 'gerente' || effectiveRole === 'supervisor') && (
+            <>
+              <QuickLinkMobile
+                label="Visitas"
+                icon={<MapPin size={14} />}
+                color="#2563EB"
+                onClick={() => (window.location.href = '/vendedores')}
+              />
+              <QuickLinkMobile
+                label="Reportes"
+                icon={<FileText size={14} />}
+                color="#7c3aed"
+                onClick={() => (window.location.href = '/vendedores')}
+              />
+              <QuickLinkMobile
+                label="Comisiones"
+                icon={<DollarSign size={14} />}
+                color="#059669"
+                onClick={() => (window.location.href = '/vendedores')}
+              />
+            </>
+          )}
+          {effectiveRole === 'vendedor' && (
+            <>
+              <QuickLinkMobile
+                label="Clientes"
+                icon={<Users size={14} />}
+                color="#2563EB"
+                onClick={() => (window.location.href = '/ventas')}
+              />
+              <QuickLinkMobile
+                label="N.E."
+                icon={<FileText size={14} />}
+                color="#7c3aed"
+                onClick={() => (window.location.href = '/ventas')}
+              />
+              <QuickLinkMobile
+                label="Potenciales"
+                icon={<UserCheck size={14} />}
+                color="#16A34A"
+                onClick={() => (window.location.href = '/ventas')}
+              />
+            </>
+          )}
+        </div>
+      )}
+
+      {/* GRID DE TARJETAS DE MÉTRICAS */}
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-          gap: '12px',
+          gridTemplateColumns: isMobile
+            ? 'repeat(3, 1fr)'
+            : 'repeat(auto-fit, minmax(200px, 1fr))',
+          gap: isMobile ? '8px' : '12px',
           marginBottom: '20px',
         }}
       >
+        {/* --- TARJETAS ADMINISTRADOR --- */}
         {effectiveRole === 'administrador' && (
           <div
             style={{
@@ -543,45 +689,60 @@ export default function Dashboard({ overrideRole }) {
               border: `1px solid ${
                 adminAlerts.pendingUsers > 0 ? '#FECACA' : '#BBF7D0'
               }`,
-              borderRadius: '12px',
-              padding: '14px',
+              borderRadius: isMobile ? '10px' : '12px',
+              padding: isMobile ? '10px' : '14px',
               display: 'flex',
+              flexDirection: 'column',
               alignItems: 'center',
-              gap: '12px',
+              justifyContent: 'center',
+              gap: isMobile ? '6px' : '0',
+              aspectRatio: isMobile ? '1' : 'auto',
             }}
           >
+            {/* Icono al lado del título, centrados */}
             <div
               style={{
-                backgroundColor:
-                  adminAlerts.pendingUsers > 0 ? '#FEE2E2' : '#DCFCE7',
-                padding: '8px',
-                borderRadius: '8px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '4px',
               }}
             >
-              <UserCheck
-                size={20}
-                color={adminAlerts.pendingUsers > 0 ? '#DC2626' : '#16A34A'}
-              />
-            </div>
-            <div>
               <div
                 style={{
-                  fontSize: '11px',
+                  backgroundColor:
+                    adminAlerts.pendingUsers > 0 ? '#FEE2E2' : '#DCFCE7',
+                  padding: isMobile ? '4px' : '8px',
+                  borderRadius: '8px',
+                  display: 'flex',
+                  alignItems: 'center',
+                }}
+              >
+                <UserCheck
+                  size={isMobile ? 14 : 20}
+                  color={adminAlerts.pendingUsers > 0 ? '#DC2626' : '#16A34A'}
+                />
+              </div>
+              <div
+                style={{
+                  fontSize: isMobile ? '8px' : '11px',
                   color: '#6b7280',
                   fontWeight: '600',
+                  textAlign: 'center',
                 }}
               >
-                Usuarios Pendientes
+                {isMobile ? 'Pend.' : 'Usuarios Pendientes'}
               </div>
-              <div
-                style={{
-                  fontSize: '18px',
-                  fontWeight: '800',
-                  color: adminAlerts.pendingUsers > 0 ? '#DC2626' : '#166534',
-                }}
-              >
-                {adminAlerts.pendingUsers}
-              </div>
+            </div>
+            <div
+              style={{
+                fontSize: isMobile ? '18px' : '18px',
+                fontWeight: '800',
+                color: adminAlerts.pendingUsers > 0 ? '#DC2626' : '#166534',
+                textAlign: 'center',
+              }}
+            >
+              {adminAlerts.pendingUsers}
             </div>
           </div>
         )}
@@ -595,49 +756,63 @@ export default function Dashboard({ overrideRole }) {
               border: `1px solid ${
                 adminAlerts.pendingNE > 0 ? '#FECACA' : '#BBF7D0'
               }`,
-              borderRadius: '12px',
-              padding: '14px',
+              borderRadius: isMobile ? '10px' : '12px',
+              padding: isMobile ? '10px' : '14px',
               display: 'flex',
+              flexDirection: 'column',
               alignItems: 'center',
-              gap: '12px',
+              justifyContent: 'center',
+              gap: isMobile ? '6px' : '0',
               cursor: adminAlerts.pendingNE > 0 ? 'pointer' : 'default',
               transition: 'transform 0.2s',
+              aspectRatio: isMobile ? '1' : 'auto',
             }}
           >
             <div
               style={{
-                backgroundColor:
-                  adminAlerts.pendingNE > 0 ? '#FEE2E2' : '#DCFCE7',
-                padding: '8px',
-                borderRadius: '8px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '4px',
               }}
             >
-              <Clock
-                size={20}
-                color={adminAlerts.pendingNE > 0 ? '#DC2626' : '#16A34A'}
-              />
-            </div>
-            <div style={{ flex: 1 }}>
               <div
                 style={{
-                  fontSize: '11px',
+                  backgroundColor:
+                    adminAlerts.pendingNE > 0 ? '#FEE2E2' : '#DCFCE7',
+                  padding: isMobile ? '4px' : '8px',
+                  borderRadius: '8px',
+                  display: 'flex',
+                  alignItems: 'center',
+                }}
+              >
+                <Clock
+                  size={isMobile ? 14 : 20}
+                  color={adminAlerts.pendingNE > 0 ? '#DC2626' : '#16A34A'}
+                />
+              </div>
+              <div
+                style={{
+                  fontSize: isMobile ? '8px' : '11px',
                   color: '#6b7280',
                   fontWeight: '600',
+                  textAlign: 'center',
                 }}
               >
-                N.E. por Aprobar
-              </div>
-              <div
-                style={{
-                  fontSize: '18px',
-                  fontWeight: '800',
-                  color: adminAlerts.pendingNE > 0 ? '#DC2626' : '#166534',
-                }}
-              >
-                {adminAlerts.pendingNE}
+                {isMobile ? 'N.E. Pend.' : 'N.E. por Aprobar'}
               </div>
             </div>
-            {adminAlerts.pendingNE > 0 && (
+            <div
+              style={{
+                fontSize: isMobile ? '18px' : '18px',
+                fontWeight: '800',
+                color: adminAlerts.pendingNE > 0 ? '#DC2626' : '#166534',
+                textAlign: 'center',
+              }}
+            >
+              {adminAlerts.pendingNE}
+            </div>
+            {adminAlerts.pendingNE > 0 && !isMobile && (
               <div
                 style={{
                   fontSize: '10px',
@@ -661,50 +836,67 @@ export default function Dashboard({ overrideRole }) {
               border: `1px solid ${
                 adminAlerts.pendingPayments > 0 ? '#FDE68A' : '#BBF7D0'
               }`,
-              borderRadius: '12px',
-              padding: '14px',
+              borderRadius: isMobile ? '10px' : '12px',
+              padding: isMobile ? '10px' : '14px',
               display: 'flex',
+              flexDirection: 'column',
               alignItems: 'center',
-              gap: '12px',
-              cursor: adminAlerts.pendingPayments > 0 ? 'pointer' : 'default',
+              justifyContent: 'center',
+              gap: isMobile ? '6px' : '0',
+              cursor:
+                adminAlerts.pendingPayments > 0 ? 'pointer' : 'default',
               transition: 'transform 0.2s',
+              aspectRatio: isMobile ? '1' : 'auto',
             }}
           >
             <div
               style={{
-                backgroundColor:
-                  adminAlerts.pendingPayments > 0 ? '#FEF3C7' : '#DCFCE7',
-                padding: '8px',
-                borderRadius: '8px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '4px',
               }}
             >
-              <Bell
-                size={20}
-                color={adminAlerts.pendingPayments > 0 ? '#B45309' : '#16A34A'}
-              />
-            </div>
-            <div style={{ flex: 1 }}>
               <div
                 style={{
-                  fontSize: '11px',
+                  backgroundColor:
+                    adminAlerts.pendingPayments > 0 ? '#FEF3C7' : '#DCFCE7',
+                  padding: isMobile ? '4px' : '8px',
+                  borderRadius: '8px',
+                  display: 'flex',
+                  alignItems: 'center',
+                }}
+              >
+                <Bell
+                  size={isMobile ? 14 : 20}
+                  color={
+                    adminAlerts.pendingPayments > 0 ? '#B45309' : '#16A34A'
+                  }
+                />
+              </div>
+              <div
+                style={{
+                  fontSize: isMobile ? '8px' : '11px',
                   color: '#6b7280',
                   fontWeight: '600',
+                  textAlign: 'center',
                 }}
               >
-                Notif. Abono Pend.
-              </div>
-              <div
-                style={{
-                  fontSize: '18px',
-                  fontWeight: '800',
-                  color:
-                    adminAlerts.pendingPayments > 0 ? '#B45309' : '#166534',
-                }}
-              >
-                {adminAlerts.pendingPayments}
+                {isMobile ? 'Abonos' : 'Notif. Abono Pend.'}
               </div>
             </div>
-            {adminAlerts.pendingPayments > 0 && (
+            <div
+              style={{
+                fontSize: isMobile ? '18px' : '18px',
+                fontWeight: '800',
+                color:
+                  adminAlerts.pendingPayments > 0 ? '#B45309' : '#166534',
+                textAlign: 'center',
+              }}
+            >
+              {adminAlerts.pendingPayments}
+            </div>
+            {adminAlerts.pendingPayments > 0 && !isMobile && (
               <div
                 style={{
                   fontSize: '10px',
@@ -722,46 +914,54 @@ export default function Dashboard({ overrideRole }) {
         {effectiveRole === 'administrador' && (
           <>
             <MetricCard
-              title="Ventas Totales (30d)"
+              title={isMobile ? 'Ventas (30d)' : 'Ventas Totales (30d)'}
               value={`$${metrics.totalSales?.toFixed(2) || 0}`}
-              icon={<DollarSign size={18} />}
+              icon={<DollarSign size={isMobile ? 14 : 18} />}
               color="#111827"
+              isMobile={isMobile}
             />
             <MetricCard
-              title="Por Cobrar Global"
+              title={isMobile ? 'Por Cobrar' : 'Por Cobrar Global'}
               value={`$${metrics.pendingCobranza?.toFixed(2) || 0}`}
-              icon={<AlertCircle size={18} />}
+              icon={<AlertCircle size={isMobile ? 14 : 18} />}
               color="#DC2626"
+              isMobile={isMobile}
             />
           </>
         )}
 
-        {/* TARJETAS DE EQUIPO PARA GERENTE / SUPERVISOR */}
+        {/* --- TARJETAS DE EQUIPO PARA GERENTE / SUPERVISOR --- */}
         {(effectiveRole === 'gerente' || effectiveRole === 'supervisor') && (
           <>
             <div
               style={{
                 backgroundColor: '#ffffff',
                 border: '1px solid #e5e7eb',
-                borderRadius: '12px',
-                padding: '14px',
+                borderRadius: isMobile ? '10px' : '12px',
+                padding: isMobile ? '10px' : '14px',
                 boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                aspectRatio: isMobile ? '1' : 'auto',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'center',
+                alignItems: 'center',
               }}
             >
               <div
                 style={{
-                  fontSize: '10px',
+                  fontSize: isMobile ? '9px' : '10px',
                   color: '#6b7280',
                   fontWeight: '700',
                   textTransform: 'uppercase',
                   marginBottom: '4px',
+                  textAlign: 'center',
                 }}
               >
-                Vendedores Activos
+                {isMobile ? 'Vend.' : 'Vendedores Activos'}
               </div>
               <div
                 style={{
-                  fontSize: '20px',
+                  fontSize: isMobile ? '18px' : '20px',
                   fontWeight: '800',
                   color: '#111827',
                 }}
@@ -769,9 +969,14 @@ export default function Dashboard({ overrideRole }) {
                 {teamStats.activeSellers}
               </div>
               <div
-                style={{ fontSize: '10px', color: '#6b7280', marginTop: '2px' }}
+                style={{
+                  fontSize: isMobile ? '9px' : '10px',
+                  color: '#6b7280',
+                  marginTop: '2px',
+                  textAlign: 'center',
+                }}
               >
-                En estructura
+                {isMobile ? 'Activos' : 'En estructura'}
               </div>
             </div>
 
@@ -779,49 +984,57 @@ export default function Dashboard({ overrideRole }) {
               style={{
                 backgroundColor: '#ffffff',
                 border: '1px solid #e5e7eb',
-                borderRadius: '12px',
-                padding: '14px',
+                borderRadius: isMobile ? '10px' : '12px',
+                padding: isMobile ? '10px' : '14px',
                 boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                aspectRatio: isMobile ? '1' : 'auto',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'center',
+                alignItems: 'center',
               }}
             >
               <div
                 style={{
-                  fontSize: '10px',
+                  fontSize: isMobile ? '9px' : '10px',
                   color: '#6b7280',
                   fontWeight: '700',
                   textTransform: 'uppercase',
                   marginBottom: '4px',
+                  textAlign: 'center',
                 }}
               >
-                Meta vs Alcanzado
+                {isMobile ? 'Meta' : 'Meta vs Alcanzado'}
               </div>
               <div
                 style={{
-                  fontSize: '18px',
+                  fontSize: isMobile ? '14px' : '18px',
                   fontWeight: '800',
                   color: '#111827',
+                  textAlign: 'center',
                 }}
               >
-                ${teamStats.achievedSales?.toFixed(2) || 0}{' '}
+                ${teamStats.achievedSales?.toFixed(0) || 0}{' '}
                 <span
                   style={{
                     color: '#9ca3af',
                     fontWeight: '400',
-                    fontSize: '14px',
+                    fontSize: isMobile ? '11px' : '14px',
                   }}
                 >
-                  / ${teamStats.totalGoal}
+                  / {teamStats.totalGoal}
                 </span>
               </div>
               <div
                 style={{
-                  fontSize: '10px',
+                  fontSize: isMobile ? '9px' : '10px',
                   color: '#16a34a',
                   fontWeight: '600',
                   marginTop: '2px',
+                  textAlign: 'center',
                 }}
               >
-                {teamStats.goalProgress?.toFixed(0) || 0}% Completado
+                {teamStats.goalProgress?.toFixed(0) || 0}%
               </div>
             </div>
 
@@ -829,25 +1042,31 @@ export default function Dashboard({ overrideRole }) {
               style={{
                 backgroundColor: '#ffffff',
                 border: '1px solid #16a34a',
-                borderRadius: '12px',
-                padding: '14px',
+                borderRadius: isMobile ? '10px' : '12px',
+                padding: isMobile ? '10px' : '14px',
                 boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                aspectRatio: isMobile ? '1' : 'auto',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'center',
+                alignItems: 'center',
               }}
             >
               <div
                 style={{
-                  fontSize: '10px',
+                  fontSize: isMobile ? '9px' : '10px',
                   color: '#16a34a',
                   fontWeight: '700',
                   textTransform: 'uppercase',
                   marginBottom: '4px',
+                  textAlign: 'center',
                 }}
               >
-                N.E. Cerradas
+                {isMobile ? 'Cerradas' : 'N.E. Cerradas'}
               </div>
               <div
                 style={{
-                  fontSize: '20px',
+                  fontSize: isMobile ? '18px' : '20px',
                   fontWeight: '800',
                   color: '#16a34a',
                 }}
@@ -855,9 +1074,14 @@ export default function Dashboard({ overrideRole }) {
                 {teamStats.closedNECount}
               </div>
               <div
-                style={{ fontSize: '10px', color: '#6b7280', marginTop: '2px' }}
+                style={{
+                  fontSize: isMobile ? '9px' : '10px',
+                  color: '#6b7280',
+                  marginTop: '2px',
+                  textAlign: 'center',
+                }}
               >
-                Esta quincena
+                {isMobile ? 'Quincena' : 'Esta quincena'}
               </div>
             </div>
 
@@ -865,25 +1089,31 @@ export default function Dashboard({ overrideRole }) {
               style={{
                 backgroundColor: '#ffffff',
                 border: '1px solid #dc2626',
-                borderRadius: '12px',
-                padding: '14px',
+                borderRadius: isMobile ? '10px' : '12px',
+                padding: isMobile ? '10px' : '14px',
                 boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                aspectRatio: isMobile ? '1' : 'auto',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'center',
+                alignItems: 'center',
               }}
             >
               <div
                 style={{
-                  fontSize: '10px',
+                  fontSize: isMobile ? '9px' : '10px',
                   color: '#dc2626',
                   fontWeight: '700',
                   textTransform: 'uppercase',
                   marginBottom: '4px',
+                  textAlign: 'center',
                 }}
               >
-                N.E. Pendientes
+                {isMobile ? 'Pendientes' : 'N.E. Pendientes'}
               </div>
               <div
                 style={{
-                  fontSize: '20px',
+                  fontSize: isMobile ? '18px' : '20px',
                   fontWeight: '800',
                   color: '#dc2626',
                 }}
@@ -891,91 +1121,112 @@ export default function Dashboard({ overrideRole }) {
                 {teamStats.pendingNECount}
               </div>
               <div
-                style={{ fontSize: '10px', color: '#6b7280', marginTop: '2px' }}
+                style={{
+                  fontSize: isMobile ? '9px' : '10px',
+                  color: '#6b7280',
+                  marginTop: '2px',
+                  textAlign: 'center',
+                }}
               >
-                Por cobrar/cerrar
+                {isMobile ? 'Por cobrar' : 'Por cobrar/cerrar'}
               </div>
             </div>
           </>
         )}
 
-        {/* TARJETAS PARA VENDEDOR */}
+        {/* --- TARJETAS PARA VENDEDOR --- */}
         {effectiveRole === 'vendedor' && (
           <>
             <MetricCard
               title="Mis Ventas"
               value={`$${metrics.totalSales?.toFixed(2) || 0}`}
-              icon={<ShoppingCart size={18} />}
+              icon={<ShoppingCart size={isMobile ? 14 : 18} />}
               color="#111827"
+              isMobile={isMobile}
             />
             <MetricCard
-              title="Saldo Pendiente"
+              title={isMobile ? 'Saldo Pend.' : 'Saldo Pendiente'}
               value={`$${metrics.pendingBalance?.toFixed(2) || 0}`}
-              icon={<Clock size={18} />}
+              icon={<Clock size={isMobile ? 14 : 18} />}
               color="#DC2626"
+              isMobile={isMobile}
             />
             <MetricCard
-              title="Mis Clientes"
+              title="Clientes"
               value={metrics.myClients || 0}
-              icon={<Users size={18} />}
+              icon={<Users size={isMobile ? 14 : 18} />}
               color="#2563EB"
+              isMobile={isMobile}
             />
             <MetricCard
               title="Potenciales"
               value={metrics.myPotentials || 0}
-              icon={<UserCheck size={18} />}
+              icon={<UserCheck size={isMobile ? 14 : 18} />}
               color="#16A34A"
+              isMobile={isMobile}
             />
           </>
         )}
 
+        {/* TARJETA DE INVENTARIO (Todos los roles) */}
         <div
           style={{
             backgroundColor: '#ffffff',
             border: '1px solid #e5e7eb',
-            borderRadius: '12px',
-            padding: '14px',
+            borderRadius: isMobile ? '10px' : '12px',
+            padding: isMobile ? '10px' : '14px',
             boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+            aspectRatio: isMobile ? '1' : 'auto',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'center',
+            alignItems: 'center',
           }}
         >
           <div
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '8px',
-              marginBottom: '8px',
+              justifyContent: 'center',
+              gap: '4px',
+              marginBottom: '6px',
             }}
           >
-            <Package size={18} color="#6b7280" />
+            <Package size={isMobile ? 14 : 18} color="#6b7280" />
             <span
               style={{
-                fontSize: '10px',
+                fontSize: isMobile ? '9px' : '10px',
                 color: '#6b7280',
                 fontWeight: '700',
                 textTransform: 'uppercase',
               }}
             >
-              Inventario Total
+              {isMobile ? 'Inventario' : 'Inventario Total'}
             </span>
           </div>
           <div
-            style={{ fontSize: '20px', fontWeight: '800', color: '#111827' }}
+            style={{
+              fontSize: isMobile ? '18px' : '20px',
+              fontWeight: '800',
+              color: '#111827',
+            }}
           >
             {inventoryStats.total}
           </div>
           <div
             style={{
               display: 'flex',
-              justifyContent: 'space-between',
-              marginTop: '8px',
-              fontSize: '11px',
+              justifyContent: 'space-around',
+              marginTop: '6px',
+              fontSize: isMobile ? '9px' : '11px',
+              width: '100%',
             }}
           >
-            <span style={{ color: '#6b7280' }}>
-              Bombillos: <strong>{inventoryStats.bombillos}</strong>
+            <span style={{ color: '#6b7280', textAlign: 'center' }}>
+              Bomb: <strong>{inventoryStats.bombillos}</strong>
             </span>
-            <span style={{ color: '#6b7280' }}>
-              Fluidos: <strong>{inventoryStats.fluidos}</strong>
+            <span style={{ color: '#6b7280', textAlign: 'center' }}>
+              Flui: <strong>{inventoryStats.fluidos}</strong>
             </span>
           </div>
         </div>
@@ -986,25 +1237,29 @@ export default function Dashboard({ overrideRole }) {
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: '1fr 1fr',
+            gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr',
             gap: '16px',
             marginBottom: '20px',
-            alignItems: 'stretch', // Asegura que ambas columnas tengan la misma altura
+            alignItems: 'stretch',
+            maxWidth: isMobile ? '100%' : '1200px',
+            margin: isMobile ? '0 0 20px 0' : '0 auto 20px auto',
           }}
         >
+          {/* GRÁFICA DE VENTAS DIARIAS */}
           <div
             style={{
               backgroundColor: '#ffffff',
               border: '1px solid #e5e7eb',
               borderRadius: '12px',
-              padding: '16px',
+              padding: isMobile ? '12px' : '16px',
               display: 'flex',
               flexDirection: 'column',
+              minHeight: isMobile ? '220px' : 'auto',
             }}
           >
             <h3
               style={{
-                fontSize: '13px',
+                fontSize: isMobile ? '12px' : '13px',
                 fontWeight: '800',
                 color: '#111827',
                 margin: '0 0 12px 0',
@@ -1013,32 +1268,31 @@ export default function Dashboard({ overrideRole }) {
             >
               Ventas Diarias (Últimos 7 Días)
             </h3>
-            
             {/* CONTENEDOR DE GRÁFICA ADAPTATIVO */}
             <div
               style={{
                 display: 'flex',
                 alignItems: 'flex-end',
-                flex: 1, // Ocupa todo el espacio vertical restante
-                gap: '8px',
+                flex: 1,
+                gap: isMobile ? '6px' : '8px',
                 paddingBottom: '10px',
                 position: 'relative',
+                minHeight: isMobile ? '140px' : '120px',
               }}
             >
               {dailySalesData.map((day, idx) => {
                 // Calcular el máximo real de los datos
-                const maxValRaw = Math.max(...dailySalesData.map((d) => d.amount), 1);
-                
+                const maxValRaw = Math.max(
+                  ...dailySalesData.map((d) => d.amount),
+                  1
+                );
                 // Definir el valor de escala: si el máximo es bajo (<5), usamos 5 como base visual
                 const scaleBase = maxValRaw < 5 ? 5 : maxValRaw;
-                
                 // Altura porcentual basada en la escala base
                 const heightPct = (day.amount / scaleBase) * 100;
-                
                 // Formatear fecha para mostrar (ej: 27/09)
-                const dateObj = new Date(day.date + 'T12:00:00'); 
+                const dateObj = new Date(day.date + 'T12:00:00');
                 const dayLabel = `${dateObj.getDate()}/${dateObj.getMonth() + 1}`;
-
                 return (
                   <div
                     key={idx}
@@ -1055,7 +1309,7 @@ export default function Dashboard({ overrideRole }) {
                     {/* Valor numérico sobre la barra */}
                     <div
                       style={{
-                        fontSize: '10px',
+                        fontSize: isMobile ? '9px' : '10px',
                         fontWeight: 'bold',
                         color: '#3b82f6',
                         marginBottom: '2px',
@@ -1064,14 +1318,13 @@ export default function Dashboard({ overrideRole }) {
                     >
                       {day.amount}
                     </div>
-                    
                     {/* Barra visual */}
                     <div
                       style={{
                         width: '100%',
                         backgroundColor: '#eff6ff',
                         borderRadius: '4px',
-                        height: '100%', // Contenedor de fondo ocupa toda la altura disponible
+                        height: '100%',
                         position: 'relative',
                         display: 'flex',
                         alignItems: 'flex-end',
@@ -1088,9 +1341,14 @@ export default function Dashboard({ overrideRole }) {
                         }}
                       ></div>
                     </div>
-                    
                     {/* Etiqueta de fecha */}
-                    <span style={{ fontSize: '9px', color: '#6b7280', whiteSpace: 'nowrap' }}>
+                    <span
+                      style={{
+                        fontSize: isMobile ? '8px' : '9px',
+                        color: '#6b7280',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
                       {dayLabel}
                     </span>
                   </div>
@@ -1099,19 +1357,20 @@ export default function Dashboard({ overrideRole }) {
             </div>
           </div>
 
+          {/* ÚLTIMAS TRANSACCIONES */}
           <div
             style={{
               backgroundColor: '#ffffff',
               border: '1px solid #e5e7eb',
               borderRadius: '14px',
-              padding: '16px',
+              padding: isMobile ? '12px' : '16px',
               display: 'flex',
               flexDirection: 'column',
             }}
           >
             <h3
               style={{
-                fontSize: '13px',
+                fontSize: isMobile ? '12px' : '13px',
                 fontWeight: '800',
                 color: '#111827',
                 margin: '0 0 12px 0',
@@ -1142,7 +1401,7 @@ export default function Dashboard({ overrideRole }) {
                   flexDirection: 'column',
                   gap: '10px',
                   overflowY: 'auto',
-                  maxHeight: '100%',
+                  maxHeight: isMobile ? '300px' : '100%',
                 }}
               >
                 {recentActivities.map((act) => (
@@ -1157,7 +1416,7 @@ export default function Dashboard({ overrideRole }) {
                       style={{
                         display: 'flex',
                         justifyContent: 'space-between',
-                        fontSize: '12px',
+                        fontSize: isMobile ? '11px' : '12px',
                         fontWeight: '700',
                         color: '#111827',
                       }}
@@ -1173,9 +1432,11 @@ export default function Dashboard({ overrideRole }) {
                       style={{
                         display: 'flex',
                         justifyContent: 'space-between',
-                        fontSize: '10px',
+                        fontSize: isMobile ? '9px' : '10px',
                         color: '#6b7280',
                         marginTop: '2px',
+                        flexWrap: 'wrap',
+                        gap: '4px',
                       }}
                     >
                       <span>
@@ -1196,142 +1457,159 @@ export default function Dashboard({ overrideRole }) {
         </div>
       )}
 
-      <div style={{ marginBottom: '20px' }}>
-        <h3
-          style={{
-            fontSize: '13px',
-            fontWeight: '800',
-            color: '#111827',
-            margin: '0 0 12px 0',
-            textTransform: 'uppercase',
-          }}
-        >
-          Accesos Rápidos
-        </h3>
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
-            gap: '10px',
-          }}
-        >
-          {effectiveRole === 'administrador' && (
-            <>
-              <QuickLink
-                label="Gestión Cobranza"
-                icon={<DollarSign size={16} />}
-                color="#059669"
-                onClick={() => (window.location.href = '/administrativo')}
-              />
-              <QuickLink
-                label="Usuarios"
-                icon={<Users size={16} />}
-                color="#2563EB"
-                onClick={() => (window.location.href = '/usuarios')}
-              />
-              <QuickLink
-                label="Inventario"
-                icon={<Package size={16} />}
-                color="#7c3aed"
-                onClick={() => (window.location.href = '/inventario')}
-              />
-            </>
-          )}
-
-          {(effectiveRole === 'gerente' || effectiveRole === 'supervisor') && (
-            <>
-              <QuickLink
-                label="Visitas Equipo"
-                icon={<MapPin size={16} />}
-                color="#2563EB"
-                onClick={() => (window.location.href = '/vendedores')}
-              />
-              <QuickLink
-                label="Reportes"
-                icon={<FileText size={16} />}
-                color="#7c3aed"
-                onClick={() => (window.location.href = '/vendedores')}
-              />
-              <QuickLink
-                label="Comisiones"
-                icon={<DollarSign size={16} />}
-                color="#059669"
-                onClick={() => (window.location.href = '/vendedores')}
-              />
-            </>
-          )}
-
-          {effectiveRole === 'vendedor' && (
-            <>
-              <QuickLink
-                label="Mis Clientes"
-                icon={<Users size={16} />}
-                color="#2563EB"
-                onClick={() => (window.location.href = '/ventas')}
-              />
-              <QuickLink
-                label="Mis N.E."
-                icon={<FileText size={16} />}
-                color="#7c3aed"
-                onClick={() => (window.location.href = '/ventas')}
-              />
-              <QuickLink
-                label="Potenciales"
-                icon={<UserCheck size={16} />}
-                color="#16A34A"
-                onClick={() => (window.location.href = '/ventas')}
-              />
-            </>
-          )}
-
-          {effectiveRole === 'stock' && (
-            <>
-              <QuickLink
-                label="Inventario General"
-                icon={<Package size={16} />}
-                color="#7c3aed"
-                onClick={() => (window.location.href = '/inventario')}
-              />
-            </>
-          )}
+      {/* SECCIÓN DE ACCESOS RÁPIDOS - Solo escritorio (en móvil ya están arriba) */}
+      {!isMobile && (
+        <div style={{ marginBottom: '20px' }}>
+          <h3
+            style={{
+              fontSize: '13px',
+              fontWeight: '800',
+              color: '#111827',
+              margin: '0 0 12px 0',
+              textTransform: 'uppercase',
+            }}
+          >
+            Accesos Rápidos
+          </h3>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+              gap: '10px',
+            }}
+          >
+            {effectiveRole === 'administrador' && (
+              <>
+                <QuickLink
+                  label="Gestión Cobranza"
+                  icon={<DollarSign size={16} />}
+                  color="#059669"
+                  onClick={() => (window.location.href = '/administrativo')}
+                />
+                <QuickLink
+                  label="Usuarios"
+                  icon={<Users size={16} />}
+                  color="#2563EB"
+                  onClick={() => (window.location.href = '/usuarios')}
+                />
+                <QuickLink
+                  label="Inventario"
+                  icon={<Package size={16} />}
+                  color="#7c3aed"
+                  onClick={() => (window.location.href = '/inventario')}
+                />
+              </>
+            )}
+            {(effectiveRole === 'gerente' || effectiveRole === 'supervisor') && (
+              <>
+                <QuickLink
+                  label="Visitas Equipo"
+                  icon={<MapPin size={16} />}
+                  color="#2563EB"
+                  onClick={() => (window.location.href = '/vendedores')}
+                />
+                <QuickLink
+                  label="Reportes"
+                  icon={<FileText size={16} />}
+                  color="#7c3aed"
+                  onClick={() => (window.location.href = '/vendedores')}
+                />
+                <QuickLink
+                  label="Comisiones"
+                  icon={<DollarSign size={16} />}
+                  color="#059669"
+                  onClick={() => (window.location.href = '/vendedores')}
+                />
+              </>
+            )}
+            {effectiveRole === 'vendedor' && (
+              <>
+                <QuickLink
+                  label="Mis Clientes"
+                  icon={<Users size={16} />}
+                  color="#2563EB"
+                  onClick={() => (window.location.href = '/ventas')}
+                />
+                <QuickLink
+                  label="Mis N.E."
+                  icon={<FileText size={16} />}
+                  color="#7c3aed"
+                  onClick={() => (window.location.href = '/ventas')}
+                />
+                <QuickLink
+                  label="Potenciales"
+                  icon={<UserCheck size={16} />}
+                  color="#16A34A"
+                  onClick={() => (window.location.href = '/ventas')}
+                />
+              </>
+            )}
+            {effectiveRole === 'stock' && (
+              <>
+                <QuickLink
+                  label="Inventario General"
+                  icon={<Package size={16} />}
+                  color="#7c3aed"
+                  onClick={() => (window.location.href = '/inventario')}
+                />
+              </>
+            )}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
 
-function MetricCard({ title, value, icon, color }) {
+function MetricCard({ title, value, icon, color, isMobile }) {
   return (
     <div
       style={{
         backgroundColor: '#ffffff',
         border: '1px solid #e5e7eb',
-        borderRadius: '12px',
-        padding: '14px',
+        borderRadius: isMobile ? '10px' : '12px',
+        padding: isMobile ? '10px' : '14px',
         boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+        aspectRatio: isMobile ? '1' : 'auto',
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'center',
+        alignItems: 'center',
       }}
     >
+      {/* Icono al lado del título, centrados juntos */}
       <div
         style={{
           display: 'flex',
           alignItems: 'center',
-          gap: '8px',
-          marginBottom: '8px',
+          justifyContent: 'center',
+          gap: '4px',
+          marginBottom: '6px',
         }}
       >
-        <div style={{ color: color }}>{icon}</div>
+        <div style={{ color: color, display: 'flex', alignItems: 'center' }}>
+          {icon}
+        </div>
         <span
           style={{
-            fontSize: '10px',
+            fontSize: isMobile ? '9px' : '10px',
             color: '#6b7280',
             fontWeight: '700',
             textTransform: 'uppercase',
+            textAlign: 'center',
           }}
         >
           {title}
         </span>
       </div>
-      <div style={{ fontSize: '20px', fontWeight: '800', color: '#111827' }}>
+      <div
+        style={{
+          fontSize: isMobile ? '16px' : '20px',
+          fontWeight: '800',
+          color: '#111827',
+          textAlign: 'center',
+        }}
+      >
         {value}
       </div>
     </div>
@@ -1362,6 +1640,37 @@ function QuickLink({ label, icon, color, onClick }) {
     >
       <div style={{ color: color }}>{icon}</div>
       {label}
+    </button>
+  );
+}
+
+function QuickLinkMobile({ label, icon, color, onClick }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: '4px',
+        padding: '8px',
+        backgroundColor: '#f9fafb',
+        border: '1px solid #e5e7eb',
+        borderRadius: '8px',
+        cursor: 'pointer',
+        transition: 'all 0.2s',
+        fontSize: '10px',
+        fontWeight: '600',
+        color: '#374151',
+        minWidth: '70px',
+        flex: '0 0 auto',
+      }}
+      onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f3f4f6')}
+      onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#f9fafb')}
+    >
+      <div style={{ color: color }}>{icon}</div>
+      <span style={{ fontSize: '9px', textAlign: 'center' }}>{label}</span>
     </button>
   );
 }
