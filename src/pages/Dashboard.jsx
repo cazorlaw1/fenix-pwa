@@ -105,7 +105,7 @@ export default function Dashboard({ overrideRole }) {
     }
   };
 
-  // --- LÓGICA ADMINISTRADOR (INTACTA) ---
+  // --- LÓGICA ADMINISTRADOR ---
   const fetchAdminData = async () => {
     const { count: pendingUsersCount } = await supabase
       .from('profiles')
@@ -168,9 +168,9 @@ export default function Dashboard({ overrideRole }) {
     
     setRecentActivities(recentNotes || []);
 
-    // Consulta específica para la gráfica de los últimos 7 días
+    // --- CORRECCIÓN GRÁFICA: Consulta específica para los últimos 7 días ---
     const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6); // Hace 6 días + hoy = 7 días
     sevenDaysAgo.setHours(0, 0, 0, 0);
     
     const { data: last7DaysSales } = await supabase
@@ -178,30 +178,35 @@ export default function Dashboard({ overrideRole }) {
       .select('final_price_usd, created_at, payment_status')
       .gte('created_at', sevenDaysAgo.toISOString());
 
-    // Generar los últimos 7 días incluyendo hoy
+    // Generar array de los últimos 7 días (incluyendo hoy)
     const last7Days = Array.from({ length: 7 }, (_, i) => {
       const d = new Date();
       d.setDate(d.getDate() - (6 - i));
-      return d.toISOString().split('T')[0];
+      return d.toLocaleDateString('en-CA'); // Formato YYYY-MM-DD consistente
     });
 
-    const dailyData = last7Days.map((date) => {
+    const dailyData = last7Days.map((dateStr) => {
+      // Filtrar ventas que coincidan con este día específico
       const daySales =
         last7DaysSales
-          ?.filter(
-            (s) =>
-              s.created_at?.startsWith(date) &&
+          ?.filter((s) => {
+            if (!s.created_at) return false;
+            // Convertir fecha de DB a formato YYYY-MM-DD local para comparar
+            const saleDate = new Date(s.created_at).toLocaleDateString('en-CA');
+            return (
+              saleDate === dateStr &&
               (s.payment_status === 'cerrada' || s.payment_status === 'abonada')
-          )
+            );
+          })
           .reduce((acc, curr) => acc + Number(curr.final_price_usd || 0), 0) ||
         0;
-      return { date, amount: daySales };
+      return { date: dateStr, amount: daySales };
     });
     
     setDailySalesData(dailyData);
   };
 
-  // --- LÓGICA GERENTE/SUPERVISOR (FILTROS IDÉNTICOS A VENDEDORES.JSX) ---
+  // --- LÓGICA GERENTE/SUPERVISOR ---
   const fetchManagerData = async () => {
     let subordinateIds = [];
     
@@ -347,7 +352,7 @@ export default function Dashboard({ overrideRole }) {
     // Mostrar solo las últimas 5 transacciones
     setRecentActivities(teamSales?.slice(0, 5) || []);
 
-    // Consulta específica para la gráfica de los últimos 7 días
+    // --- CORRECCIÓN GRÁFICA: Consulta específica para los últimos 7 días ---
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
     sevenDaysAgo.setHours(0, 0, 0, 0);
@@ -358,24 +363,27 @@ export default function Dashboard({ overrideRole }) {
       .in('seller_id', subordinateIds)
       .gte('created_at', sevenDaysAgo.toISOString());
 
-    // Generar los últimos 7 días incluyendo hoy
+    // Generar array de los últimos 7 días (incluyendo hoy)
     const last7Days = Array.from({ length: 7 }, (_, i) => {
       const d = new Date();
       d.setDate(d.getDate() - (6 - i));
-      return d.toISOString().split('T')[0];
+      return d.toLocaleDateString('en-CA');
     });
 
-    const dailyData = last7Days.map((date) => {
+    const dailyData = last7Days.map((dateStr) => {
       const daySales =
         last7DaysSales
-          ?.filter(
-            (s) =>
-              s.created_at?.startsWith(date) &&
+          ?.filter((s) => {
+            if (!s.created_at) return false;
+            const saleDate = new Date(s.created_at).toLocaleDateString('en-CA');
+            return (
+              saleDate === dateStr &&
               (s.payment_status === 'cerrada' || s.payment_status === 'abonada')
-          )
+            );
+          })
           .reduce((acc, curr) => acc + Number(curr.final_price_usd || 0), 0) ||
         0;
-      return { date, amount: daySales };
+      return { date: dateStr, amount: daySales };
     });
     
     setDailySalesData(dailyData);
@@ -432,7 +440,7 @@ export default function Dashboard({ overrideRole }) {
     // Mostrar solo las últimas 5 transacciones
     setRecentActivities(mySales?.slice(0, 5) || []);
 
-    // Consulta específica para la gráfica de los últimos 7 días
+    // --- CORRECCIÓN GRÁFICA: Consulta específica para los últimos 7 días ---
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
     sevenDaysAgo.setHours(0, 0, 0, 0);
@@ -443,24 +451,27 @@ export default function Dashboard({ overrideRole }) {
       .eq('seller_id', sellerId)
       .gte('created_at', sevenDaysAgo.toISOString());
 
-    // Generar los últimos 7 días incluyendo hoy
+    // Generar array de los últimos 7 días (incluyendo hoy)
     const last7Days = Array.from({ length: 7 }, (_, i) => {
       const d = new Date();
       d.setDate(d.getDate() - (6 - i));
-      return d.toISOString().split('T')[0];
+      return d.toLocaleDateString('en-CA');
     });
 
-    const dailyData = last7Days.map((date) => {
+    const dailyData = last7Days.map((dateStr) => {
       const daySales =
         last7DaysSales
-          ?.filter(
-            (s) =>
-              s.created_at?.startsWith(date) &&
+          ?.filter((s) => {
+            if (!s.created_at) return false;
+            const saleDate = new Date(s.created_at).toLocaleDateString('en-CA');
+            return (
+              saleDate === dateStr &&
               (s.payment_status === 'cerrada' || s.payment_status === 'abonada')
-          )
+            );
+          })
           .reduce((acc, curr) => acc + Number(curr.final_price_usd || 0), 0) ||
         0;
-      return { date, amount: daySales };
+      return { date: dateStr, amount: daySales };
     });
     
     setDailySalesData(dailyData);
@@ -1059,9 +1070,12 @@ export default function Dashboard({ overrideRole }) {
                   1
                 );
                 const heightPct = (day.amount / maxVal) * 100;
+                
+                // Formatear fecha para mostrar solo el día (ej: "29")
                 const dayNum = day.date
-                  ? new Date(day.date).getDate()
+                  ? new Date(day.date + 'T00:00:00').getDate() // Asegurar parsing correcto
                   : idx + 1;
+                  
                 return (
                   <div
                     key={idx}
@@ -1081,6 +1095,7 @@ export default function Dashboard({ overrideRole }) {
                         height: `${heightPct}%`,
                         position: 'relative',
                         transition: 'height 0.5s ease',
+                        minHeight: '4px' // Mínimo visible para días sin ventas
                       }}
                     >
                       <div
