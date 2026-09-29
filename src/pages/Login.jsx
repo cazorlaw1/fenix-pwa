@@ -74,7 +74,7 @@ export default function Login() {
 
   return (
     <>
-      {/* ESTILOS GLOBALES PARA EVITAR SCROLL LATERAL Y AJUSTES MÓVILES */}
+      {/* ESTILOS GLOBALES Y RESPONSIVOS */}
       <style>{`
         html, body {
           margin: 0;
@@ -90,37 +90,48 @@ export default function Login() {
             min-height: 100vh !important;
             height: 100vh !important;
             width: 100vw !important;
-            overflow-y: auto !important; /* Permite scroll vertical si es necesario */
+            overflow-y: auto !important;
             overflow-x: hidden !important;
+            display: block !important; /* Cambia flex a block para permitir scroll natural si es muy largo */
           }
           .login-card-wrapper {
             max-width: 100% !important;
             width: 100% !important;
             height: auto !important;
-            min-height: 100% !important;
+            min-height: 100vh !important;
             border-radius: 0 !important;
             border: none !important;
             box-shadow: none !important;
             flex-direction: column !important;
             display: flex !important;
+            margin: 0 !important;
           }
           .login-left-panel {
             flex: 0 0 auto !important;
-            padding: 40px 20px !important;
+            padding: 20px 15px !important; /* Padding reducido */
             border-right: none !important;
-            border-bottom: 4px solid #D4AF37 !important;
-            text-align: center !important; /* Centra todo el contenido del panel izquierdo */
-          }
-          .login-left-panel h1, 
-          .login-left-panel p {
+            border-bottom: 3px solid #D4AF37 !important;
             text-align: center !important;
+            justify-content: center !important;
+            gap: 10px !important;
+          }
+          .login-left-panel h1 {
+            font-size: 22px !important; /* Título más pequeño */
+            margin-bottom: 5px !important;
+          }
+          .login-left-panel p {
+            font-size: 11px !important;
+          }
+          .login-logo-img {
+            max-width: 100px !important; /* Logo más pequeño */
+            max-height: 100px !important;
           }
           .login-logo-container {
-            margin: 20px 0 !important;
+            margin: 10px 0 !important;
           }
           .login-right-panel {
             flex: 1 1 auto !important;
-            padding: 30px 20px !important;
+            padding: 20px 15px !important;
             justify-content: flex-start !important;
           }
           .login-form-wrapper {
@@ -146,7 +157,7 @@ export default function Login() {
           fontFamily: 'system-ui, -apple-system, sans-serif',
           boxSizing: 'border-box',
           width: '100%',
-          overflow: 'hidden', // Previene scroll en escritorio también si es necesario
+          overflow: 'hidden',
         }}
       >
         <div
@@ -188,7 +199,7 @@ export default function Login() {
                   margin: '0 0 10px 0',
                   color: '#ffffff',
                   textTransform: 'uppercase',
-                  textAlign: 'left', // Por defecto izquierda, en móvil se centra con CSS
+                  textAlign: 'left',
                 }}
               >
                 {isRegistering ? 'REGISTRO' : 'INICIAR SESIÓN'}
@@ -199,7 +210,7 @@ export default function Login() {
                   color: '#9ca3af',
                   lineHeight: '1.6',
                   margin: 0,
-                  textAlign: 'left', // Por defecto izquierda
+                  textAlign: 'left',
                 }}
               >
                 Bienvenido a{' '}
@@ -221,6 +232,7 @@ export default function Login() {
               }}
             >
               <img
+                className="login-logo-img"
                 src="/logo.png"
                 alt="Logo Fenix Auto Part"
                 style={{
