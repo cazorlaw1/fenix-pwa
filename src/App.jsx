@@ -12,6 +12,8 @@ import ProtectedRoute from './components/ProtectedRoute';
 import Header from './components/Header';
 import Sidebar from './components/Sidebar';
 import MobileNavigation from './components/MobileNavigation';
+import { supabase } from './lib/supabase';
+
 // Páginas
 import Dashboard from './pages/Dashboard';
 import Login from './pages/Login';
@@ -22,7 +24,6 @@ import Inventory from './pages/Inventory';
 import AdminModule from './pages/AdminModule';
 import Vendedores from './pages/Vendedores';
 import SalesModule from './pages/SalesModule';
-import { supabase } from './lib/supabase';
 
 // Componente interno para manejar el callback de Google y evitar pantalla blanca
 function AuthCallback() {
@@ -32,7 +33,7 @@ function AuthCallback() {
   useEffect(() => {
     const handleCallback = async () => {
       try {
-        // Obtener sesión tras el redirect de Google
+        // Obtener sesión tras el redirect de Google desde /auth/v1/callback
         const { data: { session }, error } = await supabase.auth.getSession();
         
         if (error || !session) {
@@ -41,7 +42,7 @@ function AuthCallback() {
           return;
         }
 
-        // Verificar perfil y redirigir según rol
+        // Verificar perfil y redirigir según rol (basado en tu CSV)
         const userProfile = await fetchProfile(session.user.id);
         
         if (userProfile?.role === 'pendiente' || !userProfile?.role) {
@@ -183,7 +184,8 @@ export default function App() {
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/pending" element={<PendingApproval />} />
-          {/* Ruta pública para manejar el retorno de Google */}
+          
+          {/* Ruta pública para manejar el retorno seguro de Google OAuth */}
           <Route path="/auth/callback" element={<AuthCallback />} />
           
           <Route element={<ProtectedRoute />}>

@@ -14,6 +14,7 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
 
+  // LÓGICA DE AUTENTICACIÓN MANUAL (EMAIL/PASSWORD)
   const handleAuth = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -45,6 +46,7 @@ export default function Login() {
         if (data?.user) {
           setEmail('');
           setPassword('');
+          // REDIRIGIR SEGÚN EL ROL AL INICIAR SESIÓN
           const userProfile = await fetchProfile(data.user.id);
           if (userProfile?.role === 'pendiente' || !userProfile?.role) {
             window.location.href = '/pending';
@@ -60,14 +62,15 @@ export default function Login() {
     }
   };
 
-  // Lógica directa para Google OAuth sin depender del contexto
+  // LÓGICA CORREGIDA PARA GOOGLE OAUTH
+  // Usa la ruta nativa /auth/v1/callback para coincidir con Google Cloud Console
   const handleGoogleAuth = async () => {
     setLoading(true);
     try {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `https://www.fenixautopartes.com/auth/v1/callback'`,
+          redirectTo: 'https://www.fenixautopartes.com/auth/v1/callback',
           queryParams: {
             access_type: 'offline',
             prompt: 'consent',
@@ -93,7 +96,7 @@ export default function Login() {
 
   return (
     <>
-      {/* ESTILOS GLOBALES PARA BLOQUEAR SCROLL Y AJUSTAR ALTURA DINÁMICA */}
+      {/* ESTILOS GLOBALES PARA BLOQUEAR SCROLL Y AJUSTAR ALTURA DINÁMICA EN MÓVIL */}
       <style>{`
         html, body {
           margin: 0;
