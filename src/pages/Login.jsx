@@ -113,15 +113,14 @@ export default function Login() {
 
   return (
     <>
-      {/* ESTILOS GLOBALES PARA BLOQUEAR SCROLL Y AJUSTAR ALTURA DINÁMICA EN MÓVIL */}
+      {/* ESTILOS GLOBALES CORREGIDOS PARA MÓVIL Y ESCRITORIO */}
       <style>{`
         html, body {
           margin: 0;
           padding: 0;
           width: 100%;
-          height: 100%;
-          overflow: hidden !important;
-          position: fixed;
+          min-height: 100%;
+          /* Se elimina position: fixed y overflow: hidden global para evitar pantallas en blanco en errores */
         }
         
         @media (max-width: 768px) {
@@ -129,19 +128,21 @@ export default function Login() {
             height: 100dvh !important;
             min-height: 100dvh !important;
             padding: 0 !important;
-            overflow: hidden !important;
+            /* El overflow se maneja aquí dentro del contenedor, no en el body */
+            overflow-y: auto !important; 
+            -webkit-overflow-scrolling: touch !important;
           }
           .login-card-wrapper {
-            height: 100% !important;
+            height: auto !important;
             min-height: 100% !important;
             border-radius: 0 !important;
             border: none !important;
             box-shadow: none !important;
             flex-direction: column !important;
-            overflow: hidden !important;
+            overflow: visible !important;
           }
           .login-left-panel {
-            flex: 0 0 45% !important; 
+            flex: 0 0 auto !important; 
             padding: 25px 20px !important;
             border-right: none !important;
             border-bottom: 4px solid #D4AF37 !important;
@@ -169,7 +170,7 @@ export default function Login() {
             flex: 1 1 auto !important;
             padding: 20px 15px !important;
             justify-content: center !important;
-            overflow: hidden !important;
+            overflow: visible !important;
           }
           .login-form-wrapper {
             max-width: 100% !important;
@@ -190,7 +191,7 @@ export default function Login() {
           fontFamily: 'system-ui, -apple-system, sans-serif',
           boxSizing: 'border-box',
           width: '100%',
-          overflow: 'hidden',
+          overflow: 'hidden', // Mantenemos overflow hidden solo en este contenedor padre
         }}
       >
         <div
