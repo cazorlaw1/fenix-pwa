@@ -65,8 +65,7 @@ export default function Dashboard({ overrideRole }) {
   }, [effectiveRole, profile?.id]);
 
   // --- FUNCIÓN AUXILIAR PARA FECHAS EN UTC-4 (AMERICA/CARACAS) ---
-  // Esto evita que el navegador convierta la fecha a la zona local del usuario
-  // y cause discrepancias en los días mostrados.
+  // Evita discrepancias por zona horaria del navegador/servidor
   const getLocalDateStr = (dateObj) => {
     return new Intl.DateTimeFormat('en-CA', {
       timeZone: 'America/Caracas',
@@ -990,6 +989,7 @@ export default function Dashboard({ overrideRole }) {
             gridTemplateColumns: '1fr 1fr',
             gap: '16px',
             marginBottom: '20px',
+            alignItems: 'stretch', // Asegura que ambas columnas tengan la misma altura
           }}
         >
           <div
@@ -998,6 +998,8 @@ export default function Dashboard({ overrideRole }) {
               border: '1px solid #e5e7eb',
               borderRadius: '12px',
               padding: '16px',
+              display: 'flex',
+              flexDirection: 'column',
             }}
           >
             <h3
@@ -1011,11 +1013,13 @@ export default function Dashboard({ overrideRole }) {
             >
               Ventas Diarias (Últimos 7 Días)
             </h3>
+            
+            {/* CONTENEDOR DE GRÁFICA ADAPTATIVO */}
             <div
               style={{
                 display: 'flex',
                 alignItems: 'flex-end',
-                height: '120px',
+                flex: 1, // Ocupa todo el espacio vertical restante
                 gap: '8px',
                 paddingBottom: '10px',
                 position: 'relative',
@@ -1025,15 +1029,14 @@ export default function Dashboard({ overrideRole }) {
                 // Calcular el máximo real de los datos
                 const maxValRaw = Math.max(...dailySalesData.map((d) => d.amount), 1);
                 
-                // Definir el valor de escala: si el máximo es bajo (<5), usamos 5 como base visual para que no se vea plano
-                // pero la barra representa el valor real.
+                // Definir el valor de escala: si el máximo es bajo (<5), usamos 5 como base visual
                 const scaleBase = maxValRaw < 5 ? 5 : maxValRaw;
                 
                 // Altura porcentual basada en la escala base
                 const heightPct = (day.amount / scaleBase) * 100;
                 
                 // Formatear fecha para mostrar (ej: 27/09)
-                const dateObj = new Date(day.date + 'T12:00:00'); // Forzar mediodía para evitar problemas de DST
+                const dateObj = new Date(day.date + 'T12:00:00'); 
                 const dayLabel = `${dateObj.getDate()}/${dateObj.getMonth() + 1}`;
 
                 return (
@@ -1049,7 +1052,7 @@ export default function Dashboard({ overrideRole }) {
                       justifyContent: 'flex-end',
                     }}
                   >
-                    {/* Tooltip simple al hover */}
+                    {/* Valor numérico sobre la barra */}
                     <div
                       style={{
                         fontSize: '10px',
@@ -1062,12 +1065,13 @@ export default function Dashboard({ overrideRole }) {
                       {day.amount}
                     </div>
                     
+                    {/* Barra visual */}
                     <div
                       style={{
                         width: '100%',
                         backgroundColor: '#eff6ff',
                         borderRadius: '4px',
-                        height: '100%', // Contenedor completo
+                        height: '100%', // Contenedor de fondo ocupa toda la altura disponible
                         position: 'relative',
                         display: 'flex',
                         alignItems: 'flex-end',
@@ -1080,10 +1084,12 @@ export default function Dashboard({ overrideRole }) {
                           height: `${heightPct}%`,
                           borderRadius: '4px',
                           transition: 'height 0.5s ease',
-                          minHeight: day.amount > 0 ? '4px' : '0', // Mínimo visible si hay dato
+                          minHeight: day.amount > 0 ? '4px' : '0',
                         }}
                       ></div>
                     </div>
+                    
+                    {/* Etiqueta de fecha */}
                     <span style={{ fontSize: '9px', color: '#6b7280', whiteSpace: 'nowrap' }}>
                       {dayLabel}
                     </span>
@@ -1099,6 +1105,8 @@ export default function Dashboard({ overrideRole }) {
               border: '1px solid #e5e7eb',
               borderRadius: '14px',
               padding: '16px',
+              display: 'flex',
+              flexDirection: 'column',
             }}
           >
             <h3
@@ -1119,6 +1127,10 @@ export default function Dashboard({ overrideRole }) {
                   color: '#9ca3af',
                   textAlign: 'center',
                   padding: '16px 0',
+                  flex: 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
                 }}
               >
                 No hay actividad reciente registrada.
@@ -1129,6 +1141,8 @@ export default function Dashboard({ overrideRole }) {
                   display: 'flex',
                   flexDirection: 'column',
                   gap: '10px',
+                  overflowY: 'auto',
+                  maxHeight: '100%',
                 }}
               >
                 {recentActivities.map((act) => (
