@@ -102,31 +102,37 @@ export default function Login() {
             overflow: hidden !important;
           }
           .login-left-panel {
-            flex: 0 0 auto !important; /* No crece ni encoge arbitrariamente */
-            padding: 20px 15px !important; /* Padding reducido drásticamente */
+            /* AUMENTADO EL TAMAÑO DEL PANEL NEGRO EN MÓVIL */
+            flex: 0 0 45% !important; 
+            padding: 25px 20px !important;
             border-right: none !important;
-            border-bottom: 3px solid #D4AF37 !important;
+            border-bottom: 4px solid #D4AF37 !important;
             min-height: auto !important;
+            display: flex !important;
+            flex-direction: column !important;
+            justify-content: center !important;
           }
           .login-left-panel h1 {
-            font-size: 20px !important; /* Título más pequeño */
-            margin-bottom: 5px !important;
+            font-size: 22px !important;
+            margin-bottom: 8px !important;
+            text-align: center !important; /* TEXTO CENTRADO */
           }
           .login-left-panel p {
-            font-size: 11px !important;
+            font-size: 12px !important;
+            text-align: center !important; /* TEXTO CENTRADO */
           }
           .login-logo-container {
-            margin: 10px 0 !important;
+            margin: 15px 0 !important;
           }
           .login-logo-img {
-            max-width: 100px !important;
-            max-height: 100px !important;
+            max-width: 110px !important;
+            max-height: 110px !important;
           }
           .login-right-panel {
             flex: 1 1 auto !important; /* Ocupa el resto del espacio exacto */
             padding: 20px 15px !important;
             justify-content: center !important;
-            overflow: hidden !important; /* Evita scroll interno si cabe justo */
+            overflow: hidden !important;
           }
           .login-form-wrapper {
             max-width: 100% !important;
@@ -138,7 +144,7 @@ export default function Login() {
         className="login-main-container"
         style={{
           minHeight: '100vh',
-          height: '100vh', // Fallback para navegadores antiguos
+          height: '100vh',
           backgroundColor: '#f3f4f6',
           display: 'flex',
           alignItems: 'center',
@@ -147,7 +153,7 @@ export default function Login() {
           fontFamily: 'system-ui, -apple-system, sans-serif',
           boxSizing: 'border-box',
           width: '100%',
-          overflow: 'hidden', // Bloqueo primario
+          overflow: 'hidden',
         }}
       >
         <div
@@ -190,7 +196,7 @@ export default function Login() {
                   margin: '0 0 10px 0',
                   color: '#ffffff',
                   textTransform: 'uppercase',
-                  textAlign: 'left',
+                  textAlign: 'left', // Por defecto izquierda para escritorio
                 }}
               >
                 {isRegistering ? 'REGISTRO' : 'INICIAR SESIÓN'}
@@ -201,7 +207,7 @@ export default function Login() {
                   color: '#9ca3af',
                   lineHeight: '1.6',
                   margin: 0,
-                  textAlign: 'left',
+                  textAlign: 'left', // Por defecto izquierda para escritorio
                 }}
               >
                 Bienvenido a{' '}
