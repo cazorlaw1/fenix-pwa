@@ -18,10 +18,12 @@ import {
 export default function Dashboard({ overrideRole }) {
   const { profile, user } = useAuth();
   const [loading, setLoading] = useState(true);
-  
+
   // Determinar rol efectivo
-  const userRole = profile?.role?.toString().toLowerCase().trim() || 'pendiente';
-  const effectiveRole = userRole === 'tecnico' ? overrideRole || 'administrador' : userRole;
+  const userRole =
+    profile?.role?.toString().toLowerCase().trim() || 'pendiente';
+  const effectiveRole =
+    userRole === 'tecnico' ? overrideRole || 'administrador' : userRole;
 
   // Estados Generales
   const [metrics, setMetrics] = useState({
@@ -31,15 +33,12 @@ export default function Dashboard({ overrideRole }) {
     myClients: 0,
     myPotentials: 0,
   });
-  
   const [recentActivities, setRecentActivities] = useState([]);
-  
   const [inventoryStats, setInventoryStats] = useState({
     bombillos: 0,
     fluidos: 0,
     total: 0,
   });
-  
   const [adminAlerts, setAdminAlerts] = useState({
     pendingUsers: 0,
     pendingNE: 0,
@@ -65,6 +64,16 @@ export default function Dashboard({ overrideRole }) {
     fetchDashboardData();
   }, [effectiveRole, profile?.id]);
 
+  // Función auxiliar para obtener fecha string en UTC-4 (America/Caracas)
+  const getLocalDateStr = (dateObj) => {
+    return new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/Caracas',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(dateObj);
+  };
+
   const fetchDashboardData = async () => {
     setLoading(true);
     try {
@@ -72,7 +81,7 @@ export default function Dashboard({ overrideRole }) {
       const { data: products } = await supabase
         .from('products')
         .select('category, stock_current');
-      
+
       if (products) {
         const bombillos = products
           .filter((p) => p.category?.toLowerCase() === 'bombillos')
@@ -105,49 +114,7 @@ export default function Dashboard({ overrideRole }) {
     }
   };
 
-  // --- FUNCIÓN AUXILIAR PARA PROCESAR LA GRÁFICA ---
-  // Esta función recibe las ventas crudas y genera los datos correctos para la gráfica
-  const processDailyChartData = (salesData) => {
-    // Generar array de los últimos 7 días (incluyendo hoy)
-    const last7Days = Array.from({ length: 7 }, (_, i) => {
-      const d = new Date();
-      d.setDate(d.getDate() - (6 - i));
-      return d.toISOString().split('T')[0]; // Formato YYYY-MM-DD local
-    });
-
-    const dailyData = last7Days.map((dateStr) => {
-      // Filtrar ventas que coincidan con este día específico
-      // Usamos includes para ser más permisivos con el formato de fecha ISO
-      const daySales = salesData
-        ?.filter((s) => {
-          if (!s.created_at) return false;
-          const saleDate = new Date(s.created_at).toISOString().split('T')[0];
-          return saleDate === dateStr;
-        })
-        .filter(
-          (s) =>
-            s.payment_status === 'cerrada' || s.payment_status === 'abonada'
-        );
-
-      // Calcular monto total y cantidad de órdenes para ese día
-      const amount = daySales.reduce(
-        (acc, curr) => acc + Number(curr.final_price_usd || 0),
-        0
-      );
-      const count = daySales.length;
-
-      return { 
-        date: dateStr, 
-        amount, 
-        count, // Guardamos la cantidad de órdenes para mostrarla si es necesario
-        displayLabel: new Date(dateStr).getDate() // Solo el número del día (ej: 29)
-      };
-    });
-    
-    return dailyData;
-  };
-
-  // --- LÓGICA ADMINISTRADOR ---
+  // --- LÓGICA ADMINISTRADOR (INTACTA) ---
   const fetchAdminData = async () => {
     const { count: pendingUsersCount } = await supabase
       .from('profiles')
@@ -172,7 +139,7 @@ export default function Dashboard({ overrideRole }) {
 
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    
+
     const { data: sales } = await supabase
       .from('sales_orders')
       .select('final_price_usd, created_at, payment_status, balance_due_usd')
@@ -201,32 +168,38 @@ export default function Dashboard({ overrideRole }) {
       totalClients: 0,
     });
 
-    // Obtener últimas 5 transacciones para mostrar
     const { data: recentNotes } = await supabase
       .from('sales_orders')
       .select('*, client:client_id(name), seller:seller_id(full_name)')
       .order('created_at', { ascending: false })
       .limit(5);
-    
+
     setRecentActivities(recentNotes || []);
 
-    // CONSULTA ESPECÍFICA PARA LA GRÁFICA (Últimos 7 días sin límite)
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
-    sevenDaysAgo.setHours(0, 0, 0, 0);
-    
-    const { data: last7DaysSales } = await supabase
-      .from('sales_orders')
-      .select('final_price_usd, created_at, payment_status')
-      .gte('created_at', sevenDaysAgo.toISOString());
+    // Generar datos para la gráfica basados en las ventas recuperadas (respetando filtros implícitos de admin)
+    const last7Days = Array.from({ length: 7 }, (_, i) => {
+      const d = new Date();
+      d.setDate(d.getDate() - (6 - i));
+      return getLocalDateStr(d);
+    });
 
-    setDailySalesData(processDailyChartData(last7DaysSales));
+    const dailyData = last7Days.map((dateStr) => {
+      // Contar órdenes creadas en este día específico (usando UTC-4)
+      const count = sales?.filter((s) => {
+        if (!s.created_at) return false;
+        const orderDateStr = getLocalDateStr(new Date(s.created_at));
+        return orderDateStr === dateStr;
+      }).length || 0;
+
+      return { date: dateStr, amount: count };
+    });
+
+    setDailySalesData(dailyData);
   };
 
-  // --- LÓGICA GERENTE/SUPERVISOR ---
+  // --- LÓGICA GERENTE/SUPERVISOR (FILTROS IDÉNTICOS A VENDEDORES.JSX) ---
   const fetchManagerData = async () => {
     let subordinateIds = [];
-    
     const { data: cfg } = await supabase
       .from('hierarchy_config')
       .select('*')
@@ -326,7 +299,6 @@ export default function Dashboard({ overrideRole }) {
       now.getDate() <= 15 ? 1 : 16
     );
 
-    // Obtener todas las ventas del equipo para cálculos
     const { data: teamSales } = await supabase
       .from('sales_orders')
       .select(
@@ -348,7 +320,7 @@ export default function Dashboard({ overrideRole }) {
     const closedNECount = fortnightSales.filter(
       (s) => s.payment_status === 'cerrada'
     ).length;
-    
+
     const pendingNECount =
       teamSales?.filter((s) => s.payment_status !== 'cerrada').length || 0;
 
@@ -366,21 +338,27 @@ export default function Dashboard({ overrideRole }) {
       potentials: potentialCount || 0,
     });
 
-    // Mostrar solo las últimas 5 transacciones
     setRecentActivities(teamSales?.slice(0, 5) || []);
 
-    // CONSULTA ESPECÍFICA PARA LA GRÁFICA (Últimos 7 días del equipo)
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
-    sevenDaysAgo.setHours(0, 0, 0, 0);
-    
-    const { data: last7DaysSales } = await supabase
-      .from('sales_orders')
-      .select('final_price_usd, created_at, payment_status')
-      .in('seller_id', subordinateIds)
-      .gte('created_at', sevenDaysAgo.toISOString());
+    // Generar datos para la gráfica basados en teamSales (respetando filtros de jerarquía)
+    const last7Days = Array.from({ length: 7 }, (_, i) => {
+      const d = new Date();
+      d.setDate(d.getDate() - (6 - i));
+      return getLocalDateStr(d);
+    });
 
-    setDailySalesData(processDailyChartData(last7DaysSales));
+    const dailyData = last7Days.map((dateStr) => {
+      // Contar órdenes creadas en este día específico
+      const count = teamSales?.filter((s) => {
+        if (!s.created_at) return false;
+        const orderDateStr = getLocalDateStr(new Date(s.created_at));
+        return orderDateStr === dateStr;
+      }).length || 0;
+
+      return { date: dateStr, amount: count };
+    });
+
+    setDailySalesData(dailyData);
   };
 
   // --- LÓGICA VENDEDOR ---
@@ -388,7 +366,6 @@ export default function Dashboard({ overrideRole }) {
     const sellerId = profile?.id;
     if (!sellerId) return;
 
-    // Obtener todas las ventas del vendedor para cálculos
     const { data: mySales } = await supabase
       .from('sales_orders')
       .select(
@@ -431,21 +408,27 @@ export default function Dashboard({ overrideRole }) {
       myPotentials: myPotentialsCount || 0,
     });
 
-    // Mostrar solo las últimas 5 transacciones
     setRecentActivities(mySales?.slice(0, 5) || []);
 
-    // CONSULTA ESPECÍFICA PARA LA GRÁFICA (Últimos 7 días del vendedor)
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
-    sevenDaysAgo.setHours(0, 0, 0, 0);
-    
-    const { data: last7DaysSales } = await supabase
-      .from('sales_orders')
-      .select('final_price_usd, created_at, payment_status')
-      .eq('seller_id', sellerId)
-      .gte('created_at', sevenDaysAgo.toISOString());
+    // Generar datos para la gráfica basados en mySales (respetando filtro de vendedor)
+    const last7Days = Array.from({ length: 7 }, (_, i) => {
+      const d = new Date();
+      d.setDate(d.getDate() - (6 - i));
+      return getLocalDateStr(d);
+    });
 
-    setDailySalesData(processDailyChartData(last7DaysSales));
+    const dailyData = last7Days.map((dateStr) => {
+      // Contar órdenes creadas en este día específico
+      const count = mySales?.filter((s) => {
+        if (!s.created_at) return false;
+        const orderDateStr = getLocalDateStr(new Date(s.created_at));
+        return orderDateStr === dateStr;
+      }).length || 0;
+
+      return { date: dateStr, amount: count };
+    });
+
+    setDailySalesData(dailyData);
   };
 
   const handleCreateNE = () => {
@@ -474,11 +457,6 @@ export default function Dashboard({ overrideRole }) {
       </div>
     );
   }
-
-  // Calcular escala para la gráfica
-  const maxAmount = Math.max(...dailySalesData.map((d) => d.amount), 1);
-  // Redondear hacia arriba para que la barra más alta no toque el techo
-  const yAxisMax = Math.ceil(maxAmount / 10) * 10 || 10; 
 
   return (
     <div
@@ -523,7 +501,7 @@ export default function Dashboard({ overrideRole }) {
             {effectiveRole}
           </span>
         </div>
-        
+
         {/* Botón de Nueva Nota de Entrega (Oculto para rol stock) */}
         {effectiveRole !== 'stock' && (
           <button
@@ -1012,7 +990,6 @@ export default function Dashboard({ overrideRole }) {
             marginBottom: '20px',
           }}
         >
-          {/* GRÁFICA ACTUALIZADA CON EJE Y */}
           <div
             style={{
               backgroundColor: '#ffffff',
@@ -1032,90 +1009,101 @@ export default function Dashboard({ overrideRole }) {
             >
               Ventas Diarias (Últimos 7 Días)
             </h3>
-            
-            <div style={{ display: 'flex', height: '140px' }}>
-              {/* Eje Y (Números verticales) */}
-              <div
-                style={{
-                  width: '30px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  justifyContent: 'space-between',
-                  alignItems: 'flex-end',
-                  paddingRight: '8px',
-                  fontSize: '9px',
-                  color: '#9ca3af',
-                  paddingBottom: '20px', // Espacio para labels X
-                }}
-              >
-                <span>{yAxisMax}</span>
-                <span>{Math.round(yAxisMax * 0.75)}</span>
-                <span>{Math.round(yAxisMax * 0.5)}</span>
-                <span>{Math.round(yAxisMax * 0.25)}</span>
-                <span>0</span>
-              </div>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'flex-end',
+                height: '120px',
+                gap: '8px',
+                paddingBottom: '10px',
+                position: 'relative',
+              }}
+            >
+              {/* Línea de referencia mínima (opcional para visualizar el mínimo de 5) */}
+              {dailySalesData.length > 0 && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    height: '100%',
+                    pointerEvents: 'none',
+                  }}
+                >
+                  {/* Marcadores visuales sutiles si se desea, pero mantenemos limpio */}
+                </div>
+              )}
 
-              {/* Área de Barras */}
-              <div
-                style={{
-                  flex: 1,
-                  display: 'flex',
-                  alignItems: 'flex-end',
-                  gap: '6px',
-                  paddingBottom: '20px', // Espacio para labels X
-                  position: 'relative',
-                  borderBottom: '1px solid #f3f4f6',
-                  borderLeft: '1px solid #f3f4f6',
-                }}
-              >
-                {dailySalesData.map((day, idx) => {
-                  // Calculamos altura basada en el máximo escalado
-                  const heightPct = (day.amount / yAxisMax) * 100;
-                  
-                  return (
+              {dailySalesData.map((day, idx) => {
+                // Calcular el máximo real de los datos
+                const maxValRaw = Math.max(...dailySalesData.map((d) => d.amount), 1);
+                
+                // Definir el valor de escala: si el máximo es bajo (<5), usamos 5 como base visual para que no se vea plano
+                // pero la barra representa el valor real.
+                const scaleBase = maxValRaw < 5 ? 5 : maxValRaw;
+                
+                // Altura porcentual basada en la escala base
+                const heightPct = (day.amount / scaleBase) * 100;
+                
+                // Formatear fecha para mostrar (ej: 27/09)
+                const dateObj = new Date(day.date + 'T12:00:00'); // Forzar mediodía para evitar problemas de DST
+                const dayLabel = `${dateObj.getDate()}/${dateObj.getMonth() + 1}`;
+
+                return (
+                  <div
+                    key={idx}
+                    style={{
+                      flex: 1,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: '4px',
+                      height: '100%',
+                      justifyContent: 'flex-end',
+                    }}
+                  >
+                    {/* Tooltip simple al hover */}
                     <div
-                      key={idx}
                       style={{
-                        flex: 1,
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        justifyContent: 'flex-end',
-                        height: '100%',
-                        position: 'relative',
+                        fontSize: '10px',
+                        fontWeight: 'bold',
+                        color: '#3b82f6',
+                        marginBottom: '2px',
+                        opacity: day.amount > 0 ? 1 : 0,
                       }}
                     >
-                      {/* Barra */}
+                      {day.amount}
+                    </div>
+                    
+                    <div
+                      style={{
+                        width: '100%',
+                        backgroundColor: '#eff6ff',
+                        borderRadius: '4px',
+                        height: '100%', // Contenedor completo
+                        position: 'relative',
+                        display: 'flex',
+                        alignItems: 'flex-end',
+                      }}
+                    >
                       <div
                         style={{
                           width: '100%',
-                          maxWidth: '24px',
                           backgroundColor: '#3b82f6',
                           height: `${heightPct}%`,
-                          borderRadius: '4px 4px 0 0',
-                          opacity: 0.9,
+                          borderRadius: '4px',
                           transition: 'height 0.5s ease',
-                          minHeight: day.amount > 0 ? '4px' : '0', // Mínimo visible si hay venta
+                          minHeight: day.amount > 0 ? '4px' : '0', // Mínimo visible si hay dato
                         }}
-                        title={`$${day.amount.toFixed(2)} (${day.count} órdenes)`}
                       ></div>
-                      
-                      {/* Label Día (X) */}
-                      <span
-                        style={{
-                          position: 'absolute',
-                          bottom: '-20px',
-                          fontSize: '10px',
-                          color: '#6b7280',
-                          fontWeight: '600',
-                        }}
-                      >
-                        {day.displayLabel}
-                      </span>
                     </div>
-                  );
-                })}
-              </div>
+                    <span style={{ fontSize: '9px', color: '#6b7280', whiteSpace: 'nowrap' }}>
+                      {dayLabel}
+                    </span>
+                  </div>
+                );
+              })}
             </div>
           </div>
 
@@ -1175,8 +1163,7 @@ export default function Dashboard({ overrideRole }) {
                       }}
                     >
                       <span>
-                        N.E. #
-                        {act.transaction_number || act.id?.substring(0, 6)}
+                        N.E. #{act.transaction_number || act.id?.substring(0, 6)}
                       </span>
                       <span style={{ color: '#dc2626' }}>
                         ${Number(act.final_price_usd || 0).toFixed(2)}
