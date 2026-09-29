@@ -105,6 +105,48 @@ export default function Dashboard({ overrideRole }) {
     }
   };
 
+  // --- FUNCIÓN AUXILIAR PARA PROCESAR LA GRÁFICA ---
+  // Esta función recibe las ventas crudas y genera los datos correctos para la gráfica
+  const processDailyChartData = (salesData) => {
+    // Generar array de los últimos 7 días (incluyendo hoy)
+    const last7Days = Array.from({ length: 7 }, (_, i) => {
+      const d = new Date();
+      d.setDate(d.getDate() - (6 - i));
+      return d.toISOString().split('T')[0]; // Formato YYYY-MM-DD local
+    });
+
+    const dailyData = last7Days.map((dateStr) => {
+      // Filtrar ventas que coincidan con este día específico
+      // Usamos includes para ser más permisivos con el formato de fecha ISO
+      const daySales = salesData
+        ?.filter((s) => {
+          if (!s.created_at) return false;
+          const saleDate = new Date(s.created_at).toISOString().split('T')[0];
+          return saleDate === dateStr;
+        })
+        .filter(
+          (s) =>
+            s.payment_status === 'cerrada' || s.payment_status === 'abonada'
+        );
+
+      // Calcular monto total y cantidad de órdenes para ese día
+      const amount = daySales.reduce(
+        (acc, curr) => acc + Number(curr.final_price_usd || 0),
+        0
+      );
+      const count = daySales.length;
+
+      return { 
+        date: dateStr, 
+        amount, 
+        count, // Guardamos la cantidad de órdenes para mostrarla si es necesario
+        displayLabel: new Date(dateStr).getDate() // Solo el número del día (ej: 29)
+      };
+    });
+    
+    return dailyData;
+  };
+
   // --- LÓGICA ADMINISTRADOR ---
   const fetchAdminData = async () => {
     const { count: pendingUsersCount } = await supabase
@@ -159,7 +201,7 @@ export default function Dashboard({ overrideRole }) {
       totalClients: 0,
     });
 
-    // Obtener últimas 5 transacciones para mostrar en la lista
+    // Obtener últimas 5 transacciones para mostrar
     const { data: recentNotes } = await supabase
       .from('sales_orders')
       .select('*, client:client_id(name), seller:seller_id(full_name)')
@@ -168,9 +210,9 @@ export default function Dashboard({ overrideRole }) {
     
     setRecentActivities(recentNotes || []);
 
-    // --- CORRECCIÓN GRÁFICA: Consulta específica para los últimos 7 días ---
+    // CONSULTA ESPECÍFICA PARA LA GRÁFICA (Últimos 7 días sin límite)
     const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6); // Hace 6 días + hoy = 7 días
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
     sevenDaysAgo.setHours(0, 0, 0, 0);
     
     const { data: last7DaysSales } = await supabase
@@ -178,32 +220,7 @@ export default function Dashboard({ overrideRole }) {
       .select('final_price_usd, created_at, payment_status')
       .gte('created_at', sevenDaysAgo.toISOString());
 
-    // Generar array de los últimos 7 días (incluyendo hoy)
-    const last7Days = Array.from({ length: 7 }, (_, i) => {
-      const d = new Date();
-      d.setDate(d.getDate() - (6 - i));
-      return d.toLocaleDateString('en-CA'); // Formato YYYY-MM-DD consistente
-    });
-
-    const dailyData = last7Days.map((dateStr) => {
-      // Filtrar ventas que coincidan con este día específico
-      const daySales =
-        last7DaysSales
-          ?.filter((s) => {
-            if (!s.created_at) return false;
-            // Convertir fecha de DB a formato YYYY-MM-DD local para comparar
-            const saleDate = new Date(s.created_at).toLocaleDateString('en-CA');
-            return (
-              saleDate === dateStr &&
-              (s.payment_status === 'cerrada' || s.payment_status === 'abonada')
-            );
-          })
-          .reduce((acc, curr) => acc + Number(curr.final_price_usd || 0), 0) ||
-        0;
-      return { date: dateStr, amount: daySales };
-    });
-    
-    setDailySalesData(dailyData);
+    setDailySalesData(processDailyChartData(last7DaysSales));
   };
 
   // --- LÓGICA GERENTE/SUPERVISOR ---
@@ -352,7 +369,7 @@ export default function Dashboard({ overrideRole }) {
     // Mostrar solo las últimas 5 transacciones
     setRecentActivities(teamSales?.slice(0, 5) || []);
 
-    // --- CORRECCIÓN GRÁFICA: Consulta específica para los últimos 7 días ---
+    // CONSULTA ESPECÍFICA PARA LA GRÁFICA (Últimos 7 días del equipo)
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
     sevenDaysAgo.setHours(0, 0, 0, 0);
@@ -363,30 +380,7 @@ export default function Dashboard({ overrideRole }) {
       .in('seller_id', subordinateIds)
       .gte('created_at', sevenDaysAgo.toISOString());
 
-    // Generar array de los últimos 7 días (incluyendo hoy)
-    const last7Days = Array.from({ length: 7 }, (_, i) => {
-      const d = new Date();
-      d.setDate(d.getDate() - (6 - i));
-      return d.toLocaleDateString('en-CA');
-    });
-
-    const dailyData = last7Days.map((dateStr) => {
-      const daySales =
-        last7DaysSales
-          ?.filter((s) => {
-            if (!s.created_at) return false;
-            const saleDate = new Date(s.created_at).toLocaleDateString('en-CA');
-            return (
-              saleDate === dateStr &&
-              (s.payment_status === 'cerrada' || s.payment_status === 'abonada')
-            );
-          })
-          .reduce((acc, curr) => acc + Number(curr.final_price_usd || 0), 0) ||
-        0;
-      return { date: dateStr, amount: daySales };
-    });
-    
-    setDailySalesData(dailyData);
+    setDailySalesData(processDailyChartData(last7DaysSales));
   };
 
   // --- LÓGICA VENDEDOR ---
@@ -440,7 +434,7 @@ export default function Dashboard({ overrideRole }) {
     // Mostrar solo las últimas 5 transacciones
     setRecentActivities(mySales?.slice(0, 5) || []);
 
-    // --- CORRECCIÓN GRÁFICA: Consulta específica para los últimos 7 días ---
+    // CONSULTA ESPECÍFICA PARA LA GRÁFICA (Últimos 7 días del vendedor)
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
     sevenDaysAgo.setHours(0, 0, 0, 0);
@@ -451,30 +445,7 @@ export default function Dashboard({ overrideRole }) {
       .eq('seller_id', sellerId)
       .gte('created_at', sevenDaysAgo.toISOString());
 
-    // Generar array de los últimos 7 días (incluyendo hoy)
-    const last7Days = Array.from({ length: 7 }, (_, i) => {
-      const d = new Date();
-      d.setDate(d.getDate() - (6 - i));
-      return d.toLocaleDateString('en-CA');
-    });
-
-    const dailyData = last7Days.map((dateStr) => {
-      const daySales =
-        last7DaysSales
-          ?.filter((s) => {
-            if (!s.created_at) return false;
-            const saleDate = new Date(s.created_at).toLocaleDateString('en-CA');
-            return (
-              saleDate === dateStr &&
-              (s.payment_status === 'cerrada' || s.payment_status === 'abonada')
-            );
-          })
-          .reduce((acc, curr) => acc + Number(curr.final_price_usd || 0), 0) ||
-        0;
-      return { date: dateStr, amount: daySales };
-    });
-    
-    setDailySalesData(dailyData);
+    setDailySalesData(processDailyChartData(last7DaysSales));
   };
 
   const handleCreateNE = () => {
@@ -503,6 +474,11 @@ export default function Dashboard({ overrideRole }) {
       </div>
     );
   }
+
+  // Calcular escala para la gráfica
+  const maxAmount = Math.max(...dailySalesData.map((d) => d.amount), 1);
+  // Redondear hacia arriba para que la barra más alta no toque el techo
+  const yAxisMax = Math.ceil(maxAmount / 10) * 10 || 10; 
 
   return (
     <div
@@ -1036,6 +1012,7 @@ export default function Dashboard({ overrideRole }) {
             marginBottom: '20px',
           }}
         >
+          {/* GRÁFICA ACTUALIZADA CON EJE Y */}
           <div
             style={{
               backgroundColor: '#ffffff',
@@ -1055,68 +1032,90 @@ export default function Dashboard({ overrideRole }) {
             >
               Ventas Diarias (Últimos 7 Días)
             </h3>
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'flex-end',
-                height: '120px',
-                gap: '8px',
-                paddingBottom: '10px',
-              }}
-            >
-              {dailySalesData.map((day, idx) => {
-                const maxVal = Math.max(
-                  ...dailySalesData.map((d) => d.amount),
-                  1
-                );
-                const heightPct = (day.amount / maxVal) * 100;
-                
-                // Formatear fecha para mostrar solo el día (ej: "29")
-                const dayNum = day.date
-                  ? new Date(day.date + 'T00:00:00').getDate() // Asegurar parsing correcto
-                  : idx + 1;
+            
+            <div style={{ display: 'flex', height: '140px' }}>
+              {/* Eje Y (Números verticales) */}
+              <div
+                style={{
+                  width: '30px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between',
+                  alignItems: 'flex-end',
+                  paddingRight: '8px',
+                  fontSize: '9px',
+                  color: '#9ca3af',
+                  paddingBottom: '20px', // Espacio para labels X
+                }}
+              >
+                <span>{yAxisMax}</span>
+                <span>{Math.round(yAxisMax * 0.75)}</span>
+                <span>{Math.round(yAxisMax * 0.5)}</span>
+                <span>{Math.round(yAxisMax * 0.25)}</span>
+                <span>0</span>
+              </div>
+
+              {/* Área de Barras */}
+              <div
+                style={{
+                  flex: 1,
+                  display: 'flex',
+                  alignItems: 'flex-end',
+                  gap: '6px',
+                  paddingBottom: '20px', // Espacio para labels X
+                  position: 'relative',
+                  borderBottom: '1px solid #f3f4f6',
+                  borderLeft: '1px solid #f3f4f6',
+                }}
+              >
+                {dailySalesData.map((day, idx) => {
+                  // Calculamos altura basada en el máximo escalado
+                  const heightPct = (day.amount / yAxisMax) * 100;
                   
-                return (
-                  <div
-                    key={idx}
-                    style={{
-                      flex: 1,
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      gap: '4px',
-                    }}
-                  >
+                  return (
                     <div
+                      key={idx}
                       style={{
-                        width: '100%',
-                        backgroundColor: '#eff6ff',
-                        borderRadius: '4px',
-                        height: `${heightPct}%`,
+                        flex: 1,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'flex-end',
+                        height: '100%',
                         position: 'relative',
-                        transition: 'height 0.5s ease',
-                        minHeight: '4px' // Mínimo visible para días sin ventas
                       }}
                     >
+                      {/* Barra */}
                       <div
                         style={{
-                          position: 'absolute',
-                          bottom: 0,
-                          left: 0,
-                          right: 0,
+                          width: '100%',
+                          maxWidth: '24px',
                           backgroundColor: '#3b82f6',
-                          height: '100%',
-                          borderRadius: '4px',
-                          opacity: 0.8,
+                          height: `${heightPct}%`,
+                          borderRadius: '4px 4px 0 0',
+                          opacity: 0.9,
+                          transition: 'height 0.5s ease',
+                          minHeight: day.amount > 0 ? '4px' : '0', // Mínimo visible si hay venta
                         }}
+                        title={`$${day.amount.toFixed(2)} (${day.count} órdenes)`}
                       ></div>
+                      
+                      {/* Label Día (X) */}
+                      <span
+                        style={{
+                          position: 'absolute',
+                          bottom: '-20px',
+                          fontSize: '10px',
+                          color: '#6b7280',
+                          fontWeight: '600',
+                        }}
+                      >
+                        {day.displayLabel}
+                      </span>
                     </div>
-                    <span style={{ fontSize: '9px', color: '#6b7280' }}>
-                      {dayNum}
-                    </span>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
           </div>
 
