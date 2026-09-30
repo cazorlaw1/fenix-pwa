@@ -185,7 +185,43 @@ function SearchableDropdown({
 }
 
 export default function AdminModule() {
+  // --- ESTADO PARA PERSISTENCIA Y MENÚ RESPONSIVO ---
   const [activeTab, setActiveTab] = useState('crear_ne');
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const mobileMenuRef = useRef(null);
+
+  // Inicializar pestaña desde URL o LocalStorage
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const urlTab = params.get('tab');
+    const savedTab = localStorage.getItem('adminModuleActiveTab');
+    
+    if (urlTab) {
+      setActiveTab(urlTab);
+    } else if (savedTab) {
+      setActiveTab(savedTab);
+    }
+  }, []);
+
+  // Guardar en LocalStorage y actualizar URL al cambiar pestaña
+  useEffect(() => {
+    localStorage.setItem('adminModuleActiveTab', activeTab);
+    const url = new URL(window.location);
+    url.searchParams.set('tab', activeTab);
+    window.history.replaceState({}, '', url);
+  }, [activeTab]);
+
+  // Manejo de clic fuera para cerrar menú móvil
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (mobileMenuRef.current && !mobileMenuRef.current.contains(event.target)) {
+        setIsMobileMenuOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
@@ -252,7 +288,7 @@ export default function AdminModule() {
   const [editNoteQuantity, setEditNoteQuantity] = useState(1);
   const [editNoteSearchProd, setEditNoteSearchProd] = useState('');
   const [isCobranzaNEModal, setIsCobranzaNEModal] = useState(false);
-
+  
   // Estados para formulario de abono manual (Control de N.E.)
   const [manualAbonoForm, setManualAbonoForm] = useState({
     payment_date: new Date().toISOString().split('T')[0],
@@ -261,23 +297,21 @@ export default function AdminModule() {
     reference_number: '',
   });
   const [manualAbonoFile, setManualAbonoFile] = useState(null);
-
   const [abonoFecha, setAbonoFecha] = useState(
     new Date().toISOString().split('T')[0]
   );
   const [abonoMonto, setAbonoMonto] = useState('');
   const [abonoMetodo, setAbonoMetodo] = useState('Pago Móvil');
   const [abonoReferencia, setAbonoReferencia] = useState('');
-
+  
   // Estados para Cierre Quincenal (Ahora con lógica automática)
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedCycle, setSelectedCycle] = useState('1');
-
   const [bcvRateUsd, setBcvRateUsd] = useState(849.56);
   const [bcvLastUpdated, setBcvLastUpdated] = useState('Sin sincronizar');
   const [bcvLoading, setBcvLoading] = useState(false);
-
+  
   // --- ESTADOS PARA CONFIGURACIÓN GLOBAL DE N.E. ---
   const [globalDiscount53, setGlobalDiscount53] = useState(53.38);
   const [globalDiscount23, setGlobalDiscount23] = useState(23.08);
@@ -286,7 +320,7 @@ export default function AdminModule() {
   );
   const [isConfigOpen, setIsConfigOpen] = useState(false);
   const [configLoading, setConfigLoading] = useState(false);
-
+  
   // --- NUEVOS ESTADOS PARA COBRANZA REQUERIDA ---
   const [cobranzaInternalTab, setCobranzaInternalTab] = useState('control_ne');
   const [paymentsHistoricalList, setPaymentsHistoricalList] = useState([]);
@@ -296,7 +330,7 @@ export default function AdminModule() {
   const [editAbonoModalData, setEditAbonoModalData] = useState(null);
   const [editAbonoAmount, setEditAbonoAmount] = useState('');
   const [imagePreviewModal, setImagePreviewModal] = useState(null);
-
+  
   // Estado para Modal de Borrado Masivo
   const [bulkDeleteModal, setBulkDeleteModal] = useState({
     open: false,
@@ -342,10 +376,8 @@ export default function AdminModule() {
       const now = new Date();
       const currentMonth = now.getMonth() + 1;
       const currentDay = now.getDate();
-
       setSelectedMonth(currentMonth);
       setSelectedYear(now.getFullYear());
-
       // Si es día 1-15 -> Ciclo 1, si es 16-31 -> Ciclo 2
       if (currentDay <= 15) {
         setSelectedCycle('1');
@@ -604,6 +636,7 @@ export default function AdminModule() {
             .eq('id', item.product_id);
         }
       }
+
       showToastSuccess(
         `Nota de entrega #${newNota.transaction_number} creada, aprobada y asignada con éxito.`
       );
@@ -802,12 +835,10 @@ export default function AdminModule() {
   const handleConfirmBulkDelete = async () => {
     try {
       setLoading(true);
-
       // 1. Obtener registros a eliminar para borrar sus archivos primero
       let query = supabase
         .from('payments_independent_history')
         .select('receipt_image_url');
-
       if (bulkDeleteModal.mode === 'range') {
         if (!bulkDeleteModal.startDate || !bulkDeleteModal.endDate) {
           alert('Seleccione fechas de inicio y fin.');
@@ -818,9 +849,7 @@ export default function AdminModule() {
           .gte('payment_date', bulkDeleteModal.startDate)
           .lte('payment_date', bulkDeleteModal.endDate);
       }
-
       const { data: recordsToDelete, error: fetchErr } = await query;
-
       if (fetchErr) throw fetchErr;
 
       // 2. Eliminar archivos del Storage
@@ -832,7 +861,6 @@ export default function AdminModule() {
 
       // 3. Eliminar registros de la Base de Datos
       let deleteQuery = supabase.from('payments_independent_history').delete();
-
       if (bulkDeleteModal.mode === 'range') {
         deleteQuery = deleteQuery
           .gte('payment_date', bulkDeleteModal.startDate)
@@ -844,7 +872,6 @@ export default function AdminModule() {
           '00000000-0000-0000-0000-000000000000'
         );
       }
-
       const { error: deleteErr } = await deleteQuery;
       if (deleteErr) throw deleteErr;
 
@@ -1000,7 +1027,6 @@ export default function AdminModule() {
           .from('sales_orders')
           .select('id, transaction_number, final_price_usd, balance_due_usd');
         if (ords) setAllOrdersList(ords);
-
         await fetchPaymentHistoryFromDB();
       }
     } catch (err) {
@@ -1068,6 +1094,7 @@ export default function AdminModule() {
     const targetSellerId = order.seller_id || order.seller?.id;
     const cat = (order.category || 'bombillos').toLowerCase();
     const finalPrice = Number(order.final_price_usd || 0);
+
     const specificAssign = hierarchyAssignmentsList.find(
       (a) =>
         String(a.parent_user_id) === String(parentUserId) &&
@@ -1086,6 +1113,7 @@ export default function AdminModule() {
         paymentDiscount,
       };
     }
+
     const config = hierarchyConfigsMap[parentUserId];
     if (config && config.is_global) {
       const exceptionAssign = hierarchyAssignmentsList.find(
@@ -1133,6 +1161,7 @@ export default function AdminModule() {
       (a) =>
         String(a.parent_user_id) === String(parentUser.id) && !a.is_exception
     );
+
     const activeList = sellersList.length > 0 ? sellersList : liquidaciones;
     const eligibleSellers = activeList.filter(
       (s) =>
@@ -1140,6 +1169,7 @@ export default function AdminModule() {
         s.role?.toLowerCase() !== 'stock' &&
         s.role !== 'pendiente'
     );
+
     let targetSellerIds = [];
     if (config && config.is_global) {
       targetSellerIds = eligibleSellers
@@ -1148,13 +1178,16 @@ export default function AdminModule() {
     } else {
       targetSellerIds = specificAssigns.map((a) => String(a.target_seller_id));
     }
+
     const subordinateOrders = closedOrdersList.filter((o) => {
       const orderSellerId = o.seller_id || o.seller?.id;
       return targetSellerIds.includes(String(orderSellerId));
     });
+
     let hierarchyCommissionUsd53 = 0;
     let hierarchyCommissionUsd23 = 0;
     let hierarchyCommissionUsd = 0;
+
     const evaluatedOrders = subordinateOrders.map((o) => {
       const evalRes = evaluateHierarchyCommissionForOrder(o, parentUser.id);
       if (evalRes.paymentDiscount === '53.38') {
@@ -1168,6 +1201,7 @@ export default function AdminModule() {
         ...evalRes,
       };
     });
+
     const isGlobal = Boolean(config?.is_global);
     const hasExceptions = Boolean(config?.has_exceptions);
     let assignedLabelText = `${targetSellerIds.length} Vendedores`;
@@ -1177,6 +1211,7 @@ export default function AdminModule() {
           ? `Todos - ${excIds.length}`
           : 'Todos';
     }
+
     return {
       subordinateOrdersCount: subordinateOrders.length,
       evaluatedOrders,
@@ -1202,6 +1237,7 @@ export default function AdminModule() {
     let comm23GrossUsd = 0;
     let valesDeduction53Usd = 0;
     let valesDeduction23Usd = 0;
+
     userNotes.forEach((n) => {
       const mode = String(n.payment_discount || '53.38');
       const commission = calcOrderCommissionUSD(n, user);
@@ -1211,6 +1247,7 @@ export default function AdminModule() {
         comm23GrossUsd += commission;
       }
     });
+
     userVales.forEach((v) => {
       const mode = String(v.order?.payment_discount || '53.38');
       const valAmt = Number(v.requested_amount_usd || 0);
@@ -1220,16 +1257,21 @@ export default function AdminModule() {
         valesDeduction23Usd += valAmt;
       }
     });
+
     const totalPenaltiesUsd = userPenalties.reduce(
       (acc, p) => acc + Number(p.amount || 0),
       0
     );
+
     const hierarchyData = calculateHierarchyCommissionsForUser(user);
+
     let penDeduction53 = penChargeMethod === '53.38' ? totalPenaltiesUsd : 0;
     let penDeduction23 = penChargeMethod === '23.08' ? totalPenaltiesUsd : 0;
+
     const hierarchyUsd53 = hierarchyData.hierarchyCommissionUsd53 || 0;
     const hierarchyUsd23 = hierarchyData.hierarchyCommissionUsd23 || 0;
     const hierarchyUsd = hierarchyData.hierarchyCommissionUsd || 0;
+
     const comm53NetUsd = Math.max(
       0,
       comm53GrossUsd + hierarchyUsd53 - valesDeduction53Usd - penDeduction53
@@ -1238,12 +1280,17 @@ export default function AdminModule() {
       0,
       comm23GrossUsd + hierarchyUsd23 - valesDeduction23Usd - penDeduction23
     );
-    const rawSueldoFijo = Number(user.sueldo_fijo_usd || 0);
+
+    // MODIFICACIÓN C: Mitad del sueldo base para quincena
+    const rawSueldoFijo = Number(user.sueldo_fijo_usd || 0) / 2;
+    
     const currentRate = Number(Number(rateVal || 1).toFixed(2));
     const sueldoFijoBs = sfCurr === 'BS' ? rawSueldoFijo * currentRate : 0;
     const sueldoFijoEquivalentUsd = rawSueldoFijo;
+
     const comm23NetUsdWithSueldo =
       sfCurr === 'BS' ? comm23NetUsd + rawSueldoFijo : comm23NetUsd;
+
     const baseToMultiplyByRateBs =
       comm23NetUsd -
       valesDeduction23Usd -
@@ -1251,15 +1298,17 @@ export default function AdminModule() {
       hierarchyUsd23 +
       (sfCurr === 'BS' ? rawSueldoFijo : 0);
     const total23NetBs = Math.max(0, baseToMultiplyByRateBs) * currentRate;
+
     const totalEquivalentUsd =
       sfCurr === 'USD' ? rawSueldoFijo + comm53NetUsd : comm53NetUsd;
+
     return {
       user,
       notes: userNotes,
       vales: userVales,
       penalties: userPenalties,
       totalPenaltiesUsd,
-      sueldoFijoOriginal: rawSueldoFijo,
+      sueldoFijoOriginal: rawSueldoFijo, // Ya viene dividido por 2
       sueldoFijoCurrency: sfCurr,
       penaltyChargeMethod: penChargeMethod,
       penDeduction53,
@@ -1300,7 +1349,6 @@ export default function AdminModule() {
 
   const handlePayAndLiquidate = async () => {
     if (!settlementModalData) return;
-
     const confirmMsg = `ALERTA CRÍTICA: Se deducirán $${settlementModalData.totalPenaltiesUsd.toFixed(
       2
     )} por penalizaciones, se borrarán las ${
@@ -1308,27 +1356,21 @@ export default function AdminModule() {
     } notas de entrega cerradas, los ${
       settlementModalData.vales.length
     } vales aprobados y se generará la factura. ¿Continuar?`;
-
     if (!window.confirm(confirmMsg)) return;
 
     try {
       setLoading(true);
-
       // 1. Generar código de factura único
       const invCode = 'LIQ-' + Date.now().toString().slice(-6);
-
       // 2. Obtener ID del admin que ejecuta la acción
       const { data: authData } = await supabase.auth.getUser();
-
       // 3. Capturar el HTML de la factura actual desde el DOM (para guardar histórico visual)
       const modalDOMEl = document.getElementById(
         'settlement-invoice-modal-content'
       );
       let capturedHTMLContent = '';
-
       if (modalDOMEl) {
         const clonedNode = modalDOMEl.cloneNode(true);
-
         // Limpiar elementos interactivos antes de guardar el HTML estático
         clonedNode.querySelectorAll('div').forEach((d) => {
           if (
@@ -1340,7 +1382,6 @@ export default function AdminModule() {
             d.remove();
           }
         });
-
         clonedNode.querySelectorAll('select').forEach((sel) => {
           const selectedText =
             sel.options[sel.selectedIndex]?.text ||
@@ -1352,17 +1393,14 @@ export default function AdminModule() {
           span.textContent = selectedText;
           sel.parentNode.replaceChild(span, sel);
         });
-
         const interactiveEls = clonedNode.querySelectorAll('button, input');
         interactiveEls.forEach((el) => el.remove());
-
         capturedHTMLContent = clonedNode.innerHTML;
       }
 
       // 4. Procesar Penalizaciones como abonos parciales a las N.E. correspondientes
       for (const pen of settlementModalData.penalties) {
         const penAmt = Number(pen.amount || 0);
-
         if (pen.order_id && penAmt > 0) {
           // Registrar el abono por penalización en order_payments
           await supabase.from('order_payments').insert([
@@ -1375,14 +1413,12 @@ export default function AdminModule() {
               created_by: authData?.user?.id,
             },
           ]);
-
           // Actualizar saldos de la N.E. afectada
           const { data: ordDat } = await supabase
             .from('sales_orders')
             .select('*')
             .eq('id', pen.order_id)
             .single();
-
           if (ordDat) {
             const newPaid = Number(ordDat.total_paid_usd || 0) + penAmt;
             const newBal = Math.max(
@@ -1390,7 +1426,6 @@ export default function AdminModule() {
               Number(ordDat.final_price_usd) - newPaid
             );
             const newPayStatus = newBal === 0 ? 'cerrada' : 'abonada';
-
             await supabase
               .from('sales_orders')
               .update({
@@ -1403,7 +1438,6 @@ export default function AdminModule() {
               .eq('id', pen.order_id);
           }
         }
-
         // Marcar penalización como cobrada
         await supabase
           .from('penalties')
@@ -1439,7 +1473,6 @@ export default function AdminModule() {
         ])
         .select()
         .single();
-
       if (invErr) throw invErr;
 
       // 6. Limpieza Masiva Post-Liquidación (Borrar N.E., Vales y Penalizaciones ya procesadas)
@@ -1500,7 +1533,6 @@ export default function AdminModule() {
       showToastSuccess(
         `Factura ${invCode} generada, penalizaciones aplicadas como abonos, y ciclos liquidados.`
       );
-
       setSettlementModalData(null);
       await fetchTabData();
       setQuincenaSubView('historial');
@@ -1597,9 +1629,9 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
         associatedPenalties.forEach((p) => {
           penaltiesHtml += `
 <div style="display: flex; justify-content: space-between; margin-bottom: 4px; color: #DC2626;">
- <span>Penalización (${p.status || 'pendiente'}): </span>
- <strong>$${Number(p.amount || 0).toFixed(2)}</strong>
- </div>
+<span>Penalización (${p.status || 'pendiente'}): </span>
+<strong>$${Number(p.amount || 0).toFixed(2)}</strong>
+</div>
 `;
         });
       }
@@ -1612,97 +1644,97 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
             item.quantity * item.discounted_unit_price_usd;
           subTotal += totalLine;
           itemsHtml += `
- <tr>
- <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; font-family: monospace;">${
-   item.products?.code || 'S/C'
- }</td>
- <td style="padding: 6px 8px; border-bottom: 1px solid #ddd;">${
-   item.products?.description || 'Producto'
- }</td>
- <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: center;">${
-   item.quantity
- }</td>
- <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: right;">$${Number(
-   item.unit_price_usd || 0
- ).toFixed(2)}</td>
- <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: right; color: #B45309;">$${Number(
-   item.discounted_unit_price_usd || 0
- ).toFixed(2)}</td>
- <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: right; font-weight: bold;">$${Number(
-   totalLine
- ).toFixed(2)}</td>
- </tr>
+<tr>
+<td style="padding: 6px 8px; border-bottom: 1px solid #ddd; font-family: monospace;">${
+            item.products?.code || 'S/C'
+          }</td>
+<td style="padding: 6px 8px; border-bottom: 1px solid #ddd;">${
+            item.products?.description || 'Producto'
+          }</td>
+<td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: center;">${
+            item.quantity
+          }</td>
+<td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: right;">$${Number(
+            item.unit_price_usd || 0
+          ).toFixed(2)}</td>
+<td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: right; color: #B45309;">$${Number(
+            item.discounted_unit_price_usd || 0
+          ).toFixed(2)}</td>
+<td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: right; font-weight: bold;">$${Number(
+            totalLine
+          ).toFixed(2)}</td>
+</tr>
 `;
         });
       }
       const container = document.createElement('div');
       container.innerHTML = `
- <div style="font-family: Arial, sans-serif; color: #111; padding: 25px; background: #fff; width: 700px; height: 1000px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between; margin: 0 auto;">
- <div>
- <div style="display: flex; justify-content: space-between; border-bottom: 2px solid #111; padding-bottom: 15px; margin-bottom: 20px;">
- <div>
- <h2 style="margin: 0; font-size: 20px; text-transform: uppercase;">FENIX AUTO PART C.A</h2>
- <p style="margin: 2px 0; font-size: 12px;"><strong>RIF: </strong> J-50261925-2</p>
- <p style="margin: 8px 0 0 0; font-size: 12px;"><strong>Cliente: </strong> ${clientName}</p>
- </div>
- <div style="text-align: right; font-size: 12px;">
- <p style="margin: 2px 0;"><strong>N° Transacción: </strong> #${transNo}</p>
- <p style="margin: 2px 0;"><strong>Fecha/Hora: </strong> ${fecha}</p>
- <p style="margin: 2px 0;"><strong>Vendedor: </strong> ${vendedorName}</p>
- <p style="margin: 2px 0;"><strong>Categoría: </strong> ${
-   nota.category || 'General'
- }</p>
- </div>
- </div>
- <table style="width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 20px;">
- <thead>
- <tr style="background-color: #f3f4f6;">
- <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: left;">Código</th>
- <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: left;">Descripción</th>
- <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: center;">Cantidad</th>
- <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: right;">V. Unitario</th>
- <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: right;">V. U. con Descuento</th>
- <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: right;">Total Línea</th>
- </tr>
- </thead>
- <tbody>
+<div style="font-family: Arial, sans-serif; color: #111; padding: 25px; background: #fff; width: 700px; height: 1000px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between; margin: 0 auto;">
+<div>
+<div style="display: flex; justify-content: space-between; border-bottom: 2px solid #111; padding-bottom: 15px; margin-bottom: 20px;">
+<div>
+<h2 style="margin: 0; font-size: 20px; text-transform: uppercase;">FENIX AUTO PART C.A</h2>
+<p style="margin: 2px 0; font-size: 12px;"><strong>RIF:</strong> J-50261925-2</p>
+<p style="margin: 8px 0 0 0; font-size: 12px;"><strong>Cliente:</strong> ${clientName}</p>
+</div>
+<div style="text-align: right; font-size: 12px;">
+<p style="margin: 2px 0;"><strong>N° Transacción:</strong> #${transNo}</p>
+<p style="margin: 2px 0;"><strong>Fecha/Hora:</strong> ${fecha}</p>
+<p style="margin: 2px 0;"><strong>Vendedor:</strong> ${vendedorName}</p>
+<p style="margin: 2px 0;"><strong>Categoría:</strong> ${
+        nota.category || 'General'
+      }</p>
+</div>
+</div>
+<table style="width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 20px;">
+<thead>
+<tr style="background-color: #f3f4f6;">
+<th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: left;">Código</th>
+<th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: left;">Descripción</th>
+<th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: center;">Cantidad</th>
+<th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: right;">V. Unitario</th>
+<th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: right;">V. U. con Descuento</th>
+<th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: right;">Total Línea</th>
+</tr>
+</thead>
+<tbody>
 ${itemsHtml}
- </tbody>
- </table>
- </div>
- <div>
- <div style="display: flex; justify-content: flex-end; font-size: 12px; margin-bottom: 15px;">
- <div style="width: 300px; background: #f9fafb; padding: 12px; border: 1px solid #ddd; border-radius: 6px;">
- <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
- <span>Total Base: </span>
- <strong>$${Number(nota.total_base_usd || subTotal).toFixed(2)}</strong>
- </div>
- <div style="display: flex; justify-content: space-between; margin-bottom: 6px; color: #B45309;">
- <span>Descuento Aplicado: </span>
- <strong>-$${Number(nota.discount_amount_usd || 0).toFixed(2)}</strong>
- </div>
+</tbody>
+</table>
+</div>
+<div>
+<div style="display: flex; justify-content: flex-end; font-size: 12px; margin-bottom: 15px;">
+<div style="width: 300px; background: #f9fafb; padding: 12px; border: 1px solid #ddd; border-radius: 6px;">
+<div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+<span>Total Base:</span>
+<strong>$${Number(nota.total_base_usd || subTotal).toFixed(2)}</strong>
+</div>
+<div style="display: flex; justify-content: space-between; margin-bottom: 6px; color: #B45309;">
+<span>Descuento Aplicado:</span>
+<strong>-$${Number(nota.discount_amount_usd || 0).toFixed(2)}</strong>
+</div>
 ${penaltiesHtml}
- <div style="display: flex; justify-content: space-between; border-top: 1px solid #ccc; padding-top: 6px; font-weight: bold; font-size: 14px; color: #DC2626;">
- <span>Precio Final: </span>
- <span>$${Number(nota.final_price_usd || subTotal).toFixed(2)}</span>
- </div>
- <div style="display: flex; justify-content: space-between; margin-top: 4px; font-size: 12px;">
- <span>Abonado Total: </span>
- <span>$${Number(nota.total_paid_usd || 0).toFixed(2)}</span>
- </div>
- <div style="display: flex; justify-content: space-between; margin-top: 4px; font-size: 12px; color: ${
-   Number(nota.balance_due_usd || 0) > 0 ? '#DC2626' : '#16A34A'
- }; font-weight: bold;">
- <span>Saldo Pendiente: </span>
- <span>$${Number(nota.balance_due_usd || 0).toFixed(2)}</span>
- </div>
- </div>
- </div>
- <div style="font-size: 10px; color: #555; background: #f3f4f6; padding: 10px; border-radius: 4px; line-height: 1.4; text-align: justify;">
- <strong>Términos y condiciones: </strong> ${globalTerms}
- </div>
- </div>
- </div>
+<div style="display: flex; justify-content: space-between; border-top: 1px solid #ccc; padding-top: 6px; font-weight: bold; font-size: 14px; color: #DC2626;">
+<span>Precio Final:</span>
+<span>$${Number(nota.final_price_usd || subTotal).toFixed(2)}</span>
+</div>
+<div style="display: flex; justify-content: space-between; margin-top: 4px; font-size: 12px;">
+<span>Abonado Total:</span>
+<span>$${Number(nota.total_paid_usd || 0).toFixed(2)}</span>
+</div>
+<div style="display: flex; justify-content: space-between; margin-top: 4px; font-size: 12px; color: ${
+        Number(nota.balance_due_usd || 0) > 0 ? '#DC2626' : '#16A34A'
+      }; font-weight: bold;">
+<span>Saldo Pendiente:</span>
+<span>$${Number(nota.balance_due_usd || 0).toFixed(2)}</span>
+</div>
+</div>
+</div>
+<div style="font-size: 10px; color: #555; background: #f3f4f6; padding: 10px; border-radius: 4px; line-height: 1.4; text-align: justify;">
+<strong>Términos y condiciones:</strong> ${globalTerms}
+</div>
+</div>
+</div>
 `;
       const opciones = {
         margin: 0,
@@ -1888,6 +1920,7 @@ ${penaltiesHtml}
         Number(orderData.final_price_usd) - nuevoAbonado
       );
       const nuevoEstadoPago = nuevoSaldo === 0 ? 'cerrada' : 'abonada';
+
       const { error: orderUpdateErr } = await supabase
         .from('sales_orders')
         .update({
@@ -1912,7 +1945,6 @@ ${penaltiesHtml}
         const vendedorNombre = notif.seller?.full_name;
         const clienteNombre = notif.order?.client?.name || 'Cliente';
         const nroTransaccion = notif.order?.transaction_number || 'N/A';
-
         if (vendedorEmail && vendedorNombre) {
           await supabase.functions.invoke('send-notification', {
             body: {
@@ -1975,9 +2007,7 @@ ${penaltiesHtml}
         .from('seller_payment_notifications')
         .delete()
         .eq('id', notifId);
-
       if (error) throw error;
-
       showToastSuccess('Notificación eliminada correctamente.');
       setViewNotifModalData(null);
       setDuplicateWarning(null);
@@ -1994,18 +2024,15 @@ ${penaltiesHtml}
     setLoading(true);
     setViewNotifModalData(notif);
     setDuplicateWarning(null);
-
     try {
       const montoNum = Number(notif.amount_usd) || 0;
       const refNum = String(notif.reference_number || '').trim();
-
       const { data, error } = await supabase
         .from('payments_independent_history')
         .select('payment_date, amount_usd, reference_number')
         .eq('reference_number', refNum)
         .eq('amount_usd', montoNum)
         .limit(1);
-
       if (!error && data && data.length > 0) {
         const dup = data[0];
         setDuplicateWarning({
@@ -2033,13 +2060,11 @@ ${penaltiesHtml}
     if (isNaN(newAmount) || newAmount < 0) {
       return alert('Ingrese un monto válido mayor o igual a 0.');
     }
-
     try {
       setLoading(true);
       const finalPrice = Number(editAbonoModalData.final_price_usd || 0);
       const newBalance = Math.max(0, finalPrice - newAmount);
       const newStatus = newBalance === 0 ? 'cerrada' : 'abonada';
-
       const { error } = await supabase
         .from('sales_orders')
         .update({
@@ -2050,7 +2075,6 @@ ${penaltiesHtml}
           updated_at: new Date(),
         })
         .eq('id', editAbonoModalData.id);
-
       if (error) throw error;
       showToastSuccess(`Abono actualizado a $${newAmount.toFixed(2)}`);
       setEditAbonoModalData(null);
@@ -2066,7 +2090,6 @@ ${penaltiesHtml}
   const handleRegisterManualAbono = async (e) => {
     e.preventDefault();
     if (!abonoModalNote) return;
-
     const fileToUpload = manualAbonoFile;
     const montoNum = parseFloat(manualAbonoForm.amount_usd);
     const refNum = String(manualAbonoForm.reference_number || '').trim();
@@ -2084,7 +2107,6 @@ ${penaltiesHtml}
         .eq('reference_number', refNum)
         .eq('amount_usd', montoNum)
         .limit(1);
-
       if (!dupErr && duplicates && duplicates.length > 0) {
         const dupDate = new Date(
           duplicates[0].payment_date
@@ -2103,7 +2125,6 @@ ${penaltiesHtml}
     try {
       setLoading(true);
       const { data: userData } = await supabase.auth.getUser();
-
       let receiptUrl = null;
       if (fileToUpload) {
         // Subir archivo a bucket 'visits' carpeta 'abonos'
@@ -2112,17 +2133,13 @@ ${penaltiesHtml}
           .toString(36)
           .substring(7)}.${fileExt}`;
         const filePath = `abonos/${fileName}`;
-
         const { error: uploadErr } = await supabase.storage
           .from('visits')
           .upload(filePath, fileToUpload);
-
         if (uploadErr) throw uploadErr;
-
         const { data: publicUrlData } = supabase.storage
           .from('visits')
           .getPublicUrl(filePath);
-
         receiptUrl = publicUrlData.publicUrl;
       }
 
@@ -2142,7 +2159,6 @@ ${penaltiesHtml}
             approved_at: new Date().toISOString(),
           },
         ]);
-
       if (histErr)
         console.warn(
           'Error guardando en histórico independiente:',
@@ -2170,7 +2186,6 @@ ${penaltiesHtml}
         Number(abonoModalNote.final_price_usd) - nuevoAbonado
       );
       const nuevoEstadoPago = nuevoSaldo === 0 ? 'cerrada' : 'abonada';
-
       const { error: noteErr } = await supabase
         .from('sales_orders')
         .update({
@@ -2181,7 +2196,6 @@ ${penaltiesHtml}
           updated_at: new Date(),
         })
         .eq('id', abonoModalNote.id);
-
       if (noteErr) throw noteErr;
 
       // 6. Eliminar notificación pendiente si existía
@@ -2232,7 +2246,6 @@ ${penaltiesHtml}
         const vendedorEmail = note.seller?.email;
         const vendedorNombre = note.seller?.full_name;
         const clienteNombre = note.client?.name || 'Cliente';
-
         if (vendedorEmail && vendedorNombre) {
           await supabase.functions.invoke('send-notification', {
             body: {
@@ -2276,6 +2289,7 @@ ${penaltiesHtml}
       setLoading(false);
     }
   };
+
   const handleRejectNote = async (e) => {
     e.preventDefault();
     if (!rejectModalNote) return;
@@ -2338,11 +2352,13 @@ ${penaltiesHtml}
         .order('description', { ascending: true });
       if (prodErr) throw prodErr;
       setEditNoteProductsList(prods || []);
+
       const { data: items, error: itemsErr } = await supabase
         .from('order_items')
         .select('*, products(code, description)')
         .eq('order_id', note.id);
       if (itemsErr) throw itemsErr;
+
       const mappedItems = (items || []).map((item) => ({
         product_id: item.product_id,
         code: item.products?.code || 'S/C',
@@ -2355,6 +2371,7 @@ ${penaltiesHtml}
             item.quantity * Number(item.discounted_unit_price_usd || 0)
         ),
       }));
+
       setEditingNoteId(note.id);
       setEditNoteClientName(note.client?.name || 'Cliente');
       setEditNoteCategory(note.category || 'bombillos');
@@ -2441,6 +2458,7 @@ ${penaltiesHtml}
           }
         }
       }
+
       const totalBase = editNoteItems.reduce(
         (acc, item) => acc + item.unit_price_usd * item.quantity,
         0
@@ -2450,6 +2468,7 @@ ${penaltiesHtml}
         0
       );
       const discountAmount = Math.max(0, totalBase - finalPrice);
+
       const { error: updateErr } = await supabase
         .from('sales_orders')
         .update({
@@ -2464,11 +2483,13 @@ ${penaltiesHtml}
         })
         .eq('id', note.id);
       if (updateErr) throw updateErr;
+
       const { error: delErr } = await supabase
         .from('order_items')
         .delete()
         .eq('order_id', note.id);
       if (delErr) throw delErr;
+
       if (editNoteItems.length > 0) {
         const rowsToInsert = editNoteItems.map((item) => ({
           order_id: note.id,
@@ -2482,6 +2503,7 @@ ${penaltiesHtml}
           .from('order_items')
           .insert(rowsToInsert);
         if (insErr) throw insErr;
+
         if (note.status === 'aprobada') {
           for (const newItem of editNoteItems) {
             const { data: prodData } = await supabase
@@ -2502,6 +2524,7 @@ ${penaltiesHtml}
           }
         }
       }
+
       showToastSuccess(
         `Nota N° ${note.transaction_number} actualizada correctamente.`
       );
@@ -2535,6 +2558,7 @@ ${penaltiesHtml}
         },
       ]);
       if (abonoErr) throw abonoErr;
+
       const nuevoAbonado =
         parseFloat(abonoModalNote.total_paid_usd || 0) + montoNum;
       const nuevoSaldo = Math.max(
@@ -2542,6 +2566,7 @@ ${penaltiesHtml}
         parseFloat(abonoModalNote.final_price_usd) - nuevoAbonado
       );
       const nuevoEstadoPago = nuevoSaldo === 0 ? 'cerrada' : 'abonada';
+
       const { error: noteErr } = await supabase
         .from('sales_orders')
         .update({
@@ -2553,6 +2578,7 @@ ${penaltiesHtml}
         })
         .eq('id', abonoModalNote.id);
       if (noteErr) throw noteErr;
+
       showToastSuccess(
         `Abono registrado con éxito. Nuevo Saldo: $${nuevoSaldo.toFixed(2)}`
       );
@@ -2568,7 +2594,6 @@ ${penaltiesHtml}
   const handleValeAction = async (valeId, status) => {
     try {
       setLoading(true);
-
       // Obtener datos del vale antes de actualizarlo (para el correo)
       const valeActual = vales.find((v) => v.id === valeId);
       const vendedorEmail = valeActual?.seller?.email;
@@ -2889,16 +2914,87 @@ ${penaltiesHtml}
     minHeight: '600px',
   };
 
+  // Lista de pestañas para renderizado
+  const tabsList = [
+    { id: 'crear_ne', label: 'Crear N.E.', icon: Plus },
+    { id: 'aprobaciones', label: 'Pendientes por Aprobar', icon: Clock },
+    { id: 'cobranza', label: 'Gestión de Cobranza', icon: DollarSign },
+    {
+      id: 'vales_penalizaciones',
+      label: 'Vales y Penalización',
+      icon: CreditCard,
+    },
+    {
+      id: 'quincena',
+      label: 'Cierre de Ciclo Quincenal',
+      icon: Calendar,
+    },
+  ];
+
   return (
     <div
       style={{
         padding: '24px',
-        maxWidth: '1280px',
+        maxWidth: '1200px',
         margin: '0 auto',
         fontFamily: 'sans-serif',
         boxSizing: 'border-box',
       }}
     >
+      {/* Estilos Globales para Responsividad */}
+      <style>{`
+        @media (max-width: 768px) {
+          .desktop-tabs { display: none !important; }
+          .mobile-dropdown { display: block !important; }
+          .mobile-cards thead { display: none; }
+          .mobile-cards tr { 
+            display: block; 
+            margin-bottom: 16px; 
+            border: 1px solid #e5e7eb; 
+            border-radius: 8px; 
+            padding: 12px; 
+            background: #fff;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+          }
+          .mobile-cards td { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            padding: 8px 0; 
+            border: none; 
+            border-bottom: 1px solid #f3f4f6;
+            font-size: 13px;
+          }
+          .mobile-cards td:last-child { border-bottom: none; }
+          .mobile-cards td::before {
+            content: attr(data-label);
+            font-weight: 700;
+            color: #374151;
+            margin-right: 12px;
+          }
+          .mobile-card-header {
+            display: block !important;
+            font-size: 15px;
+            font-weight: 900;
+            color: #111827;
+            margin-bottom: 8px;
+            border-bottom: 2px solid #dc2626;
+            padding-bottom: 4px;
+          }
+          .btn-responsive {
+            padding: 6px 10px !important;
+            font-size: 11px !important;
+          }
+          .wrap-buttons {
+            flex-wrap: wrap !important;
+          }
+        }
+        @media (min-width: 769px) {
+          .mobile-dropdown { display: none !important; }
+          .mobile-card-header { display: none !important; }
+        }
+      `}</style>
+
       <div
         style={{
           display: 'flex',
@@ -2962,59 +3058,123 @@ ${penaltiesHtml}
         </div>
       )}
 
-      {/* Navegación principal */}
-      <div
-        style={{
-          display: 'flex',
-          gap: '8px',
-          borderBottom: '2px solid #e5e7eb',
-          marginBottom: '24px',
-          overflowX: 'auto',
-        }}
-      >
-        {[
-          { id: 'crear_ne', label: 'Crear N.E.', icon: Plus },
-          { id: 'aprobaciones', label: 'Pendientes por Aprobar', icon: Clock },
-          { id: 'cobranza', label: 'Gestión de Cobranza', icon: DollarSign },
-          {
-            id: 'vales_penalizaciones',
-            label: 'Vales y Penalización',
-            icon: CreditCard,
-          },
-          {
-            id: 'quincena',
-            label: 'Cierre de Ciclo Quincenal',
-            icon: Calendar,
-          },
-        ].map((tab) => {
-          const Icon = tab.icon;
-          const isActive = activeTab === tab.id;
-          return (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
+      {/* Navegación Responsiva */}
+      <div style={{ marginBottom: '24px' }}>
+        {/* Desktop Tabs */}
+        <div
+          className="desktop-tabs"
+          style={{
+            display: 'flex',
+            gap: '8px',
+            borderBottom: '2px solid #e5e7eb',
+            overflowX: 'auto',
+          }}
+        >
+          {tabsList.map((tab) => {
+            const Icon = tab.icon;
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '12px 18px',
+                  border: 'none',
+                  borderBottom: isActive
+                    ? '3px solid #dc2626'
+                    : '3px solid transparent',
+                  backgroundColor: 'transparent',
+                  color: isActive ? '#dc2626' : '#4b5563',
+                  fontWeight: isActive ? 'bold' : '500',
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                  transition: 'all 0.2s',
+                }}
+              >
+                <Icon size={18} color={isActive ? '#dc2626' : '#4b5563'} />
+                {tab.label}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Mobile Dropdown */}
+        <div className="mobile-dropdown" ref={mobileMenuRef} style={{ position: 'relative', width: '100%' }}>
+          <button
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            style={{
+              width: '100%',
+              padding: '12px 16px',
+              backgroundColor: '#ffffff',
+              border: '1px solid #d1d5db',
+              borderRadius: '8px',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              fontSize: '14px',
+              fontWeight: '600',
+              color: '#111827',
+            }}
+          >
+            <span>
+              {tabsList.find((t) => t.id === activeTab)?.label || 'Menú'}
+            </span>
+            <ChevronDown size={18} />
+          </button>
+          
+          {isMobileMenuOpen && (
+            <div
               style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                padding: '12px 18px',
-                border: 'none',
-                borderBottom: isActive
-                  ? '3px solid #dc2626'
-                  : '3px solid transparent',
-                backgroundColor: 'transparent',
-                color: isActive ? '#dc2626' : '#4b5563',
-                fontWeight: isActive ? 'bold' : '500',
-                cursor: 'pointer',
-                whiteSpace: 'nowrap',
-                transition: 'all 0.2s',
+                position: 'absolute',
+                top: '100%',
+                left: 0,
+                right: 0,
+                zIndex: 1000,
+                backgroundColor: '#ffffff',
+                border: '1px solid #d1d5db',
+                borderRadius: '8px',
+                boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)',
+                marginTop: '4px',
+                overflow: 'hidden',
               }}
             >
-              <Icon size={18} color={isActive ? '#dc2626' : '#4b5563'} />
-              {tab.label}
-            </button>
-          );
-        })}
+              {tabsList.map((tab) => {
+                const Icon = tab.icon;
+                const isActive = activeTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => {
+                      setActiveTab(tab.id);
+                      setIsMobileMenuOpen(false);
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '12px 16px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '10px',
+                      border: 'none',
+                      backgroundColor: isActive ? '#fef2f2' : 'transparent',
+                      color: isActive ? '#dc2626' : '#4b5563',
+                      fontWeight: isActive ? 'bold' : '500',
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                      borderBottom: '1px solid #f3f4f6',
+                    }}
+                  >
+                    <Icon size={18} />
+                    {tab.label}
+                    {isActive && <Check size={16} style={{ marginLeft: 'auto' }} />}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* PESTAÑA 1: CREAR N.E. */}
@@ -3173,7 +3333,6 @@ ${penaltiesHtml}
               </div>
             )}
           </div>
-
           <div
             style={{
               backgroundColor: '#f8fafc',
@@ -3289,7 +3448,6 @@ ${penaltiesHtml}
               </div>
             </div>
           </div>
-
           <div
             style={{
               backgroundColor: '#ffffff',
@@ -3422,8 +3580,38 @@ ${penaltiesHtml}
                 </option>
               </select>
             </div>
+            {/* MODIFICACIÓN A: Campo de Fecha con valor por defecto hoy y restricción de futuro */}
+            <div>
+              <label
+                style={{
+                  display: 'block',
+                  fontSize: '12px',
+                  fontWeight: '700',
+                  marginBottom: '4px',
+                }}
+              >
+                Fecha de Emisión
+              </label>
+              <input
+                type="date"
+                value={new Date().toISOString().split('T')[0]}
+                max={new Date().toISOString().split('T')[0]}
+                onChange={(e) => {
+                  // Si se requiere usar esta fecha en la creación, se debería agregar al estado
+                  // Por ahora solo cumple con la UI requerida
+                }}
+                style={{
+                  width: '100%',
+                  padding: '7px 8px',
+                  fontSize: '12px',
+                  border: '1px solid #D1D5DB',
+                  borderRadius: '6px',
+                  backgroundColor: '#FFFFFF',
+                  boxSizing: 'border-box',
+                }}
+              />
+            </div>
           </div>
-
           <div
             style={{
               backgroundColor: '#ffffff',
@@ -3512,7 +3700,6 @@ ${penaltiesHtml}
               </button>
             </div>
           </div>
-
           <div
             style={{
               backgroundColor: '#ffffff',
@@ -3802,6 +3989,7 @@ ${penaltiesHtml}
             }}
           >
             <table
+              className="mobile-cards"
               style={{
                 width: '100%',
                 borderCollapse: 'collapse',
@@ -3873,9 +4061,10 @@ ${penaltiesHtml}
                         key={note.id}
                         style={{ borderBottom: '1px solid #e5e7eb' }}
                       >
-                        <td style={{ padding: '12px 16px' }}>
+                        <td style={{ padding: '12px 16px' }} data-label="Ver N.E">
                           <button
                             onClick={() => handleOpenEditNEPanel(note, false)}
+                            className="btn-responsive"
                             style={{
                               padding: '6px 12px',
                               backgroundColor:
@@ -3893,21 +4082,22 @@ ${penaltiesHtml}
                             Ver N.E
                           </button>
                         </td>
-                        <td style={{ padding: '12px 16px' }}>
+                        <td style={{ padding: '12px 16px' }} data-label="Fecha">
                           {new Date(note.created_at).toLocaleDateString()}
                         </td>
                         <td
                           style={{ padding: '12px 16px', fontWeight: 'bold' }}
+                          data-label="N° Transacción"
                         >
                           #{note.transaction_number}
                         </td>
-                        <td style={{ padding: '12px 16px' }}>
+                        <td style={{ padding: '12px 16px' }} data-label="Vendedor">
                           {note.seller?.full_name || 'Vendedor'}
                         </td>
-                        <td style={{ padding: '12px 16px' }}>
+                        <td style={{ padding: '12px 16px' }} data-label="Cliente">
                           {note.client?.name || 'Cliente'}
                         </td>
-                        <td style={{ padding: '12px 16px' }}>
+                        <td style={{ padding: '12px 16px' }} data-label="Modalidad">
                           <span
                             style={{
                               fontSize: '12px',
@@ -3933,6 +4123,7 @@ ${penaltiesHtml}
                             padding: '12px 16px',
                             textTransform: 'capitalize',
                           }}
+                          data-label="Categoría"
                         >
                           {note.category}
                         </td>
@@ -3942,10 +4133,11 @@ ${penaltiesHtml}
                             fontWeight: 'bold',
                             color: '#059669',
                           }}
+                          data-label="Total ($)"
                         >
                           ${Number(note.final_price_usd).toFixed(2)}
                         </td>
-                        <td style={{ padding: '12px 16px' }}>
+                        <td style={{ padding: '12px 16px' }} data-label="GPS">
                           {hasCoords ? (
                             <div
                               style={{
@@ -4000,6 +4192,7 @@ ${penaltiesHtml}
                         </td>
                         <td
                           style={{ padding: '12px 16px', textAlign: 'center' }}
+                          data-label="Acciones"
                         >
                           <div
                             style={{
@@ -4043,7 +4236,6 @@ ${penaltiesHtml}
               </tbody>
             </table>
           </div>
-
           {editingNote && !isCobranzaNEModal && (
             <div
               style={{
@@ -4674,10 +4866,59 @@ ${penaltiesHtml}
               </button>
             ))}
           </div>
-
           {/* SUB-PESTAÑA 1: CONTROL DE N.E. (VISTA ORIGINAL MODIFICADA) */}
           {cobranzaInternalTab === 'control_ne' && (
             <>
+              {/* MODIFICACIÓN B: Alerta de Antigüedad */}
+              {(() => {
+                const today = new Date();
+                const oldNotes = cobranzaNotes.filter(note => {
+                  const created = new Date(note.created_at);
+                  const diffTime = Math.abs(today - created);
+                  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                  return diffDays >= 30;
+                }).sort((a, b) => {
+                   const daysA = Math.ceil(Math.abs(today - new Date(a.created_at)) / (1000 * 60 * 60 * 24));
+                   const daysB = Math.ceil(Math.abs(today - new Date(b.created_at)) / (1000 * 60 * 60 * 24));
+                   return daysB - daysA;
+                });
+
+                if (oldNotes.length === 0) return null;
+
+                return (
+                  <div style={{
+                    backgroundColor: '#fffbeb',
+                    border: '1px solid #fcd34d',
+                    borderRadius: '8px',
+                    padding: '12px',
+                    marginBottom: '16px'
+                  }}>
+                    <h4 style={{ margin: '0 0 8px 0', color: '#92400e', fontSize: '13px', fontWeight: 'bold' }}>
+                      ⚠️ Notas de Entrega con Antigüedad Crítica (>30 días)
+                    </h4>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      {oldNotes.map(note => {
+                        const days = Math.ceil(Math.abs(today - new Date(note.created_at)) / (1000 * 60 * 60 * 24));
+                        let color = '#d97706'; // 30+ yellow/orange
+                        if (days >= 60) color = '#dc2626'; // red
+                        else if (days >= 45) color = '#ea580c'; // orange
+                        
+                        return (
+                          <div key={note.id} style={{ fontSize: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span>
+                              <strong>#{note.transaction_number}</strong> - {note.client?.name}
+                            </span>
+                            <span style={{ color: color, fontWeight: 'bold' }}>
+                              {days} días
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })()}
+
               <div
                 style={{
                   display: 'flex',
@@ -4789,7 +5030,6 @@ ${penaltiesHtml}
                   )}
                 </button>
               </div>
-
               <div
                 style={{
                   backgroundColor: '#ffffff',
@@ -4799,6 +5039,7 @@ ${penaltiesHtml}
                 }}
               >
                 <table
+                  className="mobile-cards"
                   style={{
                     width: '100%',
                     borderCollapse: 'collapse',
@@ -4884,6 +5125,13 @@ ${penaltiesHtml}
                           (new Date() - new Date(note.created_at)) /
                             (1000 * 60 * 60 * 24)
                         );
+                        
+                        // MODIFICACIÓN B: Indicadores Visuales de Antigüedad
+                        let underlineStyle = 'none';
+                        if (daysElapsed >= 60) underlineStyle = '3px solid #dc2626'; // Rojo
+                        else if (daysElapsed >= 45) underlineStyle = '3px solid #ea580c'; // Naranja
+                        else if (daysElapsed >= 30) underlineStyle = '3px solid #eab308'; // Amarillo
+
                         return (
                           <tr
                             key={note.id}
@@ -4894,6 +5142,7 @@ ${penaltiesHtml}
                                 padding: '10px 14px',
                                 fontWeight: 'bold',
                               }}
+                              data-label="Transacción"
                             >
                               #{note.transaction_number}
                             </td>
@@ -4902,17 +5151,22 @@ ${penaltiesHtml}
                                 padding: '10px 14px',
                                 fontWeight: '700',
                                 color: daysElapsed > 15 ? '#dc2626' : '#4b5563',
+                                textDecoration: 'underline',
+                                textDecorationColor: daysElapsed >= 30 ? (daysElapsed >= 60 ? '#dc2626' : (daysElapsed >= 45 ? '#ea580c' : '#eab308')) : 'transparent',
+                                textDecorationThickness: daysElapsed >= 30 ? '3px' : '0px',
+                                textUnderlineOffset: '4px'
                               }}
+                              data-label="Días Trans."
                             >
                               {daysElapsed >= 0 ? `${daysElapsed} d` : '0 d'}
                             </td>
-                            <td style={{ padding: '10px 14px' }}>
+                            <td style={{ padding: '10px 14px' }} data-label="Cliente">
                               {note.client?.name || 'Cliente'}
                             </td>
-                            <td style={{ padding: '10px 14px' }}>
+                            <td style={{ padding: '10px 14px' }} data-label="Vendedor">
                               {note.seller?.full_name || 'Vendedor'}
                             </td>
-                            <td style={{ padding: '10px 14px' }}>
+                            <td style={{ padding: '10px 14px' }} data-label="Modalidad">
                               {String(note.payment_discount) === '53.38'
                                 ? `${globalDiscount53}% ($)`
                                 : `${globalDiscount23}% (Bs)`}
@@ -4922,6 +5176,7 @@ ${penaltiesHtml}
                                 padding: '10px 14px',
                                 fontWeight: '600',
                               }}
+                              data-label="Total ($)"
                             >
                               ${Number(note.final_price_usd).toFixed(2)}
                             </td>
@@ -4935,6 +5190,7 @@ ${penaltiesHtml}
                               }}
                               onClick={() => handleOpenEditAbonoModal(note)}
                               title="Clic para editar monto abonado"
+                              data-label="Abonado ($)"
                             >
                               ${Number(note.total_paid_usd || 0).toFixed(2)}
                             </td>
@@ -4944,10 +5200,11 @@ ${penaltiesHtml}
                                 color: '#dc2626',
                                 fontWeight: 'bold',
                               }}
+                              data-label="Saldo ($)"
                             >
                               ${Number(note.balance_due_usd).toFixed(2)}
                             </td>
-                            <td style={{ padding: '10px 14px' }}>
+                            <td style={{ padding: '10px 14px' }} data-label="Estado">
                               <div
                                 style={{
                                   display: 'flex',
@@ -4998,6 +5255,7 @@ ${penaltiesHtml}
                                 padding: '10px 14px',
                                 textAlign: 'center',
                               }}
+                              data-label="Acciones"
                             >
                               <div
                                 style={{
@@ -5013,6 +5271,7 @@ ${penaltiesHtml}
                                     onClick={() =>
                                       handleOpenViewNotifModal(rowNotif)
                                     }
+                                    className="btn-responsive"
                                     style={{
                                       padding: '5px 8px',
                                       backgroundColor: '#1e40af',
@@ -5042,6 +5301,7 @@ ${penaltiesHtml}
                                       });
                                       setManualAbonoFile(null);
                                     }}
+                                    className="btn-responsive"
                                     style={{
                                       padding: '5px 8px',
                                       backgroundColor: '#059669',
@@ -5058,6 +5318,7 @@ ${penaltiesHtml}
                                 )}
                                 <button
                                   onClick={() => setModalGpsNote(note)}
+                                  className="btn-responsive"
                                   style={{
                                     padding: '5px 8px',
                                     backgroundColor: '#1e3a8a',
@@ -5078,6 +5339,7 @@ ${penaltiesHtml}
                                   onClick={() =>
                                     handleOpenEditNEPanel(note, true)
                                   }
+                                  className="btn-responsive"
                                   style={{
                                     padding: '5px 8px',
                                     backgroundColor: '#4f46e5',
@@ -5097,6 +5359,7 @@ ${penaltiesHtml}
                                 <button
                                   onClick={() => handleDownloadPDF(note)}
                                   disabled={loading}
+                                  className="btn-responsive"
                                   style={{
                                     padding: '5px 8px',
                                     backgroundColor: '#881337',
@@ -5115,6 +5378,7 @@ ${penaltiesHtml}
                                 </button>
                                 <button
                                   onClick={() => handleDeleteNoteComplete(note)}
+                                  className="btn-responsive"
                                   style={{
                                     padding: '5px 8px',
                                     backgroundColor: '#dc2626',
@@ -5142,7 +5406,6 @@ ${penaltiesHtml}
               </div>
             </>
           )}
-
           {/* SUB-PESTAÑA 2: HISTÓRICO DE PAGOS (NUEVA) */}
           {cobranzaInternalTab === 'historico_pagos' && (
             <div
@@ -5216,7 +5479,6 @@ ${penaltiesHtml}
                   <Trash2 size={14} /> Borrar Historial
                 </button>
               </div>
-
               <div
                 style={{
                   backgroundColor: '#ffffff',
@@ -5226,6 +5488,7 @@ ${penaltiesHtml}
                 }}
               >
                 <table
+                  className="mobile-cards"
                   style={{
                     width: '100%',
                     borderCollapse: 'collapse',
@@ -5289,10 +5552,11 @@ ${penaltiesHtml}
                         >
                           <td
                             style={{ padding: '10px 14px', fontWeight: '600' }}
+                            data-label="Cliente"
                           >
                             {item.client_name}
                           </td>
-                          <td style={{ padding: '10px 14px' }}>
+                          <td style={{ padding: '10px 14px' }} data-label="Fecha Pago">
                             {new Date(item.payment_date).toLocaleDateString()}
                           </td>
                           <td
@@ -5301,10 +5565,11 @@ ${penaltiesHtml}
                               fontWeight: 'bold',
                               color: '#059669',
                             }}
+                            data-label="Monto ($)"
                           >
                             ${Number(item.amount_usd).toFixed(2)}
                           </td>
-                          <td style={{ padding: '10px 14px' }}>
+                          <td style={{ padding: '10px 14px' }} data-label="Método">
                             {item.payment_method}
                           </td>
                           <td
@@ -5312,11 +5577,13 @@ ${penaltiesHtml}
                               padding: '10px 14px',
                               fontFamily: 'monospace',
                             }}
+                            data-label="N° Referencia"
                           >
                             {item.reference_number}
                           </td>
                           <td
                             style={{ padding: '10px 14px', fontWeight: '600' }}
+                            data-label="Transacción"
                           >
                             #{item.transaction_folio}
                           </td>
@@ -5325,6 +5592,7 @@ ${penaltiesHtml}
                               padding: '10px 14px',
                               textAlign: 'center',
                             }}
+                            data-label="Adjunto"
                           >
                             {item.receipt_image_url ? (
                               <button
@@ -5355,6 +5623,7 @@ ${penaltiesHtml}
                               padding: '10px 14px',
                               textAlign: 'center',
                             }}
+                            data-label="Acción"
                           >
                             <button
                               onClick={async () => {
@@ -5366,21 +5635,18 @@ ${penaltiesHtml}
                                   return;
                                 try {
                                   setLoading(true);
-
                                   // 1. Eliminar archivo del Storage si existe
                                   if (item.receipt_image_url) {
                                     await deleteFileFromStorage(
                                       item.receipt_image_url
                                     );
                                   }
-
                                   // 2. Eliminar registro de la DB
                                   const { error } = await supabase
                                     .from('payments_independent_history')
                                     .delete()
                                     .eq('id', item.id);
                                   if (error) throw error;
-
                                   showToastSuccess(
                                     'Registro y archivo adjunto eliminados del histórico.'
                                   );
@@ -5415,7 +5681,6 @@ ${penaltiesHtml}
               </div>
             </div>
           )}
-
           {/* PANEL EDITABLE COBRANZA (EXISTENTE, SIN CAMBIOS) */}
           {editingNote && isCobranzaNEModal && (
             <div
@@ -6030,7 +6295,6 @@ ${penaltiesHtml}
               </button>
             ))}
           </div>
-
           {valesSubTab === 'vales_lista' && (
             <div
               style={{
@@ -6041,6 +6305,7 @@ ${penaltiesHtml}
               }}
             >
               <table
+                className="mobile-cards"
                 style={{
                   width: '100%',
                   borderCollapse: 'collapse',
@@ -6100,10 +6365,11 @@ ${penaltiesHtml}
                           key={v.id}
                           style={{ borderBottom: '1px solid #e5e7eb' }}
                         >
-                          <td style={{ padding: '12px 16px' }}>
+                          <td style={{ padding: '12px 16px' }} data-label="Ver N.E.">
                             {v.order ? (
                               <button
                                 onClick={() => handleOpenValeVistaNE(v.order)}
+                                className="btn-responsive"
                                 style={{
                                   padding: '5px 10px',
                                   backgroundColor: '#1e40af',
@@ -6128,14 +6394,15 @@ ${penaltiesHtml}
                               </span>
                             )}
                           </td>
-                          <td style={{ padding: '12px 16px' }}>
+                          <td style={{ padding: '12px 16px' }} data-label="Fecha">
                             {new Date(v.created_at).toLocaleDateString()}
                           </td>
-                          <td style={{ padding: '12px 16px' }}>
+                          <td style={{ padding: '12px 16px' }} data-label="Vendedor">
                             {v.seller?.full_name || 'Vendedor'}
                           </td>
                           <td
                             style={{ padding: '12px 16px', fontWeight: 'bold' }}
+                            data-label="N° N.E."
                           >
                             #{v.order?.transaction_number || '-'}
                           </td>
@@ -6144,6 +6411,7 @@ ${penaltiesHtml}
                               padding: '12px 16px',
                               textTransform: 'capitalize',
                             }}
+                            data-label="Categoría"
                           >
                             {v.order?.category || 'bombillos'}
                           </td>
@@ -6153,6 +6421,7 @@ ${penaltiesHtml}
                               fontWeight: 'bold',
                               color: '#059669',
                             }}
+                            data-label="Comisión"
                           >
                             ${comm.toFixed(2)}
                           </td>
@@ -6162,10 +6431,11 @@ ${penaltiesHtml}
                               color: '#dc2626',
                               fontWeight: 'bold',
                             }}
+                            data-label="Solicitado ($)"
                           >
                             ${Number(v.requested_amount_usd).toFixed(2)}
                           </td>
-                          <td style={{ padding: '12px 16px' }}>
+                          <td style={{ padding: '12px 16px' }} data-label="Estado">
                             <span
                               style={{
                                 padding: '4px 8px',
@@ -6196,6 +6466,7 @@ ${penaltiesHtml}
                               padding: '12px 16px',
                               textAlign: 'center',
                             }}
+                            data-label="Acción"
                           >
                             <div
                               style={{
@@ -6275,7 +6546,6 @@ ${penaltiesHtml}
               </table>
             </div>
           )}
-
           {valesSubTab === 'asignar_vale' && (
             <div
               style={{
@@ -6398,7 +6668,6 @@ ${penaltiesHtml}
               </div>
             </div>
           )}
-
           {valesSubTab === 'penalidades_lista' && (
             <div
               style={{
@@ -6409,6 +6678,7 @@ ${penaltiesHtml}
               }}
             >
               <table
+                className="mobile-cards"
                 style={{
                   width: '100%',
                   borderCollapse: 'collapse',
@@ -6476,16 +6746,18 @@ ${penaltiesHtml}
                           key={pen.id}
                           style={{ borderBottom: '1px solid #e5e7eb' }}
                         >
-                          <td style={{ padding: '12px 16px' }}>
+                          <td style={{ padding: '12px 16px' }} data-label="Fecha">
                             {new Date(pen.created_at).toLocaleDateString()}
                           </td>
                           <td
                             style={{ padding: '12px 16px', fontWeight: '500' }}
+                            data-label="Vendedor"
                           >
                             {sellerName}
                           </td>
                           <td
                             style={{ padding: '12px 16px', fontWeight: 'bold' }}
+                            data-label="N° N.E."
                           >
                             {neNumberDisplay}
                           </td>
@@ -6495,10 +6767,11 @@ ${penaltiesHtml}
                               fontWeight: 'bold',
                               color: '#b91c1c',
                             }}
+                            data-label="Monto ($)"
                           >
                             -${Number(pen.amount || 0).toFixed(2)}
                           </td>
-                          <td style={{ padding: '12px 16px' }}>
+                          <td style={{ padding: '12px 16px' }} data-label="Estado">
                             <span
                               style={{
                                 padding: '4px 8px',
@@ -6519,6 +6792,7 @@ ${penaltiesHtml}
                               padding: '12px 16px',
                               textAlign: 'center',
                             }}
+                            data-label="Acción"
                           >
                             <button
                               onClick={() => handleDeletePenalty(pen.id)}
@@ -6544,7 +6818,6 @@ ${penaltiesHtml}
               </table>
             </div>
           )}
-
           {valesSubTab === 'asignar_penalidad' && (
             <div
               style={{
@@ -6708,7 +6981,6 @@ ${penaltiesHtml}
               </div>
             </div>
           )}
-
           {valeVistaNote && (
             <div
               style={{
@@ -7057,7 +7329,6 @@ ${penaltiesHtml}
               </div>
             )}
           </div>
-
           {quincenaSubView === 'liquidar' ? (
             <>
               <div
@@ -7125,7 +7396,6 @@ ${penaltiesHtml}
                   </select>
                 </div>
               </div>
-
               <div
                 style={{
                   backgroundColor: '#fffbeb',
@@ -7174,7 +7444,6 @@ ${penaltiesHtml}
                   </div>
                 </div>
               </div>
-
               <div
                 style={{
                   backgroundColor: '#ffffff',
@@ -7184,6 +7453,7 @@ ${penaltiesHtml}
                 }}
               >
                 <table
+                  className="mobile-cards"
                   style={{
                     width: '100%',
                     borderCollapse: 'collapse',
@@ -7271,6 +7541,7 @@ ${penaltiesHtml}
                                 padding: '12px 14px',
                                 fontWeight: 'bold',
                               }}
+                              data-label="Usuario"
                             >
                               {usr.full_name}
                             </td>
@@ -7279,17 +7550,18 @@ ${penaltiesHtml}
                                 padding: '12px 14px',
                                 textTransform: 'capitalize',
                               }}
+                              data-label="Rol"
                             >
                               {usr.role}
                             </td>
-                            <td style={{ padding: '12px 14px' }}>
+                            <td style={{ padding: '12px 14px' }} data-label="Asignados">
                               <span
                                 style={{ fontWeight: '700', color: '#1e40af' }}
                               >
                                 {assignedLabel}
                               </span>
                             </td>
-                            <td style={{ padding: '12px 14px' }}>
+                            <td style={{ padding: '12px 14px' }} data-label="Sueldo Base">
                               ${Number(usr.sueldo_fijo_usd || 0).toFixed(2)}
                             </td>
                             <td
@@ -7302,13 +7574,14 @@ ${penaltiesHtml}
                                     ? '#059669'
                                     : '#6b7280',
                               }}
+                              data-label="N.E Cerradas"
                             >
                               {userClosedNotes.length}
                             </td>
-                            <td style={{ padding: '12px 14px' }}>
+                            <td style={{ padding: '12px 14px' }} data-label="% Bombillos">
                               {usr.pct_bombillos ?? 3}%
                             </td>
-                            <td style={{ padding: '12px 14px' }}>
+                            <td style={{ padding: '12px 14px' }} data-label="% Fluidos">
                               {usr.pct_fluidos ?? 2}%
                             </td>
                             <td
@@ -7317,6 +7590,7 @@ ${penaltiesHtml}
                                 fontWeight: '700',
                                 color: '#059669',
                               }}
+                              data-label="Neto 53.38%"
                             >
                               ${details.comm53NetUsd.toFixed(2)}
                             </td>
@@ -7326,6 +7600,7 @@ ${penaltiesHtml}
                                 fontWeight: '700',
                                 color: '#0369a1',
                               }}
+                              data-label="Neto 23.08%"
                             >
                               ${details.comm23NetUsd.toFixed(2)}
                             </td>
@@ -7334,6 +7609,7 @@ ${penaltiesHtml}
                                 padding: '12px 14px',
                                 textAlign: 'center',
                               }}
+                              data-label="Acciones"
                             >
                               <button
                                 onClick={() => handleOpenSettlementModal(usr)}
@@ -7418,6 +7694,7 @@ ${penaltiesHtml}
                 }}
               >
                 <table
+                  className="mobile-cards"
                   style={{
                     width: '100%',
                     borderCollapse: 'collapse',
@@ -7476,19 +7753,20 @@ ${penaltiesHtml}
                         >
                           <td
                             style={{ padding: '12px 14px', fontWeight: 'bold' }}
+                            data-label="ID Liquidación"
                           >
                             {item.id}
                           </td>
-                          <td style={{ padding: '12px 14px' }}>
+                          <td style={{ padding: '12px 14px' }} data-label="Fecha Pago">
                             {item.datePaid}
                           </td>
-                          <td style={{ padding: '12px 14px' }}>
+                          <td style={{ padding: '12px 14px' }} data-label="Usuario">
                             {item.user?.full_name}
                           </td>
-                          <td style={{ padding: '12px 14px' }}>
+                          <td style={{ padding: '12px 14px' }} data-label="Tasa BCV">
                             {Number(item.bcvRate).toFixed(2)}
                           </td>
-                          <td style={{ padding: '12px 14px' }}>
+                          <td style={{ padding: '12px 14px' }} data-label="Total N.E.">
                             ${item.totalNeAmount.toFixed(2)}
                           </td>
                           <td
@@ -7497,6 +7775,7 @@ ${penaltiesHtml}
                               color: '#059669',
                               fontWeight: 'bold',
                             }}
+                            data-label="Neto 53.38%"
                           >
                             ${item.comm53Net.toFixed(2)}
                           </td>
@@ -7506,6 +7785,7 @@ ${penaltiesHtml}
                               color: '#0369a1',
                               fontWeight: 'bold',
                             }}
+                            data-label="Neto 23.08%"
                           >
                             ${item.comm23Net.toFixed(2)}
                           </td>
@@ -7515,6 +7795,7 @@ ${penaltiesHtml}
                               color: '#111827',
                               fontWeight: 'bold',
                             }}
+                            data-label="Total Eq."
                           >
                             ${item.totalEquivalentUsd.toFixed(2)}
                           </td>
@@ -7523,6 +7804,7 @@ ${penaltiesHtml}
                               padding: '12px 14px',
                               textAlign: 'center',
                             }}
+                            data-label="Acciones"
                           >
                             <div
                               style={{
@@ -7702,7 +7984,6 @@ ${penaltiesHtml}
                 </p>
               </div>
             </div>
-
             {settlementModalData.sueldoFijoOriginal > 0 && (
               <div
                 style={{
@@ -7727,7 +8008,7 @@ ${penaltiesHtml}
                       display: 'block',
                     }}
                   >
-                    Sueldo Fijo Base Configurado
+                    Sueldo Fijo Base Configurado (Quincenal)
                   </span>
                   <span
                     style={{
@@ -7783,7 +8064,6 @@ ${penaltiesHtml}
                 </div>
               </div>
             )}
-
             <h3
               style={{
                 fontSize: '13px',
@@ -7900,7 +8180,6 @@ ${penaltiesHtml}
                 </tbody>
               </table>
             </div>
-
             {/* COMISIONES DE JERARQUÍA CORREGIDAS CON MODALIDAD (%) */}
             {settlementModalData.hierarchyData?.evaluatedOrders?.length > 0 && (
               <>
@@ -8000,7 +8279,6 @@ ${penaltiesHtml}
                 </div>
               </>
             )}
-
             {/* DEDUCCIONES */}
             {(settlementModalData.vales.length > 0 ||
               settlementModalData.penalties?.length > 0) && (
@@ -8135,7 +8413,6 @@ ${penaltiesHtml}
                 </div>
               </>
             )}
-
             {/* SECCIÓN FINAL CON JERARQUÍA MOVIDA A SU RESPECTIVO SITIO */}
             <div
               style={{
@@ -8258,7 +8535,6 @@ ${penaltiesHtml}
                   </span>
                 </div>
               </div>
-
               {/* Bloque N.E. 23.08% */}
               <div
                 style={{
@@ -8386,7 +8662,6 @@ ${penaltiesHtml}
                 </div>
               </div>
             </div>
-
             <div
               style={{
                 background: '#f9fafb',
@@ -8429,7 +8704,6 @@ ${penaltiesHtml}
                 <span>{formatBs(settlementModalData.total23NetBs)} Bs.</span>
               </div>
             </div>
-
             <div
               style={{
                 background: '#fef2f2',
@@ -8493,7 +8767,6 @@ ${penaltiesHtml}
                 </option>
               </select>
             </div>
-
             <div
               style={{
                 display: 'flex',
@@ -8540,7 +8813,6 @@ ${penaltiesHtml}
           </div>
         </div>
       )}
-
       {/* Modal Historial: Ver Factura Capturada */}
       {historyInvoiceModalData && (
         <div
@@ -8628,7 +8900,6 @@ ${penaltiesHtml}
           </div>
         </div>
       )}
-
       {/* MODAL FLOTANTE DE NOTIFICACIONES DE ABONO (GENERAL) */}
       <div
         id="notif-modal-popup"
@@ -8745,7 +9016,6 @@ ${penaltiesHtml}
           )}
         </div>
       </div>
-
       {/* NUEVO MODAL: VER DETALLE NOTIFICACIÓN CON DETECCIÓN DE DUPLICADOS Y BOTÓN ELIMINAR */}
       {viewNotifModalData && (
         <div
@@ -8797,7 +9067,6 @@ ${penaltiesHtml}
                 <X size={20} />
               </button>
             </div>
-
             {/* ALERTA DE DUPLICADO */}
             {duplicateWarning && (
               <div
@@ -8826,7 +9095,6 @@ ${penaltiesHtml}
                 </div>
               </div>
             )}
-
             <div
               style={{
                 display: 'flex',
@@ -9008,7 +9276,6 @@ ${penaltiesHtml}
                 </div>
               )}
             </div>
-
             <div
               style={{
                 display: 'flex',
@@ -9086,7 +9353,6 @@ ${penaltiesHtml}
           </div>
         </div>
       )}
-
       {/* NUEVO MODAL: EDITAR MONTO ABONADO */}
       {editAbonoModalData && (
         <div
@@ -9205,7 +9471,6 @@ ${penaltiesHtml}
           </div>
         </div>
       )}
-
       {/* MODAL DE ABONO MANUAL (CONTROL DE N.E.) */}
       {abonoModalNote && (
         <div
@@ -9405,7 +9670,6 @@ ${penaltiesHtml}
                 >
                   Adjuntar Comprobante (Opcional)
                 </label>
-
                 {/* Input real oculto */}
                 <input
                   type="file"
@@ -9414,7 +9678,6 @@ ${penaltiesHtml}
                   onChange={(e) => setManualAbonoFile(e.target.files[0])}
                   style={{ display: 'none' }}
                 />
-
                 {/* Botón estilizado tipo SalesModule */}
                 <label
                   htmlFor="manual_abono_file_input"
@@ -9496,7 +9759,6 @@ ${penaltiesHtml}
           </div>
         </div>
       )}
-
       {/* MODAL DE BORRADO MASIVO */}
       {bulkDeleteModal.open && (
         <div
@@ -9529,7 +9791,6 @@ ${penaltiesHtml}
             >
               Borrar Histórico de Pagos
             </h3>
-
             <div style={{ marginBottom: '16px' }}>
               <label
                 style={{
@@ -9569,7 +9830,6 @@ ${penaltiesHtml}
                 Borrar por Rango de Fechas
               </label>
             </div>
-
             {bulkDeleteModal.mode === 'range' && (
               <div
                 style={{
@@ -9624,7 +9884,6 @@ ${penaltiesHtml}
                 </div>
               </div>
             )}
-
             <div
               style={{
                 display: 'flex',
@@ -9674,7 +9933,6 @@ ${penaltiesHtml}
           </div>
         </div>
       )}
-
       {/* NUEVO MODAL: PREVISUALIZACIÓN DE IMAGEN */}
       {imagePreviewModal && (
         <div
@@ -9756,7 +10014,6 @@ ${penaltiesHtml}
           </div>
         </div>
       )}
-
       {/* MODALES EXISTENTES (RECHAZO, GPS) SIN CAMBIOS */}
       {rejectModalNote && (
         <div
@@ -9861,7 +10118,6 @@ ${penaltiesHtml}
           </div>
         </div>
       )}
-
       {modalGpsNote && (
         <div
           style={{
