@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import JSZip from 'jszip';
 import {
@@ -16,6 +16,7 @@ import {
   Download,
   FileText,
   Archive,
+  ChevronDown,
 } from 'lucide-react';
 
 export default function Inventory() {
@@ -27,11 +28,17 @@ export default function Inventory() {
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   
+  // Estado para el menú dropdown en móvil
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const mobileMenuRef = useRef(null);
+
+  // Modales
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
   const [adjustingStockProduct, setAdjustingStockProduct] = useState(null);
   const [selectedImageModal, setSelectedImageModal] = useState(null);
   
+  // Modales de Importación/Exportación
   const [showExportModal, setShowExportModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
   const [importFile, setImportFile] = useState(null);
@@ -39,6 +46,7 @@ export default function Inventory() {
   const [exportProcessing, setExportProcessing] = useState(false);
   const [importProcessing, setImportProcessing] = useState(false);
   
+  // Formulario de Registro / Edición de Producto
   const [formCode, setFormCode] = useState('');
   const [formDescription, setFormDescription] = useState('');
   const [formCategory, setFormCategory] = useState('bombillos');
@@ -47,8 +55,20 @@ export default function Inventory() {
   const [formImageFile, setFormImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState('');
   
+  // Formulario de Ajuste Rápido de Stock
   const [stockAdjustmentValue, setStockAdjustmentValue] = useState('');
   const [stockAdjustmentType, setStockAdjustmentType] = useState('add');
+
+  // Cerrar dropdown al hacer clic fuera
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (mobileMenuRef.current && !mobileMenuRef.current.contains(event.target)) {
+        setIsMobileMenuOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   useEffect(() => {
     if (activeMainTab === 'inventory') {
@@ -233,6 +253,7 @@ export default function Inventory() {
     setEditingProduct(null);
     setAdjustingStockProduct(null);
     setStockAdjustmentValue('');
+    setIsMobileMenuOpen(false);
   };
 
   const filteredProducts = products.filter(
@@ -447,21 +468,31 @@ export default function Inventory() {
     }
   };
 
+  // Opciones del menú
+  const menuOptions = [
+    { id: 'bombillos', label: 'Bombillos', icon: Package },
+    { id: 'fluidos', label: 'Fluidos', icon: Package },
+    { id: 'import_export', label: 'Importación/Exportación', icon: Archive },
+  ];
+
   return (
     <div style={{ padding: '24px', maxWidth: '1200px', margin: '0 auto' }}>
+      {/* Estilos CSS para responsividad */}
       <style>{`
         @media (max-width: 768px) {
+          .desktop-tabs { display: none !important; }
+          .mobile-dropdown { display: block !important; }
           .desktop-table { display: none !important; }
           .mobile-cards { display: block !important; }
-          .submenu-text-full { display: none !important; }
-          .submenu-text-short { display: inline !important; }
         }
         @media (min-width: 769px) {
+          .desktop-tabs { display: flex !important; }
+          .mobile-dropdown { display: none !important; }
           .desktop-table { display: block !important; }
           .mobile-cards { display: none !important; }
-          .submenu-text-full { display: inline !important; }
-          .submenu-text-short { display: none !important; }
         }
+        
+        /* Estilos para tarjetas móviles */
         .mobile-card {
           background-color: #ffffff;
           border-radius: 8px;
@@ -519,6 +550,7 @@ export default function Inventory() {
         }
       `}</style>
 
+      {/* Encabezado del Módulo */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
         <div>
           <h1 style={{ fontSize: '24px', fontWeight: 'bold', color: '#111827', display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -533,6 +565,7 @@ export default function Inventory() {
         )}
       </div>
 
+      {/* Alertas de Feedback */}
       {errorMsg && (
         <div style={{ padding: '12px', backgroundColor: '#fee2e2', color: '#b91c1c', borderRadius: '6px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
           <AlertCircle size={18} /> {errorMsg}
@@ -544,14 +577,17 @@ export default function Inventory() {
         </div>
       )}
 
-      <div style={{ display: 'flex', gap: '8px', borderBottom: '2px solid #e5e7eb', marginBottom: '24px', overflowX: 'auto' }}>
-        {[
-          { id: 'bombillos', label: 'Bombillos', labelShort: 'Bombillos', icon: Package },
-          { id: 'fluidos', label: 'Fluidos', labelShort: 'Fluidos', icon: Package },
-          { id: 'import_export', label: 'Importación/Exportación', labelShort: 'Imp./Exp.', icon: Archive },
-        ].map((tab) => {
+      {/* ========================================== */}
+      {/* MENÚ DE NAVEGACIÓN RESPONSIVO                */}
+      {/* ========================================== */}
+      
+      {/* Versión Escritorio: Pestañas Horizontales */}
+      <div className="desktop-tabs" style={{ gap: '8px', borderBottom: '2px solid #e5e7eb', marginBottom: '24px', overflowX: 'auto' }}>
+        {menuOptions.map((tab) => {
           const Icon = tab.icon;
-          const isActive = tab.id === 'import_export' ? activeMainTab === 'import_export' : activeMainTab === 'inventory' && activeCategory === tab.id;
+          const isActive = tab.id === 'import_export' 
+            ? activeMainTab === 'import_export' 
+            : activeMainTab === 'inventory' && activeCategory === tab.id;
           return (
             <button
               key={tab.id}
@@ -563,23 +599,125 @@ export default function Inventory() {
                   setActiveCategory(tab.id);
                 }
               }}
-              style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 18px', border: 'none', borderBottom: isActive ? '3px solid #dc2626' : '3px solid transparent', backgroundColor: 'transparent', color: isActive ? '#dc2626' : '#4b5563', fontWeight: isActive ? 'bold' : '500', cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.2s' }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '12px 18px',
+                border: 'none',
+                borderBottom: isActive ? '3px solid #dc2626' : '3px solid transparent',
+                backgroundColor: 'transparent',
+                color: isActive ? '#dc2626' : '#4b5563',
+                fontWeight: isActive ? 'bold' : '500',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+                transition: 'all 0.2s',
+              }}
             >
               <Icon size={18} color={isActive ? '#dc2626' : '#4b5563'} />
-              <span className="submenu-text-full">{tab.label}</span>
-              <span className="submenu-text-short">{tab.labelShort}</span>
+              {tab.label}
             </button>
           );
         })}
       </div>
 
+      {/* Versión Móvil: Dropdown Compacto */}
+      <div className="mobile-dropdown" ref={mobileMenuRef} style={{ position: 'relative', marginBottom: '24px' }}>
+        <button 
+          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+          style={{ 
+            width: '100%', 
+            padding: '12px 16px', 
+            backgroundColor: '#ffffff', 
+            border: '1px solid #d1d5db', 
+            borderRadius: '8px', 
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            alignItems: 'center', 
+            fontSize: '15px', 
+            fontWeight: '600', 
+            color: '#111827',
+            boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+          }}
+        >
+          <span style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            {activeMainTab === 'import_export' ? <Archive size={18} color="#dc2626"/> : <Package size={18} color="#dc2626"/>}
+            {activeMainTab === 'import_export' ? 'Importación/Exportación' : 
+             activeCategory === 'bombillos' ? 'Bombillos' : 'Fluidos'}
+          </span>
+          <ChevronDown size={18} color="#6b7280" style={{ transform: isMobileMenuOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }} />
+        </button>
+
+        {isMobileMenuOpen && (
+          <div style={{ 
+            position: 'absolute', 
+            top: '100%', 
+            left: 0, 
+            right: 0, 
+            marginTop: '4px', 
+            backgroundColor: '#ffffff', 
+            border: '1px solid #e5e7eb', 
+            borderRadius: '8px', 
+            boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)', 
+            zIndex: 50, 
+            overflow: 'hidden' 
+          }}>
+            {menuOptions.map((tab) => {
+              const Icon = tab.icon;
+              const isActive = tab.id === 'import_export' 
+                ? activeMainTab === 'import_export' 
+                : activeMainTab === 'inventory' && activeCategory === tab.id;
+              return (
+                <button 
+                  key={tab.id} 
+                  onClick={() => { 
+                    if (tab.id === 'import_export') setActiveMainTab('import_export'); 
+                    else { setActiveMainTab('inventory'); setActiveCategory(tab.id); }
+                    setIsMobileMenuOpen(false);
+                  }} 
+                  style={{ 
+                    width: '100%', 
+                    padding: '14px 16px', 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '12px', 
+                    border: 'none', 
+                    backgroundColor: isActive ? '#fef2f2' : 'transparent', 
+                    color: isActive ? '#dc2626' : '#374151', 
+                    fontWeight: isActive ? '600' : '500', 
+                    textAlign: 'left',
+                    borderBottom: '1px solid #f3f4f6',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <Icon size={18} color={isActive ? '#dc2626' : '#9ca3af'} /> 
+                  {tab.label}
+                  {isActive && <Check size={16} style={{ marginLeft: 'auto' }} />}
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* ========================================== */}
+      {/* CONTENIDO DE LA PESTAÑA DE INVENTARIO      */}
+      {/* ========================================== */}
       {activeMainTab === 'inventory' && (
         <>
+          {/* Barra de Búsqueda */}
           <div style={{ position: 'relative', marginBottom: '20px' }}>
             <Search style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#9ca3af' }} size={20} />
-            <input type="text" placeholder="Buscar por código o descripción del producto..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} style={{ width: '100%', padding: '10px 12px 10px 40px', borderRadius: '8px', border: '1px solid #d1d5db', outline: 'none', fontSize: '14px', backgroundColor: '#ffffff' }} />
+            <input 
+              type="text" 
+              placeholder="Buscar por código o descripción..." 
+              value={searchQuery} 
+              onChange={(e) => setSearchQuery(e.target.value)} 
+              style={{ width: '100%', padding: '10px 12px 10px 40px', borderRadius: '8px', border: '1px solid #d1d5db', outline: 'none', fontSize: '14px', backgroundColor: '#ffffff' }} 
+            />
           </div>
 
+          {/* Tabla de Escritorio */}
           <div className="desktop-table" style={{ backgroundColor: '#ffffff', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '14px' }}>
               <thead>
@@ -637,7 +775,8 @@ export default function Inventory() {
             </table>
           </div>
 
-          <div className="mobile-cards" style={{ display: 'none' }}>
+          {/* Tarjetas para Móvil */}
+          <div className="mobile-cards">
             {loading ? (
               <div style={{ textAlign: 'center', padding: '24px', color: '#6b7280' }}>Cargando inventario...</div>
             ) : filteredProducts.length === 0 ? (
@@ -688,6 +827,9 @@ export default function Inventory() {
         </>
       )}
 
+      {/* ========================================== */}
+      {/* CONTENIDO DE IMPORTACIÓN/EXPORTACIÓN       */}
+      {/* ========================================== */}
       {activeMainTab === 'import_export' && (
         <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', padding: '24px' }}>
           <div style={{ marginBottom: '24px' }}>
@@ -696,8 +838,12 @@ export default function Inventory() {
             </h2>
             <p style={{ color: '#6b7280', fontSize: '14px' }}>Gestione la importación y exportación de datos del inventario con o sin imágenes.</p>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px', marginBottom: '24px' }}>
-            <div style={{ backgroundColor: '#f0fdf4', border: '2px solid #bbf7d0', borderRadius: '12px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          
+          {/* Grid Responsivo Corregido: Nunca se desbordará */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '20px', marginBottom: '24px', width: '100%' }}>
+            
+            {/* Tarjeta de Exportación */}
+            <div style={{ backgroundColor: '#f0fdf4', border: '2px solid #bbf7d0', borderRadius: '12px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px', width: '100%', boxSizing: 'border-box' }}>
               <div>
                 <h3 style={{ fontSize: '18px', fontWeight: 'bold', color: '#166534', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <Download size={20} /> Exportar Inventario
@@ -710,7 +856,9 @@ export default function Inventory() {
                 </button>
               </div>
             </div>
-            <div style={{ backgroundColor: '#eff6ff', border: '2px solid #bfdbfe', borderRadius: '12px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+
+            {/* Tarjeta de Importación */}
+            <div style={{ backgroundColor: '#eff6ff', border: '2px solid #bfdbfe', borderRadius: '12px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px', width: '100%', boxSizing: 'border-box' }}>
               <div>
                 <h3 style={{ fontSize: '18px', fontWeight: 'bold', color: '#1e40af', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <Upload size={20} /> Importar Inventario
@@ -724,6 +872,8 @@ export default function Inventory() {
               </div>
             </div>
           </div>
+
+          {/* Información Adicional */}
           <div style={{ padding: '16px', backgroundColor: '#f9fafb', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
             <h4 style={{ fontSize: '14px', fontWeight: 'bold', color: '#374151', marginBottom: '12px' }}>Información Importante:</h4>
             <ul style={{ color: '#6b7280', fontSize: '13px', lineHeight: '1.6', paddingLeft: '20px', margin: 0 }}>
@@ -738,6 +888,11 @@ export default function Inventory() {
         </div>
       )}
 
+      {/* ========================================== */}
+      {/* MODALES (Exportación, Importación, etc.)   */}
+      {/* ========================================== */}
+      
+      {/* Modal de Exportación */}
       {showExportModal && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '16px' }}>
           <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', width: '100%', maxWidth: '450px', padding: '24px', boxShadow: '0 10px 25px rgba(0,0,0,0.15)' }}>
@@ -765,6 +920,7 @@ export default function Inventory() {
         </div>
       )}
 
+      {/* Modal de Importación */}
       {showImportModal && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '16px' }}>
           <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', width: '100%', maxWidth: '500px', padding: '24px', boxShadow: '0 10px 25px rgba(0,0,0,0.15)' }}>
@@ -805,6 +961,7 @@ export default function Inventory() {
         </div>
       )}
 
+      {/* Modal de Registro / Edición */}
       {showAddModal && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '16px' }}>
           <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', width: '100%', maxWidth: '500px', padding: '24px', boxShadow: '0 10px 25px rgba(0,0,0,0.15)' }}>
@@ -869,6 +1026,7 @@ export default function Inventory() {
         </div>
       )}
 
+      {/* Modal de Ajuste de Stock */}
       {adjustingStockProduct && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '16px' }}>
           <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', width: '100%', maxWidth: '400px', padding: '24px', boxShadow: '0 10px 25px rgba(0,0,0,0.15)' }}>
@@ -905,6 +1063,7 @@ export default function Inventory() {
         </div>
       )}
 
+      {/* Modal para Ampliar Imagen */}
       {selectedImageModal && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, padding: '16px' }} onClick={() => setSelectedImageModal(null)}>
           <div style={{ position: 'relative', maxWidth: '90%', maxHeight: '90%' }}>
