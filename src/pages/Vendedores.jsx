@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import {
   Search,
@@ -13,16 +13,34 @@ import {
   ArrowUp,
   ArrowDown,
   ChevronsUpDown,
+  ChevronDown,
+  Check,
 } from 'lucide-react';
 
 export default function Vendedores({ currentUser }) {
-  const [activeTab, setActiveTab] = useState('visitas');
+  // Inicialización de pestaña con prioridad: URL (?tab=...) > localStorage > predeterminada ('visitas')
+  const [activeTab, setActiveTab] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const tabParam = params.get('tab');
+      if (tabParam) return tabParam;
+      const savedTab = localStorage.getItem('vendedores_active_tab');
+      if (savedTab) return savedTab;
+    }
+    return 'visitas';
+  });
+
   const [vendedores, setVendedores] = useState([]);
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [teamClients, setTeamClients] = useState([]);
   const [teamPotentials, setTeamPotentials] = useState([]);
+  
+  // Estado para el Menú Dropdown en Móvil
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const mobileMenuRef = useRef(null);
+
   const [historyModal, setHistoryModal] = useState({
     open: false,
     seller: null,
@@ -47,6 +65,27 @@ export default function Vendedores({ currentUser }) {
     official: true,
     potential: true,
   });
+
+  // Efecto para guardar en localStorage y actualizar la URL sin recargar
+  useEffect(() => {
+    localStorage.setItem('vendedores_active_tab', activeTab);
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location);
+      url.searchParams.set('tab', activeTab);
+      window.history.replaceState({}, '', url);
+    }
+  }, [activeTab]);
+
+  // Efecto para cerrar el menú desplegable móvil al hacer clic fuera
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (mobileMenuRef.current && !mobileMenuRef.current.contains(event.target)) {
+        setIsMobileMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   useEffect(() => {
     fetchVendedoresData();
@@ -472,6 +511,24 @@ export default function Vendedores({ currentUser }) {
     ),
   };
 
+  const tabsList = [
+    {
+      key: 'visitas',
+      label: 'Visitas del Equipo',
+      icon: <MapPin size={18} />,
+    },
+    {
+      key: 'resumen',
+      label: 'Resumen del Equipo',
+      icon: <Target size={18} />,
+    },
+    {
+      key: 'comisiones',
+      label: 'Resumen de Comisiones',
+      icon: <DollarSign size={18} />,
+    },
+  ];
+
   if (loading && activeTab !== 'visitas' && !historyModal.open) {
     return <div style={{ padding: '24px' }}>Cargando módulo...</div>;
   }
@@ -479,6 +536,8 @@ export default function Vendedores({ currentUser }) {
   return (
     <div
       style={{
+        maxWidth: '1200px',
+        margin: '0 auto',
         padding: '24px',
         backgroundColor: '#f9fafb',
         minHeight: '100vh',
@@ -496,7 +555,7 @@ export default function Vendedores({ currentUser }) {
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <TrendingUp size={24} color="#DC2626" strokeWidth={2.5} />
+          <TrendingUp size={24} color="#dc2626" strokeWidth={2.5} />
           <h2
             style={{
               fontSize: '20px',
@@ -539,7 +598,7 @@ export default function Vendedores({ currentUser }) {
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
           gap: '10px',
           marginBottom: '20px',
         }}
@@ -551,11 +610,15 @@ export default function Vendedores({ currentUser }) {
           color="#111827"
         />
         <div
+          className="kpi-card-responsive"
           style={{
             backgroundColor: '#ffffff',
             border: '1px solid #e5e7eb',
             borderRadius: '8px',
             padding: '10px',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'center',
           }}
         >
           <div
@@ -570,14 +633,14 @@ export default function Vendedores({ currentUser }) {
           </div>
           <div
             style={{
-              fontSize: '18px',
+              fontSize: '16px',
               fontWeight: '800',
               color: '#111827',
               marginTop: '2px',
             }}
           >
             ${stats.ventas.toLocaleString()}{' '}
-            <span style={{ fontSize: '14px', color: '#9ca3af' }}>
+            <span style={{ fontSize: '12px', color: '#9ca3af' }}>
               / ${stats.meta.toLocaleString()}
             </span>
           </div>
@@ -604,8 +667,8 @@ export default function Vendedores({ currentUser }) {
           title="N.E. Pendientes"
           value={stats.pendientes}
           sub="Por cobrar/cerrar"
-          color="#DC2626"
-          border="#DC2626"
+          color="#dc2626"
+          border="#dc2626"
         />
         {activeTab === 'comisiones' && (
           <KpiCard
@@ -618,55 +681,135 @@ export default function Vendedores({ currentUser }) {
         )}
       </div>
 
-      <div
-        style={{
-          display: 'flex',
-          gap: '8px',
-          borderBottom: '1px solid #e5e7eb',
-          marginBottom: '20px',
-        }}
-      >
-        {[
-          {
-            key: 'visitas',
-            label: 'Visitas del Equipo',
-            icon: <MapPin size={14} />,
-          },
-          {
-            key: 'resumen',
-            label: 'Resumen del Equipo',
-            icon: <Target size={14} />,
-          },
-          {
-            key: 'comisiones',
-            label: 'Resumen de Comisiones',
-            icon: <DollarSign size={14} />,
-          },
-        ].map((tab) => (
+      {/* Menú de Pestañas: Selector Desplegable en Móvil / Clásico Horizontal en Escritorio */}
+      <div style={{ marginBottom: '24px' }}>
+        {/* Versión Escritorio */}
+        <div
+          className="desktop-tabs"
+          style={{
+            display: 'flex',
+            gap: '8px',
+            borderBottom: '1px solid #e5e7eb',
+          }}
+        >
+          {tabsList.map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              style={{
+                padding: '8px 16px',
+                border: 'none',
+                borderBottom:
+                  activeTab === tab.key
+                    ? '2px solid #dc2626'
+                    : '2px solid transparent',
+                backgroundColor: 'transparent',
+                fontWeight: activeTab === tab.key ? '700' : '500',
+                color: activeTab === tab.key ? '#111827' : '#4b5563',
+                fontSize: '13px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+              }}
+            >
+              <span style={{ color: activeTab === tab.key ? '#dc2626' : '#4b5563' }}>
+                {tab.icon}
+              </span>
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Versión Móvil: Menú Dropdown Elegante */}
+        <div className="mobile-dropdown-menu" ref={mobileMenuRef} style={{ position: 'relative', display: 'none' }}>
           <button
-            key={tab.key}
-            onClick={() => setActiveTab(tab.key)}
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
             style={{
-              padding: '8px 16px',
-              border: 'none',
-              borderBottom:
-                activeTab === tab.key
-                  ? '2px solid #000'
-                  : '2px solid transparent',
-              backgroundColor: 'transparent',
-              fontWeight: activeTab === tab.key ? '700' : '500',
-              color: activeTab === tab.key ? '#000' : '#6b7280',
-              fontSize: '13px',
-              cursor: 'pointer',
+              width: '100%',
+              padding: '12px 16px',
+              backgroundColor: '#ffffff',
+              border: '1px solid #d1d5db',
+              borderRadius: '8px',
               display: 'flex',
+              justifyContent: 'space-between',
               alignItems: 'center',
-              gap: '6px',
+              fontSize: '14px',
+              fontWeight: '600',
+              color: '#111827',
+              cursor: 'pointer',
+              boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
             }}
           >
-            {tab.icon}
-            {tab.label}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ color: '#dc2626' }}>
+                {tabsList.find((t) => t.key === activeTab)?.icon}
+              </span>
+              <span>{tabsList.find((t) => t.key === activeTab)?.label}</span>
+            </div>
+            <ChevronDown
+              size={18}
+              color="#4b5563"
+              style={{
+                transform: isMobileMenuOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+                transition: 'transform 0.2s ease',
+              }}
+            />
           </button>
-        ))}
+
+          {isMobileMenuOpen && (
+            <div
+              style={{
+                position: 'absolute',
+                top: 'calc(100% + 4px)',
+                left: 0,
+                right: 0,
+                backgroundColor: '#ffffff',
+                border: '1px solid #d1d5db',
+                borderRadius: '8px',
+                boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)',
+                zIndex: 100,
+                overflow: 'hidden',
+              }}
+            >
+              {tabsList.map((tab) => {
+                const isActive = activeTab === tab.key;
+                return (
+                  <button
+                    key={tab.key}
+                    onClick={() => {
+                      setActiveTab(tab.key);
+                      setIsMobileMenuOpen(false);
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '12px 16px',
+                      backgroundColor: isActive ? '#fef2f2' : 'transparent',
+                      border: 'none',
+                      borderBottom: '1px solid #e5e7eb',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      fontSize: '14px',
+                      fontWeight: isActive ? '700' : '500',
+                      color: isActive ? '#dc2626' : '#4b5563',
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <span style={{ color: isActive ? '#dc2626' : '#4b5563' }}>
+                        {tab.icon}
+                      </span>
+                      <span>{tab.label}</span>
+                    </div>
+                    {isActive && <Check size={18} color="#dc2626" />}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
       </div>
 
       <div
@@ -694,7 +837,7 @@ export default function Vendedores({ currentUser }) {
               <span
                 style={{
                   fontSize: '11px',
-                  color: '#6b7280',
+                  color: '#4b5563',
                   fontWeight: '500',
                 }}
               >
@@ -707,7 +850,7 @@ export default function Vendedores({ currentUser }) {
                   gap: '4px',
                   cursor: 'pointer',
                   fontSize: '11px',
-                  color: visitFilters.official ? '#15803D' : '#9ca3af',
+                  color: visitFilters.official ? '#15803D' : '#4b5563',
                   fontWeight: visitFilters.official ? '600' : '400',
                 }}
               >
@@ -729,7 +872,7 @@ export default function Vendedores({ currentUser }) {
                   }}
                 />
                 <span>Oficiales</span>
-                <span style={{ fontSize: '9px', color: '#9ca3af' }}>
+                <span style={{ fontSize: '9px', color: '#4b5563' }}>
                   ({teamClients.length})
                 </span>
               </label>
@@ -740,7 +883,7 @@ export default function Vendedores({ currentUser }) {
                   gap: '4px',
                   cursor: 'pointer',
                   fontSize: '11px',
-                  color: visitFilters.potential ? '#B45309' : '#9ca3af',
+                  color: visitFilters.potential ? '#B45309' : '#4b5563',
                   fontWeight: visitFilters.potential ? '600' : '400',
                 }}
               >
@@ -762,14 +905,14 @@ export default function Vendedores({ currentUser }) {
                   }}
                 />
                 <span>Potenciales</span>
-                <span style={{ fontSize: '9px', color: '#9ca3af' }}>
+                <span style={{ fontSize: '9px', color: '#4b5563' }}>
                   ({teamPotentials.length})
                 </span>
               </label>
               <span
                 style={{
                   fontSize: '10px',
-                  color: '#9ca3af',
+                  color: '#4b5563',
                   marginLeft: 'auto',
                 }}
               >
@@ -786,7 +929,7 @@ export default function Vendedores({ currentUser }) {
                 textAlign: 'left',
               }}
             >
-              <thead>
+              <thead className="desktop-thead">
                 <tr
                   style={{
                     backgroundColor: '#f9fafb',
@@ -845,7 +988,7 @@ export default function Vendedores({ currentUser }) {
                       style={{
                         padding: '24px',
                         textAlign: 'center',
-                        color: '#6b7280',
+                        color: '#4b5563',
                       }}
                     >
                       No hay clientes o potenciales en el equipo asignado.
@@ -868,9 +1011,11 @@ export default function Vendedores({ currentUser }) {
                     return (
                       <tr
                         key={client.id}
-                        style={{ borderBottom: '1px solid #f3f4f6' }}
+                        className="responsive-table-row"
+                        style={{ borderBottom: '1px solid #e5e7eb' }}
                       >
-                        <td style={{ padding: '10px' }}>
+                        {/* Escritorio */}
+                        <td className="desktop-cell-normal" style={{ padding: '10px' }}>
                           <div
                             style={{
                               display: 'flex',
@@ -879,7 +1024,7 @@ export default function Vendedores({ currentUser }) {
                               marginBottom: '4px',
                             }}
                           >
-                            <span style={{ fontWeight: '600' }}>
+                            <span style={{ fontWeight: '600', color: '#111827' }}>
                               {client.name}
                             </span>
                             {isPotential ? (
@@ -910,12 +1055,12 @@ export default function Vendedores({ currentUser }) {
                               </span>
                             )}
                           </div>
-                          <div style={{ fontSize: '11px', color: '#6b7280' }}>
+                          <div style={{ fontSize: '11px', color: '#4b5563' }}>
                             CI: {client.ci_number || 'N/A'} | RIF:{' '}
                             {client.rif_number || 'N/A'}
                           </div>
                         </td>
-                        <td style={{ padding: '10px' }}>
+                        <td className="desktop-cell-normal" style={{ padding: '10px' }}>
                           <div
                             style={{
                               display: 'flex',
@@ -973,10 +1118,10 @@ export default function Vendedores({ currentUser }) {
                             )}
                           </div>
                         </td>
-                        <td style={{ padding: '10px', fontSize: '12px' }}>
+                        <td className="desktop-cell-normal" style={{ padding: '10px', fontSize: '12px', color: '#111827' }}>
                           {client.profiles?.full_name || 'N/A'}
                         </td>
-                        <td style={{ padding: '10px', textAlign: 'center' }}>
+                        <td className="desktop-cell-normal" style={{ padding: '10px', textAlign: 'center' }}>
                           {mapsUrl ? (
                             <a
                               href={mapsUrl}
@@ -999,23 +1144,25 @@ export default function Vendedores({ currentUser }) {
                             </a>
                           ) : (
                             <span
-                              style={{ fontSize: '11px', color: '#9CA3AF' }}
+                              style={{ fontSize: '11px', color: '#4b5563' }}
                             >
                               Sin GPS
                             </span>
                           )}
                         </td>
                         <td
+                          className="desktop-cell-normal"
                           style={{
                             padding: '10px',
                             textAlign: 'center',
-                            color: '#DC2626',
+                            color: '#dc2626',
                             fontWeight: 'bold',
                           }}
                         >
                           {nePendientes}
                         </td>
                         <td
+                          className="desktop-cell-normal"
                           style={{
                             padding: '10px',
                             textAlign: 'center',
@@ -1025,12 +1172,71 @@ export default function Vendedores({ currentUser }) {
                         >
                           {neCerradas}
                         </td>
-                        <td style={{ padding: '10px', fontSize: '12px' }}>
+                        <td className="desktop-cell-normal" style={{ padding: '10px', fontSize: '12px', color: '#111827' }}>
                           {client.last_visit_at
                             ? new Date(
                                 client.last_visit_at
                               ).toLocaleDateString()
                             : 'Sin registro'}
+                        </td>
+
+                        {/* Móvil: Tarjeta Apilada */}
+                        <td className="mobile-cell-stacked" style={{ display: 'none' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e5e7eb', paddingBottom: '6px' }}>
+                            <span style={{ fontWeight: '800', fontSize: '14px', color: '#111827' }}>{client.name}</span>
+                            {isPotential ? (
+                              <span style={{ fontSize: '9px', backgroundColor: '#FEF3C7', color: '#B45309', padding: '2px 6px', borderRadius: '4px', fontWeight: '700' }}>POTENCIAL</span>
+                            ) : (
+                              <span style={{ fontSize: '9px', backgroundColor: '#DCFCE7', color: '#15803D', padding: '2px 6px', borderRadius: '4px', fontWeight: '700' }}>OFICIAL</span>
+                            )}
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
+                            <span style={{ color: '#4b5563', fontWeight: '600' }}>CI / RIF:</span>
+                            <span style={{ color: '#111827' }}>{client.ci_number || 'N/A'} | {client.rif_number || 'N/A'}</span>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
+                            <span style={{ color: '#4b5563', fontWeight: '600' }}>Datos Adjuntos:</span>
+                            <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                              {!isPotential && client.ci_photo_url && (
+                                <DocBadge label="CI" onClick={() => setImageModal({ open: true, url: client.ci_photo_url, title: `C.I. de ${client.name}` })} />
+                              )}
+                              {!isPotential && client.rif_photo_url && (
+                                <DocBadge label="RIF" onClick={() => setImageModal({ open: true, url: client.rif_photo_url, title: `RIF de ${client.name}` })} />
+                              )}
+                              {client.additional_doc_url && (
+                                <DocBadge label="Adic." onClick={() => setImageModal({ open: true, url: client.additional_doc_url, title: `Doc. Adic. de ${client.name}` })} />
+                              )}
+                              {client.last_visit_photo_url && (
+                                <DocBadge label="Foto" onClick={() => setImageModal({ open: true, url: client.last_visit_photo_url, title: `Visita a ${client.name}` })} />
+                              )}
+                            </div>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
+                            <span style={{ color: '#4b5563', fontWeight: '600' }}>Registrado Por:</span>
+                            <span style={{ color: '#111827' }}>{client.profiles?.full_name || 'N/A'}</span>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
+                            <span style={{ color: '#4b5563', fontWeight: '600' }}>GPS Visita:</span>
+                            <span>
+                              {mapsUrl ? (
+                                <a href={mapsUrl} target="_blank" rel="noopener noreferrer" style={{ color: '#1D4ED8', textDecoration: 'none', fontWeight: '700' }}>Ver Mapa</a>
+                              ) : (
+                                <span style={{ color: '#4b5563' }}>Sin GPS</span>
+                              )}
+                            </span>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
+                            <span style={{ color: '#4b5563', fontWeight: '600' }}>N.E. Pendientes:</span>
+                            <span style={{ color: '#dc2626', fontWeight: 'bold' }}>{nePendientes}</span>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
+                            <span style={{ color: '#4b5563', fontWeight: '600' }}>N.E. Cerradas:</span>
+                            <span style={{ color: '#10B981', fontWeight: 'bold' }}>{neCerradas}</span>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
+                            <span style={{ color: '#4b5563', fontWeight: '600' }}>Última Visita:</span>
+                            <span style={{ color: '#111827' }}>{client.last_visit_at ? new Date(client.last_visit_at).toLocaleDateString() : 'Sin registro'}</span>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -1052,7 +1258,7 @@ export default function Vendedores({ currentUser }) {
               textAlign: 'left',
             }}
           >
-            <thead>
+            <thead className="desktop-thead">
               <tr
                 style={{
                   backgroundColor: '#f9fafb',
@@ -1109,7 +1315,7 @@ export default function Vendedores({ currentUser }) {
                     style={{
                       padding: '24px',
                       textAlign: 'center',
-                      color: '#6b7280',
+                      color: '#4b5563',
                     }}
                   >
                     No hay vendedores asignados en la estructura.
@@ -1122,11 +1328,12 @@ export default function Vendedores({ currentUser }) {
                   sortConfig.resumen.direction,
                   getResumenValue
                 ).map((v) => (
-                  <tr key={v.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
-                    <td style={{ padding: '10px', fontWeight: '600' }}>
+                  <tr key={v.id} className="responsive-table-row" style={{ borderBottom: '1px solid #e5e7eb' }}>
+                    {/* Escritorio */}
+                    <td className="desktop-cell-normal" style={{ padding: '10px', fontWeight: '600', color: '#111827' }}>
                       {v.full_name || 'Sin Nombre'}
                     </td>
-                    <td style={{ padding: '10px' }}>
+                    <td className="desktop-cell-normal" style={{ padding: '10px' }}>
                       <div
                         style={{
                           display: 'flex',
@@ -1152,7 +1359,7 @@ export default function Vendedores({ currentUser }) {
                           onClick={() => handleSaveSeller(v)}
                           disabled={savingId === v.id}
                           style={{
-                            backgroundColor: '#000',
+                            backgroundColor: '#111827',
                             color: '#D4AF37',
                             border: 'none',
                             padding: '4px 8px',
@@ -1181,10 +1388,11 @@ export default function Vendedores({ currentUser }) {
                         {(v.bombillosBruto + v.fluidosBruto).toLocaleString()}
                       </div>
                     </td>
-                    <td style={{ padding: '10px', textAlign: 'center' }}>
+                    <td className="desktop-cell-normal" style={{ padding: '10px', textAlign: 'center', color: '#111827' }}>
                       {v.totalNE}
                     </td>
                     <td
+                      className="desktop-cell-normal"
                       style={{
                         padding: '10px',
                         textAlign: 'center',
@@ -1195,20 +1403,21 @@ export default function Vendedores({ currentUser }) {
                       {v.neCerradas}
                     </td>
                     <td
+                      className="desktop-cell-normal"
                       style={{
                         padding: '10px',
                         textAlign: 'center',
-                        color: '#DC2626',
+                        color: '#dc2626',
                         fontWeight: 'bold',
                       }}
                     >
                       {v.nePendientes}
                     </td>
-                    <td style={{ padding: '10px' }}>
+                    <td className="desktop-cell-normal" style={{ padding: '10px' }}>
                       <button
                         onClick={() => openHistoryModal(v)}
                         style={{
-                          backgroundColor: '#000',
+                          backgroundColor: '#111827',
                           color: '#D4AF37',
                           border: 'none',
                           padding: '6px 10px',
@@ -1223,6 +1432,64 @@ export default function Vendedores({ currentUser }) {
                       >
                         <Eye size={12} /> Ver Historial
                       </button>
+                    </td>
+
+                    {/* Móvil: Tarjeta Apilada */}
+                    <td className="mobile-cell-stacked" style={{ display: 'none' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e5e7eb', paddingBottom: '6px' }}>
+                        <span style={{ fontWeight: '800', fontSize: '14px', color: '#111827' }}>{v.full_name || 'Sin Nombre'}</span>
+                        <button
+                          onClick={() => openHistoryModal(v)}
+                          style={{
+                            backgroundColor: '#111827',
+                            color: '#D4AF37',
+                            border: 'none',
+                            padding: '4px 8px',
+                            borderRadius: '6px',
+                            fontWeight: '700',
+                            fontSize: '10px',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                          }}
+                        >
+                          <Eye size={10} /> Historial
+                        </button>
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '12px' }}>
+                        <span style={{ color: '#4b5563', fontWeight: '600' }}>Meta vs Acumulado:</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <input
+                            type="number"
+                            value={v.sales_goal_usd}
+                            onChange={(e) => handleGoalChange(v.id, e.target.value)}
+                            style={{ width: '80px', padding: '4px', borderRadius: '4px', border: '1px solid #d1d5db', fontSize: '12px' }}
+                          />
+                          <button
+                            onClick={() => handleSaveSeller(v)}
+                            disabled={savingId === v.id}
+                            style={{ backgroundColor: '#111827', color: '#D4AF37', border: 'none', padding: '4px 8px', borderRadius: '4px', fontWeight: '700', fontSize: '10px', cursor: 'pointer' }}
+                          >
+                            <Save size={10} /> {savingId === v.id ? '...' : 'Guardar'}
+                          </button>
+                        </div>
+                        <div style={{ fontSize: '11px', color: '#10B981', fontWeight: '600' }}>
+                          Alcanzado: ${(v.bombillosBruto + v.fluidosBruto).toLocaleString()}
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
+                        <span style={{ color: '#4b5563', fontWeight: '600' }}>N.E. Totales:</span>
+                        <span style={{ color: '#111827' }}>{v.totalNE}</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
+                        <span style={{ color: '#4b5563', fontWeight: '600' }}>Cerradas:</span>
+                        <span style={{ color: '#10B981', fontWeight: 'bold' }}>{v.neCerradas}</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
+                        <span style={{ color: '#4b5563', fontWeight: '600' }}>Pendientes:</span>
+                        <span style={{ color: '#dc2626', fontWeight: 'bold' }}>{v.nePendientes}</span>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -1242,7 +1509,7 @@ export default function Vendedores({ currentUser }) {
               textAlign: 'left',
             }}
           >
-            <thead>
+            <thead className="desktop-thead">
               <tr
                 style={{
                   backgroundColor: '#f9fafb',
@@ -1288,7 +1555,7 @@ export default function Vendedores({ currentUser }) {
                     style={{
                       padding: '24px',
                       textAlign: 'center',
-                      color: '#6b7280',
+                      color: '#4b5563',
                     }}
                   >
                     No hay vendedores asignados en la estructura.
@@ -1301,30 +1568,32 @@ export default function Vendedores({ currentUser }) {
                   sortConfig.comisiones.direction,
                   getComisionesValue
                 ).map((v) => (
-                  <tr key={v.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
-                    <td style={{ padding: '10px', fontWeight: '600' }}>
+                  <tr key={v.id} className="responsive-table-row" style={{ borderBottom: '1px solid #e5e7eb' }}>
+                    {/* Escritorio */}
+                    <td className="desktop-cell-normal" style={{ padding: '10px', fontWeight: '600', color: '#111827' }}>
                       {v.full_name || 'Sin Nombre'}
                     </td>
-                    <td style={{ padding: '10px', fontSize: '12px' }}>
+                    <td className="desktop-cell-normal" style={{ padding: '10px', fontSize: '12px', color: '#111827' }}>
                       {v.pctAsignado}
                     </td>
-                    <td style={{ padding: '10px', textAlign: 'center' }}>
-                      <div style={{ fontWeight: '700' }}>
+                    <td className="desktop-cell-normal" style={{ padding: '10px', textAlign: 'center' }}>
+                      <div style={{ fontWeight: '700', color: '#111827' }}>
                         {v.bombillosCount} un.
                       </div>
-                      <div style={{ fontSize: '11px', color: '#6b7280' }}>
+                      <div style={{ fontSize: '11px', color: '#4b5563' }}>
                         ${v.bombillosBruto.toLocaleString()}
                       </div>
                     </td>
-                    <td style={{ padding: '10px', textAlign: 'center' }}>
-                      <div style={{ fontWeight: '700' }}>
+                    <td className="desktop-cell-normal" style={{ padding: '10px', textAlign: 'center' }}>
+                      <div style={{ fontWeight: '700', color: '#111827' }}>
                         {v.fluidosCount} un.
                       </div>
-                      <div style={{ fontSize: '11px', color: '#6b7280' }}>
+                      <div style={{ fontSize: '11px', color: '#4b5563' }}>
                         ${v.fluidosBruto.toLocaleString()}
                       </div>
                     </td>
                     <td
+                      className="desktop-cell-normal"
                       style={{
                         padding: '10px',
                         textAlign: 'right',
@@ -1333,6 +1602,26 @@ export default function Vendedores({ currentUser }) {
                       }}
                     >
                       ${v.comisionTotalUSD.toFixed(2)}
+                    </td>
+
+                    {/* Móvil: Tarjeta Apilada */}
+                    <td className="mobile-cell-stacked" style={{ display: 'none' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e5e7eb', paddingBottom: '6px' }}>
+                        <span style={{ fontWeight: '800', fontSize: '14px', color: '#111827' }}>{v.full_name || 'Sin Nombre'}</span>
+                        <span style={{ fontSize: '11px', backgroundColor: '#f3f4f6', padding: '2px 6px', borderRadius: '4px', fontWeight: '600', color: '#4b5563' }}>{v.pctAsignado}</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
+                        <span style={{ color: '#4b5563', fontWeight: '600' }}>Bombillos (Cnt / $):</span>
+                        <span style={{ color: '#111827' }}>{v.bombillosCount} un. / ${v.bombillosBruto.toLocaleString()}</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
+                        <span style={{ color: '#4b5563', fontWeight: '600' }}>Fluidos (Cnt / $):</span>
+                        <span style={{ color: '#111827' }}>{v.fluidosCount} un. / ${v.fluidosBruto.toLocaleString()}</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', borderTop: '1px solid #e5e7eb', paddingTop: '6px', marginTop: '4px' }}>
+                        <span style={{ color: '#111827', fontWeight: '700' }}>Comisión Total ($):</span>
+                        <span style={{ color: '#dc2626', fontWeight: '800' }}>${v.comisionTotalUSD.toFixed(2)}</span>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -1393,7 +1682,7 @@ export default function Vendedores({ currentUser }) {
                   style={{
                     margin: '4px 0 0 0',
                     fontSize: '12px',
-                    color: '#6b7280',
+                    color: '#4b5563',
                   }}
                 >
                   Notas de entrega registradas por este vendedor
@@ -1407,7 +1696,7 @@ export default function Vendedores({ currentUser }) {
                   background: 'none',
                   border: 'none',
                   cursor: 'pointer',
-                  color: '#6b7280',
+                  color: '#4b5563',
                 }}
               >
                 <X size={20} />
@@ -1415,6 +1704,7 @@ export default function Vendedores({ currentUser }) {
             </div>
             <div style={{ overflowX: 'auto' }}>
               <table
+                className="custom-responsive-table"
                 style={{
                   width: '100%',
                   borderCollapse: 'collapse',
@@ -1422,7 +1712,7 @@ export default function Vendedores({ currentUser }) {
                   textAlign: 'left',
                 }}
               >
-                <thead>
+                <thead className="desktop-thead">
                   <tr
                     style={{
                       backgroundColor: '#f9fafb',
@@ -1483,7 +1773,7 @@ export default function Vendedores({ currentUser }) {
                         style={{
                           padding: '16px',
                           textAlign: 'center',
-                          color: '#6b7280',
+                          color: '#4b5563',
                         }}
                       >
                         Este vendedor no tiene notas de entrega registradas.
@@ -1493,18 +1783,20 @@ export default function Vendedores({ currentUser }) {
                     sortedHistoryOrders.map((nota) => (
                       <tr
                         key={nota.id}
-                        style={{ borderBottom: '1px solid #f3f4f6' }}
+                        className="responsive-table-row"
+                        style={{ borderBottom: '1px solid #e5e7eb' }}
                       >
-                        <td style={{ padding: '8px', fontWeight: '600' }}>
+                        {/* Escritorio */}
+                        <td className="desktop-cell-normal" style={{ padding: '8px', fontWeight: '600', color: '#111827' }}>
                           {nota.clients?.name || 'N/A'}
                         </td>
-                        <td style={{ padding: '8px', fontFamily: 'monospace' }}>
+                        <td className="desktop-cell-normal" style={{ padding: '8px', fontFamily: 'monospace', color: '#111827' }}>
                           #{nota.transaction_number || nota.id.substring(0, 6)}
                         </td>
-                        <td style={{ padding: '8px' }}>
+                        <td className="desktop-cell-normal" style={{ padding: '8px', color: '#111827' }}>
                           {new Date(nota.created_at).toLocaleDateString()}
                         </td>
-                        <td style={{ padding: '8px' }}>
+                        <td className="desktop-cell-normal" style={{ padding: '8px' }}>
                           <span
                             style={{
                               padding: '2px 6px',
@@ -1525,22 +1817,60 @@ export default function Vendedores({ currentUser }) {
                           </span>
                         </td>
                         <td
+                          className="desktop-cell-normal"
                           style={{
                             padding: '8px',
                             textAlign: 'right',
                             fontWeight: '700',
+                            color: '#111827',
                           }}
                         >
                           ${Number(nota.final_price_usd).toFixed(2)}
                         </td>
                         <td
+                          className="desktop-cell-normal"
                           style={{
                             padding: '8px',
                             textAlign: 'right',
-                            color: '#DC2626',
+                            color: '#dc2626',
                           }}
                         >
                           ${Number(nota.balance_due_usd).toFixed(2)}
+                        </td>
+
+                        {/* Móvil: Tarjeta Apilada */}
+                        <td className="mobile-cell-stacked" style={{ display: 'none' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e5e7eb', paddingBottom: '6px' }}>
+                            <span style={{ fontWeight: '800', fontSize: '13px', color: '#111827' }}>{nota.clients?.name || 'N/A'}</span>
+                            <span
+                              style={{
+                                padding: '2px 6px',
+                                borderRadius: '4px',
+                                fontSize: '10px',
+                                fontWeight: '700',
+                                backgroundColor: nota.payment_status === 'cerrada' ? '#DCFCE7' : '#FEF3C7',
+                                color: nota.payment_status === 'cerrada' ? '#15803D' : '#B45309',
+                              }}
+                            >
+                              {nota.payment_status.toUpperCase()}
+                            </span>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
+                            <span style={{ color: '#4b5563', fontWeight: '600' }}>Transacción:</span>
+                            <span style={{ fontFamily: 'monospace', color: '#111827' }}>#{nota.transaction_number || nota.id.substring(0, 6)}</span>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
+                            <span style={{ color: '#4b5563', fontWeight: '600' }}>Fecha:</span>
+                            <span style={{ color: '#111827' }}>{new Date(nota.created_at).toLocaleDateString()}</span>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
+                            <span style={{ color: '#4b5563', fontWeight: '600' }}>Total ($):</span>
+                            <span style={{ fontWeight: '700', color: '#111827' }}>${Number(nota.final_price_usd).toFixed(2)}</span>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
+                            <span style={{ color: '#4b5563', fontWeight: '600' }}>Saldo ($):</span>
+                            <span style={{ color: '#dc2626', fontWeight: '700' }}>${Number(nota.balance_due_usd).toFixed(2)}</span>
+                          </div>
                         </td>
                       </tr>
                     ))
@@ -1586,7 +1916,7 @@ export default function Vendedores({ currentUser }) {
                 background: 'none',
                 border: 'none',
                 cursor: 'pointer',
-                color: '#6b7280',
+                color: '#4b5563',
               }}
             >
               <X size={24} />
@@ -1650,12 +1980,30 @@ export default function Vendedores({ currentUser }) {
         .desktop-cell-normal { display: table-cell; }
         .sortable-header { cursor: pointer; user-select: none; transition: background-color 0.15s; }
         .sortable-header:hover { background-color: #f3f4f6 !important; }
+
+        /* Media queries para pantallas móviles (Breakpoint: 768px) */
         @media (max-width: 768px) {
+          .desktop-tabs { display: none !important; }
+          .mobile-dropdown-menu { display: block !important; }
           .users-table-container { overflow-x: hidden !important; }
           .desktop-thead { display: none !important; }
           .mobile-thead { display: table-header-group !important; }
           .desktop-cell-normal { display: none !important; }
-          .mobile-cell-stacked { display: flex !important; flex-direction: column; gap: 6px; padding: 10px !important; }
+          .mobile-cell-stacked { display: flex !important; flex-direction: column; gap: 6px; padding: 12px !important; }
+          
+          /* Paneles informativos superiores cuadrados y centrados en móvil */
+          .kpi-card, .kpi-card-responsive {
+            aspect-ratio: 1 / 1 !important;
+            padding: 8px !important;
+            text-align: center !important;
+            display: flex !important;
+            flex-direction: column !important;
+            justify-content: center !important;
+            align-items: center !important;
+          }
+          .kpi-card div, .kpi-card-responsive div {
+            text-align: center !important;
+          }
         }
       `}</style>
     </div>
@@ -1717,6 +2065,7 @@ function SortableHeader({
 function KpiCard({ title, value, sub, color, border }) {
   return (
     <div
+      className="kpi-card"
       style={{
         backgroundColor: '#ffffff',
         border: `1px solid ${border || '#e5e7eb'}`,
@@ -1728,7 +2077,7 @@ function KpiCard({ title, value, sub, color, border }) {
         style={{
           fontSize: '10px',
           fontWeight: '700',
-          color: '#6b7280',
+          color: '#4b5563',
           textTransform: 'uppercase',
         }}
       >
@@ -1736,7 +2085,7 @@ function KpiCard({ title, value, sub, color, border }) {
       </div>
       <div
         style={{
-          fontSize: '20px',
+          fontSize: '18px',
           fontWeight: '800',
           color: color,
           marginTop: '2px',
