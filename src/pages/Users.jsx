@@ -21,7 +21,11 @@ export default function Users() {
   const [exceptionsCountMap, setExceptionsCountMap] = useState({});
   const [hierarchyConfigMap, setHierarchyConfigMap] = useState({});
   const [searchQuery, setSearchQuery] = useState('');
-  
+
+  // Estados para el menú desplegable móvil
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const mobileMenuRef = useRef(null);
+
   // Estados para sub-sección de Estructura
   const [selectedParentUser, setSelectedParentUser] = useState(null);
   const [globalData, setGlobalData] = useState({
@@ -61,10 +65,6 @@ export default function Users() {
   const clientRifInputRef = useRef(null);
   const clientDocInputRef = useRef(null);
 
-  // --- NUEVOS ESTADOS PARA MENÚ RESPONSIVO ---
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const mobileMenuRef = useRef(null);
-
   useEffect(() => {
     fetchUsersAndAssignments();
   }, []);
@@ -76,18 +76,21 @@ export default function Users() {
     }
   }, [activeTab]);
 
-  // --- EFECTO PARA CERRAR DROPDOWN AL HACER CLIC FUERA ---
+  // useEffect para cerrar el dropdown móvil al hacer clic fuera
   useEffect(() => {
-    function handleClickOutside(event) {
-      if (mobileMenuRef.current && !mobileMenuRef.current.contains(event.target)) {
+    const handleClickOutside = (event) => {
+      if (
+        mobileMenuRef.current &&
+        !mobileMenuRef.current.contains(event.target)
+      ) {
         setIsMobileMenuOpen(false);
       }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
     };
-  }, [mobileMenuRef]);
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   const fetchUsersAndAssignments = async () => {
     setLoading(true);
@@ -95,14 +98,12 @@ export default function Users() {
       const { data: usersData, error: usersError } = await supabase
         .from('profiles')
         .select('*');
-
       if (usersError) throw usersError;
       setAllUsers(usersData || []);
 
       const { data: cfgData } = await supabase
         .from('hierarchy_config')
         .select('parent_user_id, is_global, has_exceptions');
-      
       const cfgMap = {};
       cfgData?.forEach((c) => {
         cfgMap[c.parent_user_id] = c;
@@ -112,7 +113,6 @@ export default function Users() {
       const { data: assignData, error: assignError } = await supabase
         .from('hierarchy_assignments')
         .select('parent_user_id, target_seller_id, is_exception');
-
       if (!assignError && assignData) {
         const counts = {};
         const excCounts = {};
@@ -139,7 +139,11 @@ export default function Users() {
       const { data, error } = await supabase
         .from('clients')
         .select(
-          `*, profiles:assigned_seller_id(full_name, email, role), sales_orders(id, payment_status, balance_due_usd, seller_id)`
+          `
+          *,
+          profiles:assigned_seller_id(full_name, email, role),
+          sales_orders(id, payment_status, balance_due_usd, seller_id)
+        `
         )
         .order('created_at', { ascending: false });
 
@@ -172,7 +176,6 @@ export default function Users() {
           u.role?.toLowerCase() !== 'stock' &&
           u.role !== 'pendiente'
       );
-
       activeSellersList.forEach((seller) => {
         const found = targetRows?.find((r) => r.target_seller_id === seller.id);
         specificTargets[seller.id] = {
@@ -307,6 +310,7 @@ export default function Users() {
   };
 
   // --- Lógica para Pestaña PERFILES ---
+
   const startEditingProfile = (user) => {
     setEditingProfileId(user.id);
     setProfileFormData({
@@ -332,6 +336,7 @@ export default function Users() {
   const handleProfileFileChange = async (e, field, bucket, allowedTypes) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
     if (!allowedTypes.includes(file.type)) {
       alert(`Formato no permitido. Aceptados: ${allowedTypes.join(', ')}`);
       return;
@@ -340,18 +345,23 @@ export default function Users() {
       alert('El archivo supera el tamaño máximo de 5MB.');
       return;
     }
+
     try {
       const fileExt = file.name.split('.').pop();
       const fileName = `${Date.now()}-${Math.random()
         .toString(36)
         .substring(2, 8)}.${fileExt}`;
       const filePath = `${editingProfileId}/${fileName}`;
+
       const { error: uploadError } = await supabase.storage
         .from(bucket)
         .upload(filePath, file, { upsert: false });
+
       if (uploadError) throw uploadError;
+
       const { data } = supabase.storage.from(bucket).getPublicUrl(filePath);
       const newUrl = data.publicUrl;
+
       setProfileFormData((prev) => ({ ...prev, [field]: newUrl }));
     } catch (err) {
       alert('Error subiendo archivo: ' + err.message);
@@ -362,6 +372,7 @@ export default function Users() {
     setSavingProfile(true);
     try {
       const { _old_avatar_url, _old_ci_url, ...updates } = profileFormData;
+
       // Eliminar archivos antiguos si cambiaron
       if (_old_avatar_url && _old_avatar_url !== updates.avatar_url) {
         await deleteOldFile(_old_avatar_url, 'avatars');
@@ -369,11 +380,14 @@ export default function Users() {
       if (_old_ci_url && _old_ci_url !== updates.ci_url) {
         await deleteOldFile(_old_ci_url, 'documents');
       }
+
       const { error } = await supabase
         .from('profiles')
         .update(updates)
         .eq('id', userId);
+
       if (error) throw error;
+
       alert('Perfil actualizado correctamente.');
       setEditingProfileId(null);
       fetchUsersAndAssignments(); // Recargar lista
@@ -385,6 +399,7 @@ export default function Users() {
   };
 
   // --- Lógica para Pestaña CLIENTES ---
+
   const openClientEditModal = (client) => {
     setClientEditModal({
       open: true,
@@ -417,6 +432,7 @@ export default function Users() {
   const handleClientFileUpload = async (e, field, bucket) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
     setUploadingClientFile(true);
     try {
       const fileExt = file.name.split('.').pop();
@@ -424,11 +440,15 @@ export default function Users() {
         .toString(36)
         .substring(2, 8)}.${fileExt}`;
       const filePath = `${clientEditModal.client.id}/${fileName}`;
+
       const { error: uploadError } = await supabase.storage
         .from(bucket)
         .upload(filePath, file, { upsert: false });
+
       if (uploadError) throw uploadError;
+
       const { data } = supabase.storage.from(bucket).getPublicUrl(filePath);
+
       setClientEditModal((prev) => ({
         ...prev,
         formData: { ...prev.formData, [field]: data.publicUrl },
@@ -446,6 +466,7 @@ export default function Users() {
     try {
       const { _old_ci_photo, _old_rif_photo, _old_additional_doc, ...updates } =
         clientEditModal.formData;
+
       // Eliminar archivos antiguos si cambiaron
       if (_old_ci_photo && _old_ci_photo !== updates.ci_photo_url) {
         await deleteOldFile(_old_ci_photo, 'documents');
@@ -459,11 +480,14 @@ export default function Users() {
       ) {
         await deleteOldFile(_old_additional_doc, 'documents');
       }
+
       const { error } = await supabase
         .from('clients')
         .update(updates)
         .eq('id', clientEditModal.client.id);
+
       if (error) throw error;
+
       alert('Cliente actualizado correctamente.');
       closeClientEditModal();
       fetchAllClients(); // Recargar lista
@@ -481,6 +505,7 @@ export default function Users() {
     const idx = url.indexOf(pattern);
     if (idx === -1) return;
     const path = url.substring(idx + pattern.length);
+
     try {
       const { error } = await supabase.storage.from(bucket).remove([path]);
       if (error)
@@ -498,7 +523,7 @@ export default function Users() {
     );
   }
 
-  const tabs = [
+  const tabsList = [
     { key: 'admitir', label: 'Admitir Pendientes' },
     { key: 'comisiones', label: 'Comisiones por N.E. Cerrada' },
     { key: 'estructura', label: 'Estructura de Comisiones' },
@@ -509,12 +534,12 @@ export default function Users() {
   return (
     <div
       style={{
+        maxWidth: '1200px',
+        margin: '0 auto',
         padding: '24px',
         backgroundColor: '#f9fafb',
         minHeight: '100vh',
         fontFamily: 'system-ui, sans-serif',
-        maxWidth: '1200px',
-        margin: '0 auto',
       }}
     >
       <h2
@@ -529,22 +554,14 @@ export default function Users() {
       </h2>
 
       {/* Indicadores / Tarjetas de Resumen */}
-      <div
-        className="summary-cards-container"
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-          gap: '12px',
-          marginBottom: '24px',
-        }}
-      >
+      <div className="summary-cards-grid" style={{ marginBottom: '24px' }}>
         <div
+          className="summary-card-item"
           style={{
             backgroundColor: '#ffffff',
             border: '1px solid #e5e7eb',
             borderRadius: '12px',
             padding: '16px',
-            textAlign: 'center',
           }}
         >
           <div
@@ -572,12 +589,12 @@ export default function Users() {
           </div>
         </div>
         <div
+          className="summary-card-item"
           style={{
             backgroundColor: '#ffffff',
             border: '1.5px solid #dc2626',
             borderRadius: '12px',
             padding: '16px',
-            textAlign: 'center',
           }}
         >
           <div
@@ -605,12 +622,12 @@ export default function Users() {
           </div>
         </div>
         <div
+          className="summary-card-item"
           style={{
             backgroundColor: '#ffffff',
             border: '1.5px solid #D4AF37',
             borderRadius: '12px',
             padding: '16px',
-            textAlign: 'center',
           }}
         >
           <div
@@ -639,20 +656,16 @@ export default function Users() {
         </div>
       </div>
 
-      {/* Navegación Pestañas / Dropdown Responsivo */}
-      <div ref={mobileMenuRef} style={{ position: 'relative', marginBottom: '24px' }}>
-        
-        {/* Versión Escritorio: Pestañas Horizontales */}
-        <div
-          className="desktop-tabs"
-          style={{
-            display: 'flex',
-            gap: '8px',
-            borderBottom: '1px solid #e5e7eb',
-            flexWrap: 'wrap',
-          }}
-        >
-          {tabs.map((tab) => (
+      {/* Navegación Pestañas (Escritorio / Móvil) */}
+      <div
+        style={{
+          borderBottom: '1px solid #e5e7eb',
+          marginBottom: '24px',
+        }}
+      >
+        {/* Pestañas de Escritorio */}
+        <div className="desktop-tabs-container" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          {tabsList.map((tab) => (
             <button
               key={tab.key}
               onClick={() => {
@@ -678,40 +691,50 @@ export default function Users() {
           ))}
         </div>
 
-        {/* Versión Móvil: Dropdown Elegante */}
-        <div className="mobile-dropdown-container">
+        {/* Menú Dropdown Elegante para Móvil */}
+        <div
+          className="mobile-dropdown-container"
+          ref={mobileMenuRef}
+          style={{ position: 'relative', display: 'none' }}
+        >
           <button
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            className="dropdown-trigger"
             style={{
               width: '100%',
               display: 'flex',
-              justifyContent: 'space-between',
               alignItems: 'center',
-              padding: '12px 16px',
-              backgroundColor: '#fff',
+              justifyContent: 'space-between',
+              padding: '10px 14px',
+              backgroundColor: '#ffffff',
               border: '1px solid #d1d5db',
               borderRadius: '8px',
-              fontSize: '14px',
+              fontSize: '13px',
               fontWeight: '600',
               color: '#111827',
               cursor: 'pointer',
+              boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
             }}
           >
-            <span>{tabs.find(t => t.key === activeTab)?.label}</span>
-            <ChevronDown size={18} color="#4b5563" />
+            <span>
+              {tabsList.find((t) => t.key === activeTab)?.label || 'Seleccionar...'}
+            </span>
+            <ChevronDown
+              size={18}
+              style={{
+                transform: isMobileMenuOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+                transition: 'transform 0.2s ease',
+              }}
+            />
           </button>
 
           {isMobileMenuOpen && (
             <div
-              className="dropdown-menu"
               style={{
                 position: 'absolute',
-                top: '100%',
+                top: 'calc(100% + 4px)',
                 left: 0,
                 right: 0,
-                marginTop: '4px',
-                backgroundColor: '#fff',
+                backgroundColor: '#ffffff',
                 border: '1px solid #d1d5db',
                 borderRadius: '8px',
                 boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)',
@@ -719,35 +742,37 @@ export default function Users() {
                 overflow: 'hidden',
               }}
             >
-              {tabs.map((tab) => (
-                <button
-                  key={tab.key}
-                  onClick={() => {
-                    setActiveTab(tab.key);
-                    setSelectedParentUser(null);
-                    setIsMobileMenuOpen(false);
-                  }}
-                  className="dropdown-item"
-                  style={{
-                    width: '100%',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    padding: '12px 16px',
-                    backgroundColor: activeTab === tab.key ? '#fef2f2' : 'transparent',
-                    border: 'none',
-                    borderBottom: '1px solid #e5e7eb',
-                    fontSize: '14px',
-                    fontWeight: activeTab === tab.key ? '700' : '500',
-                    color: activeTab === tab.key ? '#dc2626' : '#4b5563',
-                    cursor: 'pointer',
-                    textAlign: 'left',
-                  }}
-                >
-                  <span>{tab.label}</span>
-                  {activeTab === tab.key && <Check size={18} color="#dc2626" />}
-                </button>
-              ))}
+              {tabsList.map((tab) => {
+                const isActive = activeTab === tab.key;
+                return (
+                  <button
+                    key={tab.key}
+                    onClick={() => {
+                      setActiveTab(tab.key);
+                      setSelectedParentUser(null);
+                      setIsMobileMenuOpen(false);
+                    }}
+                    style={{
+                      width: '100%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '10px 14px',
+                      backgroundColor: isActive ? '#fef2f2' : 'transparent',
+                      border: 'none',
+                      borderBottom: '1px solid #e5e7eb',
+                      textAlign: 'left',
+                      fontSize: '13px',
+                      fontWeight: isActive ? '700' : '500',
+                      color: isActive ? '#dc2626' : '#4b5563',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <span>{tab.label}</span>
+                    {isActive && <Check size={18} style={{ color: '#dc2626' }} />}
+                  </button>
+                );
+              })}
             </div>
           )}
         </div>
@@ -785,7 +810,7 @@ export default function Users() {
               No hay usuarios pendientes por asignación.
             </div>
           ) : (
-            <div className="users-table-container">
+            <div className="users-table-container mobile-cards">
               <table className="custom-responsive-table">
                 <thead className="desktop-thead">
                   <tr
@@ -802,6 +827,19 @@ export default function Users() {
                     <th style={{ padding: '10px' }}>% Fluidos</th>
                     <th style={{ padding: '10px' }}>Sueldo F. ($)</th>
                     <th style={{ padding: '10px' }}>Acción</th>
+                  </tr>
+                </thead>
+                <thead className="mobile-thead">
+                  <tr
+                    style={{
+                      backgroundColor: '#f9fafb',
+                      borderBottom: '1px solid #e5e7eb',
+                      color: '#4b5563',
+                    }}
+                  >
+                    <th colSpan="2" style={{ padding: '10px' }}>
+                      Nombre
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -860,7 +898,7 @@ export default function Users() {
               }}
             />
           </div>
-          <div className="users-table-container">
+          <div className="users-table-container mobile-cards">
             <table className="custom-responsive-table">
               <thead className="desktop-thead">
                 <tr
@@ -877,6 +915,19 @@ export default function Users() {
                   <th style={{ padding: '10px' }}>% Fluidos</th>
                   <th style={{ padding: '10px' }}>Sueldo F. ($)</th>
                   <th style={{ padding: '10px' }}>Acción</th>
+                </tr>
+              </thead>
+              <thead className="mobile-thead">
+                <tr
+                  style={{
+                    backgroundColor: '#f9fafb',
+                    borderBottom: '1px solid #e5e7eb',
+                    color: '#4b5563',
+                  }}
+                >
+                  <th colSpan="2" style={{ padding: '10px' }}>
+                    Nombre
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -917,7 +968,7 @@ export default function Users() {
           >
             Estructura Jerárquica de Comisiones (Admin, Gerentes, Supervisores)
           </h3>
-          <div className="users-table-container">
+          <div className="users-table-container mobile-cards">
             <table className="custom-responsive-table">
               <thead className="desktop-thead">
                 <tr
@@ -932,6 +983,19 @@ export default function Users() {
                   <th style={{ padding: '10px' }}>Rol</th>
                   <th style={{ padding: '10px' }}>Vendedores Asignados</th>
                   <th style={{ padding: '10px' }}>Acción</th>
+                </tr>
+              </thead>
+              <thead className="mobile-thead">
+                <tr
+                  style={{
+                    backgroundColor: '#f9fafb',
+                    borderBottom: '1px solid #e5e7eb',
+                    color: '#4b5563',
+                  }}
+                >
+                  <th colSpan="2" style={{ padding: '10px' }}>
+                    Nombre
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -1227,8 +1291,9 @@ export default function Users() {
               >
                 Seleccionar Vendedores Específicos (`target_seller_id`)
               </h4>
-              <div style={{ overflowX: 'auto' }}>
+              <div className="users-table-container mobile-cards">
                 <table
+                  className="custom-responsive-table"
                   style={{
                     width: '100%',
                     borderCollapse: 'collapse',
@@ -1236,7 +1301,7 @@ export default function Users() {
                     textAlign: 'left',
                   }}
                 >
-                  <thead>
+                  <thead className="desktop-thead">
                     <tr
                       style={{
                         backgroundColor: '#f9fafb',
@@ -1248,6 +1313,19 @@ export default function Users() {
                       <th style={{ padding: '10px' }}>Rol</th>
                       <th style={{ padding: '10px' }}>% Bombillos</th>
                       <th style={{ padding: '10px' }}>% Fluidos</th>
+                    </tr>
+                  </thead>
+                  <thead className="mobile-thead">
+                    <tr
+                      style={{
+                        backgroundColor: '#f9fafb',
+                        borderBottom: '1px solid #e5e7eb',
+                        color: '#4b5563',
+                      }}
+                    >
+                      <th colSpan="2" style={{ padding: '10px' }}>
+                        Usuario
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1270,7 +1348,10 @@ export default function Users() {
                             key={targetUser.id}
                             style={{ borderBottom: '1px solid #f3f4f6' }}
                           >
-                            <td style={{ padding: '10px' }}>
+                            <td
+                              className="desktop-cell-normal"
+                              style={{ padding: '10px' }}
+                            >
                               <input
                                 type="checkbox"
                                 checked={targetState.selected}
@@ -1288,13 +1369,22 @@ export default function Users() {
                                 }}
                               />
                             </td>
-                            <td style={{ padding: '10px', fontWeight: '600' }}>
+                            <td
+                              className="desktop-cell-normal"
+                              style={{ padding: '10px', fontWeight: '600' }}
+                            >
                               {targetUser.full_name}
                             </td>
-                            <td style={{ padding: '10px' }}>
+                            <td
+                              className="desktop-cell-normal"
+                              style={{ padding: '10px' }}
+                            >
                               {targetUser.role}
                             </td>
-                            <td style={{ padding: '10px' }}>
+                            <td
+                              className="desktop-cell-normal"
+                              style={{ padding: '10px' }}
+                            >
                               <input
                                 type="number"
                                 disabled={!targetState.selected}
@@ -1320,7 +1410,10 @@ export default function Users() {
                               />{' '}
                               %
                             </td>
-                            <td style={{ padding: '10px' }}>
+                            <td
+                              className="desktop-cell-normal"
+                              style={{ padding: '10px' }}
+                            >
                               <input
                                 type="number"
                                 disabled={!targetState.selected}
@@ -1345,6 +1438,134 @@ export default function Users() {
                                 }}
                               />{' '}
                               %
+                            </td>
+
+                            {/* Mobile Card View for Specific Targets */}
+                            <td colSpan="2" className="mobile-cell-stacked">
+                              <div
+                                style={{
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  gap: '8px',
+                                  width: '100%',
+                                }}
+                              >
+                                <div
+                                  style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                  }}
+                                >
+                                  <span style={{ fontWeight: '600' }}>
+                                    {targetUser.full_name} ({targetUser.role})
+                                  </span>
+                                  <label
+                                    style={{
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '4px',
+                                      fontSize: '12px',
+                                    }}
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      checked={targetState.selected}
+                                      onChange={(e) => {
+                                        setGlobalData({
+                                          ...globalData,
+                                          specificTargets: {
+                                            ...globalData.specificTargets,
+                                            [targetUser.id]: {
+                                              ...targetState,
+                                              selected: e.target.checked,
+                                            },
+                                          },
+                                        });
+                                      }}
+                                    />
+                                    Asignar
+                                  </label>
+                                </div>
+                                <div
+                                  style={{
+                                    display: 'grid',
+                                    gridTemplateColumns: '1fr 1fr',
+                                    gap: '6px',
+                                  }}
+                                >
+                                  <div>
+                                    <span
+                                      style={{
+                                        fontSize: '10px',
+                                        color: '#6b7280',
+                                        display: 'block',
+                                        fontWeight: '700',
+                                      }}
+                                    >
+                                      % Bombillos
+                                    </span>
+                                    <input
+                                      type="number"
+                                      disabled={!targetState.selected}
+                                      value={targetState.pctBombillos}
+                                      onChange={(e) => {
+                                        setGlobalData({
+                                          ...globalData,
+                                          specificTargets: {
+                                            ...globalData.specificTargets,
+                                            [targetUser.id]: {
+                                              ...targetState,
+                                              pctBombillos: e.target.value,
+                                            },
+                                          },
+                                        });
+                                      }}
+                                      style={{
+                                        width: '100%',
+                                        padding: '4px',
+                                        border: '1px solid #d1d5db',
+                                        borderRadius: '4px',
+                                      }}
+                                    />
+                                  </div>
+                                  <div>
+                                    <span
+                                      style={{
+                                        fontSize: '10px',
+                                        color: '#6b7280',
+                                        display: 'block',
+                                        fontWeight: '700',
+                                      }}
+                                    >
+                                      % Fluidos
+                                    </span>
+                                    <input
+                                      type="number"
+                                      disabled={!targetState.selected}
+                                      value={targetState.pctFluidos}
+                                      onChange={(e) => {
+                                        setGlobalData({
+                                          ...globalData,
+                                          specificTargets: {
+                                            ...globalData.specificTargets,
+                                            [targetUser.id]: {
+                                              ...targetState,
+                                              pctFluidos: e.target.value,
+                                            },
+                                          },
+                                        });
+                                      }}
+                                      style={{
+                                        width: '100%',
+                                        padding: '4px',
+                                        border: '1px solid #d1d5db',
+                                        borderRadius: '4px',
+                                      }}
+                                    />
+                                  </div>
+                                </div>
+                              </div>
                             </td>
                           </tr>
                         );
@@ -1394,7 +1615,7 @@ export default function Users() {
           >
             Gestión de Perfiles de Usuario
           </h3>
-          <div className="users-table-container">
+          <div className="users-table-container mobile-cards">
             <table className="custom-responsive-table">
               <thead className="desktop-thead">
                 <tr
@@ -1412,14 +1633,27 @@ export default function Users() {
                   <th style={{ padding: '10px' }}>Acción</th>
                 </tr>
               </thead>
+              <thead className="mobile-thead">
+                <tr
+                  style={{
+                    backgroundColor: '#f9fafb',
+                    borderBottom: '1px solid #e5e7eb',
+                    color: '#4b5563',
+                  }}
+                >
+                  <th colSpan="2" style={{ padding: '10px' }}>
+                    Perfil
+                  </th>
+                </tr>
+              </thead>
               <tbody>
                 {allUsers.map((user) => {
                   const isEditing = editingProfileId === user.id;
+
                   if (isEditing) {
                     return (
                       <tr
                         key={user.id}
-                        className="mobile-cards"
                         style={{
                           borderBottom: '1px solid #f3f4f6',
                           backgroundColor: '#fffbeb',
@@ -1648,19 +1882,17 @@ export default function Users() {
                             <X size={12} />
                           </button>
                         </td>
-                        
-                        {/* Mobile View for Editing Profile (Card Layout) */}
-                        <td colSpan="6" className="mobile-cell-stacked">
+
+                        {/* Mobile View for Editing Profile */}
+                        <td colSpan="2" className="mobile-cell-stacked">
                           <div
                             style={{
                               display: 'flex',
                               flexDirection: 'column',
                               gap: '10px',
+                              width: '100%',
                             }}
                           >
-                             <div style={{ fontWeight: '700', fontSize: '14px', color: '#111827', borderBottom: '1px solid #e5e7eb', paddingBottom: '8px' }}>
-                                Editando Perfil
-                             </div>
                             <div
                               style={{
                                 display: 'flex',
@@ -1728,73 +1960,56 @@ export default function Users() {
                                 }
                               />
                             </div>
-                            <div>
-                                <label style={{fontSize: '10px', fontWeight: '700', color: '#6b7280'}}>Nombre</label>
-                                <input
-                                type="text"
-                                placeholder="Nombre"
-                                value={profileFormData.full_name}
-                                onChange={(e) =>
-                                    handleProfileFieldChange(
-                                    'full_name',
-                                    e.target.value
-                                    )
-                                }
-                                style={{
-                                    padding: '8px',
-                                    border: '1px solid #ccc',
-                                    borderRadius: '4px',
-                                    width: '100%',
-                                    boxSizing: 'border-box'
-                                }}
-                                />
-                            </div>
-                            <div>
-                                <label style={{fontSize: '10px', fontWeight: '700', color: '#6b7280'}}>C.I.</label>
-                                <input
-                                type="text"
-                                placeholder="C.I."
-                                value={profileFormData.ci}
-                                onChange={(e) =>
-                                    handleProfileFieldChange('ci', e.target.value)
-                                }
-                                style={{
-                                    padding: '8px',
-                                    border: '1px solid #ccc',
-                                    borderRadius: '4px',
-                                    width: '100%',
-                                    boxSizing: 'border-box'
-                                }}
-                                />
-                            </div>
-                            <div>
-                                <label style={{fontSize: '10px', fontWeight: '700', color: '#6b7280'}}>Ciudad</label>
-                                <input
-                                type="text"
-                                placeholder="Ciudad"
-                                value={profileFormData.city}
-                                onChange={(e) =>
-                                    handleProfileFieldChange('city', e.target.value)
-                                }
-                                style={{
-                                    padding: '8px',
-                                    border: '1px solid #ccc',
-                                    borderRadius: '4px',
-                                    width: '100%',
-                                    boxSizing: 'border-box'
-                                }}
-                                />
-                            </div>
+                            <input
+                              type="text"
+                              placeholder="Nombre"
+                              value={profileFormData.full_name}
+                              onChange={(e) =>
+                                handleProfileFieldChange(
+                                  'full_name',
+                                  e.target.value
+                                )
+                              }
+                              style={{
+                                padding: '8px',
+                                border: '1px solid #ccc',
+                                borderRadius: '4px',
+                              }}
+                            />
+                            <input
+                              type="text"
+                              placeholder="C.I."
+                              value={profileFormData.ci}
+                              onChange={(e) =>
+                                handleProfileFieldChange('ci', e.target.value)
+                              }
+                              style={{
+                                padding: '8px',
+                                border: '1px solid #ccc',
+                                borderRadius: '4px',
+                              }}
+                            />
+                            <input
+                              type="text"
+                              placeholder="Ciudad"
+                              value={profileFormData.city}
+                              onChange={(e) =>
+                                handleProfileFieldChange('city', e.target.value)
+                              }
+                              style={{
+                                padding: '8px',
+                                border: '1px solid #ccc',
+                                borderRadius: '4px',
+                              }}
+                            />
                             <div
                               style={{
                                 display: 'flex',
                                 justifyContent: 'space-between',
                                 alignItems: 'center',
-                                borderTop: '1px solid #f3f4f6',
-                                paddingTop: '8px'
                               }}
                             >
-                              <span style={{ fontSize: '12px', fontWeight: '600' }}>
+                              <span style={{ fontSize: '12px' }}>
                                 Doc. CI: {profileFormData.ci_url ? 'Sí' : 'No'}
                               </span>
                               <button
@@ -1832,7 +2047,7 @@ export default function Users() {
                                 }
                               />
                             </div>
-                            <div style={{ display: 'flex', gap: '10px', marginTop: '8px' }}>
+                            <div style={{ display: 'flex', gap: '10px' }}>
                               <button
                                 onClick={() => saveProfileChanges(user.id)}
                                 disabled={savingProfile}
@@ -1867,10 +2082,10 @@ export default function Users() {
                       </tr>
                     );
                   }
+
                   return (
                     <tr
                       key={user.id}
-                      className="mobile-cards"
                       style={{ borderBottom: '1px solid #f3f4f6' }}
                     >
                       <td
@@ -1981,90 +2196,92 @@ export default function Users() {
                           Editar
                         </button>
                       </td>
-                      
-                      {/* Mobile View for Normal Row (Card Layout) */}
-                      <td colSpan="6" className="mobile-cell-stacked">
+
+                      {/* Mobile View for Normal Row */}
+                      <td colSpan="2" className="mobile-cell-stacked">
                         <div
                           style={{
                             display: 'flex',
                             flexDirection: 'column',
-                            gap: '8px',
+                            gap: '6px',
+                            width: '100%',
                           }}
                         >
-                           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', borderBottom: '1px solid #f3f4f6', paddingBottom: '8px' }}>
+                          <div
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '10px',
+                            }}
+                          >
+                            <div
+                              style={{
+                                width: '40px',
+                                height: '40px',
+                                borderRadius: '50%',
+                                overflow: 'hidden',
+                                backgroundColor: '#f3f4f6',
+                              }}
+                            >
+                              {user.avatar_url ? (
+                                <img
+                                  src={user.avatar_url}
+                                  alt="Avatar"
+                                  style={{
+                                    width: '100%',
+                                    height: '100%',
+                                    objectFit: 'cover',
+                                  }}
+                                />
+                              ) : (
                                 <div
-                                    style={{
-                                    width: '50px',
-                                    height: '50px',
-                                    borderRadius: '50%',
-                                    overflow: 'hidden',
-                                    backgroundColor: '#f3f4f6',
-                                    }}
+                                  style={{
+                                    width: '100%',
+                                    height: '100%',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                  }}
                                 >
-                                    {user.avatar_url ? (
-                                    <img
-                                        src={user.avatar_url}
-                                        alt="Avatar"
-                                        style={{
-                                        width: '100%',
-                                        height: '100%',
-                                        objectFit: 'cover',
-                                        }}
-                                    />
-                                    ) : (
-                                    <div
-                                        style={{
-                                        width: '100%',
-                                        height: '100%',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        }}
-                                    >
-                                        <svg
-                                        xmlns="http://www.w3.org/2000/svg"
-                                        width="24"
-                                        height="24"
-                                        viewBox="0 0 24 24"
-                                        fill="none"
-                                        stroke="#9ca3af"
-                                        strokeWidth="2"
-                                        >
-                                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                                        <circle cx="12" cy="7" r="4" />
-                                        </svg>
-                                    </div>
-                                    )}
+                                  <svg
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    width="20"
+                                    height="20"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="#9ca3af"
+                                    strokeWidth="2"
+                                  >
+                                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                                    <circle cx="12" cy="7" r="4" />
+                                  </svg>
                                 </div>
-                                <div>
-                                    <div style={{ fontWeight: '700', fontSize: '14px', color: '#111827' }}>
-                                    {user.full_name || 'Sin Nombre'}
-                                    </div>
-                                    <div style={{ fontSize: '12px', color: '#6b7280' }}>
-                                    {user.email}
-                                    </div>
-                                </div>
-                           </div>
-                           
-                           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                                <div>
-                                    <span style={{ fontSize: '10px', fontWeight: '700', color: '#6b7280', display: 'block' }}>C.I.</span>
-                                    <span style={{ fontSize: '13px' }}>{user.ci || '-'}</span>
-                                </div>
-                                <div>
-                                    <span style={{ fontSize: '10px', fontWeight: '700', color: '#6b7280', display: 'block' }}>Ciudad</span>
-                                    <span style={{ fontSize: '13px' }}>{user.city || '-'}</span>
-                                </div>
-                           </div>
-                           
-                           <div>
-                                <span style={{ fontSize: '10px', fontWeight: '700', color: '#6b7280', display: 'block' }}>Documento CI</span>
-                                <span style={{ fontSize: '13px', color: user.ci_url ? '#10B981' : '#9CA3AF' }}>
-                                    {user.ci_url ? 'Adjunto ✓' : 'N/A'}
-                                </span>
-                           </div>
-
-                           <button
+                              )}
+                            </div>
+                            <div>
+                              <div style={{ fontWeight: '600' }}>
+                                {user.full_name || 'Sin Nombre'}
+                              </div>
+                              <div
+                                style={{ fontSize: '11px', color: '#6b7280' }}
+                              >
+                                {user.email}
+                              </div>
+                            </div>
+                          </div>
+                          <div
+                            style={{
+                              display: 'grid',
+                              gridTemplateColumns: '1fr 1fr',
+                              gap: '8px',
+                              fontSize: '12px',
+                            }}
+                          >
+                            <div>CI: {user.ci || '-'}</div>
+                            <div>Ciudad: {user.city || '-'}</div>
+                            <div>Doc: {user.ci_url ? 'Sí' : 'No'}</div>
+                          </div>
+                          <button
                             onClick={() => startEditingProfile(user)}
                             style={{
                               backgroundColor: '#000',
@@ -2076,7 +2293,6 @@ export default function Users() {
                               fontSize: '11px',
                               cursor: 'pointer',
                               width: '100%',
-                              marginTop: '4px'
                             }}
                           >
                             Editar Perfil
@@ -2112,6 +2328,7 @@ export default function Users() {
           >
             Base de Datos de Clientes (Oficiales y Potenciales)
           </h3>
+
           {loadingClients ? (
             <div
               style={{ padding: '20px', textAlign: 'center', color: '#6b7280' }}
@@ -2119,7 +2336,7 @@ export default function Users() {
               Cargando clientes...
             </div>
           ) : (
-            <div className="users-table-container">
+            <div className="users-table-container mobile-cards">
               <table className="custom-responsive-table">
                 <thead className="desktop-thead">
                   <tr
@@ -2140,6 +2357,19 @@ export default function Users() {
                     </th>
                     <th style={{ padding: '10px' }}>Última Visita</th>
                     <th style={{ padding: '10px' }}>Acción</th>
+                  </tr>
+                </thead>
+                <thead className="mobile-thead">
+                  <tr
+                    style={{
+                      backgroundColor: '#f9fafb',
+                      borderBottom: '1px solid #e5e7eb',
+                      color: '#4b5563',
+                    }}
+                  >
+                    <th colSpan="2" style={{ padding: '10px' }}>
+                      Cliente
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -2165,13 +2395,16 @@ export default function Users() {
                       const neCerradas = (client.sales_orders || []).filter(
                         (o) => o.payment_status === 'cerrada'
                       ).length;
+
                       return (
                         <tr
                           key={client.id}
-                          className="mobile-cards"
                           style={{ borderBottom: '1px solid #f3f4f6' }}
                         >
-                          <td style={{ padding: '10px' }}>
+                          <td
+                            className="desktop-cell-normal"
+                            style={{ padding: '10px' }}
+                          >
                             <div
                               style={{
                                 display: 'flex',
@@ -2216,7 +2449,10 @@ export default function Users() {
                               {client.rif_number || 'N/A'}
                             </div>
                           </td>
-                          <td style={{ padding: '10px' }}>
+                          <td
+                            className="desktop-cell-normal"
+                            style={{ padding: '10px' }}
+                          >
                             <div
                               style={{
                                 display: 'flex',
@@ -2254,10 +2490,14 @@ export default function Users() {
                               )}
                             </div>
                           </td>
-                          <td style={{ padding: '10px', fontSize: '12px' }}>
+                          <td
+                            className="desktop-cell-normal"
+                            style={{ padding: '10px', fontSize: '12px' }}
+                          >
                             {client.profiles?.full_name || 'N/A'}
                           </td>
                           <td
+                            className="desktop-cell-normal"
                             style={{
                               padding: '10px',
                               textAlign: 'center',
@@ -2268,6 +2508,7 @@ export default function Users() {
                             {nePendientes}
                           </td>
                           <td
+                            className="desktop-cell-normal"
                             style={{
                               padding: '10px',
                               textAlign: 'center',
@@ -2277,14 +2518,20 @@ export default function Users() {
                           >
                             {neCerradas}
                           </td>
-                          <td style={{ padding: '10px', fontSize: '12px' }}>
+                          <td
+                            className="desktop-cell-normal"
+                            style={{ padding: '10px', fontSize: '12px' }}
+                          >
                             {client.last_visit_at
                               ? new Date(
                                   client.last_visit_at
                                 ).toLocaleDateString()
                               : 'Sin registro'}
                           </td>
-                          <td style={{ padding: '10px' }}>
+                          <td
+                            className="desktop-cell-normal"
+                            style={{ padding: '10px' }}
+                          >
                             <button
                               onClick={() => openClientEditModal(client)}
                               style={{
@@ -2305,74 +2552,133 @@ export default function Users() {
                             </button>
                           </td>
 
-                          {/* Mobile View for Client Row (Card Layout) */}
-                          <td colSpan="7" className="mobile-cell-stacked">
-                             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', borderBottom: '1px solid #f3f4f6', paddingBottom: '8px' }}>
-                                    <div>
-                                        <div style={{ fontWeight: '700', fontSize: '14px', color: '#111827' }}>{client.name}</div>
-                                        <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '2px' }}>
-                                            CI: {client.ci_number || 'N/A'} | RIF: {client.rif_number || 'N/A'}
-                                        </div>
-                                    </div>
-                                    {isPotential ? (
-                                        <span style={{ fontSize: '9px', backgroundColor: '#FEF3C7', color: '#B45309', padding: '2px 6px', borderRadius: '4px', fontWeight: '700' }}>POTENCIAL</span>
-                                    ) : (
-                                        <span style={{ fontSize: '9px', backgroundColor: '#DCFCE7', color: '#15803D', padding: '2px 6px', borderRadius: '4px', fontWeight: '700' }}>OFICIAL</span>
-                                    )}
-                                </div>
-
+                          {/* Mobile View for Client Row */}
+                          <td colSpan="2" className="mobile-cell-stacked">
+                            <div
+                              style={{
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '8px',
+                                width: '100%',
+                              }}
+                            >
+                              <div
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'space-between',
+                                }}
+                              >
+                                <span style={{ fontWeight: '600' }}>
+                                  {client.name}
+                                </span>
+                                {isPotential ? (
+                                  <span
+                                    style={{
+                                      fontSize: '9px',
+                                      backgroundColor: '#FEF3C7',
+                                      color: '#B45309',
+                                      padding: '2px 6px',
+                                      borderRadius: '4px',
+                                      fontWeight: '700',
+                                    }}
+                                  >
+                                    POTENCIAL
+                                  </span>
+                                ) : (
+                                  <span
+                                    style={{
+                                      fontSize: '9px',
+                                      backgroundColor: '#DCFCE7',
+                                      color: '#15803D',
+                                      padding: '2px 6px',
+                                      borderRadius: '4px',
+                                      fontWeight: '700',
+                                    }}
+                                  >
+                                    OFICIAL
+                                  </span>
+                                )}
+                              </div>
+                              <div style={{ fontSize: '11px', color: '#6b7280' }}>
+                                CI: {client.ci_number || 'N/A'} | RIF:{' '}
+                                {client.rif_number || 'N/A'}
+                              </div>
+                              <div
+                                style={{
+                                  display: 'grid',
+                                  gridTemplateColumns: '1fr 1fr',
+                                  gap: '4px',
+                                  fontSize: '11px',
+                                }}
+                              >
                                 <div>
-                                    <span style={{ fontSize: '10px', fontWeight: '700', color: '#6b7280', display: 'block' }}>Documentos</span>
-                                    <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '4px' }}>
-                                        {!isPotential && client.ci_photo_url && <DocBadge label="CI" url={client.ci_photo_url} title={`C.I. de ${client.name}`} />}
-                                        {!isPotential && client.rif_photo_url && <DocBadge label="RIF" url={client.rif_photo_url} title={`RIF de ${client.name}`} />}
-                                        {client.additional_doc_url && <DocBadge label="Adic." url={client.additional_doc_url} title={`Doc. Adic. de ${client.name}`} />}
-                                        {client.last_visit_photo_url && <DocBadge label="Foto" url={client.last_visit_photo_url} title={`Visita a ${client.name}`} />}
-                                        {(!client.ci_photo_url && !client.rif_photo_url && !client.additional_doc_url && !client.last_visit_photo_url) && <span style={{fontSize: '11px', color: '#9ca3af'}}>Sin documentos</span>}
-                                    </div>
+                                  Reg: {client.profiles?.full_name || 'N/A'}
                                 </div>
-
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                                    <div>
-                                        <span style={{ fontSize: '10px', fontWeight: '700', color: '#6b7280', display: 'block' }}>Registrado Por</span>
-                                        <span style={{ fontSize: '12px' }}>{client.profiles?.full_name || 'N/A'}</span>
-                                    </div>
-                                    <div>
-                                        <span style={{ fontSize: '10px', fontWeight: '700', color: '#6b7280', display: 'block' }}>Última Visita</span>
-                                        <span style={{ fontSize: '12px' }}>{client.last_visit_at ? new Date(client.last_visit_at).toLocaleDateString() : 'Sin registro'}</span>
-                                    </div>
+                                <div>N.E. Pend: {nePendientes}</div>
+                                <div>N.E. Cerr: {neCerradas}</div>
+                                <div>
+                                  Visita:{' '}
+                                  {client.last_visit_at
+                                    ? new Date(
+                                        client.last_visit_at
+                                      ).toLocaleDateString()
+                                    : 'Sin reg'}
                                 </div>
-
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', backgroundColor: '#f9fafb', padding: '8px', borderRadius: '6px' }}>
-                                    <div style={{ textAlign: 'center' }}>
-                                        <span style={{ fontSize: '10px', fontWeight: '700', color: '#DC2626', display: 'block' }}>N.E. Pendientes</span>
-                                        <span style={{ fontSize: '14px', fontWeight: '800', color: '#DC2626' }}>{nePendientes}</span>
-                                    </div>
-                                    <div style={{ textAlign: 'center' }}>
-                                        <span style={{ fontSize: '10px', fontWeight: '700', color: '#10B981', display: 'block' }}>N.E. Cerradas</span>
-                                        <span style={{ fontSize: '14px', fontWeight: '800', color: '#10B981' }}>{neCerradas}</span>
-                                    </div>
-                                </div>
-
-                                <button
-                                  onClick={() => openClientEditModal(client)}
-                                  style={{
-                                    backgroundColor: '#000',
-                                    color: '#D4AF37',
-                                    border: 'none',
-                                    padding: '8px',
-                                    borderRadius: '6px',
-                                    fontWeight: '700',
-                                    fontSize: '11px',
-                                    cursor: 'pointer',
-                                    width: '100%',
-                                    marginTop: '4px'
-                                  }}
-                                >
-                                  Editar Cliente
-                                </button>
-                             </div>
+                              </div>
+                              <div
+                                style={{
+                                  display: 'flex',
+                                  gap: '6px',
+                                  flexWrap: 'wrap',
+                                }}
+                              >
+                                {!isPotential && client.ci_photo_url && (
+                                  <DocBadge
+                                    label="CI"
+                                    url={client.ci_photo_url}
+                                    title={`C.I. de ${client.name}`}
+                                  />
+                                )}
+                                {!isPotential && client.rif_photo_url && (
+                                  <DocBadge
+                                    label="RIF"
+                                    url={client.rif_photo_url}
+                                    title={`RIF de ${client.name}`}
+                                  />
+                                )}
+                                {client.additional_doc_url && (
+                                  <DocBadge
+                                    label="Adic."
+                                    url={client.additional_doc_url}
+                                    title={`Doc. Adic. de ${client.name}`}
+                                  />
+                                )}
+                                {client.last_visit_photo_url && (
+                                  <DocBadge
+                                    label="Foto"
+                                    url={client.last_visit_photo_url}
+                                    title={`Visita a ${client.name}`}
+                                  />
+                                )}
+                              </div>
+                              <button
+                                onClick={() => openClientEditModal(client)}
+                                style={{
+                                  backgroundColor: '#000',
+                                  color: '#D4AF37',
+                                  border: 'none',
+                                  padding: '8px',
+                                  borderRadius: '6px',
+                                  fontWeight: '700',
+                                  fontSize: '11px',
+                                  cursor: 'pointer',
+                                  width: '100%',
+                                }}
+                              >
+                                Editar Cliente
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       );
@@ -2443,6 +2749,7 @@ export default function Users() {
                 <X size={20} />
               </button>
             </div>
+
             <div
               style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}
             >
@@ -2473,6 +2780,7 @@ export default function Users() {
                   }}
                 />
               </div>
+
               {/* CI y RIF Textos */}
               <div
                 style={{
@@ -2534,6 +2842,7 @@ export default function Users() {
                   />
                 </div>
               </div>
+
               {/* Archivos Adjuntos */}
               <div
                 style={{
@@ -2553,6 +2862,7 @@ export default function Users() {
                 >
                   Documentos Adjuntos
                 </h4>
+
                 <div
                   style={{
                     display: 'flex',
@@ -2625,6 +2935,7 @@ export default function Users() {
                       />
                     </div>
                   </div>
+
                   {/* RIF Photo */}
                   <div
                     style={{
@@ -2694,6 +3005,7 @@ export default function Users() {
                       />
                     </div>
                   </div>
+
                   {/* Additional Doc */}
                   <div
                     style={{
@@ -2765,6 +3077,7 @@ export default function Users() {
                   </div>
                 </div>
               </div>
+
               <div
                 style={{
                   display: 'flex',
@@ -2807,42 +3120,13 @@ export default function Users() {
         </div>
       )}
 
-      {/* CSS para cambiar la estructura de tabla en móvil sin alterar escritorio */}
+      {/* CSS para diseño responsivo, tarjetas móviles y campos informativos */}
       <style>{`
-        /* Summary Cards Responsive */
-        @media (max-width: 768px) {
-          .summary-cards-container {
-            grid-template-columns: repeat(3, 1fr) !important;
-            gap: 8px !important;
-          }
-          .summary-cards-container > div {
-            padding: 8px !important;
-          }
-          .summary-cards-container > div > div:first-child {
-            font-size: 9px !important;
-          }
-          .summary-cards-container > div > div:nth-child(2) {
-            font-size: 18px !important;
-          }
-          .summary-cards-container > div > div:last-child {
-            font-size: 9px !important;
-            margin-top: 0 !important;
-          }
+        .summary-cards-grid {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 12px;
         }
-
-        /* Desktop Tabs Visibility */
-        @media (max-width: 768px) {
-          .desktop-tabs {
-            display: none !important;
-          }
-        }
-        @media (min-width: 769px) {
-          .mobile-dropdown-container {
-            display: none !important;
-          }
-        }
-
-        /* Table Responsive Logic */
         .users-table-container {
           width: 100%;
           overflow-x: auto;
@@ -2853,47 +3137,259 @@ export default function Users() {
           font-size: 13px;
           text-align: left;
         }
-        .desktop-thead {
-          display: table-header-group;
-        }
-        .desktop-cell-normal {
-          display: table-cell;
+        .mobile-thead {
+          display: none;
         }
         .mobile-cell-stacked {
           display: none;
         }
-        
+        .desktop-cell-normal {
+          display: table-cell;
+        }
+
         @media (max-width: 768px) {
-          .users-table-container {
+          .desktop-tabs-container {
+            display: none !important;
+          }
+          .mobile-dropdown-container {
+            display: block !important;
+          }
+          .summary-cards-grid {
+            grid-template-columns: repeat(3, 1fr) !important;
+            gap: 8px !important;
+          }
+          .summary-card-item {
+            padding: 10px 6px !important;
+            text-align: center !important;
+          }
+          .summary-card-item div:nth-child(1) {
+            font-size: 9px !important;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+          }
+          .summary-card-item div:nth-child(2) {
+            font-size: 18px !important;
+            margin-top: 2px !important;
+          }
+          .summary-card-item div:nth-child(3) {
+            font-size: 9px !important;
+            margin-top: 1px !important;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+          }
+          .users-table-container.mobile-cards {
             overflow-x: hidden !important;
+            background: transparent !important;
+            border: none !important;
+            padding: 0 !important;
+          }
+          .custom-responsive-table {
+            display: block !important;
           }
           .desktop-thead {
             display: none !important;
+          }
+          .mobile-thead {
+            display: none !important;
+          }
+          .custom-responsive-table tbody {
+            display: flex !important;
+            flex-direction: column !important;
+            gap: 12px !important;
+          }
+          .custom-responsive-table tr {
+            display: flex !important;
+            flex-direction: column !important;
+            background-color: #ffffff !important;
+            border: 1px solid #d1d5db !important;
+            border-radius: 8px !important;
+            padding: 14px !important;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
           }
           .desktop-cell-normal {
             display: none !important;
           }
           .mobile-cell-stacked {
-            display: table-cell !important;
-            padding: 12px !important;
-            background-color: #fff;
-            border-bottom: 1px solid #e5e7eb;
+            display: flex !important;
+            flex-direction: column;
+            gap: 8px;
+            padding: 0 !important;
           }
-          /* Card Style for Mobile Rows */
-          .mobile-cards {
-            display: block;
-            margin-bottom: 12px;
-            border: 1px solid #e5e7eb;
-            border-radius: 8px;
-            background-color: #fff;
-            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        }
+
+        @media (min-width: 769px) {
+          .desktop-tabs-container {
+            display: flex !important;
           }
-          .mobile-cards td {
-            border: none;
+          .mobile-dropdown-container {
+            display: none !important;
           }
         }
       `}</style>
     </div>
+  );
+}
+
+function StructureUserRow({ user, onSelect }) {
+  return (
+    <tr style={{ borderBottom: '1px solid #f3f4f6' }}>
+      {/* VISTA ESCRITORIO: Nombre */}
+      <td
+        className="desktop-cell-normal"
+        style={{ padding: '10px', fontWeight: '600' }}
+      >
+        {user.full_name || 'Sin Nombre'}
+      </td>
+      {/* VISTA ESCRITORIO: Correo */}
+      <td
+        className="desktop-cell-normal"
+        style={{ padding: '10px', color: '#6b7280' }}
+      >
+        {user.email}
+      </td>
+      {/* VISTA ESCRITORIO: Rol */}
+      <td className="desktop-cell-normal" style={{ padding: '10px' }}>
+        <span
+          style={{
+            backgroundColor: '#f3f4f6',
+            padding: '4px 8px',
+            borderRadius: '4px',
+            fontSize: '12px',
+            fontWeight: '600',
+          }}
+        >
+          {user.role}
+        </span>
+      </td>
+      {/* VISTA ESCRITORIO: Vendedores Asignados */}
+      <td className="desktop-cell-normal" style={{ padding: '10px' }}>
+        {user.is_global ? (
+          <span style={{ color: '#10b981', fontWeight: '600' }}>
+            Global {user.has_exceptions ? `(Con Excepciones)` : ''}
+          </span>
+        ) : (
+          <span style={{ color: '#2563eb', fontWeight: '600' }}>
+            {user.assigned_count} vendedores asignados
+          </span>
+        )}
+      </td>
+      {/* VISTA ESCRITORIO: Acción */}
+      <td className="desktop-cell-normal" style={{ padding: '10px' }}>
+        <button
+          onClick={onSelect}
+          style={{
+            backgroundColor: '#000000',
+            color: '#D4AF37',
+            border: 'none',
+            padding: '6px 12px',
+            borderRadius: '6px',
+            fontWeight: '700',
+            fontSize: '11px',
+            cursor: 'pointer',
+          }}
+        >
+          Configurar
+        </button>
+      </td>
+
+      {/* VISTA MÓVIL: Tarjeta Apilada */}
+      <td
+        colSpan="2"
+        className="mobile-cell-stacked"
+        style={{ verticalAlign: 'top', width: '100%' }}
+      >
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '8px',
+            width: '100%',
+          }}
+        >
+          <div>
+            <span
+              style={{
+                fontWeight: '600',
+                color: '#111827',
+                fontSize: '13px',
+                display: 'block',
+              }}
+            >
+              {user.full_name || 'Sin Nombre'}
+            </span>
+            <span
+              style={{
+                fontSize: '11px',
+                color: '#6b7280',
+                wordBreak: 'break-all',
+                display: 'block',
+              }}
+            >
+              {user.email}
+            </span>
+          </div>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr',
+              gap: '6px',
+              fontSize: '12px',
+            }}
+          >
+            <div>
+              <span
+                style={{
+                  fontSize: '10px',
+                  color: '#6b7280',
+                  display: 'block',
+                  fontWeight: '700',
+                  textTransform: 'uppercase',
+                }}
+              >
+                Rol
+              </span>
+              <span>{user.role}</span>
+            </div>
+            <div>
+              <span
+                style={{
+                  fontSize: '10px',
+                  color: '#6b7280',
+                  display: 'block',
+                  fontWeight: '700',
+                  textTransform: 'uppercase',
+                }}
+              >
+                Asignación
+              </span>
+              <span>
+                {user.is_global
+                  ? `Global${user.has_exceptions ? ' (Exc)' : ''}`
+                  : `${user.assigned_count} asig.`}
+              </span>
+            </div>
+          </div>
+          <button
+            onClick={onSelect}
+            style={{
+              backgroundColor: '#000000',
+              color: '#D4AF37',
+              border: 'none',
+              padding: '8px',
+              borderRadius: '6px',
+              fontWeight: '700',
+              fontSize: '11px',
+              cursor: 'pointer',
+              width: '100%',
+            }}
+          >
+            Configurar Estructura
+          </button>
+        </div>
+      </td>
+    </tr>
   );
 }
 
@@ -2905,7 +3401,6 @@ function UserRow({ user, onSave }) {
   const [pctFluidos, setPctFluidos] = useState(user.pct_fluidos || 0);
   const [sueldoFijo, setSueldoFijo] = useState(user.sueldo_fijo_usd || 0);
   const isStockRole = role === 'stock';
-
   const handleSave = () => {
     onSave(user.id, {
       role,
@@ -2914,9 +3409,8 @@ function UserRow({ user, onSave }) {
       sueldo_fijo_usd: Number(sueldoFijo),
     });
   };
-
   return (
-    <tr className="mobile-cards" style={{ borderBottom: '1px solid #f3f4f6' }}>
+    <tr style={{ borderBottom: '1px solid #f3f4f6' }}>
       {/* VISTA ESCRITORIO: Nombre */}
       <td
         className="desktop-cell-normal"
@@ -3023,9 +3517,12 @@ function UserRow({ user, onSave }) {
           Guardar
         </button>
       </td>
-
-      {/* VISTA MÓVIL: Tarjeta Apilada */}
-      <td colSpan="7" className="mobile-cell-stacked">
+      {/* VISTA MÓVIL: Fila única combinada (colSpan=2) que abarca todo el ancho */}
+      <td
+        colSpan="2"
+        className="mobile-cell-stacked"
+        style={{ verticalAlign: 'top', width: '100%' }}
+      >
         <div
           style={{
             display: 'flex',
@@ -3034,12 +3531,12 @@ function UserRow({ user, onSave }) {
             width: '100%',
           }}
         >
-          <div style={{ borderBottom: '1px solid #f3f4f6', paddingBottom: '8px' }}>
+          <div>
             <span
               style={{
-                fontWeight: '700',
+                fontWeight: '600',
                 color: '#111827',
-                fontSize: '14px',
+                fontSize: '13px',
                 display: 'block',
               }}
             >
@@ -3047,7 +3544,7 @@ function UserRow({ user, onSave }) {
             </span>
             <span
               style={{
-                fontSize: '12px',
+                fontSize: '11px',
                 color: '#6b7280',
                 wordBreak: 'break-all',
                 display: 'block',
@@ -3056,7 +3553,6 @@ function UserRow({ user, onSave }) {
               {user.email}
             </span>
           </div>
-          
           <div>
             <span
               style={{
@@ -3065,7 +3561,6 @@ function UserRow({ user, onSave }) {
                 display: 'block',
                 fontWeight: '700',
                 textTransform: 'uppercase',
-                marginBottom: '4px'
               }}
             >
               Rol
@@ -3074,13 +3569,12 @@ function UserRow({ user, onSave }) {
               value={role}
               onChange={(e) => setRole(e.target.value)}
               style={{
-                padding: '8px',
+                padding: '6px',
                 borderRadius: '6px',
                 border: role ? '1px solid #d1d5db' : '1px solid #dc2626',
                 backgroundColor: role ? '#ffffff' : '#fef2f2',
                 width: '100%',
-                fontSize: '13px',
-                boxSizing: 'border-box'
+                fontSize: '12px',
               }}
             >
               <option value="" disabled>
@@ -3094,12 +3588,11 @@ function UserRow({ user, onSave }) {
               <option value="suspendido">Suspendido</option>
             </select>
           </div>
-
           <div
             style={{
               display: 'grid',
               gridTemplateColumns: '1fr 1fr',
-              gap: '12px',
+              gap: '6px',
             }}
           >
             <div>
@@ -3109,7 +3602,6 @@ function UserRow({ user, onSave }) {
                   color: '#6b7280',
                   display: 'block',
                   fontWeight: '700',
-                  marginBottom: '4px'
                 }}
               >
                 % Bombillos
@@ -3121,12 +3613,11 @@ function UserRow({ user, onSave }) {
                 onChange={(e) => setPctBombillos(e.target.value)}
                 style={{
                   width: '100%',
-                  padding: '8px',
+                  padding: '4px',
                   borderRadius: '6px',
                   border: '1px solid #d1d5db',
                   backgroundColor: isStockRole ? '#f3f4f6' : '#ffffff',
-                  fontSize: '13px',
-                  boxSizing: 'border-box'
+                  fontSize: '12px',
                 }}
               />
             </div>
@@ -3137,7 +3628,6 @@ function UserRow({ user, onSave }) {
                   color: '#6b7280',
                   display: 'block',
                   fontWeight: '700',
-                  marginBottom: '4px'
                 }}
               >
                 % Fluidos
@@ -3149,17 +3639,15 @@ function UserRow({ user, onSave }) {
                 onChange={(e) => setPctFluidos(e.target.value)}
                 style={{
                   width: '100%',
-                  padding: '8px',
+                  padding: '4px',
                   borderRadius: '6px',
                   border: '1px solid #d1d5db',
                   backgroundColor: isStockRole ? '#f3f4f6' : '#ffffff',
-                  fontSize: '13px',
-                  boxSizing: 'border-box'
+                  fontSize: '12px',
                 }}
               />
             </div>
           </div>
-
           <div>
             <span
               style={{
@@ -3167,7 +3655,6 @@ function UserRow({ user, onSave }) {
                 color: '#6b7280',
                 display: 'block',
                 fontWeight: '700',
-                marginBottom: '4px'
               }}
             >
               Sueldo Fijo ($)
@@ -3178,31 +3665,28 @@ function UserRow({ user, onSave }) {
               onChange={(e) => setSueldoFijo(e.target.value)}
               style={{
                 width: '100%',
-                padding: '8px',
+                padding: '4px',
                 borderRadius: '6px',
                 border: '1px solid #d1d5db',
-                fontSize: '13px',
-                boxSizing: 'border-box'
+                fontSize: '12px',
               }}
             />
           </div>
-
           <button
             onClick={handleSave}
             style={{
               backgroundColor: '#000000',
               color: '#D4AF37',
               border: 'none',
-              padding: '10px',
+              padding: '8px',
               borderRadius: '6px',
               fontWeight: '700',
-              fontSize: '12px',
+              fontSize: '11px',
               cursor: 'pointer',
               width: '100%',
-              marginTop: '8px',
             }}
           >
-            Guardar Cambios
+            Guardar
           </button>
         </div>
       </td>
@@ -3210,183 +3694,44 @@ function UserRow({ user, onSave }) {
   );
 }
 
-function StructureUserRow({ user, onSelect }) {
-  const renderAssignedText = () => {
-    if (user.is_global) {
-      if (user.has_exceptions && (user.exception_count || 0) > 0) {
-        return `Todos - ${user.exception_count}`;
-      }
-      return 'Todos';
-    }
-    return `${user.assigned_count || 0} Vendedores`;
-  };
-
-  return (
-    <tr className="mobile-cards" style={{ borderBottom: '1px solid #f3f4f6' }}>
-      {/* VISTA ESCRITORIO */}
-      <td
-        className="desktop-cell-normal"
-        style={{ padding: '10px', fontWeight: '600' }}
-      >
-        {user.full_name || 'Sin Nombre'}
-      </td>
-      <td
-        className="desktop-cell-normal"
-        style={{ padding: '10px', color: '#6b7280' }}
-      >
-        {user.email}
-      </td>
-      <td
-        className="desktop-cell-normal"
-        style={{ padding: '10px', textTransform: 'capitalize' }}
-      >
-        {user.role}
-      </td>
-      <td className="desktop-cell-normal" style={{ padding: '10px' }}>
-        {renderAssignedText()}
-      </td>
-      <td className="desktop-cell-normal" style={{ padding: '10px' }}>
-        <button
-          onClick={onSelect}
-          style={{
-            backgroundColor: '#000',
-            color: '#D4AF37',
-            border: 'none',
-            padding: '6px 12px',
-            borderRadius: '6px',
-            fontWeight: '700',
-            fontSize: '11px',
-            cursor: 'pointer',
-          }}
-        >
-          Asignar Vendedores
-        </button>
-      </td>
-
-      {/* VISTA MÓVIL: Tarjeta Apilada */}
-      <td colSpan="5" className="mobile-cell-stacked">
-        <div
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '8px',
-            width: '100%',
-          }}
-        >
-          <div style={{ borderBottom: '1px solid #f3f4f6', paddingBottom: '8px' }}>
-            <span
-              style={{
-                fontWeight: '700',
-                color: '#111827',
-                fontSize: '14px',
-                display: 'block',
-              }}
-            >
-              {user.full_name || 'Sin Nombre'}
-            </span>
-            <span
-              style={{
-                fontSize: '12px',
-                color: '#6b7280',
-                wordBreak: 'break-all',
-                display: 'block',
-              }}
-            >
-              {user.email}
-            </span>
-          </div>
-          
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-            <span
-              style={{
-                fontSize: '10px',
-                fontWeight: '700',
-                textTransform: 'uppercase',
-                color: '#6b7280',
-              }}
-            >
-              Rol
-            </span>
-            <span style={{ fontSize: '13px', fontWeight: '600', textTransform: 'capitalize', color: '#374151' }}>
-              {user.role}
-            </span>
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-             <span
-              style={{
-                fontSize: '10px',
-                fontWeight: '700',
-                textTransform: 'uppercase',
-                color: '#6b7280',
-              }}
-            >
-              Asignación
-            </span>
-            <span style={{ fontSize: '13px', color: '#111827' }}>
-              {renderAssignedText()}
-            </span>
-          </div>
-
-          <button
-            onClick={onSelect}
-            style={{
-              backgroundColor: '#000',
-              color: '#D4AF37',
-              border: 'none',
-              padding: '10px',
-              borderRadius: '6px',
-              fontWeight: '700',
-              fontSize: '12px',
-              cursor: 'pointer',
-              width: '100%',
-              marginTop: '8px',
-            }}
-          >
-            Asignar Vendedores
-          </button>
-        </div>
-      </td>
-    </tr>
-  );
-}
-
-// Componente auxiliar para badges de documentos en Clientes
 function DocBadge({ label, url, title }) {
-  const [isOpen, setIsOpen] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
+  const isPdf = url.toLowerCase().includes('.pdf');
+
   return (
     <>
       <button
-        onClick={() => setIsOpen(true)}
+        onClick={() => setModalOpen(true)}
         style={{
+          backgroundColor: '#f3f4f6',
+          border: '1px solid #d1d5db',
+          borderRadius: '4px',
+          padding: '2px 6px',
+          fontSize: '10px',
+          fontWeight: '700',
+          color: '#374151',
+          cursor: 'pointer',
           display: 'inline-flex',
           alignItems: 'center',
           gap: '3px',
-          padding: '3px 6px',
-          backgroundColor: '#F0FDF4',
-          color: '#15803D',
-          borderRadius: '4px',
-          border: 'none',
-          cursor: 'pointer',
-          fontSize: '10px',
-          fontWeight: '700',
         }}
+        title={`Ver ${title}`}
       >
         <Eye size={10} /> {label}
       </button>
-      {isOpen && (
+
+      {modalOpen && (
         <div
           style={{
             position: 'fixed',
             inset: 0,
-            backgroundColor: 'rgba(0,0,0,0.8)',
+            backgroundColor: 'rgba(0,0,0,0.7)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             zIndex: 3000,
             padding: '16px',
           }}
-          onClick={() => setIsOpen(false)}
         >
           <div
             style={{
@@ -3394,71 +3739,80 @@ function DocBadge({ label, url, title }) {
               borderRadius: '12px',
               maxWidth: '90vw',
               maxHeight: '90vh',
-              padding: '16px',
-              position: 'relative',
+              overflow: 'hidden',
+              display: 'flex',
+              flexDirection: 'column',
+              boxShadow: '0 20px 50px rgba(0,0,0,0.3)',
             }}
-            onClick={(e) => e.stopPropagation()}
           >
-            <button
-              onClick={() => setIsOpen(false)}
-              style={{
-                position: 'absolute',
-                top: '8px',
-                right: '8px',
-                background: 'none',
-                border: 'none',
-                cursor: 'pointer',
-                color: '#6b7280',
-              }}
-            >
-              <X size={24} />
-            </button>
-            <h3
-              style={{
-                margin: '0 0 12px 0',
-                fontSize: '14px',
-                fontWeight: '700',
-                color: '#111827',
-              }}
-            >
-              {title}
-            </h3>
-            <img
-              src={url}
-              alt="Documento"
-              style={{
-                maxWidth: '100%',
-                maxHeight: '70vh',
-                objectFit: 'contain',
-                borderRadius: '8px',
-              }}
-            />
             <div
               style={{
-                marginTop: '12px',
                 display: 'flex',
-                justifyContent: 'center',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                padding: '12px 16px',
+                borderBottom: '1px solid #e5e7eb',
               }}
             >
-              <a
-                href={url}
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{
-                  padding: '8px 16px',
-                  backgroundColor: '#111827',
-                  color: '#fff',
-                  borderRadius: '6px',
-                  textDecoration: 'none',
-                  fontSize: '12px',
-                  fontWeight: '700',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                }}
-              >
-                <Download size={14} /> Descargar Original
-              </a>
+              <h4 style={{ margin: 0, fontSize: '14px', fontWeight: '700' }}>
+                {title}
+              </h4>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <a
+                  href={url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    fontSize: '11px',
+                    color: '#2563eb',
+                    textDecoration: 'none',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                  }}
+                >
+                  <Download size={12} /> Descargar
+                </a>
+                <button
+                  onClick={() => setModalOpen(false)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    color: '#6b7280',
+                  }}
+                >
+                  <X size={18} />
+                </button>
+              </div>
+            </div>
+            <div
+              style={{
+                padding: '16px',
+                overflow: 'auto',
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+              }}
+            >
+              {isPdf ? (
+                <iframe
+                  src={url}
+                  title={title}
+                  style={{ width: '80vw', height: '70vh', border: 'none' }}
+                />
+              ) : (
+                <img
+                  src={url}
+                  alt={title}
+                  style={{
+                    maxWidth: '100%',
+                    maxHeight: '70vh',
+                    objectFit: 'contain',
+                    borderRadius: '4px',
+                  }}
+                />
+              )}
             </div>
           </div>
         </div>
