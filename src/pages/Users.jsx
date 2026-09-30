@@ -9,6 +9,8 @@ import {
   ChevronLeft,
   Upload,
   Trash2,
+  ChevronDown,
+  Check,
 } from 'lucide-react';
 
 export default function Users() {
@@ -19,7 +21,7 @@ export default function Users() {
   const [exceptionsCountMap, setExceptionsCountMap] = useState({});
   const [hierarchyConfigMap, setHierarchyConfigMap] = useState({});
   const [searchQuery, setSearchQuery] = useState('');
-
+  
   // Estados para sub-sección de Estructura
   const [selectedParentUser, setSelectedParentUser] = useState(null);
   const [globalData, setGlobalData] = useState({
@@ -59,6 +61,10 @@ export default function Users() {
   const clientRifInputRef = useRef(null);
   const clientDocInputRef = useRef(null);
 
+  // --- NUEVOS ESTADOS PARA MENÚ RESPONSIVO ---
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const mobileMenuRef = useRef(null);
+
   useEffect(() => {
     fetchUsersAndAssignments();
   }, []);
@@ -70,18 +76,33 @@ export default function Users() {
     }
   }, [activeTab]);
 
+  // --- EFECTO PARA CERRAR DROPDOWN AL HACER CLIC FUERA ---
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (mobileMenuRef.current && !mobileMenuRef.current.contains(event.target)) {
+        setIsMobileMenuOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [mobileMenuRef]);
+
   const fetchUsersAndAssignments = async () => {
     setLoading(true);
     try {
       const { data: usersData, error: usersError } = await supabase
         .from('profiles')
         .select('*');
+
       if (usersError) throw usersError;
       setAllUsers(usersData || []);
 
       const { data: cfgData } = await supabase
         .from('hierarchy_config')
         .select('parent_user_id, is_global, has_exceptions');
+      
       const cfgMap = {};
       cfgData?.forEach((c) => {
         cfgMap[c.parent_user_id] = c;
@@ -91,6 +112,7 @@ export default function Users() {
       const { data: assignData, error: assignError } = await supabase
         .from('hierarchy_assignments')
         .select('parent_user_id, target_seller_id, is_exception');
+
       if (!assignError && assignData) {
         const counts = {};
         const excCounts = {};
@@ -117,11 +139,7 @@ export default function Users() {
       const { data, error } = await supabase
         .from('clients')
         .select(
-          `
-          *,
-          profiles:assigned_seller_id(full_name, email, role),
-          sales_orders(id, payment_status, balance_due_usd, seller_id)
-        `
+          `*, profiles:assigned_seller_id(full_name, email, role), sales_orders(id, payment_status, balance_due_usd, seller_id)`
         )
         .order('created_at', { ascending: false });
 
@@ -154,6 +172,7 @@ export default function Users() {
           u.role?.toLowerCase() !== 'stock' &&
           u.role !== 'pendiente'
       );
+
       activeSellersList.forEach((seller) => {
         const found = targetRows?.find((r) => r.target_seller_id === seller.id);
         specificTargets[seller.id] = {
@@ -288,7 +307,6 @@ export default function Users() {
   };
 
   // --- Lógica para Pestaña PERFILES ---
-
   const startEditingProfile = (user) => {
     setEditingProfileId(user.id);
     setProfileFormData({
@@ -314,7 +332,6 @@ export default function Users() {
   const handleProfileFileChange = async (e, field, bucket, allowedTypes) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     if (!allowedTypes.includes(file.type)) {
       alert(`Formato no permitido. Aceptados: ${allowedTypes.join(', ')}`);
       return;
@@ -323,23 +340,18 @@ export default function Users() {
       alert('El archivo supera el tamaño máximo de 5MB.');
       return;
     }
-
     try {
       const fileExt = file.name.split('.').pop();
       const fileName = `${Date.now()}-${Math.random()
         .toString(36)
         .substring(2, 8)}.${fileExt}`;
       const filePath = `${editingProfileId}/${fileName}`;
-
       const { error: uploadError } = await supabase.storage
         .from(bucket)
         .upload(filePath, file, { upsert: false });
-
       if (uploadError) throw uploadError;
-
       const { data } = supabase.storage.from(bucket).getPublicUrl(filePath);
       const newUrl = data.publicUrl;
-
       setProfileFormData((prev) => ({ ...prev, [field]: newUrl }));
     } catch (err) {
       alert('Error subiendo archivo: ' + err.message);
@@ -350,7 +362,6 @@ export default function Users() {
     setSavingProfile(true);
     try {
       const { _old_avatar_url, _old_ci_url, ...updates } = profileFormData;
-
       // Eliminar archivos antiguos si cambiaron
       if (_old_avatar_url && _old_avatar_url !== updates.avatar_url) {
         await deleteOldFile(_old_avatar_url, 'avatars');
@@ -358,14 +369,11 @@ export default function Users() {
       if (_old_ci_url && _old_ci_url !== updates.ci_url) {
         await deleteOldFile(_old_ci_url, 'documents');
       }
-
       const { error } = await supabase
         .from('profiles')
         .update(updates)
         .eq('id', userId);
-
       if (error) throw error;
-
       alert('Perfil actualizado correctamente.');
       setEditingProfileId(null);
       fetchUsersAndAssignments(); // Recargar lista
@@ -377,7 +385,6 @@ export default function Users() {
   };
 
   // --- Lógica para Pestaña CLIENTES ---
-
   const openClientEditModal = (client) => {
     setClientEditModal({
       open: true,
@@ -410,7 +417,6 @@ export default function Users() {
   const handleClientFileUpload = async (e, field, bucket) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     setUploadingClientFile(true);
     try {
       const fileExt = file.name.split('.').pop();
@@ -418,15 +424,11 @@ export default function Users() {
         .toString(36)
         .substring(2, 8)}.${fileExt}`;
       const filePath = `${clientEditModal.client.id}/${fileName}`;
-
       const { error: uploadError } = await supabase.storage
         .from(bucket)
         .upload(filePath, file, { upsert: false });
-
       if (uploadError) throw uploadError;
-
       const { data } = supabase.storage.from(bucket).getPublicUrl(filePath);
-
       setClientEditModal((prev) => ({
         ...prev,
         formData: { ...prev.formData, [field]: data.publicUrl },
@@ -444,7 +446,6 @@ export default function Users() {
     try {
       const { _old_ci_photo, _old_rif_photo, _old_additional_doc, ...updates } =
         clientEditModal.formData;
-
       // Eliminar archivos antiguos si cambiaron
       if (_old_ci_photo && _old_ci_photo !== updates.ci_photo_url) {
         await deleteOldFile(_old_ci_photo, 'documents');
@@ -458,14 +459,11 @@ export default function Users() {
       ) {
         await deleteOldFile(_old_additional_doc, 'documents');
       }
-
       const { error } = await supabase
         .from('clients')
         .update(updates)
         .eq('id', clientEditModal.client.id);
-
       if (error) throw error;
-
       alert('Cliente actualizado correctamente.');
       closeClientEditModal();
       fetchAllClients(); // Recargar lista
@@ -483,7 +481,6 @@ export default function Users() {
     const idx = url.indexOf(pattern);
     if (idx === -1) return;
     const path = url.substring(idx + pattern.length);
-
     try {
       const { error } = await supabase.storage.from(bucket).remove([path]);
       if (error)
@@ -501,6 +498,14 @@ export default function Users() {
     );
   }
 
+  const tabs = [
+    { key: 'admitir', label: 'Admitir Pendientes' },
+    { key: 'comisiones', label: 'Comisiones por N.E. Cerrada' },
+    { key: 'estructura', label: 'Estructura de Comisiones' },
+    { key: 'perfiles', label: 'Perfiles' },
+    { key: 'clientes', label: 'Clientes' },
+  ];
+
   return (
     <div
       style={{
@@ -508,6 +513,8 @@ export default function Users() {
         backgroundColor: '#f9fafb',
         minHeight: '100vh',
         fontFamily: 'system-ui, sans-serif',
+        maxWidth: '1200px',
+        margin: '0 auto',
       }}
     >
       <h2
@@ -523,6 +530,7 @@ export default function Users() {
 
       {/* Indicadores / Tarjetas de Resumen */}
       <div
+        className="summary-cards-container"
         style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
@@ -536,6 +544,7 @@ export default function Users() {
             border: '1px solid #e5e7eb',
             borderRadius: '12px',
             padding: '16px',
+            textAlign: 'center',
           }}
         >
           <div
@@ -568,6 +577,7 @@ export default function Users() {
             border: '1.5px solid #dc2626',
             borderRadius: '12px',
             padding: '16px',
+            textAlign: 'center',
           }}
         >
           <div
@@ -600,6 +610,7 @@ export default function Users() {
             border: '1.5px solid #D4AF37',
             borderRadius: '12px',
             padding: '16px',
+            textAlign: 'center',
           }}
         >
           <div
@@ -628,46 +639,118 @@ export default function Users() {
         </div>
       </div>
 
-      {/* Navegación Pestañas */}
-      <div
-        style={{
-          display: 'flex',
-          gap: '8px',
-          borderBottom: '1px solid #e5e7eb',
-          marginBottom: '20px',
-          flexWrap: 'wrap',
-        }}
-      >
-        {[
-          { key: 'admitir', label: 'Admitir Pendientes' },
-          { key: 'comisiones', label: 'Comisiones por N.E. Cerrada' },
-          { key: 'estructura', label: 'Estructura de Comisiones' },
-          { key: 'perfiles', label: 'Perfiles' },
-          { key: 'clientes', label: 'Clientes' },
-        ].map((tab) => (
+      {/* Navegación Pestañas / Dropdown Responsivo */}
+      <div ref={mobileMenuRef} style={{ position: 'relative', marginBottom: '24px' }}>
+        
+        {/* Versión Escritorio: Pestañas Horizontales */}
+        <div
+          className="desktop-tabs"
+          style={{
+            display: 'flex',
+            gap: '8px',
+            borderBottom: '1px solid #e5e7eb',
+            flexWrap: 'wrap',
+          }}
+        >
+          {tabs.map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => {
+                setActiveTab(tab.key);
+                setSelectedParentUser(null);
+              }}
+              style={{
+                padding: '8px 16px',
+                border: 'none',
+                borderBottom:
+                  activeTab === tab.key
+                    ? '2px solid #000'
+                    : '2px solid transparent',
+                backgroundColor: 'transparent',
+                fontWeight: activeTab === tab.key ? '700' : '500',
+                color: activeTab === tab.key ? '#000' : '#6b7280',
+                fontSize: '13px',
+                cursor: 'pointer',
+              }}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Versión Móvil: Dropdown Elegante */}
+        <div className="mobile-dropdown-container">
           <button
-            key={tab.key}
-            onClick={() => {
-              setActiveTab(tab.key);
-              setSelectedParentUser(null);
-            }}
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            className="dropdown-trigger"
             style={{
-              padding: '8px 16px',
-              border: 'none',
-              borderBottom:
-                activeTab === tab.key
-                  ? '2px solid #000'
-                  : '2px solid transparent',
-              backgroundColor: 'transparent',
-              fontWeight: activeTab === tab.key ? '700' : '500',
-              color: activeTab === tab.key ? '#000' : '#6b7280',
-              fontSize: '13px',
+              width: '100%',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              padding: '12px 16px',
+              backgroundColor: '#fff',
+              border: '1px solid #d1d5db',
+              borderRadius: '8px',
+              fontSize: '14px',
+              fontWeight: '600',
+              color: '#111827',
               cursor: 'pointer',
             }}
           >
-            {tab.label}
+            <span>{tabs.find(t => t.key === activeTab)?.label}</span>
+            <ChevronDown size={18} color="#4b5563" />
           </button>
-        ))}
+
+          {isMobileMenuOpen && (
+            <div
+              className="dropdown-menu"
+              style={{
+                position: 'absolute',
+                top: '100%',
+                left: 0,
+                right: 0,
+                marginTop: '4px',
+                backgroundColor: '#fff',
+                border: '1px solid #d1d5db',
+                borderRadius: '8px',
+                boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)',
+                zIndex: 50,
+                overflow: 'hidden',
+              }}
+            >
+              {tabs.map((tab) => (
+                <button
+                  key={tab.key}
+                  onClick={() => {
+                    setActiveTab(tab.key);
+                    setSelectedParentUser(null);
+                    setIsMobileMenuOpen(false);
+                  }}
+                  className="dropdown-item"
+                  style={{
+                    width: '100%',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    padding: '12px 16px',
+                    backgroundColor: activeTab === tab.key ? '#fef2f2' : 'transparent',
+                    border: 'none',
+                    borderBottom: '1px solid #e5e7eb',
+                    fontSize: '14px',
+                    fontWeight: activeTab === tab.key ? '700' : '500',
+                    color: activeTab === tab.key ? '#dc2626' : '#4b5563',
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                  }}
+                >
+                  <span>{tab.label}</span>
+                  {activeTab === tab.key && <Check size={18} color="#dc2626" />}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* SECCIÓN 1: ADMITIR */}
@@ -719,19 +802,6 @@ export default function Users() {
                     <th style={{ padding: '10px' }}>% Fluidos</th>
                     <th style={{ padding: '10px' }}>Sueldo F. ($)</th>
                     <th style={{ padding: '10px' }}>Acción</th>
-                  </tr>
-                </thead>
-                <thead className="mobile-thead">
-                  <tr
-                    style={{
-                      backgroundColor: '#f9fafb',
-                      borderBottom: '1px solid #e5e7eb',
-                      color: '#4b5563',
-                    }}
-                  >
-                    <th colSpan="2" style={{ padding: '10px' }}>
-                      Nombre
-                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -809,19 +879,6 @@ export default function Users() {
                   <th style={{ padding: '10px' }}>Acción</th>
                 </tr>
               </thead>
-              <thead className="mobile-thead">
-                <tr
-                  style={{
-                    backgroundColor: '#f9fafb',
-                    borderBottom: '1px solid #e5e7eb',
-                    color: '#4b5563',
-                  }}
-                >
-                  <th colSpan="2" style={{ padding: '10px' }}>
-                    Nombre
-                  </th>
-                </tr>
-              </thead>
               <tbody>
                 {activeUsers
                   .filter(
@@ -875,19 +932,6 @@ export default function Users() {
                   <th style={{ padding: '10px' }}>Rol</th>
                   <th style={{ padding: '10px' }}>Vendedores Asignados</th>
                   <th style={{ padding: '10px' }}>Acción</th>
-                </tr>
-              </thead>
-              <thead className="mobile-thead">
-                <tr
-                  style={{
-                    backgroundColor: '#f9fafb',
-                    borderBottom: '1px solid #e5e7eb',
-                    color: '#4b5563',
-                  }}
-                >
-                  <th colSpan="2" style={{ padding: '10px' }}>
-                    Nombre
-                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -1368,27 +1412,14 @@ export default function Users() {
                   <th style={{ padding: '10px' }}>Acción</th>
                 </tr>
               </thead>
-              <thead className="mobile-thead">
-                <tr
-                  style={{
-                    backgroundColor: '#f9fafb',
-                    borderBottom: '1px solid #e5e7eb',
-                    color: '#4b5563',
-                  }}
-                >
-                  <th colSpan="2" style={{ padding: '10px' }}>
-                    Perfil
-                  </th>
-                </tr>
-              </thead>
               <tbody>
                 {allUsers.map((user) => {
                   const isEditing = editingProfileId === user.id;
-
                   if (isEditing) {
                     return (
                       <tr
                         key={user.id}
+                        className="mobile-cards"
                         style={{
                           borderBottom: '1px solid #f3f4f6',
                           backgroundColor: '#fffbeb',
@@ -1617,9 +1648,9 @@ export default function Users() {
                             <X size={12} />
                           </button>
                         </td>
-
-                        {/* Mobile View for Editing Profile */}
-                        <td colSpan="2" className="mobile-cell-stacked">
+                        
+                        {/* Mobile View for Editing Profile (Card Layout) */}
+                        <td colSpan="6" className="mobile-cell-stacked">
                           <div
                             style={{
                               display: 'flex',
@@ -1627,6 +1658,9 @@ export default function Users() {
                               gap: '10px',
                             }}
                           >
+                             <div style={{ fontWeight: '700', fontSize: '14px', color: '#111827', borderBottom: '1px solid #e5e7eb', paddingBottom: '8px' }}>
+                                Editando Perfil
+                             </div>
                             <div
                               style={{
                                 display: 'flex',
@@ -1694,56 +1728,73 @@ export default function Users() {
                                 }
                               />
                             </div>
-                            <input
-                              type="text"
-                              placeholder="Nombre"
-                              value={profileFormData.full_name}
-                              onChange={(e) =>
-                                handleProfileFieldChange(
-                                  'full_name',
-                                  e.target.value
-                                )
-                              }
-                              style={{
-                                padding: '8px',
-                                border: '1px solid #ccc',
-                                borderRadius: '4px',
-                              }}
-                            />
-                            <input
-                              type="text"
-                              placeholder="C.I."
-                              value={profileFormData.ci}
-                              onChange={(e) =>
-                                handleProfileFieldChange('ci', e.target.value)
-                              }
-                              style={{
-                                padding: '8px',
-                                border: '1px solid #ccc',
-                                borderRadius: '4px',
-                              }}
-                            />
-                            <input
-                              type="text"
-                              placeholder="Ciudad"
-                              value={profileFormData.city}
-                              onChange={(e) =>
-                                handleProfileFieldChange('city', e.target.value)
-                              }
-                              style={{
-                                padding: '8px',
-                                border: '1px solid #ccc',
-                                borderRadius: '4px',
-                              }}
-                            />
+                            <div>
+                                <label style={{fontSize: '10px', fontWeight: '700', color: '#6b7280'}}>Nombre</label>
+                                <input
+                                type="text"
+                                placeholder="Nombre"
+                                value={profileFormData.full_name}
+                                onChange={(e) =>
+                                    handleProfileFieldChange(
+                                    'full_name',
+                                    e.target.value
+                                    )
+                                }
+                                style={{
+                                    padding: '8px',
+                                    border: '1px solid #ccc',
+                                    borderRadius: '4px',
+                                    width: '100%',
+                                    boxSizing: 'border-box'
+                                }}
+                                />
+                            </div>
+                            <div>
+                                <label style={{fontSize: '10px', fontWeight: '700', color: '#6b7280'}}>C.I.</label>
+                                <input
+                                type="text"
+                                placeholder="C.I."
+                                value={profileFormData.ci}
+                                onChange={(e) =>
+                                    handleProfileFieldChange('ci', e.target.value)
+                                }
+                                style={{
+                                    padding: '8px',
+                                    border: '1px solid #ccc',
+                                    borderRadius: '4px',
+                                    width: '100%',
+                                    boxSizing: 'border-box'
+                                }}
+                                />
+                            </div>
+                            <div>
+                                <label style={{fontSize: '10px', fontWeight: '700', color: '#6b7280'}}>Ciudad</label>
+                                <input
+                                type="text"
+                                placeholder="Ciudad"
+                                value={profileFormData.city}
+                                onChange={(e) =>
+                                    handleProfileFieldChange('city', e.target.value)
+                                }
+                                style={{
+                                    padding: '8px',
+                                    border: '1px solid #ccc',
+                                    borderRadius: '4px',
+                                    width: '100%',
+                                    boxSizing: 'border-box'
+                                }}
+                                />
+                            </div>
                             <div
                               style={{
                                 display: 'flex',
                                 justifyContent: 'space-between',
                                 alignItems: 'center',
+                                borderTop: '1px solid #f3f4f6',
+                                paddingTop: '8px'
                               }}
                             >
-                              <span style={{ fontSize: '12px' }}>
+                              <span style={{ fontSize: '12px', fontWeight: '600' }}>
                                 Doc. CI: {profileFormData.ci_url ? 'Sí' : 'No'}
                               </span>
                               <button
@@ -1781,7 +1832,7 @@ export default function Users() {
                                 }
                               />
                             </div>
-                            <div style={{ display: 'flex', gap: '10px' }}>
+                            <div style={{ display: 'flex', gap: '10px', marginTop: '8px' }}>
                               <button
                                 onClick={() => saveProfileChanges(user.id)}
                                 disabled={savingProfile}
@@ -1816,10 +1867,10 @@ export default function Users() {
                       </tr>
                     );
                   }
-
                   return (
                     <tr
                       key={user.id}
+                      className="mobile-cards"
                       style={{ borderBottom: '1px solid #f3f4f6' }}
                     >
                       <td
@@ -1930,91 +1981,90 @@ export default function Users() {
                           Editar
                         </button>
                       </td>
-
-                      {/* Mobile View for Normal Row */}
-                      <td colSpan="2" className="mobile-cell-stacked">
+                      
+                      {/* Mobile View for Normal Row (Card Layout) */}
+                      <td colSpan="6" className="mobile-cell-stacked">
                         <div
                           style={{
                             display: 'flex',
                             flexDirection: 'column',
-                            gap: '6px',
+                            gap: '8px',
                           }}
                         >
-                          <div
-                            style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '10px',
-                            }}
-                          >
-                            <div
-                              style={{
-                                width: '40px',
-                                height: '40px',
-                                borderRadius: '50%',
-                                overflow: 'hidden',
-                                backgroundColor: '#f3f4f6',
-                              }}
-                            >
-                              {user.avatar_url ? (
-                                <img
-                                  src={user.avatar_url}
-                                  alt="Avatar"
-                                  style={{
-                                    width: '100%',
-                                    height: '100%',
-                                    objectFit: 'cover',
-                                  }}
-                                />
-                              ) : (
+                           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', borderBottom: '1px solid #f3f4f6', paddingBottom: '8px' }}>
                                 <div
-                                  style={{
-                                    width: '100%',
-                                    height: '100%',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                  }}
+                                    style={{
+                                    width: '50px',
+                                    height: '50px',
+                                    borderRadius: '50%',
+                                    overflow: 'hidden',
+                                    backgroundColor: '#f3f4f6',
+                                    }}
                                 >
-                                  <svg
-                                    xmlns="http://www.w3.org/2000/svg"
-                                    width="20"
-                                    height="20"
-                                    viewBox="0 0 24 24"
-                                    fill="none"
-                                    stroke="#9ca3af"
-                                    strokeWidth="2"
-                                  >
-                                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                                    <circle cx="12" cy="7" r="4" />
-                                  </svg>
+                                    {user.avatar_url ? (
+                                    <img
+                                        src={user.avatar_url}
+                                        alt="Avatar"
+                                        style={{
+                                        width: '100%',
+                                        height: '100%',
+                                        objectFit: 'cover',
+                                        }}
+                                    />
+                                    ) : (
+                                    <div
+                                        style={{
+                                        width: '100%',
+                                        height: '100%',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        }}
+                                    >
+                                        <svg
+                                        xmlns="http://www.w3.org/2000/svg"
+                                        width="24"
+                                        height="24"
+                                        viewBox="0 0 24 24"
+                                        fill="none"
+                                        stroke="#9ca3af"
+                                        strokeWidth="2"
+                                        >
+                                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                                        <circle cx="12" cy="7" r="4" />
+                                        </svg>
+                                    </div>
+                                    )}
                                 </div>
-                              )}
-                            </div>
-                            <div>
-                              <div style={{ fontWeight: '600' }}>
-                                {user.full_name || 'Sin Nombre'}
-                              </div>
-                              <div
-                                style={{ fontSize: '11px', color: '#6b7280' }}
-                              >
-                                {user.email}
-                              </div>
-                            </div>
-                          </div>
-                          <div
-                            style={{
-                              display: 'grid',
-                              gridTemplateColumns: '1fr 1fr',
-                              gap: '8px',
-                              fontSize: '12px',
-                            }}
-                          >
-                            <div>CI: {user.ci || '-'}</div>
-                            <div>Ciudad: {user.city || '-'}</div>
-                            <div>Doc: {user.ci_url ? 'Sí' : 'No'}</div>
-                          </div>
-                          <button
+                                <div>
+                                    <div style={{ fontWeight: '700', fontSize: '14px', color: '#111827' }}>
+                                    {user.full_name || 'Sin Nombre'}
+                                    </div>
+                                    <div style={{ fontSize: '12px', color: '#6b7280' }}>
+                                    {user.email}
+                                    </div>
+                                </div>
+                           </div>
+                           
+                           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                                <div>
+                                    <span style={{ fontSize: '10px', fontWeight: '700', color: '#6b7280', display: 'block' }}>C.I.</span>
+                                    <span style={{ fontSize: '13px' }}>{user.ci || '-'}</span>
+                                </div>
+                                <div>
+                                    <span style={{ fontSize: '10px', fontWeight: '700', color: '#6b7280', display: 'block' }}>Ciudad</span>
+                                    <span style={{ fontSize: '13px' }}>{user.city || '-'}</span>
+                                </div>
+                           </div>
+                           
+                           <div>
+                                <span style={{ fontSize: '10px', fontWeight: '700', color: '#6b7280', display: 'block' }}>Documento CI</span>
+                                <span style={{ fontSize: '13px', color: user.ci_url ? '#10B981' : '#9CA3AF' }}>
+                                    {user.ci_url ? 'Adjunto ✓' : 'N/A'}
+                                </span>
+                           </div>
+
+                           <button
                             onClick={() => startEditingProfile(user)}
                             style={{
                               backgroundColor: '#000',
@@ -2026,6 +2076,7 @@ export default function Users() {
                               fontSize: '11px',
                               cursor: 'pointer',
                               width: '100%',
+                              marginTop: '4px'
                             }}
                           >
                             Editar Perfil
@@ -2061,7 +2112,6 @@ export default function Users() {
           >
             Base de Datos de Clientes (Oficiales y Potenciales)
           </h3>
-
           {loadingClients ? (
             <div
               style={{ padding: '20px', textAlign: 'center', color: '#6b7280' }}
@@ -2071,7 +2121,7 @@ export default function Users() {
           ) : (
             <div className="users-table-container">
               <table className="custom-responsive-table">
-                <thead>
+                <thead className="desktop-thead">
                   <tr
                     style={{
                       backgroundColor: '#f9fafb',
@@ -2115,10 +2165,10 @@ export default function Users() {
                       const neCerradas = (client.sales_orders || []).filter(
                         (o) => o.payment_status === 'cerrada'
                       ).length;
-
                       return (
                         <tr
                           key={client.id}
+                          className="mobile-cards"
                           style={{ borderBottom: '1px solid #f3f4f6' }}
                         >
                           <td style={{ padding: '10px' }}>
@@ -2254,6 +2304,76 @@ export default function Users() {
                               Editar
                             </button>
                           </td>
+
+                          {/* Mobile View for Client Row (Card Layout) */}
+                          <td colSpan="7" className="mobile-cell-stacked">
+                             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', borderBottom: '1px solid #f3f4f6', paddingBottom: '8px' }}>
+                                    <div>
+                                        <div style={{ fontWeight: '700', fontSize: '14px', color: '#111827' }}>{client.name}</div>
+                                        <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '2px' }}>
+                                            CI: {client.ci_number || 'N/A'} | RIF: {client.rif_number || 'N/A'}
+                                        </div>
+                                    </div>
+                                    {isPotential ? (
+                                        <span style={{ fontSize: '9px', backgroundColor: '#FEF3C7', color: '#B45309', padding: '2px 6px', borderRadius: '4px', fontWeight: '700' }}>POTENCIAL</span>
+                                    ) : (
+                                        <span style={{ fontSize: '9px', backgroundColor: '#DCFCE7', color: '#15803D', padding: '2px 6px', borderRadius: '4px', fontWeight: '700' }}>OFICIAL</span>
+                                    )}
+                                </div>
+
+                                <div>
+                                    <span style={{ fontSize: '10px', fontWeight: '700', color: '#6b7280', display: 'block' }}>Documentos</span>
+                                    <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '4px' }}>
+                                        {!isPotential && client.ci_photo_url && <DocBadge label="CI" url={client.ci_photo_url} title={`C.I. de ${client.name}`} />}
+                                        {!isPotential && client.rif_photo_url && <DocBadge label="RIF" url={client.rif_photo_url} title={`RIF de ${client.name}`} />}
+                                        {client.additional_doc_url && <DocBadge label="Adic." url={client.additional_doc_url} title={`Doc. Adic. de ${client.name}`} />}
+                                        {client.last_visit_photo_url && <DocBadge label="Foto" url={client.last_visit_photo_url} title={`Visita a ${client.name}`} />}
+                                        {(!client.ci_photo_url && !client.rif_photo_url && !client.additional_doc_url && !client.last_visit_photo_url) && <span style={{fontSize: '11px', color: '#9ca3af'}}>Sin documentos</span>}
+                                    </div>
+                                </div>
+
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                                    <div>
+                                        <span style={{ fontSize: '10px', fontWeight: '700', color: '#6b7280', display: 'block' }}>Registrado Por</span>
+                                        <span style={{ fontSize: '12px' }}>{client.profiles?.full_name || 'N/A'}</span>
+                                    </div>
+                                    <div>
+                                        <span style={{ fontSize: '10px', fontWeight: '700', color: '#6b7280', display: 'block' }}>Última Visita</span>
+                                        <span style={{ fontSize: '12px' }}>{client.last_visit_at ? new Date(client.last_visit_at).toLocaleDateString() : 'Sin registro'}</span>
+                                    </div>
+                                </div>
+
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', backgroundColor: '#f9fafb', padding: '8px', borderRadius: '6px' }}>
+                                    <div style={{ textAlign: 'center' }}>
+                                        <span style={{ fontSize: '10px', fontWeight: '700', color: '#DC2626', display: 'block' }}>N.E. Pendientes</span>
+                                        <span style={{ fontSize: '14px', fontWeight: '800', color: '#DC2626' }}>{nePendientes}</span>
+                                    </div>
+                                    <div style={{ textAlign: 'center' }}>
+                                        <span style={{ fontSize: '10px', fontWeight: '700', color: '#10B981', display: 'block' }}>N.E. Cerradas</span>
+                                        <span style={{ fontSize: '14px', fontWeight: '800', color: '#10B981' }}>{neCerradas}</span>
+                                    </div>
+                                </div>
+
+                                <button
+                                  onClick={() => openClientEditModal(client)}
+                                  style={{
+                                    backgroundColor: '#000',
+                                    color: '#D4AF37',
+                                    border: 'none',
+                                    padding: '8px',
+                                    borderRadius: '6px',
+                                    fontWeight: '700',
+                                    fontSize: '11px',
+                                    cursor: 'pointer',
+                                    width: '100%',
+                                    marginTop: '4px'
+                                  }}
+                                >
+                                  Editar Cliente
+                                </button>
+                             </div>
+                          </td>
                         </tr>
                       );
                     })
@@ -2323,7 +2443,6 @@ export default function Users() {
                 <X size={20} />
               </button>
             </div>
-
             <div
               style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}
             >
@@ -2354,7 +2473,6 @@ export default function Users() {
                   }}
                 />
               </div>
-
               {/* CI y RIF Textos */}
               <div
                 style={{
@@ -2416,7 +2534,6 @@ export default function Users() {
                   />
                 </div>
               </div>
-
               {/* Archivos Adjuntos */}
               <div
                 style={{
@@ -2436,7 +2553,6 @@ export default function Users() {
                 >
                   Documentos Adjuntos
                 </h4>
-
                 <div
                   style={{
                     display: 'flex',
@@ -2509,7 +2625,6 @@ export default function Users() {
                       />
                     </div>
                   </div>
-
                   {/* RIF Photo */}
                   <div
                     style={{
@@ -2579,7 +2694,6 @@ export default function Users() {
                       />
                     </div>
                   </div>
-
                   {/* Additional Doc */}
                   <div
                     style={{
@@ -2651,7 +2765,6 @@ export default function Users() {
                   </div>
                 </div>
               </div>
-
               <div
                 style={{
                   display: 'flex',
@@ -2696,46 +2809,90 @@ export default function Users() {
 
       {/* CSS para cambiar la estructura de tabla en móvil sin alterar escritorio */}
       <style>{`
-     .users-table-container {
-       width: 100%;
-       overflow-x: auto;
-     }
-     .custom-responsive-table {
-       width: 100%;
-       border-collapse: collapse;
-       font-size: 13px;
-       text-align: left;
-     }
-     .mobile-thead {
-       display: none;
-     }
-     .mobile-cell-stacked {
-       display: none;
-     }
-     .desktop-cell-normal {
-       display: table-cell;
-     }
-     @media (max-width: 768px) {
-       .users-table-container {
-         overflow-x: hidden !important;
-       }
-       .desktop-thead {
-         display: none !important;
-       }
-       .mobile-thead {
-         display: table-header-group !important;
-       }
-       .desktop-cell-normal {
-         display: none !important;
-       }
-       .mobile-cell-stacked {
-         display: flex !important;
-         flex-direction: column;
-         gap: 6px;
-         padding: 10px !important;
-       }
-     }
-   `}</style>
+        /* Summary Cards Responsive */
+        @media (max-width: 768px) {
+          .summary-cards-container {
+            grid-template-columns: repeat(3, 1fr) !important;
+            gap: 8px !important;
+          }
+          .summary-cards-container > div {
+            padding: 8px !important;
+          }
+          .summary-cards-container > div > div:first-child {
+            font-size: 9px !important;
+          }
+          .summary-cards-container > div > div:nth-child(2) {
+            font-size: 18px !important;
+          }
+          .summary-cards-container > div > div:last-child {
+            font-size: 9px !important;
+            margin-top: 0 !important;
+          }
+        }
+
+        /* Desktop Tabs Visibility */
+        @media (max-width: 768px) {
+          .desktop-tabs {
+            display: none !important;
+          }
+        }
+        @media (min-width: 769px) {
+          .mobile-dropdown-container {
+            display: none !important;
+          }
+        }
+
+        /* Table Responsive Logic */
+        .users-table-container {
+          width: 100%;
+          overflow-x: auto;
+        }
+        .custom-responsive-table {
+          width: 100%;
+          border-collapse: collapse;
+          font-size: 13px;
+          text-align: left;
+        }
+        .desktop-thead {
+          display: table-header-group;
+        }
+        .desktop-cell-normal {
+          display: table-cell;
+        }
+        .mobile-cell-stacked {
+          display: none;
+        }
+        
+        @media (max-width: 768px) {
+          .users-table-container {
+            overflow-x: hidden !important;
+          }
+          .desktop-thead {
+            display: none !important;
+          }
+          .desktop-cell-normal {
+            display: none !important;
+          }
+          .mobile-cell-stacked {
+            display: table-cell !important;
+            padding: 12px !important;
+            background-color: #fff;
+            border-bottom: 1px solid #e5e7eb;
+          }
+          /* Card Style for Mobile Rows */
+          .mobile-cards {
+            display: block;
+            margin-bottom: 12px;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            background-color: #fff;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+          }
+          .mobile-cards td {
+            border: none;
+          }
+        }
+      `}</style>
     </div>
   );
 }
@@ -2748,6 +2905,7 @@ function UserRow({ user, onSave }) {
   const [pctFluidos, setPctFluidos] = useState(user.pct_fluidos || 0);
   const [sueldoFijo, setSueldoFijo] = useState(user.sueldo_fijo_usd || 0);
   const isStockRole = role === 'stock';
+
   const handleSave = () => {
     onSave(user.id, {
       role,
@@ -2756,8 +2914,9 @@ function UserRow({ user, onSave }) {
       sueldo_fijo_usd: Number(sueldoFijo),
     });
   };
+
   return (
-    <tr style={{ borderBottom: '1px solid #f3f4f6' }}>
+    <tr className="mobile-cards" style={{ borderBottom: '1px solid #f3f4f6' }}>
       {/* VISTA ESCRITORIO: Nombre */}
       <td
         className="desktop-cell-normal"
@@ -2864,12 +3023,9 @@ function UserRow({ user, onSave }) {
           Guardar
         </button>
       </td>
-      {/* VISTA MÓVIL: Fila única combinada (colSpan=2) que abarca todo el ancho */}
-      <td
-        colSpan="2"
-        className="mobile-cell-stacked"
-        style={{ verticalAlign: 'top', width: '100%' }}
-      >
+
+      {/* VISTA MÓVIL: Tarjeta Apilada */}
+      <td colSpan="7" className="mobile-cell-stacked">
         <div
           style={{
             display: 'flex',
@@ -2878,12 +3034,12 @@ function UserRow({ user, onSave }) {
             width: '100%',
           }}
         >
-          <div>
+          <div style={{ borderBottom: '1px solid #f3f4f6', paddingBottom: '8px' }}>
             <span
               style={{
-                fontWeight: '600',
+                fontWeight: '700',
                 color: '#111827',
-                fontSize: '13px',
+                fontSize: '14px',
                 display: 'block',
               }}
             >
@@ -2891,7 +3047,7 @@ function UserRow({ user, onSave }) {
             </span>
             <span
               style={{
-                fontSize: '11px',
+                fontSize: '12px',
                 color: '#6b7280',
                 wordBreak: 'break-all',
                 display: 'block',
@@ -2900,6 +3056,7 @@ function UserRow({ user, onSave }) {
               {user.email}
             </span>
           </div>
+          
           <div>
             <span
               style={{
@@ -2908,6 +3065,7 @@ function UserRow({ user, onSave }) {
                 display: 'block',
                 fontWeight: '700',
                 textTransform: 'uppercase',
+                marginBottom: '4px'
               }}
             >
               Rol
@@ -2916,12 +3074,13 @@ function UserRow({ user, onSave }) {
               value={role}
               onChange={(e) => setRole(e.target.value)}
               style={{
-                padding: '6px',
+                padding: '8px',
                 borderRadius: '6px',
                 border: role ? '1px solid #d1d5db' : '1px solid #dc2626',
                 backgroundColor: role ? '#ffffff' : '#fef2f2',
                 width: '100%',
-                fontSize: '12px',
+                fontSize: '13px',
+                boxSizing: 'border-box'
               }}
             >
               <option value="" disabled>
@@ -2935,11 +3094,12 @@ function UserRow({ user, onSave }) {
               <option value="suspendido">Suspendido</option>
             </select>
           </div>
+
           <div
             style={{
               display: 'grid',
               gridTemplateColumns: '1fr 1fr',
-              gap: '6px',
+              gap: '12px',
             }}
           >
             <div>
@@ -2949,6 +3109,7 @@ function UserRow({ user, onSave }) {
                   color: '#6b7280',
                   display: 'block',
                   fontWeight: '700',
+                  marginBottom: '4px'
                 }}
               >
                 % Bombillos
@@ -2960,11 +3121,12 @@ function UserRow({ user, onSave }) {
                 onChange={(e) => setPctBombillos(e.target.value)}
                 style={{
                   width: '100%',
-                  padding: '4px',
+                  padding: '8px',
                   borderRadius: '6px',
                   border: '1px solid #d1d5db',
                   backgroundColor: isStockRole ? '#f3f4f6' : '#ffffff',
-                  fontSize: '12px',
+                  fontSize: '13px',
+                  boxSizing: 'border-box'
                 }}
               />
             </div>
@@ -2975,6 +3137,7 @@ function UserRow({ user, onSave }) {
                   color: '#6b7280',
                   display: 'block',
                   fontWeight: '700',
+                  marginBottom: '4px'
                 }}
               >
                 % Fluidos
@@ -2986,15 +3149,17 @@ function UserRow({ user, onSave }) {
                 onChange={(e) => setPctFluidos(e.target.value)}
                 style={{
                   width: '100%',
-                  padding: '4px',
+                  padding: '8px',
                   borderRadius: '6px',
                   border: '1px solid #d1d5db',
                   backgroundColor: isStockRole ? '#f3f4f6' : '#ffffff',
-                  fontSize: '12px',
+                  fontSize: '13px',
+                  boxSizing: 'border-box'
                 }}
               />
             </div>
           </div>
+
           <div>
             <span
               style={{
@@ -3002,6 +3167,7 @@ function UserRow({ user, onSave }) {
                 color: '#6b7280',
                 display: 'block',
                 fontWeight: '700',
+                marginBottom: '4px'
               }}
             >
               Sueldo Fijo ($)
@@ -3012,29 +3178,31 @@ function UserRow({ user, onSave }) {
               onChange={(e) => setSueldoFijo(e.target.value)}
               style={{
                 width: '100%',
-                padding: '4px',
+                padding: '8px',
                 borderRadius: '6px',
                 border: '1px solid #d1d5db',
-                fontSize: '12px',
+                fontSize: '13px',
+                boxSizing: 'border-box'
               }}
             />
           </div>
+
           <button
             onClick={handleSave}
             style={{
               backgroundColor: '#000000',
               color: '#D4AF37',
               border: 'none',
-              padding: '8px 12px',
+              padding: '10px',
               borderRadius: '6px',
               fontWeight: '700',
-              fontSize: '11px',
+              fontSize: '12px',
               cursor: 'pointer',
               width: '100%',
-              marginTop: '4px',
+              marginTop: '8px',
             }}
           >
-            Guardar
+            Guardar Cambios
           </button>
         </div>
       </td>
@@ -3052,8 +3220,9 @@ function StructureUserRow({ user, onSelect }) {
     }
     return `${user.assigned_count || 0} Vendedores`;
   };
+
   return (
-    <tr style={{ borderBottom: '1px solid #f3f4f6' }}>
+    <tr className="mobile-cards" style={{ borderBottom: '1px solid #f3f4f6' }}>
       {/* VISTA ESCRITORIO */}
       <td
         className="desktop-cell-normal"
@@ -3093,26 +3262,23 @@ function StructureUserRow({ user, onSelect }) {
           Asignar Vendedores
         </button>
       </td>
-      {/* VISTA MÓVIL: Fila única combinada (colSpan=2) que abarca todo el ancho */}
-      <td
-        colSpan="2"
-        className="mobile-cell-stacked"
-        style={{ verticalAlign: 'top', width: '100%' }}
-      >
+
+      {/* VISTA MÓVIL: Tarjeta Apilada */}
+      <td colSpan="5" className="mobile-cell-stacked">
         <div
           style={{
             display: 'flex',
             flexDirection: 'column',
-            gap: '6px',
+            gap: '8px',
             width: '100%',
           }}
         >
-          <div>
+          <div style={{ borderBottom: '1px solid #f3f4f6', paddingBottom: '8px' }}>
             <span
               style={{
-                fontWeight: '600',
+                fontWeight: '700',
                 color: '#111827',
-                fontSize: '13px',
+                fontSize: '14px',
                 display: 'block',
               }}
             >
@@ -3120,7 +3286,7 @@ function StructureUserRow({ user, onSelect }) {
             </span>
             <span
               style={{
-                fontSize: '11px',
+                fontSize: '12px',
                 color: '#6b7280',
                 wordBreak: 'break-all',
                 display: 'block',
@@ -3129,37 +3295,55 @@ function StructureUserRow({ user, onSelect }) {
               {user.email}
             </span>
           </div>
+          
           <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
             <span
               style={{
-                fontSize: '12px',
-                fontWeight: '600',
-                textTransform: 'capitalize',
-                color: '#374151',
+                fontSize: '10px',
+                fontWeight: '700',
+                textTransform: 'uppercase',
+                color: '#6b7280',
               }}
             >
-              Rol: {user.role}
+              Rol
             </span>
-            <span style={{ fontSize: '12px', color: '#6b7280' }}>
+            <span style={{ fontSize: '13px', fontWeight: '600', textTransform: 'capitalize', color: '#374151' }}>
+              {user.role}
+            </span>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+             <span
+              style={{
+                fontSize: '10px',
+                fontWeight: '700',
+                textTransform: 'uppercase',
+                color: '#6b7280',
+              }}
+            >
+              Asignación
+            </span>
+            <span style={{ fontSize: '13px', color: '#111827' }}>
               {renderAssignedText()}
             </span>
           </div>
+
           <button
             onClick={onSelect}
             style={{
               backgroundColor: '#000',
               color: '#D4AF37',
               border: 'none',
-              padding: '8px 12px',
+              padding: '10px',
               borderRadius: '6px',
               fontWeight: '700',
-              fontSize: '11px',
+              fontSize: '12px',
               cursor: 'pointer',
               width: '100%',
-              marginTop: '4px',
+              marginTop: '8px',
             }}
           >
-            Asignar
+            Asignar Vendedores
           </button>
         </div>
       </td>
@@ -3170,7 +3354,6 @@ function StructureUserRow({ user, onSelect }) {
 // Componente auxiliar para badges de documentos en Clientes
 function DocBadge({ label, url, title }) {
   const [isOpen, setIsOpen] = useState(false);
-
   return (
     <>
       <button
@@ -3191,7 +3374,6 @@ function DocBadge({ label, url, title }) {
       >
         <Eye size={10} /> {label}
       </button>
-
       {isOpen && (
         <div
           style={{
