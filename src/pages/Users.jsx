@@ -14,13 +14,36 @@ import {
 } from 'lucide-react';
 
 export default function Users() {
-  const [activeTab, setActiveTab] = useState('admitir'); // 'admitir' | 'comisiones' | 'estructura' | 'perfiles' | 'clientes'
+  // Inicializar pestaña activa priorizando parámetro de URL (?tab= o #), luego localStorage, y por defecto 'admitir'
+  const getInitialTab = () => {
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      const tabParam = urlParams.get('tab');
+      if (tabParam) return tabParam;
+
+      const hashParam = window.location.hash.replace('#', '');
+      if (hashParam) return hashParam;
+
+      const savedTab = localStorage.getItem('users_active_tab');
+      if (savedTab) return savedTab;
+    }
+    return 'admitir';
+  };
+
+  const [activeTab, setActiveTab] = useState(getInitialTab); // 'admitir' | 'comisiones' | 'estructura' | 'perfiles' | 'clientes'
   const [loading, setLoading] = useState(true);
   const [allUsers, setAllUsers] = useState([]);
   const [assignmentsCountMap, setAssignmentsCountMap] = useState({});
   const [exceptionsCountMap, setExceptionsCountMap] = useState({});
   const [hierarchyConfigMap, setHierarchyConfigMap] = useState({});
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Estado para el Modal de Visualización de Imágenes / Documentos Adjuntos
+  const [imageModal, setImageModal] = useState({
+    open: false,
+    url: '',
+    title: 'Documento Adjunto',
+  });
 
   // Estados para el menú desplegable móvil
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -68,6 +91,16 @@ export default function Users() {
   useEffect(() => {
     fetchUsersAndAssignments();
   }, []);
+
+  // Guardar pestaña activa en localStorage y actualizar URL sin recargar
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('users_active_tab', activeTab);
+      const url = new URL(window.location);
+      url.searchParams.set('tab', activeTab);
+      window.history.replaceState({}, '', url);
+    }
+  }, [activeTab]);
 
   // Cargar clientes cuando se activa la pestaña
   useEffect(() => {
@@ -1595,7 +1628,7 @@ export default function Users() {
         </div>
       )}
 
-      {/* ================= NUEVA SECCIÓN: PERFILES ================= */}
+      {/* ================= SECCIÓN: PERFILES ================= */}
       {activeTab === 'perfiles' && (
         <div
           style={{
@@ -1670,6 +1703,16 @@ export default function Users() {
                               borderRadius: '50%',
                               overflow: 'hidden',
                               border: '1px solid #ddd',
+                              cursor: profileFormData.avatar_url ? 'pointer' : 'default',
+                            }}
+                            onClick={() => {
+                              if (profileFormData.avatar_url) {
+                                setImageModal({
+                                  open: true,
+                                  url: profileFormData.avatar_url,
+                                  title: `Avatar de ${profileFormData.full_name || 'Usuario'}`,
+                                });
+                              }
                             }}
                           >
                             {profileFormData.avatar_url ? (
@@ -1799,11 +1842,28 @@ export default function Users() {
                             }}
                           >
                             {profileFormData.ci_url ? (
-                              <span
-                                style={{ fontSize: '11px', color: 'green' }}
+                              <button
+                                onClick={() =>
+                                  setImageModal({
+                                    open: true,
+                                    url: profileFormData.ci_url,
+                                    title: `Documento C.I. de ${profileFormData.full_name || 'Usuario'}`,
+                                  })
+                                }
+                                style={{
+                                  fontSize: '11px',
+                                  color: '#10B981',
+                                  background: 'none',
+                                  border: 'none',
+                                  cursor: 'pointer',
+                                  fontWeight: '600',
+                                  textAlign: 'left',
+                                  padding: 0,
+                                  textDecoration: 'underline',
+                                }}
                               >
-                                ✓ Cargado
-                              </span>
+                                Ver Adjunto ✓
+                              </button>
                             ) : (
                               <span style={{ fontSize: '11px', color: '#999' }}>
                                 Sin doc
@@ -1907,6 +1967,16 @@ export default function Users() {
                                   borderRadius: '50%',
                                   overflow: 'hidden',
                                   border: '1px solid #ddd',
+                                  cursor: profileFormData.avatar_url ? 'pointer' : 'default',
+                                }}
+                                onClick={() => {
+                                  if (profileFormData.avatar_url) {
+                                    setImageModal({
+                                      open: true,
+                                      url: profileFormData.avatar_url,
+                                      title: `Avatar de ${profileFormData.full_name || 'Usuario'}`,
+                                    });
+                                  }
                                 }}
                               >
                                 {profileFormData.avatar_url ? (
@@ -2009,9 +2079,31 @@ export default function Users() {
                                 alignItems: 'center',
                               }}
                             >
-                              <span style={{ fontSize: '12px' }}>
-                                Doc. CI: {profileFormData.ci_url ? 'Sí' : 'No'}
-                              </span>
+                              {profileFormData.ci_url ? (
+                                <button
+                                  onClick={() =>
+                                    setImageModal({
+                                      open: true,
+                                      url: profileFormData.ci_url,
+                                      title: `Documento C.I. de ${profileFormData.full_name || 'Usuario'}`,
+                                    })
+                                  }
+                                  style={{
+                                    fontSize: '12px',
+                                    color: '#10B981',
+                                    background: 'none',
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                    fontWeight: '600',
+                                    padding: 0,
+                                    textDecoration: 'underline',
+                                  }}
+                                >
+                                  Ver Doc. CI ✓
+                                </button>
+                              ) : (
+                                <span style={{ fontSize: '12px' }}>Doc. CI: No</span>
+                              )}
                               <button
                                 onClick={() =>
                                   ciInputRefs.current[user.id]?.click()
@@ -2099,6 +2191,16 @@ export default function Users() {
                             borderRadius: '50%',
                             overflow: 'hidden',
                             backgroundColor: '#f3f4f6',
+                            cursor: user.avatar_url ? 'pointer' : 'default',
+                          }}
+                          onClick={() => {
+                            if (user.avatar_url) {
+                              setImageModal({
+                                open: true,
+                                url: user.avatar_url,
+                                title: `Avatar de ${user.full_name || 'Usuario'}`,
+                              });
+                            }
                           }}
                         >
                           {user.avatar_url ? (
@@ -2161,15 +2263,27 @@ export default function Users() {
                         style={{ padding: '10px' }}
                       >
                         {user.ci_url ? (
-                          <span
+                          <button
+                            onClick={() =>
+                              setImageModal({
+                                open: true,
+                                url: user.ci_url,
+                                title: `Documento C.I. de ${user.full_name || 'Usuario'}`,
+                              })
+                            }
                             style={{
                               fontSize: '11px',
                               color: '#10B981',
                               fontWeight: '600',
+                              background: 'none',
+                              border: 'none',
+                              cursor: 'pointer',
+                              padding: 0,
+                              textDecoration: 'underline',
                             }}
                           >
                             Adjunto ✓
-                          </span>
+                          </button>
                         ) : (
                           <span style={{ fontSize: '11px', color: '#9CA3AF' }}>
                             N/A
@@ -2221,6 +2335,16 @@ export default function Users() {
                                 borderRadius: '50%',
                                 overflow: 'hidden',
                                 backgroundColor: '#f3f4f6',
+                                cursor: user.avatar_url ? 'pointer' : 'default',
+                              }}
+                              onClick={() => {
+                                if (user.avatar_url) {
+                                  setImageModal({
+                                    open: true,
+                                    url: user.avatar_url,
+                                    title: `Avatar de ${user.full_name || 'Usuario'}`,
+                                  });
+                                }
                               }}
                             >
                               {user.avatar_url ? (
@@ -2279,7 +2403,34 @@ export default function Users() {
                           >
                             <div>CI: {user.ci || '-'}</div>
                             <div>Ciudad: {user.city || '-'}</div>
-                            <div>Doc: {user.ci_url ? 'Sí' : 'No'}</div>
+                            <div>
+                              Doc:{' '}
+                              {user.ci_url ? (
+                                <button
+                                  onClick={() =>
+                                    setImageModal({
+                                      open: true,
+                                      url: user.ci_url,
+                                      title: `Documento C.I. de ${user.full_name || 'Usuario'}`,
+                                    })
+                                  }
+                                  style={{
+                                    fontSize: '12px',
+                                    color: '#10B981',
+                                    fontWeight: '600',
+                                    background: 'none',
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                    padding: 0,
+                                    textDecoration: 'underline',
+                                  }}
+                                >
+                                  Sí (Ver)
+                                </button>
+                              ) : (
+                                'No'
+                              )}
+                            </div>
                           </div>
                           <button
                             onClick={() => startEditingProfile(user)}
@@ -2308,7 +2459,7 @@ export default function Users() {
         </div>
       )}
 
-      {/* ================= NUEVA SECCIÓN: CLIENTES ================= */}
+      {/* ================= SECCIÓN: CLIENTES ================= */}
       {activeTab === 'clientes' && (
         <div
           style={{
@@ -2465,6 +2616,7 @@ export default function Users() {
                                   label="CI"
                                   url={client.ci_photo_url}
                                   title={`C.I. de ${client.name}`}
+                                  onOpenModal={(url, title) => setImageModal({ open: true, url, title })}
                                 />
                               )}
                               {!isPotential && client.rif_photo_url && (
@@ -2472,6 +2624,7 @@ export default function Users() {
                                   label="RIF"
                                   url={client.rif_photo_url}
                                   title={`RIF de ${client.name}`}
+                                  onOpenModal={(url, title) => setImageModal({ open: true, url, title })}
                                 />
                               )}
                               {client.additional_doc_url && (
@@ -2479,6 +2632,7 @@ export default function Users() {
                                   label="Adic."
                                   url={client.additional_doc_url}
                                   title={`Doc. Adic. de ${client.name}`}
+                                  onOpenModal={(url, title) => setImageModal({ open: true, url, title })}
                                 />
                               )}
                               {client.last_visit_photo_url && (
@@ -2486,6 +2640,7 @@ export default function Users() {
                                   label="Foto"
                                   url={client.last_visit_photo_url}
                                   title={`Visita a ${client.name}`}
+                                  onOpenModal={(url, title) => setImageModal({ open: true, url, title })}
                                 />
                               )}
                             </div>
@@ -2638,6 +2793,7 @@ export default function Users() {
                                     label="CI"
                                     url={client.ci_photo_url}
                                     title={`C.I. de ${client.name}`}
+                                    onOpenModal={(url, title) => setImageModal({ open: true, url, title })}
                                   />
                                 )}
                                 {!isPotential && client.rif_photo_url && (
@@ -2645,6 +2801,7 @@ export default function Users() {
                                     label="RIF"
                                     url={client.rif_photo_url}
                                     title={`RIF de ${client.name}`}
+                                    onOpenModal={(url, title) => setImageModal({ open: true, url, title })}
                                   />
                                 )}
                                 {client.additional_doc_url && (
@@ -2652,6 +2809,7 @@ export default function Users() {
                                     label="Adic."
                                     url={client.additional_doc_url}
                                     title={`Doc. Adic. de ${client.name}`}
+                                    onOpenModal={(url, title) => setImageModal({ open: true, url, title })}
                                   />
                                 )}
                                 {client.last_visit_photo_url && (
@@ -2659,6 +2817,7 @@ export default function Users() {
                                     label="Foto"
                                     url={client.last_visit_photo_url}
                                     title={`Visita a ${client.name}`}
+                                    onOpenModal={(url, title) => setImageModal({ open: true, url, title })}
                                   />
                                 )}
                               </div>
@@ -2688,6 +2847,97 @@ export default function Users() {
               </table>
             </div>
           )}
+        </div>
+      )}
+
+      {/* ================= MODAL VISUALIZACIÓN DE IMAGEN A TAMAÑO COMPLETO ================= */}
+      {imageModal.open && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            padding: '16px',
+          }}
+          onClick={() => setImageModal({ open: false, url: '', title: '' })}
+        >
+          <div
+            style={{
+              position: 'relative',
+              backgroundColor: '#ffffff',
+              borderRadius: '12px',
+              maxWidth: '90vw',
+              maxHeight: '90vh',
+              overflow: 'hidden',
+              display: 'flex',
+              flexDirection: 'column',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '12px 16px',
+                borderBottom: '1px solid #e5e7eb',
+                backgroundColor: '#f9fafb',
+              }}
+            >
+              <h4
+                style={{
+                  margin: 0,
+                  fontSize: '14px',
+                  fontWeight: '700',
+                  color: '#111827',
+                }}
+              >
+                {imageModal.title}
+              </h4>
+              <button
+                onClick={() => setImageModal({ open: false, url: '', title: '' })}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: '#4b5563',
+                  padding: '4px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  borderRadius: '4px',
+                }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <div
+              style={{
+                padding: '16px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                overflow: 'auto',
+                backgroundColor: '#111827',
+              }}
+            >
+              <img
+                src={imageModal.url}
+                alt="Documento ampliado"
+                style={{
+                  maxWidth: '100%',
+                  maxHeight: '75vh',
+                  objectFit: 'contain',
+                  borderRadius: '4px',
+                }}
+              />
+            </div>
+          </div>
         </div>
       )}
 
@@ -2896,18 +3146,26 @@ export default function Users() {
                     </div>
                     <div style={{ display: 'flex', gap: '8px' }}>
                       {clientEditModal.formData.ci_photo_url && (
-                        <a
-                          href={clientEditModal.formData.ci_photo_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
+                        <button
+                          onClick={() =>
+                            setImageModal({
+                              open: true,
+                              url: clientEditModal.formData.ci_photo_url,
+                              title: `Foto C.I. de ${clientEditModal.formData.name || 'Cliente'}`,
+                            })
+                          }
                           style={{
                             fontSize: '11px',
                             color: '#2563eb',
-                            textDecoration: 'none',
+                            background: 'none',
+                            border: 'none',
+                            cursor: 'pointer',
+                            textDecoration: 'underline',
+                            padding: 0,
                           }}
                         >
                           Ver
-                        </a>
+                        </button>
                       )}
                       <button
                         onClick={() => clientCiInputRef.current?.click()}
@@ -2962,18 +3220,26 @@ export default function Users() {
                     </div>
                     <div style={{ display: 'flex', gap: '8px' }}>
                       {clientEditModal.formData.rif_photo_url && (
-                        <a
-                          href={clientEditModal.formData.rif_photo_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
+                        <button
+                          onClick={() =>
+                            setImageModal({
+                              open: true,
+                              url: clientEditModal.formData.rif_photo_url,
+                              title: `Foto RIF de ${clientEditModal.formData.name || 'Cliente'}`,
+                            })
+                          }
                           style={{
                             fontSize: '11px',
                             color: '#2563eb',
-                            textDecoration: 'none',
+                            background: 'none',
+                            border: 'none',
+                            cursor: 'pointer',
+                            textDecoration: 'underline',
+                            padding: 0,
                           }}
                         >
                           Ver
-                        </a>
+                        </button>
                       )}
                       <button
                         onClick={() => clientRifInputRef.current?.click()}
@@ -3032,18 +3298,26 @@ export default function Users() {
                     </div>
                     <div style={{ display: 'flex', gap: '8px' }}>
                       {clientEditModal.formData.additional_doc_url && (
-                        <a
-                          href={clientEditModal.formData.additional_doc_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
+                        <button
+                          onClick={() =>
+                            setImageModal({
+                              open: true,
+                              url: clientEditModal.formData.additional_doc_url,
+                              title: `Doc. Adicional de ${clientEditModal.formData.name || 'Cliente'}`,
+                            })
+                          }
                           style={{
                             fontSize: '11px',
                             color: '#2563eb',
-                            textDecoration: 'none',
+                            background: 'none',
+                            border: 'none',
+                            cursor: 'pointer',
+                            textDecoration: 'underline',
+                            padding: 0,
                           }}
                         >
                           Ver
-                        </a>
+                        </button>
                       )}
                       <button
                         onClick={() => clientDocInputRef.current?.click()}
@@ -3229,6 +3503,32 @@ export default function Users() {
         }
       `}</style>
     </div>
+  );
+}
+
+// Componente Auxiliar para Miniaturas de Documentos (si se usa en clientes)
+function DocBadge({ label, url, title, onOpenModal }) {
+  return (
+    <button
+      onClick={() => onOpenModal && onOpenModal(url, title)}
+      style={{
+        fontSize: '10px',
+        backgroundColor: '#f3f4f6',
+        color: '#1f2937',
+        border: '1px solid #d1d5db',
+        padding: '2px 6px',
+        borderRadius: '4px',
+        fontWeight: '600',
+        cursor: 'pointer',
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: '3px',
+      }}
+      title={`Ver ${title}`}
+    >
+      <span>{label}</span>
+      <span style={{ color: '#10B981' }}>✓</span>
+    </button>
   );
 }
 
@@ -3602,6 +3902,7 @@ function UserRow({ user, onSave }) {
                   color: '#6b7280',
                   display: 'block',
                   fontWeight: '700',
+                  textTransform: 'uppercase',
                 }}
               >
                 % Bombillos
@@ -3613,11 +3914,10 @@ function UserRow({ user, onSave }) {
                 onChange={(e) => setPctBombillos(e.target.value)}
                 style={{
                   width: '100%',
-                  padding: '4px',
+                  padding: '6px',
                   borderRadius: '6px',
                   border: '1px solid #d1d5db',
                   backgroundColor: isStockRole ? '#f3f4f6' : '#ffffff',
-                  fontSize: '12px',
                 }}
               />
             </div>
@@ -3628,6 +3928,7 @@ function UserRow({ user, onSave }) {
                   color: '#6b7280',
                   display: 'block',
                   fontWeight: '700',
+                  textTransform: 'uppercase',
                 }}
               >
                 % Fluidos
@@ -3639,11 +3940,10 @@ function UserRow({ user, onSave }) {
                 onChange={(e) => setPctFluidos(e.target.value)}
                 style={{
                   width: '100%',
-                  padding: '4px',
+                  padding: '6px',
                   borderRadius: '6px',
                   border: '1px solid #d1d5db',
                   backgroundColor: isStockRole ? '#f3f4f6' : '#ffffff',
-                  fontSize: '12px',
                 }}
               />
             </div>
@@ -3655,6 +3955,7 @@ function UserRow({ user, onSave }) {
                 color: '#6b7280',
                 display: 'block',
                 fontWeight: '700',
+                textTransform: 'uppercase',
               }}
             >
               Sueldo Fijo ($)
@@ -3665,10 +3966,9 @@ function UserRow({ user, onSave }) {
               onChange={(e) => setSueldoFijo(e.target.value)}
               style={{
                 width: '100%',
-                padding: '4px',
+                padding: '6px',
                 borderRadius: '6px',
                 border: '1px solid #d1d5db',
-                fontSize: '12px',
               }}
             />
           </div>
@@ -3686,137 +3986,10 @@ function UserRow({ user, onSave }) {
               width: '100%',
             }}
           >
-            Guardar
+            Guardar Cambios
           </button>
         </div>
       </td>
     </tr>
-  );
-}
-
-function DocBadge({ label, url, title }) {
-  const [modalOpen, setModalOpen] = useState(false);
-  const isPdf = url.toLowerCase().includes('.pdf');
-
-  return (
-    <>
-      <button
-        onClick={() => setModalOpen(true)}
-        style={{
-          backgroundColor: '#f3f4f6',
-          border: '1px solid #d1d5db',
-          borderRadius: '4px',
-          padding: '2px 6px',
-          fontSize: '10px',
-          fontWeight: '700',
-          color: '#374151',
-          cursor: 'pointer',
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: '3px',
-        }}
-        title={`Ver ${title}`}
-      >
-        <Eye size={10} /> {label}
-      </button>
-
-      {modalOpen && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            backgroundColor: 'rgba(0,0,0,0.7)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 3000,
-            padding: '16px',
-          }}
-        >
-          <div
-            style={{
-              backgroundColor: '#fff',
-              borderRadius: '12px',
-              maxWidth: '90vw',
-              maxHeight: '90vh',
-              overflow: 'hidden',
-              display: 'flex',
-              flexDirection: 'column',
-              boxShadow: '0 20px 50px rgba(0,0,0,0.3)',
-            }}
-          >
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                padding: '12px 16px',
-                borderBottom: '1px solid #e5e7eb',
-              }}
-            >
-              <h4 style={{ margin: 0, fontSize: '14px', fontWeight: '700' }}>
-                {title}
-              </h4>
-              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                <a
-                  href={url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{
-                    fontSize: '11px',
-                    color: '#2563eb',
-                    textDecoration: 'none',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                  }}
-                >
-                  <Download size={12} /> Descargar
-                </a>
-                <button
-                  onClick={() => setModalOpen(false)}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    cursor: 'pointer',
-                    color: '#6b7280',
-                  }}
-                >
-                  <X size={18} />
-                </button>
-              </div>
-            </div>
-            <div
-              style={{
-                padding: '16px',
-                overflow: 'auto',
-                display: 'flex',
-                justifyContent: 'center',
-                alignItems: 'center',
-              }}
-            >
-              {isPdf ? (
-                <iframe
-                  src={url}
-                  title={title}
-                  style={{ width: '80vw', height: '70vh', border: 'none' }}
-                />
-              ) : (
-                <img
-                  src={url}
-                  alt={title}
-                  style={{
-                    maxWidth: '100%',
-                    maxHeight: '70vh',
-                    objectFit: 'contain',
-                    borderRadius: '4px',
-                  }}
-                />
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-    </>
   );
 }
