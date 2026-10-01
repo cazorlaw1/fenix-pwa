@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
 import {
   Search,
@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 
 export default function Vendedores({ currentUser }) {
-  // ===== Estado de Pestañas con Persistencia y Navegación Directa (URL > localStorage > por defecto) =====
+  // A. Persistencia y Navegación de Pestañas
   const [activeTab, setActiveTab] = useState(() => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
@@ -29,30 +29,6 @@ export default function Vendedores({ currentUser }) {
     }
     return 'visitas';
   });
-
-  // ===== Estados de Menú Desplegable Móvil =====
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const mobileMenuRef = useRef(null);
-
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (mobileMenuRef.current && !mobileMenuRef.current.contains(event.target)) {
-        setIsMobileMenuOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  // Sincronizar pestaña activa con localStorage y actualizar URL sin recargar
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('vendedores_active_tab', activeTab);
-      const url = new URL(window.location.href);
-      url.searchParams.set('tab', activeTab);
-      window.history.replaceState({}, '', url);
-    }
-  }, [activeTab]);
 
   const [vendedores, setVendedores] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -70,6 +46,28 @@ export default function Vendedores({ currentUser }) {
     url: '',
     title: '',
   });
+
+  // C. Menú Dropdown en Móvil - Estados obligatorios
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const mobileMenuRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (mobileMenuRef.current && !mobileMenuRef.current.contains(event.target)) {
+        setIsMobileMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Sincronizar pestaña activa con localStorage y URL
+  useEffect(() => {
+    localStorage.setItem('vendedores_active_tab', activeTab);
+    const url = new URL(window.location);
+    url.searchParams.set('tab', activeTab);
+    window.history.replaceState({}, '', url);
+  }, [activeTab]);
 
   // ===== Estados de ordenamiento por tabla =====
   const [sortConfig, setSortConfig] = useState({
@@ -509,7 +507,7 @@ export default function Vendedores({ currentUser }) {
     ),
   };
 
-  const tabsList = [
+  const tabsConfig = [
     {
       key: 'visitas',
       label: 'Visitas del Equipo',
@@ -553,7 +551,7 @@ export default function Vendedores({ currentUser }) {
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <TrendingUp size={24} color="#dc2626" strokeWidth={2.5} />
+          <TrendingUp size={24} color="#DC2626" strokeWidth={2.5} />
           <h2
             style={{
               fontSize: '20px',
@@ -573,7 +571,7 @@ export default function Vendedores({ currentUser }) {
               position: 'absolute',
               left: '10px',
               top: '50%',
-              transform: 'translateY(-50%)',
+              transform: 'translateY(-50px)', // Ajustado para evitar solapamiento si cambia altura
             }}
           />
           <input
@@ -593,7 +591,7 @@ export default function Vendedores({ currentUser }) {
         </div>
       </div>
 
-      {/* ============ PANELES INFORMATIVOS (KPIs) con Ajuste Responsivo Móvil ============ */}
+      {/* B. Ajuste Responsivo de Paneles Informativos (Móvil y Escritorio) */}
       <div
         className="kpi-grid-container"
         style={{
@@ -610,19 +608,19 @@ export default function Vendedores({ currentUser }) {
           color="#111827"
         />
         <div
-          className="kpi-card-item"
+          className="kpi-card-box"
           style={{
             backgroundColor: '#ffffff',
             border: '1px solid #e5e7eb',
             borderRadius: '8px',
             padding: '10px',
+            textAlign: 'center',
             display: 'flex',
             flexDirection: 'column',
             justifyContent: 'center',
           }}
         >
           <div
-            className="kpi-title"
             style={{
               fontSize: '10px',
               fontWeight: '700',
@@ -633,21 +631,19 @@ export default function Vendedores({ currentUser }) {
             Meta vs Alcanzado
           </div>
           <div
-            className="kpi-value"
             style={{
-              fontSize: '18px',
+              fontSize: '16px',
               fontWeight: '800',
               color: '#111827',
               marginTop: '2px',
             }}
           >
             ${stats.ventas.toLocaleString()}{' '}
-            <span style={{ fontSize: '14px', color: '#9ca3af' }}>
+            <span style={{ fontSize: '12px', color: '#9ca3af' }}>
               / ${stats.meta.toLocaleString()}
             </span>
           </div>
           <div
-            className="kpi-sub"
             style={{
               fontSize: '10px',
               color: '#10B981',
@@ -670,8 +666,8 @@ export default function Vendedores({ currentUser }) {
           title="N.E. Pendientes"
           value={stats.pendientes}
           sub="Por cobrar/cerrar"
-          color="#dc2626"
-          border="#dc2626"
+          color="#DC2626"
+          border="#DC2626"
         />
         {activeTab === 'comisiones' && (
           <KpiCard
@@ -684,9 +680,9 @@ export default function Vendedores({ currentUser }) {
         )}
       </div>
 
-      {/* ============ NAVEGACIÓN: Pestañas de Escritorio y Menú Desplegable Móvil ============ */}
-      <div style={{ marginBottom: '24px' }}>
-        {/* Pestañas Horizontales Clásicas (Escritorio) */}
+      {/* C. Menú Dropdown en Móvil & Pestañas de Escritorio */}
+      <div style={{ marginBottom: '24px', position: 'relative' }}>
+        {/* Pestañas clásicas escritorio */}
         <div
           className="desktop-tabs-container"
           style={{
@@ -695,7 +691,7 @@ export default function Vendedores({ currentUser }) {
             borderBottom: '1px solid #e5e7eb',
           }}
         >
-          {tabsList.map((tab) => (
+          {tabsConfig.map((tab) => (
             <button
               key={tab.key}
               onClick={() => setActiveTab(tab.key)}
@@ -704,11 +700,11 @@ export default function Vendedores({ currentUser }) {
                 border: 'none',
                 borderBottom:
                   activeTab === tab.key
-                    ? '2px solid #000'
+                    ? '2px solid #dc2626'
                     : '2px solid transparent',
                 backgroundColor: 'transparent',
                 fontWeight: activeTab === tab.key ? '700' : '500',
-                color: activeTab === tab.key ? '#000' : '#4b5563',
+                color: activeTab === tab.key ? '#111827' : '#4b5563',
                 fontSize: '13px',
                 cursor: 'pointer',
                 display: 'flex',
@@ -722,12 +718,8 @@ export default function Vendedores({ currentUser }) {
           ))}
         </div>
 
-        {/* Menú Desplegable Móvil Elegante */}
-        <div
-          ref={mobileMenuRef}
-          className="mobile-dropdown-container"
-          style={{ position: 'relative', display: 'none', width: '100%' }}
-        >
+        {/* Menú Dropdown Móvil OBLIGATORIO */}
+        <div ref={mobileMenuRef} className="mobile-dropdown-container" style={{ display: 'none', position: 'relative' }}>
           <button
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
             style={{
@@ -735,29 +727,21 @@ export default function Vendedores({ currentUser }) {
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              padding: '12px 16px',
+              padding: '10px 14px',
               backgroundColor: '#ffffff',
               border: '1px solid #d1d5db',
               borderRadius: '8px',
-              fontSize: '14px',
+              fontSize: '13px',
               fontWeight: '600',
               color: '#111827',
               cursor: 'pointer',
-              boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
             }}
           >
             <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              {tabsList.find((t) => t.key === activeTab)?.icon}
-              {tabsList.find((t) => t.key === activeTab)?.label}
+              {tabsConfig.find((t) => t.key === activeTab)?.icon}
+              {tabsConfig.find((t) => t.key === activeTab)?.label}
             </span>
-            <ChevronDown
-              size={18}
-              color="#4b5563"
-              style={{
-                transform: isMobileMenuOpen ? 'rotate(180deg)' : 'rotate(0deg)',
-                transition: 'transform 0.2s',
-              }}
-            />
+            <ChevronDown size={18} color="#4b5563" />
           </button>
 
           {isMobileMenuOpen && (
@@ -775,8 +759,8 @@ export default function Vendedores({ currentUser }) {
                 overflow: 'hidden',
               }}
             >
-              {tabsList.map((tab) => {
-                const isSelected = activeTab === tab.key;
+              {tabsConfig.map((tab) => {
+                const isActive = activeTab === tab.key;
                 return (
                   <button
                     key={tab.key}
@@ -789,14 +773,14 @@ export default function Vendedores({ currentUser }) {
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'space-between',
-                      padding: '12px 16px',
-                      backgroundColor: isSelected ? '#fef2f2' : 'transparent',
+                      padding: '10px 14px',
+                      backgroundColor: isActive ? '#fef2f2' : 'transparent',
                       border: 'none',
                       borderBottom: '1px solid #e5e7eb',
                       textAlign: 'left',
-                      fontSize: '14px',
-                      fontWeight: isSelected ? '700' : '500',
-                      color: isSelected ? '#dc2626' : '#4b5563',
+                      fontSize: '13px',
+                      fontWeight: isActive ? '700' : '500',
+                      color: isActive ? '#dc2626' : '#4b5563',
                       cursor: 'pointer',
                     }}
                   >
@@ -804,7 +788,7 @@ export default function Vendedores({ currentUser }) {
                       {tab.icon}
                       {tab.label}
                     </span>
-                    {isSelected && <Check size={18} color="#dc2626" />}
+                    {isActive && <Check size={18} color="#dc2626" />}
                   </button>
                 );
               })}
@@ -825,7 +809,6 @@ export default function Vendedores({ currentUser }) {
         {/* ============ TAB VISITAS ============ */}
         {activeTab === 'visitas' && (
           <>
-            {/* Filtros de tipo de cliente - DISEÑO DISCRETO Y COMPACTO */}
             <div
               style={{
                 display: 'flex',
@@ -838,7 +821,7 @@ export default function Vendedores({ currentUser }) {
               <span
                 style={{
                   fontSize: '11px',
-                  color: '#6b7280',
+                  color: '#4b5563',
                   fontWeight: '500',
                 }}
               >
@@ -851,7 +834,7 @@ export default function Vendedores({ currentUser }) {
                   gap: '4px',
                   cursor: 'pointer',
                   fontSize: '11px',
-                  color: visitFilters.official ? '#15803D' : '#9ca3af',
+                  color: visitFilters.official ? '#15803D' : '#4b5563',
                   fontWeight: visitFilters.official ? '600' : '400',
                 }}
               >
@@ -873,7 +856,7 @@ export default function Vendedores({ currentUser }) {
                   }}
                 />
                 <span>Oficiales</span>
-                <span style={{ fontSize: '9px', color: '#9ca3af' }}>
+                <span style={{ fontSize: '9px', color: '#4b5563' }}>
                   ({teamClients.length})
                 </span>
               </label>
@@ -884,7 +867,7 @@ export default function Vendedores({ currentUser }) {
                   gap: '4px',
                   cursor: 'pointer',
                   fontSize: '11px',
-                  color: visitFilters.potential ? '#B45309' : '#9ca3af',
+                  color: visitFilters.potential ? '#B45309' : '#4b5563',
                   fontWeight: visitFilters.potential ? '600' : '400',
                 }}
               >
@@ -906,14 +889,14 @@ export default function Vendedores({ currentUser }) {
                   }}
                 />
                 <span>Potenciales</span>
-                <span style={{ fontSize: '9px', color: '#9ca3af' }}>
+                <span style={{ fontSize: '9px', color: '#4b5563' }}>
                   ({teamPotentials.length})
                 </span>
               </label>
               <span
                 style={{
                   fontSize: '10px',
-                  color: '#9ca3af',
+                  color: '#4b5563',
                   marginLeft: 'auto',
                 }}
               >
@@ -930,7 +913,7 @@ export default function Vendedores({ currentUser }) {
                 textAlign: 'left',
               }}
             >
-              <thead className="desktop-thead">
+              <thead>
                 <tr
                   style={{
                     backgroundColor: '#f9fafb',
@@ -989,7 +972,7 @@ export default function Vendedores({ currentUser }) {
                       style={{
                         padding: '24px',
                         textAlign: 'center',
-                        color: '#6b7280',
+                        color: '#4b5563',
                       }}
                     >
                       No hay clientes o potenciales en el equipo asignado.
@@ -1012,10 +995,9 @@ export default function Vendedores({ currentUser }) {
                     return (
                       <tr
                         key={client.id}
-                        className="responsive-row"
-                        style={{ borderBottom: '1px solid #f3f4f6' }}
+                        style={{ borderBottom: '1px solid #e5e7eb' }}
                       >
-                        <td className="desktop-cell-normal" style={{ padding: '10px' }}>
+                        <td className="mobile-card-cell" data-label="Nombre / CI / RIF" style={{ padding: '10px' }}>
                           <div
                             style={{
                               display: 'flex',
@@ -1024,7 +1006,7 @@ export default function Vendedores({ currentUser }) {
                               marginBottom: '4px',
                             }}
                           >
-                            <span style={{ fontWeight: '600' }}>
+                            <span style={{ fontWeight: '600', color: '#111827' }}>
                               {client.name}
                             </span>
                             {isPotential ? (
@@ -1055,12 +1037,12 @@ export default function Vendedores({ currentUser }) {
                               </span>
                             )}
                           </div>
-                          <div style={{ fontSize: '11px', color: '#6b7280' }}>
+                          <div style={{ fontSize: '11px', color: '#4b5563' }}>
                             CI: {client.ci_number || 'N/A'} | RIF:{' '}
                             {client.rif_number || 'N/A'}
                           </div>
                         </td>
-                        <td className="desktop-cell-normal" style={{ padding: '10px' }}>
+                        <td className="mobile-card-cell" data-label="Datos Adjuntos" style={{ padding: '10px' }}>
                           <div
                             style={{
                               display: 'flex',
@@ -1118,10 +1100,10 @@ export default function Vendedores({ currentUser }) {
                             )}
                           </div>
                         </td>
-                        <td className="desktop-cell-normal" style={{ padding: '10px', fontSize: '12px' }}>
+                        <td className="mobile-card-cell" data-label="Registrado Por" style={{ padding: '10px', fontSize: '12px', color: '#111827' }}>
                           {client.profiles?.full_name || 'N/A'}
                         </td>
-                        <td className="desktop-cell-normal" style={{ padding: '10px', textAlign: 'center' }}>
+                        <td className="mobile-card-cell" data-label="GPS Visita" style={{ padding: '10px', textAlign: 'center' }}>
                           {mapsUrl ? (
                             <a
                               href={mapsUrl}
@@ -1144,25 +1126,27 @@ export default function Vendedores({ currentUser }) {
                             </a>
                           ) : (
                             <span
-                              style={{ fontSize: '11px', color: '#9CA3AF' }}
+                              style={{ fontSize: '11px', color: '#4b5563' }}
                             >
                               Sin GPS
                             </span>
                           )}
                         </td>
                         <td
-                          className="desktop-cell-normal"
+                          className="mobile-card-cell"
+                          data-label="N.E. Pendientes"
                           style={{
                             padding: '10px',
                             textAlign: 'center',
-                            color: '#dc2626',
+                            color: '#DC2626',
                             fontWeight: 'bold',
                           }}
                         >
                           {nePendientes}
                         </td>
                         <td
-                          className="desktop-cell-normal"
+                          className="mobile-card-cell"
+                          data-label="N.E. Cerradas"
                           style={{
                             padding: '10px',
                             textAlign: 'center',
@@ -1172,63 +1156,12 @@ export default function Vendedores({ currentUser }) {
                         >
                           {neCerradas}
                         </td>
-                        <td className="desktop-cell-normal" style={{ padding: '10px', fontSize: '12px' }}>
+                        <td className="mobile-card-cell" data-label="Última Visita" style={{ padding: '10px', fontSize: '12px', color: '#111827' }}>
                           {client.last_visit_at
                             ? new Date(
                                 client.last_visit_at
                               ).toLocaleDateString()
                             : 'Sin registro'}
-                        </td>
-
-                        {/* Versión móvil apilada (tarjeta) */}
-                        <td className="mobile-cell-stacked">
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '6px' }}>
-                            <span style={{ fontWeight: '700', fontSize: '14px', color: '#111827' }}>
-                              {client.name}
-                            </span>
-                            {isPotential ? (
-                              <span style={{ fontSize: '9px', backgroundColor: '#FEF3C7', color: '#B45309', padding: '2px 6px', borderRadius: '4px', fontWeight: '700' }}>
-                                POTENCIAL
-                              </span>
-                            ) : (
-                              <span style={{ fontSize: '9px', backgroundColor: '#DCFCE7', color: '#15803D', padding: '2px 6px', borderRadius: '4px', fontWeight: '700' }}>
-                                OFICIAL
-                              </span>
-                            )}
-                          </div>
-                          <div style={{ fontSize: '11px', color: '#6b7280', marginBottom: '4px' }}>
-                            <strong>CI/RIF:</strong> {client.ci_number || 'N/A'} | {client.rif_number || 'N/A'}
-                          </div>
-                          <div style={{ fontSize: '11px', color: '#4b5563', marginBottom: '4px' }}>
-                            <strong>Registrado por:</strong> {client.profiles?.full_name || 'N/A'}
-                          </div>
-                          <div style={{ fontSize: '11px', color: '#4b5563', marginBottom: '4px' }}>
-                            <strong>N.E. Pendientes / Cerradas:</strong>{' '}
-                            <span style={{ color: '#dc2626', fontWeight: 'bold' }}>{nePendientes}</span> /{' '}
-                            <span style={{ color: '#10B981', fontWeight: 'bold' }}>{neCerradas}</span>
-                          </div>
-                          <div style={{ fontSize: '11px', color: '#4b5563', marginBottom: '6px' }}>
-                            <strong>Última Visita:</strong> {client.last_visit_at ? new Date(client.last_visit_at).toLocaleDateString() : 'Sin registro'}
-                          </div>
-                          <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', marginTop: '4px' }}>
-                            {mapsUrl && (
-                              <a href={mapsUrl} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '3px 6px', backgroundColor: '#EFF6FF', color: '#1D4ED8', borderRadius: '4px', textDecoration: 'none', fontSize: '10px', fontWeight: '700' }}>
-                                <MapPin size={10} /> Mapa
-                              </a>
-                            )}
-                            {!isPotential && client.ci_photo_url && (
-                              <DocBadge label="CI" onClick={() => setImageModal({ open: true, url: client.ci_photo_url, title: `C.I. de ${client.name}` })} />
-                            )}
-                            {!isPotential && client.rif_photo_url && (
-                              <DocBadge label="RIF" onClick={() => setImageModal({ open: true, url: client.rif_photo_url, title: `RIF de ${client.name}` })} />
-                            )}
-                            {client.additional_doc_url && (
-                              <DocBadge label="Adic." onClick={() => setImageModal({ open: true, url: client.additional_doc_url, title: `Doc. Adic. de ${client.name}` })} />
-                            )}
-                            {client.last_visit_photo_url && (
-                              <DocBadge label="Foto" onClick={() => setImageModal({ open: true, url: client.last_visit_photo_url, title: `Visita a ${client.name}` })} />
-                            )}
-                          </div>
                         </td>
                       </tr>
                     );
@@ -1250,7 +1183,7 @@ export default function Vendedores({ currentUser }) {
               textAlign: 'left',
             }}
           >
-            <thead className="desktop-thead">
+            <thead>
               <tr
                 style={{
                   backgroundColor: '#f9fafb',
@@ -1307,7 +1240,7 @@ export default function Vendedores({ currentUser }) {
                     style={{
                       padding: '24px',
                       textAlign: 'center',
-                      color: '#6b7280',
+                      color: '#4b5563',
                     }}
                   >
                     No hay vendedores asignados en la estructura.
@@ -1320,11 +1253,11 @@ export default function Vendedores({ currentUser }) {
                   sortConfig.resumen.direction,
                   getResumenValue
                 ).map((v) => (
-                  <tr key={v.id} className="responsive-row" style={{ borderBottom: '1px solid #f3f4f6' }}>
-                    <td className="desktop-cell-normal" style={{ padding: '10px', fontWeight: '600' }}>
+                  <tr key={v.id} style={{ borderBottom: '1px solid #e5e7eb' }}>
+                    <td className="mobile-card-cell" data-label="Nombre" style={{ padding: '10px', fontWeight: '600', color: '#111827' }}>
                       {v.full_name || 'Sin Nombre'}
                     </td>
-                    <td className="desktop-cell-normal" style={{ padding: '10px' }}>
+                    <td className="mobile-card-cell" data-label="Meta vs Acumulado" style={{ padding: '10px' }}>
                       <div
                         style={{
                           display: 'flex',
@@ -1350,7 +1283,7 @@ export default function Vendedores({ currentUser }) {
                           onClick={() => handleSaveSeller(v)}
                           disabled={savingId === v.id}
                           style={{
-                            backgroundColor: '#000',
+                            backgroundColor: '#111827',
                             color: '#D4AF37',
                             border: 'none',
                             padding: '4px 8px',
@@ -1379,11 +1312,12 @@ export default function Vendedores({ currentUser }) {
                         {(v.bombillosBruto + v.fluidosBruto).toLocaleString()}
                       </div>
                     </td>
-                    <td className="desktop-cell-normal" style={{ padding: '10px', textAlign: 'center' }}>
+                    <td className="mobile-card-cell" data-label="N.E. Totales" style={{ padding: '10px', textAlign: 'center', color: '#111827' }}>
                       {v.totalNE}
                     </td>
                     <td
-                      className="desktop-cell-normal"
+                      className="mobile-card-cell"
+                      data-label="Cerradas"
                       style={{
                         padding: '10px',
                         textAlign: 'center',
@@ -1394,21 +1328,22 @@ export default function Vendedores({ currentUser }) {
                       {v.neCerradas}
                     </td>
                     <td
-                      className="desktop-cell-normal"
+                      className="mobile-card-cell"
+                      data-label="Pendientes"
                       style={{
                         padding: '10px',
                         textAlign: 'center',
-                        color: '#dc2626',
+                        color: '#DC2626',
                         fontWeight: 'bold',
                       }}
                     >
                       {v.nePendientes}
                     </td>
-                    <td className="desktop-cell-normal" style={{ padding: '10px' }}>
+                    <td className="mobile-card-cell" data-label="Acción" style={{ padding: '10px' }}>
                       <button
                         onClick={() => openHistoryModal(v)}
                         style={{
-                          backgroundColor: '#000',
+                          backgroundColor: '#111827',
                           color: '#D4AF37',
                           border: 'none',
                           padding: '6px 10px',
@@ -1423,45 +1358,6 @@ export default function Vendedores({ currentUser }) {
                       >
                         <Eye size={12} /> Ver Historial
                       </button>
-                    </td>
-
-                    {/* Versión móvil apilada (tarjeta) */}
-                    <td className="mobile-cell-stacked">
-                      <div style={{ fontWeight: '700', fontSize: '14px', color: '#111827', marginBottom: '6px' }}>
-                        {v.full_name || 'Sin Nombre'}
-                      </div>
-                      <div style={{ fontSize: '11px', color: '#4b5563', marginBottom: '6px' }}>
-                        <strong>Alcanzado:</strong> ${(v.bombillosBruto + v.fluidosBruto).toLocaleString()}
-                      </div>
-                      <div style={{ fontSize: '11px', color: '#4b5563', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                        <strong>Meta ($):</strong>
-                        <input
-                          type="number"
-                          value={v.sales_goal_usd}
-                          onChange={(e) => handleGoalChange(v.id, e.target.value)}
-                          style={{ width: '80px', padding: '2px 4px', borderRadius: '4px', border: '1px solid #d1d5db', fontSize: '11px' }}
-                        />
-                        <button
-                          onClick={() => handleSaveSeller(v)}
-                          disabled={savingId === v.id}
-                          style={{ backgroundColor: '#000', color: '#D4AF37', border: 'none', padding: '3px 6px', borderRadius: '4px', fontWeight: '700', fontSize: '9px', cursor: 'pointer' }}
-                        >
-                          {savingId === v.id ? '...' : 'Guardar'}
-                        </button>
-                      </div>
-                      <div style={{ fontSize: '11px', color: '#4b5563', marginBottom: '6px' }}>
-                        <strong>N.E. Totales / Cerradas / Pendientes:</strong> {v.totalNE} /{' '}
-                        <span style={{ color: '#10B981', fontWeight: 'bold' }}>{v.neCerradas}</span> /{' '}
-                        <span style={{ color: '#dc2626', fontWeight: 'bold' }}>{v.nePendientes}</span>
-                      </div>
-                      <div style={{ marginTop: '4px' }}>
-                        <button
-                          onClick={() => openHistoryModal(v)}
-                          style={{ backgroundColor: '#000', color: '#D4AF37', border: 'none', padding: '5px 8px', borderRadius: '6px', fontWeight: '700', fontSize: '11px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-                        >
-                          <Eye size={12} /> Ver Historial
-                        </button>
-                      </div>
                     </td>
                   </tr>
                 ))
@@ -1481,7 +1377,7 @@ export default function Vendedores({ currentUser }) {
               textAlign: 'left',
             }}
           >
-            <thead className="desktop-thead">
+            <thead>
               <tr
                 style={{
                   backgroundColor: '#f9fafb',
@@ -1527,7 +1423,7 @@ export default function Vendedores({ currentUser }) {
                     style={{
                       padding: '24px',
                       textAlign: 'center',
-                      color: '#6b7280',
+                      color: '#4b5563',
                     }}
                   >
                     No hay vendedores asignados en la estructura.
@@ -1540,31 +1436,32 @@ export default function Vendedores({ currentUser }) {
                   sortConfig.comisiones.direction,
                   getComisionesValue
                 ).map((v) => (
-                  <tr key={v.id} className="responsive-row" style={{ borderBottom: '1px solid #f3f4f6' }}>
-                    <td className="desktop-cell-normal" style={{ padding: '10px', fontWeight: '600' }}>
+                  <tr key={v.id} style={{ borderBottom: '1px solid #e5e7eb' }}>
+                    <td className="mobile-card-cell" data-label="Nombre" style={{ padding: '10px', fontWeight: '600', color: '#111827' }}>
                       {v.full_name || 'Sin Nombre'}
                     </td>
-                    <td className="desktop-cell-normal" style={{ padding: '10px', fontSize: '12px' }}>
+                    <td className="mobile-card-cell" data-label="% Asignado" style={{ padding: '10px', fontSize: '12px', color: '#111827' }}>
                       {v.pctAsignado}
                     </td>
-                    <td className="desktop-cell-normal" style={{ padding: '10px', textAlign: 'center' }}>
-                      <div style={{ fontWeight: '700' }}>
+                    <td className="mobile-card-cell" data-label="Bombillos (Cnt / $)" style={{ padding: '10px', textAlign: 'center' }}>
+                      <div style={{ fontWeight: '700', color: '#111827' }}>
                         {v.bombillosCount} un.
                       </div>
-                      <div style={{ fontSize: '11px', color: '#6b7280' }}>
+                      <div style={{ fontSize: '11px', color: '#4b5563' }}>
                         ${v.bombillosBruto.toLocaleString()}
                       </div>
                     </td>
-                    <td className="desktop-cell-normal" style={{ padding: '10px', textAlign: 'center' }}>
-                      <div style={{ fontWeight: '700' }}>
+                    <td className="mobile-card-cell" data-label="Fluidos (Cnt / $)" style={{ padding: '10px', textAlign: 'center' }}>
+                      <div style={{ fontWeight: '700', color: '#111827' }}>
                         {v.fluidosCount} un.
                       </div>
-                      <div style={{ fontSize: '11px', color: '#6b7280' }}>
+                      <div style={{ fontSize: '11px', color: '#4b5563' }}>
                         ${v.fluidosBruto.toLocaleString()}
                       </div>
                     </td>
                     <td
-                      className="desktop-cell-normal"
+                      className="mobile-card-cell"
+                      data-label="Comisión Total ($)"
                       style={{
                         padding: '10px',
                         textAlign: 'right',
@@ -1573,25 +1470,6 @@ export default function Vendedores({ currentUser }) {
                       }}
                     >
                       ${v.comisionTotalUSD.toFixed(2)}
-                    </td>
-
-                    {/* Versión móvil apilada (tarjeta) */}
-                    <td className="mobile-cell-stacked">
-                      <div style={{ fontWeight: '700', fontSize: '14px', color: '#111827', marginBottom: '6px' }}>
-                        {v.full_name || 'Sin Nombre'}
-                      </div>
-                      <div style={{ fontSize: '11px', color: '#4b5563', marginBottom: '4px' }}>
-                        <strong>% Asignado:</strong> {v.pctAsignado}
-                      </div>
-                      <div style={{ fontSize: '11px', color: '#4b5563', marginBottom: '4px' }}>
-                        <strong>Bombillos:</strong> {v.bombillosCount} un. (${v.bombillosBruto.toLocaleString()})
-                      </div>
-                      <div style={{ fontSize: '11px', color: '#4b5563', marginBottom: '4px' }}>
-                        <strong>Fluidos:</strong> {v.fluidosCount} un. (${v.fluidosBruto.toLocaleString()})
-                      </div>
-                      <div style={{ fontSize: '12px', color: '#111827', fontWeight: '800', marginTop: '4px' }}>
-                        <strong>Comisión Total:</strong> ${v.comisionTotalUSD.toFixed(2)}
-                      </div>
                     </td>
                   </tr>
                 ))
@@ -1618,7 +1496,7 @@ export default function Vendedores({ currentUser }) {
           <div
             style={{
               backgroundColor: '#fff',
-              borderRadius: '12px',
+              borderRadius: '8px',
               width: '100%',
               maxWidth: '900px',
               maxHeight: '90vh',
@@ -1652,7 +1530,7 @@ export default function Vendedores({ currentUser }) {
                   style={{
                     margin: '4px 0 0 0',
                     fontSize: '12px',
-                    color: '#6b7280',
+                    color: '#4b5563',
                   }}
                 >
                   Notas de entrega registradas por este vendedor
@@ -1666,7 +1544,7 @@ export default function Vendedores({ currentUser }) {
                   background: 'none',
                   border: 'none',
                   cursor: 'pointer',
-                  color: '#6b7280',
+                  color: '#4b5563',
                 }}
               >
                 <X size={20} />
@@ -1674,6 +1552,7 @@ export default function Vendedores({ currentUser }) {
             </div>
             <div style={{ overflowX: 'auto' }}>
               <table
+                className="custom-responsive-table"
                 style={{
                   width: '100%',
                   borderCollapse: 'collapse',
@@ -1686,6 +1565,7 @@ export default function Vendedores({ currentUser }) {
                     style={{
                       backgroundColor: '#f9fafb',
                       borderBottom: '1px solid #e5e7eb',
+                      color: '#4b5563',
                     }}
                   >
                     <SortableHeader
@@ -1742,7 +1622,7 @@ export default function Vendedores({ currentUser }) {
                         style={{
                           padding: '16px',
                           textAlign: 'center',
-                          color: '#6b7280',
+                          color: '#4b5563',
                         }}
                       >
                         Este vendedor no tiene notas de entrega registradas.
@@ -1752,18 +1632,18 @@ export default function Vendedores({ currentUser }) {
                     sortedHistoryOrders.map((nota) => (
                       <tr
                         key={nota.id}
-                        style={{ borderBottom: '1px solid #f3f4f6' }}
+                        style={{ borderBottom: '1px solid #e5e7eb' }}
                       >
-                        <td style={{ padding: '8px', fontWeight: '600' }}>
+                        <td className="mobile-card-cell" data-label="Cliente" style={{ padding: '8px', fontWeight: '600', color: '#111827' }}>
                           {nota.clients?.name || 'N/A'}
                         </td>
-                        <td style={{ padding: '8px', fontFamily: 'monospace' }}>
+                        <td className="mobile-card-cell" data-label="Transacción" style={{ padding: '8px', fontFamily: 'monospace', color: '#111827' }}>
                           #{nota.transaction_number || nota.id.substring(0, 6)}
                         </td>
-                        <td style={{ padding: '8px' }}>
+                        <td className="mobile-card-cell" data-label="Fecha" style={{ padding: '8px', color: '#111827' }}>
                           {new Date(nota.created_at).toLocaleDateString()}
                         </td>
-                        <td style={{ padding: '8px' }}>
+                        <td className="mobile-card-cell" data-label="Estado" style={{ padding: '8px' }}>
                           <span
                             style={{
                               padding: '2px 6px',
@@ -1784,19 +1664,25 @@ export default function Vendedores({ currentUser }) {
                           </span>
                         </td>
                         <td
+                          className="mobile-card-cell"
+                          data-label="Total ($)"
                           style={{
                             padding: '8px',
                             textAlign: 'right',
                             fontWeight: '700',
+                            color: '#111827',
                           }}
                         >
                           ${Number(nota.final_price_usd).toFixed(2)}
                         </td>
                         <td
+                          className="mobile-card-cell"
+                          data-label="Saldo ($)"
                           style={{
                             padding: '8px',
                             textAlign: 'right',
-                            color: '#dc2626',
+                            color: '#DC2626',
+                            fontWeight: '700',
                           }}
                         >
                           ${Number(nota.balance_due_usd).toFixed(2)}
@@ -1828,7 +1714,7 @@ export default function Vendedores({ currentUser }) {
           <div
             style={{
               backgroundColor: '#fff',
-              borderRadius: '12px',
+              borderRadius: '8px',
               maxWidth: '90vw',
               maxHeight: '90vh',
               padding: '16px',
@@ -1845,7 +1731,7 @@ export default function Vendedores({ currentUser }) {
                 background: 'none',
                 border: 'none',
                 cursor: 'pointer',
-                color: '#6b7280',
+                color: '#4b5563',
               }}
             >
               <X size={24} />
@@ -1901,57 +1787,99 @@ export default function Vendedores({ currentUser }) {
         </div>
       )}
 
-      {/* ============ ESTILOS CSS RESPONSIVOS (MÓVIL / ESCRITORIO) ============ */}
+      {/* D & E. Guía de Estilos y Requisitos Técnicos para Móvil y Escritorio */}
       <style>{`
-        .users-table-container { width: 100%; overflow-x: auto; }
-        .custom-responsive-table { width: 100%; border-collapse: collapse; font-size: 13px; text-align: left; }
-        .mobile-thead { display: none; }
-        .mobile-cell-stacked { display: none; }
-        .desktop-cell-normal { display: table-cell; }
+        /* B. Paneles informativos adaptativos y pequeños en móvil */
+        @media (max-width: 768px) {
+          .kpi-grid-container {
+            grid-template-columns: repeat(3, 1fr) !important;
+            gap: 6px !important;
+          }
+          .kpi-card-box {
+            padding: 6px !important;
+            max-height: 75px !important;
+            overflow: hidden !important;
+          }
+          .kpi-card-box div:nth-child(1) {
+            font-size: 8px !important;
+            line-height: 1rem !important;
+            white-space: nowrap !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+          }
+          .kpi-card-box div:nth-child(2) {
+            font-size: 13px !important;
+            line-height: 1.1rem !important;
+          }
+          .kpi-card-box div:nth-child(3) {
+            font-size: 8px !important;
+          }
+
+          /* C. Intercambio de navegación en móvil */
+          .desktop-tabs-container {
+            display: none !important;
+          }
+          .mobile-dropdown-container {
+            display: block !important;
+          }
+
+          /* D. Tablas con tarjetas apiladas en móvil */
+          .custom-responsive-table thead {
+            display: none !important;
+          }
+          .custom-responsive-table, 
+          .custom-responsive-table tbody, 
+          .custom-responsive-table tr, 
+          .custom-responsive-table td {
+            display: block !important;
+            width: 100% !important;
+          }
+          .custom-responsive-table tr {
+            margin-bottom: 12px !important;
+            border: 1px solid #d1d5db !important;
+            border-radius: 8px !important;
+            background-color: #ffffff !important;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05) !important;
+            overflow: hidden !important;
+          }
+          .custom-responsive-table tr:first-child td:first-child {
+            background-color: #f9fafb !important;
+            border-bottom: 1px solid #e5e7eb !important;
+            font-size: 14px !important;
+            font-weight: 700 !important;
+          }
+          .custom-responsive-table td {
+            display: flex !important;
+            justify-content: space-between !important;
+            align-items: center !important;
+            padding: 8px 12px !important;
+            border-bottom: 1px solid #e5e7eb !important;
+            text-align: right !important;
+          }
+          .custom-responsive-table td:last-child {
+            border-bottom: none !important;
+          }
+          .custom-responsive-table td::before {
+            content: attr(data-label);
+            font-weight: 600;
+            color: #4b5563;
+            text-align: left;
+            font-size: 12px;
+            margin-right: 12px;
+          }
+        }
+
+        @media (min-width: 769px) {
+          .desktop-tabs-container {
+            display: flex !important;
+          }
+          .mobile-dropdown-container {
+            display: none !important;
+          }
+        }
+
         .sortable-header { cursor: pointer; user-select: none; transition: background-color 0.15s; }
         .sortable-header:hover { background-color: #f3f4f6 !important; }
-
-        @media (max-width: 768px) {
-          .desktop-tabs-container { display: none !important; }
-          .mobile-dropdown-container { display: block !important; }
-
-          /* Ajuste responsivo de paneles informativos (KPIs) en móvil: formato compacto adaptativo y cuadrado/rectangular optimizado */
-          .kpi-grid-container {
-            grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)) !important;
-            gap: 8px !important;
-          }
-          .kpi-card-item, .kpi-card-wrapper {
-            padding: 8px !important;
-            border-radius: 8px !important;
-            min-height: 70px;
-            max-height: 100px;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            text-align: center;
-          }
-          .kpi-title {
-            font-size: 9px !important;
-            line-height: 1.1;
-            margin-bottom: 2px;
-          }
-          .kpi-value {
-            font-size: 14px !important;
-            line-height: 1.2;
-          }
-          .kpi-sub {
-            font-size: 8px !important;
-            line-height: 1.1;
-          }
-
-          /* Tablas con Tarjetas Apiladas en Móvil */
-          .users-table-container { overflow-x: hidden !important; }
-          .desktop-thead { display: none !important; }
-          .mobile-thead { display: table-header-group !important; }
-          .desktop-cell-normal { display: none !important; }
-          .mobile-cell-stacked { display: block !important; padding: 12px !important; background-color: #ffffff; border-bottom: 1px solid #e5e7eb; }
-          .responsive-row { display: block !important; width: 100%; margin-bottom: 8px; border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden; background: #fff; }
-        }
       `}</style>
     </div>
   );
@@ -1970,7 +1898,7 @@ function SortableHeader({
   const direction = isActive ? sortConfig.direction : null;
 
   let Icon = ChevronsUpDown;
-  let iconColor = '#9ca3af';
+  let iconColor = '#4b5563';
   if (direction === 'asc') {
     Icon = ArrowUp;
     iconColor = '#111827';
@@ -2012,30 +1940,29 @@ function SortableHeader({
 function KpiCard({ title, value, sub, color, border }) {
   return (
     <div
-      className="kpi-card-item"
+      className="kpi-card-box"
       style={{
         backgroundColor: '#ffffff',
         border: `1px solid ${border || '#e5e7eb'}`,
         borderRadius: '8px',
         padding: '10px',
+        textAlign: 'center',
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'center',
       }}
     >
       <div
-        className="kpi-title"
         style={{
           fontSize: '10px',
           fontWeight: '700',
-          color: '#6b7280',
+          color: '#4b5563',
           textTransform: 'uppercase',
         }}
       >
         {title}{' '}
       </div>
       <div
-        className="kpi-value"
         style={{
           fontSize: '20px',
           fontWeight: '800',
@@ -2045,7 +1972,7 @@ function KpiCard({ title, value, sub, color, border }) {
       >
         {value}{' '}
       </div>
-      <div className="kpi-sub" style={{ fontSize: '10px', color: color, marginTop: '2px' }}>
+      <div style={{ fontSize: '10px', color: color, marginTop: '2px' }}>
         {sub}{' '}
       </div>
     </div>
