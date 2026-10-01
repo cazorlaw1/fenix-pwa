@@ -8,7 +8,7 @@ export function AuthProvider({ children }) {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  const fetchProfile = async (userId) => {
+  const fetchProfile = async (userId, currentUser = null) => {
     try {
       const { data: profileData, error } = await supabase
         .from('profiles')
@@ -28,6 +28,35 @@ export function AuthProvider({ children }) {
         : { id: userId, role: 'vendedor' };
 
       setProfile(activeProfile);
+
+      // Verificación especial para cuentas de Google u OAuth:
+      // Si el rol es 'pendiente', verificamos si ya se le notificó al admin. 
+      // Si no, invocamos la Edge Function 'new_user' para asegurar que llegue el correo.
+      if (activeProfile.role === 'pendiente' && (currentUser || user)) {
+        const targetUser = currentUser || user;
+        const notificationKey = `google_alert_sent_${userId}`;
+        
+        // Revisamos si el proveedor o el origen fue Google (o si no se ha enviado el flag local)
+        const isGoogleUser = targetUser?.app_metadata?.provider === 'google' || targetUser?.identities?.some(id => id.provider === 'google');
+        
+        if (isGoogleUser && !localStorage.getItem(notificationKey)) {
+          try {
+            await supabase.functions.invoke('send-notification', {
+              body: {
+                type: 'new_user',
+                payload: {
+                  usuarioNombre: activeProfile.full_name || targetUser.email,
+                  usuarioEmail: targetUser.email
+                }
+              }
+            });
+            localStorage.setItem(notificationKey, 'true');
+          } catch (notifErr) {
+            console.error('Error enviando notificación de nuevo usuario Google:', notifErr);
+          }
+        }
+      }
+
       return activeProfile;
     } catch (err) {
       console.error('Error en fetchProfile:', err);
@@ -40,7 +69,7 @@ export function AuthProvider({ children }) {
       const currentUser = session?.user ?? null;
       setUser(currentUser);
       if (currentUser) {
-        await fetchProfile(currentUser.id);
+        await fetchProfile(currentUser.id, currentUser);
       }
       setLoading(false);
     });
@@ -51,7 +80,7 @@ export function AuthProvider({ children }) {
         setUser(currentUser);
 
         if (currentUser) {
-          await fetchProfile(currentUser.id);
+          await fetchProfile(currentUser.id, currentUser);
         } else {
           setProfile(null);
         }
@@ -78,7 +107,7 @@ export function AuthProvider({ children }) {
 
     if (data?.user) {
       setUser(data.user);
-      await fetchProfile(data.user.id);
+      await fetchProfile(data.user.id, data.user);
     }
 
     setLoading(false);
