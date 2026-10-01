@@ -188,7 +188,7 @@ export default function Profile() {
 
   return (
     <div
-      className="profile-outer-container"
+      className="profile-container"
       style={{
         minHeight: 'calc(100vh - 65px)',
         backgroundColor: '#ffffff',
@@ -200,7 +200,7 @@ export default function Profile() {
       }}
     >
       <div
-        className="profile-card-container"
+        className="profile-card"
         style={{
           maxWidth: '600px',
           width: '100%',
@@ -213,6 +213,7 @@ export default function Profile() {
         }}
       >
         <h1
+          className="profile-title"
           style={{
             fontSize: '22px',
             fontWeight: 'bold',
@@ -227,6 +228,7 @@ export default function Profile() {
 
         {/* ===== AVATAR REDONDO Y CENTRADO ===== */}
         <div
+          className="profile-avatar-section"
           style={{
             display: 'flex',
             flexDirection: 'column',
@@ -235,6 +237,7 @@ export default function Profile() {
           }}
         >
           <div
+            className="profile-avatar-img-container"
             onClick={() => !uploadingAvatar && avatarInputRef.current?.click()}
             style={{
               width: '130px',
@@ -392,6 +395,7 @@ export default function Profile() {
         {/* ALERTA DE PERFIL INCOMPLETO (Incluye Ciudad) */}
         {isIncomplete && (
           <div
+            className="profile-alert"
             style={{
               backgroundColor: '#fef2f2',
               borderLeft: '4px solid #dc2626',
@@ -403,7 +407,7 @@ export default function Profile() {
               fontWeight: '500',
             }}
           >
-            ⚠️️ Tienes el perfil incompleto. Por favor completa tu C.I., Ciudad y
+            ⚠️ Tienes el perfil incompleto. Por favor completa tu C.I., Ciudad y
             adjunta tus documentos.
           </div>
         )}
@@ -425,6 +429,7 @@ export default function Profile() {
         )}
 
         <form
+          className="profile-form"
           onSubmit={handleSave}
           style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}
         >
@@ -867,17 +872,78 @@ export default function Profile() {
           to { transform: rotate(360deg); }
         }
 
+        /* ===== ESTILOS ADAPTATIVOS EXCLUSIVOS PARA MÓVIL (Sin Scroll y Elementos Reducidos) ===== */
         @media (max-width: 768px) {
-          .profile-outer-container {
-            min-height: auto !important;
-            padding: 10px 12px !important;
-            align-items: flex-start !important;
+          .profile-container {
+            min-height: calc(100vh - 65px) !important;
+            height: calc(100vh - 65px) !important;
+            max-height: calc(100vh - 65px) !important;
+            padding: 8px 12px !important;
+            box-sizing: border-box !important;
+            overflow: hidden !important;
+            align-items: center !important;
           }
-          .profile-card-container {
-            padding: 16px !important;
+
+          .profile-card {
+            padding: 14px 16px !important;
             border-radius: 12px !important;
-            box-shadow: none !important;
-            border: none !important;
+            max-height: 100% !important;
+            display: flex !important;
+            flex-direction: column !important;
+            justify-content: space-between !important;
+            overflow: hidden !important;
+            box-sizing: border-box !important;
+          }
+
+          .profile-title {
+            font-size: 17px !important;
+            padding-bottom: 6px !important;
+            margin-bottom: 10px !important;
+          }
+
+          .profile-avatar-section {
+            margin-bottom: 10px !important;
+          }
+
+          .profile-avatar-img-container {
+            width: 80px !important;
+            height: 80px !important;
+          }
+
+          .profile-avatar-section button {
+            margin-top: 6px !important;
+            padding: 4px 10px !important;
+            font-size: 11px !important;
+          }
+
+          .profile-avatar-section span {
+            display: none !important; /* Oculta texto secundario pequeño para ganar espacio */
+          }
+
+          .profile-alert {
+            padding: 6px 10px !important;
+            margin-bottom: 10px !important;
+            font-size: 11px !important;
+          }
+
+          .profile-form {
+            gap: 10px !important;
+          }
+
+          .profile-form input {
+            padding: 6px 10px !important;
+            font-size: 13px !important;
+          }
+
+          .profile-form label {
+            margin-bottom: 2px !important;
+            font-size: 10px !important;
+          }
+
+          .profile-form button[type="submit"] {
+            margin-top: 4px !important;
+            padding: 9px !important;
+            font-size: 13px !important;
           }
         }
       `}</style>
