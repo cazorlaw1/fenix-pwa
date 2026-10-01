@@ -1,20 +1,38 @@
 // src/pages/Login.jsx
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '../lib/supabase';
+import { supabase } from '../lib/supabase'; // Asegúrate de que esta ruta sea correcta
 import { useAuth } from '../context/AuthContext';
 
 export default function Login() {
   const navigate = useNavigate();
   const { fetchProfile } = useAuth();
   const [isRegistering, setIsRegistering] = useState(false);
-  const [isForgotPassword, setIsForgotPassword] = useState(false); // <--- Estado para la vista de recuperación
+  const [isForgotPassword, setIsForgotPassword] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [fullName, setFullName] = useState('');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
+
+  // ✅ NUEVO: Función para notificar a los administradores
+  const notifyNewUser = async (userProfile) => {
+    try {
+      await supabase.functions.invoke('send-notification', {
+        body: {
+          type: 'new_user',
+          payload: {
+            usuarioNombre: userProfile.full_name || userProfile.email.split('@')[0],
+            usuarioEmail: userProfile.email
+          }
+        }
+      });
+    } catch (err) {
+      console.error('Error enviando notificación de nuevo usuario:', err);
+      // No lanzamos error aquí para no interrumpir el flujo de registro del usuario
+    }
+  };
 
   // LÓGICA DE AUTENTICACIÓN MANUAL (EMAIL/PASSWORD)
   const handleAuth = async (e) => {
@@ -31,7 +49,14 @@ export default function Login() {
           },
         });
         if (error) throw error;
+        
         if (data?.user) {
+          // ✅ NUEVO: Llamar a la notificación inmediatamente después del registro exitoso
+          await notifyNewUser({
+            email: email,
+            full_name: fullName
+          });
+
           setMessage(
             'Su cuenta fue registrada exitosamente. Espere la aprobación del administrador.'
           );
@@ -120,7 +145,6 @@ export default function Login() {
           padding: 0;
           width: 100%;
           min-height: 100%;
-          /* Se elimina position: fixed y overflow: hidden global para evitar pantallas en blanco en errores */
         }
         
         @media (max-width: 768px) {
@@ -128,7 +152,6 @@ export default function Login() {
             height: 100dvh !important;
             min-height: 100dvh !important;
             padding: 0 !important;
-            /* El overflow se maneja aquí dentro del contenedor, no en el body */
             overflow-y: auto !important; 
             -webkit-overflow-scrolling: touch !important;
           }
@@ -191,7 +214,7 @@ export default function Login() {
           fontFamily: 'system-ui, -apple-system, sans-serif',
           boxSizing: 'border-box',
           width: '100%',
-          overflow: 'hidden', // Mantenemos overflow hidden solo en este contenedor padre
+          overflow: 'hidden',
         }}
       >
         <div
