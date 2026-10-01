@@ -185,43 +185,7 @@ function SearchableDropdown({
 }
 
 export default function AdminModule() {
-  // --- ESTADO PARA PERSISTENCIA Y MENÚ RESPONSIVO ---
   const [activeTab, setActiveTab] = useState('crear_ne');
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const mobileMenuRef = useRef(null);
-
-  // Inicializar pestaña desde URL o LocalStorage
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const urlTab = params.get('tab');
-    const savedTab = localStorage.getItem('adminModuleActiveTab');
-    
-    if (urlTab) {
-      setActiveTab(urlTab);
-    } else if (savedTab) {
-      setActiveTab(savedTab);
-    }
-  }, []);
-
-  // Guardar en LocalStorage y actualizar URL al cambiar pestaña
-  useEffect(() => {
-    localStorage.setItem('adminModuleActiveTab', activeTab);
-    const url = new URL(window.location);
-    url.searchParams.set('tab', activeTab);
-    window.history.replaceState({}, '', url);
-  }, [activeTab]);
-
-  // Manejo de clic fuera para cerrar menú móvil
-  useEffect(() => {
-    function handleClickOutside(event) {
-      if (mobileMenuRef.current && !mobileMenuRef.current.contains(event.target)) {
-        setIsMobileMenuOpen(false);
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
@@ -288,7 +252,16 @@ export default function AdminModule() {
   const [editNoteQuantity, setEditNoteQuantity] = useState(1);
   const [editNoteSearchProd, setEditNoteSearchProd] = useState('');
   const [isCobranzaNEModal, setIsCobranzaNEModal] = useState(false);
-  
+
+  // --- NUEVO ESTADO: FECHA DE CREACIÓN DE N.E. (A) ---
+  const [neFecha, setNeFecha] = useState(
+    new Date().toISOString().split('T')[0]
+  );
+
+  // --- NUEVOS ESTADOS: MENÚ RESPONSIVE (E) ---
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const mobileMenuRef = useRef(null);
+
   // Estados para formulario de abono manual (Control de N.E.)
   const [manualAbonoForm, setManualAbonoForm] = useState({
     payment_date: new Date().toISOString().split('T')[0],
@@ -303,7 +276,7 @@ export default function AdminModule() {
   const [abonoMonto, setAbonoMonto] = useState('');
   const [abonoMetodo, setAbonoMetodo] = useState('Pago Móvil');
   const [abonoReferencia, setAbonoReferencia] = useState('');
-  
+
   // Estados para Cierre Quincenal (Ahora con lógica automática)
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
@@ -311,7 +284,7 @@ export default function AdminModule() {
   const [bcvRateUsd, setBcvRateUsd] = useState(849.56);
   const [bcvLastUpdated, setBcvLastUpdated] = useState('Sin sincronizar');
   const [bcvLoading, setBcvLoading] = useState(false);
-  
+
   // --- ESTADOS PARA CONFIGURACIÓN GLOBAL DE N.E. ---
   const [globalDiscount53, setGlobalDiscount53] = useState(53.38);
   const [globalDiscount23, setGlobalDiscount23] = useState(23.08);
@@ -320,7 +293,7 @@ export default function AdminModule() {
   );
   const [isConfigOpen, setIsConfigOpen] = useState(false);
   const [configLoading, setConfigLoading] = useState(false);
-  
+
   // --- NUEVOS ESTADOS PARA COBRANZA REQUERIDA ---
   const [cobranzaInternalTab, setCobranzaInternalTab] = useState('control_ne');
   const [paymentsHistoricalList, setPaymentsHistoricalList] = useState([]);
@@ -330,7 +303,7 @@ export default function AdminModule() {
   const [editAbonoModalData, setEditAbonoModalData] = useState(null);
   const [editAbonoAmount, setEditAbonoAmount] = useState('');
   const [imagePreviewModal, setImagePreviewModal] = useState(null);
-  
+
   // Estado para Modal de Borrado Masivo
   const [bulkDeleteModal, setBulkDeleteModal] = useState({
     open: false,
@@ -338,6 +311,39 @@ export default function AdminModule() {
     startDate: '',
     endDate: '',
   });
+
+  // --- EFECTO PARA PERSISTENCIA DE PESTAÑA (D) ---
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const tabFromUrl = urlParams.get('tab');
+    const tabFromStorage = localStorage.getItem('admin_active_tab');
+
+    if (tabFromUrl) {
+      setActiveTab(tabFromUrl);
+      localStorage.setItem('admin_active_tab', tabFromUrl);
+    } else if (tabFromStorage) {
+      setActiveTab(tabFromStorage);
+    }
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem('admin_active_tab', activeTab);
+  }, [activeTab]);
+
+  // --- EFECTO PARA CERRAR MENÚ MÓVIL AL HACER CLIC FUERA (E) ---
+  useEffect(() => {
+    function handleClickOutsideMenu(event) {
+      if (
+        mobileMenuRef.current &&
+        !mobileMenuRef.current.contains(event.target)
+      ) {
+        setIsMobileMenuOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutsideMenu);
+    return () =>
+      document.removeEventListener('mousedown', handleClickOutsideMenu);
+  }, []);
 
   const showToastSuccess = (msg) => {
     setSuccessMsg(msg);
@@ -437,8 +443,8 @@ export default function AdminModule() {
       setConfigLoading(false);
     }
   };
-
   // -----------------------------------------
+
   const fetchGlobalCreateNeAndCierreData = async () => {
     try {
       const { data: sellers } = await supabase
@@ -583,6 +589,13 @@ export default function AdminModule() {
     if (!neTargetUserId)
       return alert('Seleccione el usuario a quien se asignará la N.E.');
     if (neCart.length === 0) return alert('El carrito está vacío.');
+
+    // --- VALIDACIÓN DE FECHA (A) ---
+    const today = new Date().toISOString().split('T')[0];
+    if (neFecha > today) {
+      return alert('No se puede asignar una fecha futura.');
+    }
+
     setLoading(true);
     try {
       const payload = {
@@ -598,15 +611,18 @@ export default function AdminModule() {
         status: 'aprobada',
         payment_status: 'pendiente',
         observation: neObservacion,
+        created_at: new Date(neFecha).toISOString(), // (A) Fecha seleccionada
       };
       if (manualFolioMode && specificFolioNum) {
         payload.transaction_number = Number(specificFolioNum);
       }
+
       const { data: newNota, error: orderErr } = await supabase
         .from('sales_orders')
         .insert([payload])
         .select()
         .single();
+
       if (orderErr) throw orderErr;
 
       const detalles = neCart.map((item) => ({
@@ -646,6 +662,7 @@ export default function AdminModule() {
       setNeObservacion('');
       setSpecificFolioNum('');
       setManualFolioMode(false);
+      setNeFecha(new Date().toISOString().split('T')[0]); // Reset a hoy
       fetchEstimatedFolio();
       fetchTabData();
       fetchGlobalCreateNeAndCierreData();
@@ -691,6 +708,22 @@ export default function AdminModule() {
     if (valA > valB) return cobranzaSortAsc ? 1 : -1;
     return 0;
   });
+
+  // --- FUNCIÓN AUXILIAR PARA CALCULAR DÍAS DE ANTIGÜEDAD (B) ---
+  const calcDaysElapsed = (createdAt) => {
+    return Math.floor(
+      (new Date() - new Date(createdAt)) / (1000 * 60 * 60 * 24)
+    );
+  };
+
+  // --- N.E. CON ANTIGÜEDAD > 30, 45, 60 DÍAS (B) ---
+  const agingNotes = cobranzaNotes
+    .map((note) => ({
+      ...note,
+      days: calcDaysElapsed(note.created_at),
+    }))
+    .filter((n) => n.days >= 30 && n.payment_status !== 'cerrada')
+    .sort((a, b) => b.days - a.days);
 
   const obtenerTasaBCV = async (showToast = false) => {
     try {
@@ -776,7 +809,6 @@ export default function AdminModule() {
         .from('payments_independent_history')
         .select('*')
         .order('payment_date', { ascending: false });
-
       if (!error && data) {
         setPaymentsHistoricalList(data);
       } else {
@@ -816,8 +848,6 @@ export default function AdminModule() {
   const deleteFileFromStorage = async (url) => {
     if (!url) return;
     try {
-      // Extraer path relativo de la URL pública
-      // Ejemplo: https://.../storage/v1/object/public/visits/abonos/filename.png -> abonos/filename.png
       const parts = url.split('/visits/');
       if (parts.length > 1) {
         const filePath = parts[1];
@@ -835,7 +865,6 @@ export default function AdminModule() {
   const handleConfirmBulkDelete = async () => {
     try {
       setLoading(true);
-      // 1. Obtener registros a eliminar para borrar sus archivos primero
       let query = supabase
         .from('payments_independent_history')
         .select('receipt_image_url');
@@ -852,21 +881,18 @@ export default function AdminModule() {
       const { data: recordsToDelete, error: fetchErr } = await query;
       if (fetchErr) throw fetchErr;
 
-      // 2. Eliminar archivos del Storage
       if (recordsToDelete && recordsToDelete.length > 0) {
         for (const record of recordsToDelete) {
           await deleteFileFromStorage(record.receipt_image_url);
         }
       }
 
-      // 3. Eliminar registros de la Base de Datos
       let deleteQuery = supabase.from('payments_independent_history').delete();
       if (bulkDeleteModal.mode === 'range') {
         deleteQuery = deleteQuery
           .gte('payment_date', bulkDeleteModal.startDate)
           .lte('payment_date', bulkDeleteModal.endDate);
       } else {
-        // Borrar todo: Usamos un UUID falso para evitar error de tipo
         deleteQuery = deleteQuery.neq(
           'id',
           '00000000-0000-0000-0000-000000000000'
@@ -898,10 +924,10 @@ export default function AdminModule() {
     try {
       const { data: hConfig } = await supabase
         .from('hierarchy_config')
-        .select('*');
+        .select('');
       const { data: hAssign } = await supabase
         .from('hierarchy_assignments')
-        .select('*');
+        .select('');
       const configMap = {};
       (hConfig || []).forEach((c) => {
         configMap[c.parent_user_id] = c;
@@ -1027,6 +1053,7 @@ export default function AdminModule() {
           .from('sales_orders')
           .select('id, transaction_number, final_price_usd, balance_due_usd');
         if (ords) setAllOrdersList(ords);
+
         await fetchPaymentHistoryFromDB();
       }
     } catch (err) {
@@ -1141,6 +1168,7 @@ export default function AdminModule() {
         paymentDiscount,
       };
     }
+
     return {
       pctUsed: 0,
       commissionUsd: 0,
@@ -1281,9 +1309,8 @@ export default function AdminModule() {
       comm23GrossUsd + hierarchyUsd23 - valesDeduction23Usd - penDeduction23
     );
 
-    // MODIFICACIÓN C: Mitad del sueldo base para quincena
+    // --- MODIFICACIÓN (C): MITAD DEL SUELDO FIJO POR CICLO QUINCENAL ---
     const rawSueldoFijo = Number(user.sueldo_fijo_usd || 0) / 2;
-    
     const currentRate = Number(Number(rateVal || 1).toFixed(2));
     const sueldoFijoBs = sfCurr === 'BS' ? rawSueldoFijo * currentRate : 0;
     const sueldoFijoEquivalentUsd = rawSueldoFijo;
@@ -1308,7 +1335,7 @@ export default function AdminModule() {
       vales: userVales,
       penalties: userPenalties,
       totalPenaltiesUsd,
-      sueldoFijoOriginal: rawSueldoFijo, // Ya viene dividido por 2
+      sueldoFijoOriginal: rawSueldoFijo,
       sueldoFijoCurrency: sfCurr,
       penaltyChargeMethod: penChargeMethod,
       penDeduction53,
@@ -1357,21 +1384,17 @@ export default function AdminModule() {
       settlementModalData.vales.length
     } vales aprobados y se generará la factura. ¿Continuar?`;
     if (!window.confirm(confirmMsg)) return;
-
     try {
       setLoading(true);
-      // 1. Generar código de factura único
       const invCode = 'LIQ-' + Date.now().toString().slice(-6);
-      // 2. Obtener ID del admin que ejecuta la acción
       const { data: authData } = await supabase.auth.getUser();
-      // 3. Capturar el HTML de la factura actual desde el DOM (para guardar histórico visual)
+
       const modalDOMEl = document.getElementById(
         'settlement-invoice-modal-content'
       );
       let capturedHTMLContent = '';
       if (modalDOMEl) {
         const clonedNode = modalDOMEl.cloneNode(true);
-        // Limpiar elementos interactivos antes de guardar el HTML estático
         clonedNode.querySelectorAll('div').forEach((d) => {
           if (
             d.textContent &&
@@ -1398,11 +1421,9 @@ export default function AdminModule() {
         capturedHTMLContent = clonedNode.innerHTML;
       }
 
-      // 4. Procesar Penalizaciones como abonos parciales a las N.E. correspondientes
       for (const pen of settlementModalData.penalties) {
         const penAmt = Number(pen.amount || 0);
         if (pen.order_id && penAmt > 0) {
-          // Registrar el abono por penalización en order_payments
           await supabase.from('order_payments').insert([
             {
               order_id: pen.order_id,
@@ -1413,7 +1434,6 @@ export default function AdminModule() {
               created_by: authData?.user?.id,
             },
           ]);
-          // Actualizar saldos de la N.E. afectada
           const { data: ordDat } = await supabase
             .from('sales_orders')
             .select('*')
@@ -1438,14 +1458,12 @@ export default function AdminModule() {
               .eq('id', pen.order_id);
           }
         }
-        // Marcar penalización como cobrada
         await supabase
           .from('penalties')
           .update({ status: 'cobrada' })
           .eq('id', pen.id);
       }
 
-      // 5. Insertar Factura de Liquidación en BD
       const { data: insertedInv, error: invErr } = await supabase
         .from('settlement_invoices')
         .insert([
@@ -1475,7 +1493,6 @@ export default function AdminModule() {
         .single();
       if (invErr) throw invErr;
 
-      // 6. Limpieza Masiva Post-Liquidación (Borrar N.E., Vales y Penalizaciones ya procesadas)
       const noteIdsToDelete = settlementModalData.notes.map((n) => n.id);
       if (noteIdsToDelete.length > 0) {
         await supabase
@@ -1492,18 +1509,14 @@ export default function AdminModule() {
           .in('order_id', noteIdsToDelete);
         await supabase.from('sales_orders').delete().in('id', noteIdsToDelete);
       }
-
       const valeIdsToDelete = settlementModalData.vales.map((v) => v.id);
       if (valeIdsToDelete.length > 0) {
         await supabase.from('vales').delete().in('id', valeIdsToDelete);
       }
-
       const penIdsToDelete = settlementModalData.penalties.map((p) => p.id);
       if (penIdsToDelete.length > 0) {
         await supabase.from('penalties').delete().in('id', penIdsToDelete);
       }
-
-      // Borrar penalizaciones huérfanas asociadas a las N.E. eliminadas
       if (noteIdsToDelete.length > 0) {
         await supabase
           .from('penalties')
@@ -1511,7 +1524,6 @@ export default function AdminModule() {
           .in('order_id', noteIdsToDelete);
       }
 
-      // ✅ 7. ENVIAR NOTIFICACIÓN DE LIQUIDACIÓN AL USUARIO
       try {
         await supabase.functions.invoke('send-notification', {
           body: {
@@ -1629,7 +1641,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
         associatedPenalties.forEach((p) => {
           penaltiesHtml += `
 <div style="display: flex; justify-content: space-between; margin-bottom: 4px; color: #DC2626;">
-<span>Penalización (${p.status || 'pendiente'}): </span>
+<span>Penalización (${p.status || 'pendiente'}):</span>
 <strong>$${Number(p.amount || 0).toFixed(2)}</strong>
 </div>
 `;
@@ -1837,14 +1849,12 @@ ${penaltiesHtml}
     }
   };
 
-  // --- MODIFICADO: LÓGICA DE APROBACIÓN DE NOTIFICACIÓN CON DETECCIÓN DE DUPLICADOS Y MOVIMIENTO A HISTÓRICO ---
   const handleApprovePaymentNotification = async (notif) => {
     try {
       setLoading(true);
       const montoNum = Number(notif.amount_usd) || 0;
       const refNum = String(notif.reference_number || '').trim();
 
-      // 1. Verificar Duplicados en Histórico Independiente
       const duplicate = paymentsHistoricalList.find(
         (p) =>
           Math.abs(Number(p.amount_usd) - montoNum) < 0.01 &&
@@ -1868,7 +1878,6 @@ ${penaltiesHtml}
 
       const { data: userData } = await supabase.auth.getUser();
 
-      // 2. Insertar en Histórico Independiente
       const { error: histErr } = await supabase
         .from('payments_independent_history')
         .insert([
@@ -1893,7 +1902,6 @@ ${penaltiesHtml}
         );
       }
 
-      // 3. Mantener Lógica Original de Abono a la N.E.
       const { error: payErr } = await supabase.from('order_payments').insert([
         {
           order_id: notif.order_id,
@@ -1920,7 +1928,6 @@ ${penaltiesHtml}
         Number(orderData.final_price_usd) - nuevoAbonado
       );
       const nuevoEstadoPago = nuevoSaldo === 0 ? 'cerrada' : 'abonada';
-
       const { error: orderUpdateErr } = await supabase
         .from('sales_orders')
         .update({
@@ -1939,7 +1946,6 @@ ${penaltiesHtml}
         .eq('id', notif.id);
       if (notifUpdateErr) throw notifUpdateErr;
 
-      // ✅ NUEVO: ENVIAR CORREO AL VENDEDOR NOTIFICANDO QUE SU ABONO FUE APROBADO
       try {
         const vendedorEmail = notif.seller?.email;
         const vendedorNombre = notif.seller?.full_name;
@@ -1993,7 +1999,6 @@ ${penaltiesHtml}
     }
   };
 
-  // --- NUEVA FUNCIÓN: ELIMINAR/DESAPROBAR NOTIFICACIÓN PENDIENTE ---
   const handleDeletePaymentNotification = async (notifId) => {
     if (
       !window.confirm(
@@ -2019,7 +2024,6 @@ ${penaltiesHtml}
     }
   };
 
-  // --- MODIFICADO: ABRIR MODAL DE VISUALIZACIÓN CON CONSULTA A DB PARA DUPLICADOS ---
   const handleOpenViewNotifModal = async (notif) => {
     setLoading(true);
     setViewNotifModalData(notif);
@@ -2048,7 +2052,6 @@ ${penaltiesHtml}
     }
   };
 
-  // --- NUEVA FUNCIÓN: EDITAR MONTO ABONADO DIRECTAMENTE ---
   const handleOpenEditAbonoModal = (note) => {
     setEditAbonoModalData(note);
     setEditAbonoAmount(String(note.total_paid_usd || 0));
@@ -2086,20 +2089,15 @@ ${penaltiesHtml}
     }
   };
 
-  // --- NUEVA FUNCIÓN: REGISTRAR ABONO MANUAL DESDE CONTROL DE N.E. (CON VERIFICACIÓN DE DUPLICADOS) ---
   const handleRegisterManualAbono = async (e) => {
     e.preventDefault();
     if (!abonoModalNote) return;
     const fileToUpload = manualAbonoFile;
     const montoNum = parseFloat(manualAbonoForm.amount_usd);
     const refNum = String(manualAbonoForm.reference_number || '').trim();
-
-    // 1. Validaciones básicas
     if (isNaN(montoNum) || montoNum <= 0) {
       return alert('Ingrese un monto válido.');
     }
-
-    // 2. Verificar Duplicados en DB antes de guardar
     try {
       const { data: duplicates, error: dupErr } = await supabase
         .from('payments_independent_history')
@@ -2121,13 +2119,11 @@ ${penaltiesHtml}
     } catch (err) {
       console.error('Error verificando duplicados:', err);
     }
-
     try {
       setLoading(true);
       const { data: userData } = await supabase.auth.getUser();
       let receiptUrl = null;
       if (fileToUpload) {
-        // Subir archivo a bucket 'visits' carpeta 'abonos'
         const fileExt = fileToUpload.name.split('.').pop();
         const fileName = `${Date.now()}_${Math.random()
           .toString(36)
@@ -2143,7 +2139,6 @@ ${penaltiesHtml}
         receiptUrl = publicUrlData.publicUrl;
       }
 
-      // 3. Registrar en Histórico Independiente
       const { error: histErr } = await supabase
         .from('payments_independent_history')
         .insert([
@@ -2165,7 +2160,6 @@ ${penaltiesHtml}
           histErr.message
         );
 
-      // 4. Registrar Abono en Order Payments
       const { error: payErr } = await supabase.from('order_payments').insert([
         {
           order_id: abonoModalNote.id,
@@ -2178,7 +2172,6 @@ ${penaltiesHtml}
       ]);
       if (payErr) throw payErr;
 
-      // 5. Actualizar Saldo de N.E.
       const nuevoAbonado =
         Number(abonoModalNote.total_paid_usd || 0) + montoNum;
       const nuevoSaldo = Math.max(
@@ -2198,7 +2191,6 @@ ${penaltiesHtml}
         .eq('id', abonoModalNote.id);
       if (noteErr) throw noteErr;
 
-      // 6. Eliminar notificación pendiente si existía
       const existingNotif = paymentNotifications.find(
         (n) => n.order_id === abonoModalNote.id && n.status === 'pending'
       );
@@ -2241,7 +2233,6 @@ ${penaltiesHtml}
         .eq('id', note.id);
       if (error) throw error;
 
-      // ✅ ENVIAR CORREO AL VENDEDOR NOTIFICANDO LA APROBACIÓN
       try {
         const vendedorEmail = note.seller?.email;
         const vendedorNombre = note.seller?.full_name;
@@ -2304,7 +2295,6 @@ ${penaltiesHtml}
         .eq('id', rejectModalNote.id);
       if (error) throw error;
 
-      // ✅ NOTIFICAR AL VENDEDOR QUE SU NOTA FUE RECHAZADA
       try {
         await supabase.functions.invoke('send-notification', {
           body: {
@@ -2348,7 +2338,7 @@ ${penaltiesHtml}
       setIsCobranzaNEModal(isCobranza);
       const { data: prods, error: prodErr } = await supabase
         .from('products')
-        .select('*')
+        .select('')
         .order('description', { ascending: true });
       if (prodErr) throw prodErr;
       setEditNoteProductsList(prods || []);
@@ -2358,7 +2348,6 @@ ${penaltiesHtml}
         .select('*, products(code, description)')
         .eq('order_id', note.id);
       if (itemsErr) throw itemsErr;
-
       const mappedItems = (items || []).map((item) => ({
         product_id: item.product_id,
         code: item.products?.code || 'S/C',
@@ -2371,7 +2360,6 @@ ${penaltiesHtml}
             item.quantity * Number(item.discounted_unit_price_usd || 0)
         ),
       }));
-
       setEditingNoteId(note.id);
       setEditNoteClientName(note.client?.name || 'Cliente');
       setEditNoteCategory(note.category || 'bombillos');
@@ -2566,7 +2554,6 @@ ${penaltiesHtml}
         parseFloat(abonoModalNote.final_price_usd) - nuevoAbonado
       );
       const nuevoEstadoPago = nuevoSaldo === 0 ? 'cerrada' : 'abonada';
-
       const { error: noteErr } = await supabase
         .from('sales_orders')
         .update({
@@ -2594,7 +2581,6 @@ ${penaltiesHtml}
   const handleValeAction = async (valeId, status) => {
     try {
       setLoading(true);
-      // Obtener datos del vale antes de actualizarlo (para el correo)
       const valeActual = vales.find((v) => v.id === valeId);
       const vendedorEmail = valeActual?.seller?.email;
       const vendedorNombre = valeActual?.seller?.full_name;
@@ -2609,7 +2595,6 @@ ${penaltiesHtml}
         .eq('id', valeId);
       if (error) throw error;
 
-      // ✅ ENVIAR CORREO AL VENDEDOR SOBRE LA DECISIÓN DEL VALE
       if (vendedorEmail && vendedorNombre) {
         try {
           const tipoNotif =
@@ -2705,7 +2690,6 @@ ${penaltiesHtml}
         'La nota de entrega seleccionada no tiene saldo pendiente o es 0.'
       );
 
-    // Obtener datos del vendedor y la nota para el correo
     const vendedorProfile = sellersList.find(
       (s) => String(s.id) === String(assignTargetUserId)
     );
@@ -2730,7 +2714,6 @@ ${penaltiesHtml}
         .insert([penaltyPayload]);
       if (penErr) throw penErr;
 
-      // ✅ ENVIAR CORREO AL VENDEDOR Y AL ADMINISTRADOR SOBRE LA PENALIZACIÓN
       if (vendedorEmail) {
         try {
           await supabase.functions.invoke('send-notification', {
@@ -2860,7 +2843,6 @@ ${penaltiesHtml}
     );
   });
 
-  // Filtro para Histórico de Pagos Independientes
   const filteredPaymentsHistory = paymentsHistoricalList.filter((item) => {
     if (!paymentsHistorySearch.trim()) return true;
     const q = paymentsHistorySearch.toLowerCase();
@@ -2905,17 +2887,16 @@ ${penaltiesHtml}
     });
   };
 
-  const tabContentWrapperStyle = {
-    width: '100%',
-    boxSizing: 'border-box',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '16px',
-    minHeight: '600px',
+  // --- FUNCIÓN AUXILIAR PARA CAMBIAR PESTAÑA CON URL (D) ---
+  const handleTabChange = (tabId) => {
+    setActiveTab(tabId);
+    const url = new URL(window.location.href);
+    url.searchParams.set('tab', tabId);
+    window.history.replaceState({}, '', url.toString());
   };
 
-  // Lista de pestañas para renderizado
-  const tabsList = [
+  // --- DATOS DE PESTAÑAS ---
+  const tabsData = [
     { id: 'crear_ne', label: 'Crear N.E.', icon: Plus },
     { id: 'aprobaciones', label: 'Pendientes por Aprobar', icon: Clock },
     { id: 'cobranza', label: 'Gestión de Cobranza', icon: DollarSign },
@@ -2931,6 +2912,18 @@ ${penaltiesHtml}
     },
   ];
 
+  const tabContentWrapperStyle = {
+    width: '100%',
+    boxSizing: 'border-box',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '16px',
+    minHeight: '600px',
+  };
+
+  // --- FECHA MÁXIMA PARA INPUT (A) ---
+  const todayISO = new Date().toISOString().split('T')[0];
+
   return (
     <div
       style={{
@@ -2941,57 +2934,200 @@ ${penaltiesHtml}
         boxSizing: 'border-box',
       }}
     >
-      {/* Estilos Globales para Responsividad */}
+      {/* --- ESTILOS RESPONSIVOS (E) --- */}
       <style>{`
-        @media (max-width: 768px) {
-          .desktop-tabs { display: none !important; }
-          .mobile-dropdown { display: block !important; }
-          .mobile-cards thead { display: none; }
-          .mobile-cards tr { 
-            display: block; 
-            margin-bottom: 16px; 
-            border: 1px solid #e5e7eb; 
-            border-radius: 8px; 
-            padding: 12px; 
-            background: #fff;
-            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
-          }
-          .mobile-cards td { 
-            display: flex; 
-            justify-content: space-between; 
-            align-items: center; 
-            padding: 8px 0; 
-            border: none; 
-            border-bottom: 1px solid #f3f4f6;
-            font-size: 13px;
-          }
-          .mobile-cards td:last-child { border-bottom: none; }
-          .mobile-cards td::before {
-            content: attr(data-label);
-            font-weight: 700;
-            color: #374151;
-            margin-right: 12px;
-          }
-          .mobile-card-header {
-            display: block !important;
-            font-size: 15px;
-            font-weight: 900;
-            color: #111827;
-            margin-bottom: 8px;
-            border-bottom: 2px solid #dc2626;
-            padding-bottom: 4px;
-          }
-          .btn-responsive {
-            padding: 6px 10px !important;
-            font-size: 11px !important;
-          }
-          .wrap-buttons {
-            flex-wrap: wrap !important;
-          }
+        .admin-tabs-desktop {
+          display: flex;
+          gap: 8px;
+          border-bottom: 2px solid #e5e7eb;
+          margin-bottom: 24px;
+          overflow-x: auto;
         }
-        @media (min-width: 769px) {
-          .mobile-dropdown { display: none !important; }
-          .mobile-card-header { display: none !important; }
+        .admin-tabs-mobile {
+          display: none;
+          position: relative;
+          margin-bottom: 24px;
+        }
+        .admin-mobile-trigger {
+          width: 100%;
+          padding: 12px 16px;
+          background: #ffffff;
+          border: 1px solid #d1d5db;
+          border-radius: 8px;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          cursor: pointer;
+          font-weight: 700;
+          color: #111827;
+          font-size: 14px;
+        }
+        .admin-mobile-dropdown {
+          position: absolute;
+          top: calc(100% + 4px);
+          left: 0;
+          right: 0;
+          background: #ffffff;
+          border: 1px solid #d1d5db;
+          border-radius: 8px;
+          box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);
+          z-index: 1000;
+          overflow: hidden;
+        }
+        .admin-mobile-item {
+          padding: 12px 16px;
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          cursor: pointer;
+          border-bottom: 1px solid #e5e7eb;
+          color: #4b5563;
+          font-size: 14px;
+          transition: background 0.15s;
+        }
+        .admin-mobile-item:last-child {
+          border-bottom: none;
+        }
+        .admin-mobile-item:hover {
+          background: #fef2f2;
+        }
+        .admin-mobile-item.active {
+          background: #fef2f2;
+          color: #dc2626;
+          font-weight: 700;
+        }
+        .admin-aging-section {
+          background: #fffbeb;
+          border: 1px solid #fde68a;
+          border-radius: 8px;
+          padding: 14px 16px;
+          margin-bottom: 16px;
+        }
+        .admin-aging-title {
+          font-size: 13px;
+          font-weight: 800;
+          color: #78350f;
+          margin-bottom: 10px;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+        .admin-aging-item {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 6px 10px;
+          background: #ffffff;
+          border: 1px solid #fde68a;
+          border-radius: 6px;
+          margin-bottom: 6px;
+          font-size: 12px;
+        }
+        .admin-aging-item:last-child {
+          margin-bottom: 0;
+        }
+        .admin-days-30 {
+          text-decoration: underline;
+          text-decoration-color: #eab308;
+          text-decoration-thickness: 3px;
+          text-underline-offset: 3px;
+        }
+        .admin-days-45 {
+          text-decoration: underline;
+          text-decoration-color: #f97316;
+          text-decoration-thickness: 3px;
+          text-underline-offset: 3px;
+        }
+        .admin-days-60 {
+          text-decoration: underline;
+          text-decoration-color: #dc2626;
+          text-decoration-thickness: 3px;
+          text-underline-offset: 3px;
+        }
+
+        /* --- TABLAS RESPONSIVAS (E) --- */
+        .admin-table-desktop {
+          width: 100%;
+          border-collapse: collapse;
+          text-align: left;
+          font-size: 13px;
+        }
+        .admin-mobile-cards {
+          display: none;
+        }
+        .admin-mobile-card {
+          background: #ffffff;
+          border: 1px solid #e5e7eb;
+          border-radius: 8px;
+          padding: 12px;
+          margin-bottom: 10px;
+          box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        }
+        .admin-mobile-card-header {
+          font-size: 14px;
+          font-weight: 800;
+          color: #111827;
+          border-bottom: 1px solid #e5e7eb;
+          padding-bottom: 8px;
+          margin-bottom: 8px;
+        }
+        .admin-mobile-card-row {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 4px 0;
+          font-size: 12px;
+          border-bottom: 1px dashed #f3f4f6;
+        }
+        .admin-mobile-card-row:last-child {
+          border-bottom: none;
+        }
+        .admin-mobile-card-label {
+          color: #6b7280;
+          font-weight: 600;
+          font-size: 11px;
+        }
+        .admin-mobile-card-value {
+          color: #111827;
+          font-weight: 600;
+          text-align: right;
+          max-width: 60%;
+          word-break: break-word;
+        }
+        .admin-mobile-card-actions {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 6px;
+          margin-top: 10px;
+          padding-top: 10px;
+          border-top: 1px solid #e5e7eb;
+        }
+
+        @media (max-width: 768px) {
+          .admin-tabs-desktop {
+            display: none !important;
+          }
+          .admin-tabs-mobile {
+            display: block !important;
+          }
+          .admin-table-desktop {
+            display: none !important;
+          }
+          .admin-mobile-cards {
+            display: block !important;
+          }
+          .admin-mobile-card-actions button {
+            font-size: 10px !important;
+            padding: 5px 8px !important;
+          }
+          .admin-tab-button-desktop {
+            padding: 10px 12px !important;
+            font-size: 12px !important;
+          }
+          .admin-action-btn-mobile {
+            padding: 5px 8px !important;
+            font-size: 10px !important;
+          }
         }
       `}</style>
 
@@ -3058,123 +3194,94 @@ ${penaltiesHtml}
         </div>
       )}
 
-      {/* Navegación Responsiva */}
-      <div style={{ marginBottom: '24px' }}>
-        {/* Desktop Tabs */}
-        <div
-          className="desktop-tabs"
-          style={{
-            display: 'flex',
-            gap: '8px',
-            borderBottom: '2px solid #e5e7eb',
-            overflowX: 'auto',
-          }}
-        >
-          {tabsList.map((tab) => {
-            const Icon = tab.icon;
-            const isActive = activeTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  padding: '12px 18px',
-                  border: 'none',
-                  borderBottom: isActive
-                    ? '3px solid #dc2626'
-                    : '3px solid transparent',
-                  backgroundColor: 'transparent',
-                  color: isActive ? '#dc2626' : '#4b5563',
-                  fontWeight: isActive ? 'bold' : '500',
-                  cursor: 'pointer',
-                  whiteSpace: 'nowrap',
-                  transition: 'all 0.2s',
-                }}
-              >
-                <Icon size={18} color={isActive ? '#dc2626' : '#4b5563'} />
-                {tab.label}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Mobile Dropdown */}
-        <div className="mobile-dropdown" ref={mobileMenuRef} style={{ position: 'relative', width: '100%' }}>
-          <button
-            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            style={{
-              width: '100%',
-              padding: '12px 16px',
-              backgroundColor: '#ffffff',
-              border: '1px solid #d1d5db',
-              borderRadius: '8px',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              fontSize: '14px',
-              fontWeight: '600',
-              color: '#111827',
-            }}
-          >
-            <span>
-              {tabsList.find((t) => t.id === activeTab)?.label || 'Menú'}
-            </span>
-            <ChevronDown size={18} />
-          </button>
-          
-          {isMobileMenuOpen && (
-            <div
+      {/* --- MENÚ ESCRITORIO (E) --- */}
+      <div className="admin-tabs-desktop">
+        {tabsData.map((tab) => {
+          const Icon = tab.icon;
+          const isActive = activeTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => handleTabChange(tab.id)}
+              className="admin-tab-button-desktop"
               style={{
-                position: 'absolute',
-                top: '100%',
-                left: 0,
-                right: 0,
-                zIndex: 1000,
-                backgroundColor: '#ffffff',
-                border: '1px solid #d1d5db',
-                borderRadius: '8px',
-                boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)',
-                marginTop: '4px',
-                overflow: 'hidden',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '12px 18px',
+                border: 'none',
+                borderBottom: isActive
+                  ? '3px solid #dc2626'
+                  : '3px solid transparent',
+                backgroundColor: 'transparent',
+                color: isActive ? '#dc2626' : '#4b5563',
+                fontWeight: isActive ? 'bold' : '500',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+                transition: 'all 0.2s',
               }}
             >
-              {tabsList.map((tab) => {
-                const Icon = tab.icon;
-                const isActive = activeTab === tab.id;
-                return (
-                  <button
-                    key={tab.id}
-                    onClick={() => {
-                      setActiveTab(tab.id);
-                      setIsMobileMenuOpen(false);
-                    }}
-                    style={{
-                      width: '100%',
-                      padding: '12px 16px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '10px',
-                      border: 'none',
-                      backgroundColor: isActive ? '#fef2f2' : 'transparent',
-                      color: isActive ? '#dc2626' : '#4b5563',
-                      fontWeight: isActive ? 'bold' : '500',
-                      cursor: 'pointer',
-                      textAlign: 'left',
-                      borderBottom: '1px solid #f3f4f6',
-                    }}
-                  >
-                    <Icon size={18} />
-                    {tab.label}
-                    {isActive && <Check size={16} style={{ marginLeft: 'auto' }} />}
-                  </button>
-                );
-              })}
-            </div>
-          )}
+              <Icon size={18} color={isActive ? '#dc2626' : '#4b5563'} />
+              {tab.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* --- MENÚ MÓVIL DROPDOWN (E) --- */}
+      <div className="admin-tabs-mobile" ref={mobileMenuRef}>
+        <div
+          className="admin-mobile-trigger"
+          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+        >
+          <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            {(() => {
+              const current = tabsData.find((t) => t.id === activeTab);
+              const Icon = current?.icon || Plus;
+              return (
+                <>
+                  <Icon size={18} color="#dc2626" />
+                  {current?.label || 'Seleccionar módulo'}
+                </>
+              );
+            })()}
+          </span>
+          <ChevronDown
+            size={18}
+            style={{
+              transform: isMobileMenuOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+              transition: 'transform 0.2s',
+            }}
+          />
         </div>
+        {isMobileMenuOpen && (
+          <div className="admin-mobile-dropdown">
+            {tabsData.map((tab) => {
+              const Icon = tab.icon;
+              const isActive = activeTab === tab.id;
+              return (
+                <div
+                  key={tab.id}
+                  className={`admin-mobile-item ${isActive ? 'active' : ''}`}
+                  onClick={() => {
+                    handleTabChange(tab.id);
+                    setIsMobileMenuOpen(false);
+                  }}
+                >
+                  <Icon size={18} color={isActive ? '#dc2626' : '#4b5563'} />
+                  <span>{tab.label}</span>
+                  {isActive && (
+                    <Check
+                      size={16}
+                      color="#dc2626"
+                      style={{ marginLeft: 'auto' }}
+                    />
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* PESTAÑA 1: CREAR N.E. */}
@@ -3459,6 +3566,37 @@ ${penaltiesHtml}
               gap: '12px',
             }}
           >
+            {/* --- NUEVO CAMPO: FECHA DE CREACIÓN (A) --- */}
+            <div>
+              <label
+                style={{
+                  display: 'block',
+                  fontSize: '12px',
+                  fontWeight: '700',
+                  marginBottom: '4px',
+                }}
+              >
+                Fecha de Emisión
+              </label>
+              <input
+                type="date"
+                value={neFecha}
+                max={todayISO}
+                onChange={(e) => setNeFecha(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '7px 8px',
+                  fontSize: '12px',
+                  border: '1px solid #D1D5DB',
+                  borderRadius: '6px',
+                  backgroundColor: '#FFFFFF',
+                  boxSizing: 'border-box',
+                }}
+              />
+              <span style={{ fontSize: '10px', color: '#6b7280' }}>
+                Predeterminada: hoy. Permitidas: hasta hoy.
+              </span>
+            </div>
             <div>
               <label
                 style={{
@@ -3579,37 +3717,6 @@ ${penaltiesHtml}
                   {globalDiscount23}% Pagará en Bs BCV
                 </option>
               </select>
-            </div>
-            {/* MODIFICACIÓN A: Campo de Fecha con valor por defecto hoy y restricción de futuro */}
-            <div>
-              <label
-                style={{
-                  display: 'block',
-                  fontSize: '12px',
-                  fontWeight: '700',
-                  marginBottom: '4px',
-                }}
-              >
-                Fecha de Emisión
-              </label>
-              <input
-                type="date"
-                value={new Date().toISOString().split('T')[0]}
-                max={new Date().toISOString().split('T')[0]}
-                onChange={(e) => {
-                  // Si se requiere usar esta fecha en la creación, se debería agregar al estado
-                  // Por ahora solo cumple con la UI requerida
-                }}
-                style={{
-                  width: '100%',
-                  padding: '7px 8px',
-                  fontSize: '12px',
-                  border: '1px solid #D1D5DB',
-                  borderRadius: '6px',
-                  backgroundColor: '#FFFFFF',
-                  boxSizing: 'border-box',
-                }}
-              />
             </div>
           </div>
           <div
@@ -3734,7 +3841,8 @@ ${penaltiesHtml}
               </div>
               <div style={{ textAlign: 'right' }}>
                 <p style={{ margin: 0 }}>
-                  <strong>Fecha/Hora: </strong> {new Date().toLocaleString()}
+                  <strong>Fecha Emisión: </strong>{' '}
+                  {new Date(neFecha).toLocaleDateString()}
                 </p>
                 <p style={{ margin: '2px 0' }}>
                   <strong>Folio Proyectado: </strong> #{estimatedNextFolio}
@@ -3988,15 +4096,8 @@ ${penaltiesHtml}
               overflowX: 'auto',
             }}
           >
-            <table
-              className="mobile-cards"
-              style={{
-                width: '100%',
-                borderCollapse: 'collapse',
-                textAlign: 'left',
-                fontSize: '14px',
-              }}
-            >
+            {/* --- TABLA ESCRITORIO --- */}
+            <table className="admin-table-desktop">
               <thead>
                 <tr
                   style={{
@@ -4061,10 +4162,9 @@ ${penaltiesHtml}
                         key={note.id}
                         style={{ borderBottom: '1px solid #e5e7eb' }}
                       >
-                        <td style={{ padding: '12px 16px' }} data-label="Ver N.E">
+                        <td style={{ padding: '12px 16px' }}>
                           <button
                             onClick={() => handleOpenEditNEPanel(note, false)}
-                            className="btn-responsive"
                             style={{
                               padding: '6px 12px',
                               backgroundColor:
@@ -4082,22 +4182,21 @@ ${penaltiesHtml}
                             Ver N.E
                           </button>
                         </td>
-                        <td style={{ padding: '12px 16px' }} data-label="Fecha">
+                        <td style={{ padding: '12px 16px' }}>
                           {new Date(note.created_at).toLocaleDateString()}
                         </td>
                         <td
                           style={{ padding: '12px 16px', fontWeight: 'bold' }}
-                          data-label="N° Transacción"
                         >
                           #{note.transaction_number}
                         </td>
-                        <td style={{ padding: '12px 16px' }} data-label="Vendedor">
+                        <td style={{ padding: '12px 16px' }}>
                           {note.seller?.full_name || 'Vendedor'}
                         </td>
-                        <td style={{ padding: '12px 16px' }} data-label="Cliente">
+                        <td style={{ padding: '12px 16px' }}>
                           {note.client?.name || 'Cliente'}
                         </td>
-                        <td style={{ padding: '12px 16px' }} data-label="Modalidad">
+                        <td style={{ padding: '12px 16px' }}>
                           <span
                             style={{
                               fontSize: '12px',
@@ -4123,7 +4222,6 @@ ${penaltiesHtml}
                             padding: '12px 16px',
                             textTransform: 'capitalize',
                           }}
-                          data-label="Categoría"
                         >
                           {note.category}
                         </td>
@@ -4133,11 +4231,10 @@ ${penaltiesHtml}
                             fontWeight: 'bold',
                             color: '#059669',
                           }}
-                          data-label="Total ($)"
                         >
                           ${Number(note.final_price_usd).toFixed(2)}
                         </td>
-                        <td style={{ padding: '12px 16px' }} data-label="GPS">
+                        <td style={{ padding: '12px 16px' }}>
                           {hasCoords ? (
                             <div
                               style={{
@@ -4192,7 +4289,6 @@ ${penaltiesHtml}
                         </td>
                         <td
                           style={{ padding: '12px 16px', textAlign: 'center' }}
-                          data-label="Acciones"
                         >
                           <div
                             style={{
@@ -4235,6 +4331,158 @@ ${penaltiesHtml}
                 )}
               </tbody>
             </table>
+
+            {/* --- TARJETAS MÓVIL --- */}
+            <div className="admin-mobile-cards">
+              {loading && !editingNoteId ? (
+                <div
+                  style={{
+                    textAlign: 'center',
+                    padding: '20px',
+                    color: '#6b7280',
+                  }}
+                >
+                  Cargando solicitudes...
+                </div>
+              ) : pendingNotes.length === 0 ? (
+                <div
+                  style={{
+                    textAlign: 'center',
+                    padding: '20px',
+                    color: '#6b7280',
+                  }}
+                >
+                  No hay solicitudes de aprobación pendientes.
+                </div>
+              ) : (
+                pendingNotes.map((note) => {
+                  const lat = note.latitude;
+                  const lng = note.longitude;
+                  const hasCoords =
+                    lat !== null &&
+                    lng !== null &&
+                    lat !== undefined &&
+                    lng !== undefined;
+                  const mapsUrl = hasCoords
+                    ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+                        `${lat},${lng}`
+                      )}`
+                    : null;
+                  return (
+                    <div key={note.id} className="admin-mobile-card">
+                      <div className="admin-mobile-card-header">
+                        N.E. #{note.transaction_number}
+                      </div>
+                      <div className="admin-mobile-card-row">
+                        <span className="admin-mobile-card-label">Fecha</span>
+                        <span className="admin-mobile-card-value">
+                          {new Date(note.created_at).toLocaleDateString()}
+                        </span>
+                      </div>
+                      <div className="admin-mobile-card-row">
+                        <span className="admin-mobile-card-label">Vendedor</span>
+                        <span className="admin-mobile-card-value">
+                          {note.seller?.full_name || 'Vendedor'}
+                        </span>
+                      </div>
+                      <div className="admin-mobile-card-row">
+                        <span className="admin-mobile-card-label">Cliente</span>
+                        <span className="admin-mobile-card-value">
+                          {note.client?.name || 'Cliente'}
+                        </span>
+                      </div>
+                      <div className="admin-mobile-card-row">
+                        <span className="admin-mobile-card-label">Modalidad</span>
+                        <span className="admin-mobile-card-value">
+                          {String(note.payment_discount) === '53.38'
+                            ? `${globalDiscount53}% ($)`
+                            : `${globalDiscount23}% (Bs)`}
+                        </span>
+                      </div>
+                      <div className="admin-mobile-card-row">
+                        <span className="admin-mobile-card-label">Total</span>
+                        <span
+                          className="admin-mobile-card-value"
+                          style={{ color: '#059669', fontWeight: '700' }}
+                        >
+                          ${Number(note.final_price_usd).toFixed(2)}
+                        </span>
+                      </div>
+                      <div className="admin-mobile-card-actions">
+                        <button
+                          onClick={() => handleOpenEditNEPanel(note, false)}
+                          className="admin-action-btn-mobile"
+                          style={{
+                            padding: '6px 12px',
+                            backgroundColor: '#0284c7',
+                            color: '#ffffff',
+                            border: 'none',
+                            borderRadius: '4px',
+                            fontSize: '11px',
+                            fontWeight: '600',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          Ver N.E
+                        </button>
+                        {hasCoords && (
+                          <a
+                            href={mapsUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="admin-action-btn-mobile"
+                            style={{
+                              padding: '6px 12px',
+                              backgroundColor: '#f0fdf4',
+                              color: '#16a34a',
+                              border: '1px solid #bbf7d0',
+                              borderRadius: '4px',
+                              fontSize: '11px',
+                              fontWeight: '700',
+                              textDecoration: 'none',
+                            }}
+                          >
+                            GPS
+                          </a>
+                        )}
+                        <button
+                          onClick={() => handleApproveNote(note)}
+                          className="admin-action-btn-mobile"
+                          style={{
+                            padding: '6px 12px',
+                            backgroundColor: '#d1fae5',
+                            color: '#059669',
+                            border: 'none',
+                            borderRadius: '4px',
+                            fontSize: '11px',
+                            fontWeight: '600',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          Aprobar
+                        </button>
+                        <button
+                          onClick={() => setRejectModalNote(note)}
+                          className="admin-action-btn-mobile"
+                          style={{
+                            padding: '6px 12px',
+                            backgroundColor: '#fee2e2',
+                            color: '#dc2626',
+                            border: 'none',
+                            borderRadius: '4px',
+                            fontSize: '11px',
+                            fontWeight: '600',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          Rechazar
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
           </div>
           {editingNote && !isCobranzaNEModal && (
             <div
@@ -4829,10 +5077,9 @@ ${penaltiesHtml}
         </div>
       )}
 
-      {/* PESTAÑA COBRANZA (MODIFICADA CON PESTANAS INTERNAS) */}
+      {/* PESTAÑA COBRANZA */}
       {activeTab === 'cobranza' && (
         <div style={tabContentWrapperStyle}>
-          {/* NUEVAS PESTAÑAS INTERNAS */}
           <div
             style={{
               display: 'flex',
@@ -4866,58 +5113,60 @@ ${penaltiesHtml}
               </button>
             ))}
           </div>
-          {/* SUB-PESTAÑA 1: CONTROL DE N.E. (VISTA ORIGINAL MODIFICADA) */}
+
+          {/* SUB-PESTAÑA 1: CONTROL DE N.E. */}
           {cobranzaInternalTab === 'control_ne' && (
             <>
-              {/* MODIFICACIÓN B: Alerta de Antigüedad */}
-              {(() => {
-                const today = new Date();
-                const oldNotes = cobranzaNotes.filter(note => {
-                  const created = new Date(note.created_at);
-                  const diffTime = Math.abs(today - created);
-                  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                  return diffDays >= 30;
-                }).sort((a, b) => {
-                   const daysA = Math.ceil(Math.abs(today - new Date(a.created_at)) / (1000 * 60 * 60 * 24));
-                   const daysB = Math.ceil(Math.abs(today - new Date(b.created_at)) / (1000 * 60 * 60 * 24));
-                   return daysB - daysA;
-                });
-
-                if (oldNotes.length === 0) return null;
-
-                return (
-                  <div style={{
-                    backgroundColor: '#fffbeb',
-                    border: '1px solid #fcd34d',
-                    borderRadius: '8px',
-                    padding: '12px',
-                    marginBottom: '16px'
-                  }}>
-                    <h4 style={{ margin: '0 0 8px 0', color: '#92400e', fontSize: '13px', fontWeight: 'bold' }}>
-                      ⚠️ Notas de Entrega con Antigüedad Crítica (>30 días)
-                    </h4>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                      {oldNotes.map(note => {
-                        const days = Math.ceil(Math.abs(today - new Date(note.created_at)) / (1000 * 60 * 60 * 24));
-                        let color = '#d97706'; // 30+ yellow/orange
-                        if (days >= 60) color = '#dc2626'; // red
-                        else if (days >= 45) color = '#ea580c'; // orange
-                        
-                        return (
-                          <div key={note.id} style={{ fontSize: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <span>
-                              <strong>#{note.transaction_number}</strong> - {note.client?.name}
-                            </span>
-                            <span style={{ color: color, fontWeight: 'bold' }}>
-                              {days} días
-                            </span>
-                          </div>
-                        );
-                      })}
-                    </div>
+              {/* --- SECCIÓN ALERTA DE ANTIGÜEDAD (B) --- */}
+              {agingNotes.length > 0 && (
+                <div className="admin-aging-section">
+                  <div className="admin-aging-title">
+                    <AlertTriangle size={18} color="#d97706" />
+                    Notas de Entrega con Antigüedad Crítica
                   </div>
-                );
-              })()}
+                  {agingNotes.slice(0, 10).map((n) => {
+                    let color = '#eab308';
+                    let label = '30+ días';
+                    if (n.days >= 60) {
+                      color = '#dc2626';
+                      label = '60+ días';
+                    } else if (n.days >= 45) {
+                      color = '#f97316';
+                      label = '45+ días';
+                    }
+                    return (
+                      <div key={n.id} className="admin-aging-item">
+                        <div>
+                          <strong>N.E. #{n.transaction_number}</strong> —{' '}
+                          {n.client?.name || 'Cliente'}
+                        </div>
+                        <div
+                          style={{
+                            color: color,
+                            fontWeight: '800',
+                            fontSize: '12px',
+                          }}
+                        >
+                          {n.days} días · {label}
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {agingNotes.length > 10 && (
+                    <div
+                      style={{
+                        textAlign: 'center',
+                        fontSize: '11px',
+                        color: '#78350f',
+                        marginTop: '8px',
+                        fontStyle: 'italic',
+                      }}
+                    >
+                      ...y {agingNotes.length - 10} notas más
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div
                 style={{
@@ -4991,7 +5240,6 @@ ${penaltiesHtml}
                     />
                   </div>
                 </div>
-                {/* BOTÓN MODIFICADO: AHORA ABRE MODAL GENERAL DE NOTIFICACIONES PENDIENTES */}
                 <button
                   onClick={() => {
                     const notifModal =
@@ -5038,15 +5286,8 @@ ${penaltiesHtml}
                   overflowX: 'auto',
                 }}
               >
-                <table
-                  className="mobile-cards"
-                  style={{
-                    width: '100%',
-                    borderCollapse: 'collapse',
-                    textAlign: 'left',
-                    fontSize: '13px',
-                  }}
-                >
+                {/* --- TABLA ESCRITORIO COBRANZA --- */}
+                <table className="admin-table-desktop">
                   <thead>
                     <tr
                       style={{
@@ -5121,16 +5362,11 @@ ${penaltiesHtml}
                           (n) =>
                             n.order_id === note.id && n.status === 'pending'
                         );
-                        const daysElapsed = Math.floor(
-                          (new Date() - new Date(note.created_at)) /
-                            (1000 * 60 * 60 * 24)
-                        );
-                        
-                        // MODIFICACIÓN B: Indicadores Visuales de Antigüedad
-                        let underlineStyle = 'none';
-                        if (daysElapsed >= 60) underlineStyle = '3px solid #dc2626'; // Rojo
-                        else if (daysElapsed >= 45) underlineStyle = '3px solid #ea580c'; // Naranja
-                        else if (daysElapsed >= 30) underlineStyle = '3px solid #eab308'; // Amarillo
+                        const daysElapsed = calcDaysElapsed(note.created_at);
+                        let daysClass = '';
+                        if (daysElapsed >= 60) daysClass = 'admin-days-60';
+                        else if (daysElapsed >= 45) daysClass = 'admin-days-45';
+                        else if (daysElapsed >= 30) daysClass = 'admin-days-30';
 
                         return (
                           <tr
@@ -5142,31 +5378,26 @@ ${penaltiesHtml}
                                 padding: '10px 14px',
                                 fontWeight: 'bold',
                               }}
-                              data-label="Transacción"
                             >
                               #{note.transaction_number}
                             </td>
                             <td
+                              className={daysClass}
                               style={{
                                 padding: '10px 14px',
                                 fontWeight: '700',
                                 color: daysElapsed > 15 ? '#dc2626' : '#4b5563',
-                                textDecoration: 'underline',
-                                textDecorationColor: daysElapsed >= 30 ? (daysElapsed >= 60 ? '#dc2626' : (daysElapsed >= 45 ? '#ea580c' : '#eab308')) : 'transparent',
-                                textDecorationThickness: daysElapsed >= 30 ? '3px' : '0px',
-                                textUnderlineOffset: '4px'
                               }}
-                              data-label="Días Trans."
                             >
                               {daysElapsed >= 0 ? `${daysElapsed} d` : '0 d'}
                             </td>
-                            <td style={{ padding: '10px 14px' }} data-label="Cliente">
+                            <td style={{ padding: '10px 14px' }}>
                               {note.client?.name || 'Cliente'}
                             </td>
-                            <td style={{ padding: '10px 14px' }} data-label="Vendedor">
+                            <td style={{ padding: '10px 14px' }}>
                               {note.seller?.full_name || 'Vendedor'}
                             </td>
-                            <td style={{ padding: '10px 14px' }} data-label="Modalidad">
+                            <td style={{ padding: '10px 14px' }}>
                               {String(note.payment_discount) === '53.38'
                                 ? `${globalDiscount53}% ($)`
                                 : `${globalDiscount23}% (Bs)`}
@@ -5176,11 +5407,9 @@ ${penaltiesHtml}
                                 padding: '10px 14px',
                                 fontWeight: '600',
                               }}
-                              data-label="Total ($)"
                             >
                               ${Number(note.final_price_usd).toFixed(2)}
                             </td>
-                            {/* MODIFICADO: CLICK EN ABONADO ABRE MODAL DE EDICIÓN */}
                             <td
                               style={{
                                 padding: '10px 14px',
@@ -5190,7 +5419,6 @@ ${penaltiesHtml}
                               }}
                               onClick={() => handleOpenEditAbonoModal(note)}
                               title="Clic para editar monto abonado"
-                              data-label="Abonado ($)"
                             >
                               ${Number(note.total_paid_usd || 0).toFixed(2)}
                             </td>
@@ -5200,11 +5428,10 @@ ${penaltiesHtml}
                                 color: '#dc2626',
                                 fontWeight: 'bold',
                               }}
-                              data-label="Saldo ($)"
                             >
                               ${Number(note.balance_due_usd).toFixed(2)}
                             </td>
-                            <td style={{ padding: '10px 14px' }} data-label="Estado">
+                            <td style={{ padding: '10px 14px' }}>
                               <div
                                 style={{
                                   display: 'flex',
@@ -5255,7 +5482,6 @@ ${penaltiesHtml}
                                 padding: '10px 14px',
                                 textAlign: 'center',
                               }}
-                              data-label="Acciones"
                             >
                               <div
                                 style={{
@@ -5265,13 +5491,11 @@ ${penaltiesHtml}
                                   flexWrap: 'wrap',
                                 }}
                               >
-                                {/* MODIFICADO: BOTÓN "VER NOTIF." EN LUGAR DE "APROBAR NOTIF." */}
                                 {rowNotif && (
                                   <button
                                     onClick={() =>
                                       handleOpenViewNotifModal(rowNotif)
                                     }
-                                    className="btn-responsive"
                                     style={{
                                       padding: '5px 8px',
                                       backgroundColor: '#1e40af',
@@ -5290,7 +5514,6 @@ ${penaltiesHtml}
                                   <button
                                     onClick={() => {
                                       setAbonoModalNote(note);
-                                      // Resetear formulario manual al abrir
                                       setManualAbonoForm({
                                         payment_date: new Date()
                                           .toISOString()
@@ -5301,7 +5524,6 @@ ${penaltiesHtml}
                                       });
                                       setManualAbonoFile(null);
                                     }}
-                                    className="btn-responsive"
                                     style={{
                                       padding: '5px 8px',
                                       backgroundColor: '#059669',
@@ -5318,7 +5540,6 @@ ${penaltiesHtml}
                                 )}
                                 <button
                                   onClick={() => setModalGpsNote(note)}
-                                  className="btn-responsive"
                                   style={{
                                     padding: '5px 8px',
                                     backgroundColor: '#1e3a8a',
@@ -5339,7 +5560,6 @@ ${penaltiesHtml}
                                   onClick={() =>
                                     handleOpenEditNEPanel(note, true)
                                   }
-                                  className="btn-responsive"
                                   style={{
                                     padding: '5px 8px',
                                     backgroundColor: '#4f46e5',
@@ -5359,7 +5579,6 @@ ${penaltiesHtml}
                                 <button
                                   onClick={() => handleDownloadPDF(note)}
                                   disabled={loading}
-                                  className="btn-responsive"
                                   style={{
                                     padding: '5px 8px',
                                     backgroundColor: '#881337',
@@ -5378,7 +5597,6 @@ ${penaltiesHtml}
                                 </button>
                                 <button
                                   onClick={() => handleDeleteNoteComplete(note)}
-                                  className="btn-responsive"
                                   style={{
                                     padding: '5px 8px',
                                     backgroundColor: '#dc2626',
@@ -5403,10 +5621,253 @@ ${penaltiesHtml}
                     )}
                   </tbody>
                 </table>
+
+                {/* --- TARJETAS MÓVIL COBRANZA --- */}
+                <div className="admin-mobile-cards">
+                  {sortedCobranzaNotes.length === 0 ? (
+                    <div
+                      style={{
+                        textAlign: 'center',
+                        padding: '24px',
+                        color: '#6b7280',
+                      }}
+                    >
+                      No se encontraron notas de cobranza.
+                    </div>
+                  ) : (
+                    sortedCobranzaNotes.map((note) => {
+                      const rowNotif = paymentNotifications.find(
+                        (n) =>
+                          n.order_id === note.id && n.status === 'pending'
+                      );
+                      const daysElapsed = calcDaysElapsed(note.created_at);
+                      let daysClass = '';
+                      if (daysElapsed >= 60) daysClass = 'admin-days-60';
+                      else if (daysElapsed >= 45) daysClass = 'admin-days-45';
+                      else if (daysElapsed >= 30) daysClass = 'admin-days-30';
+
+                      return (
+                        <div key={note.id} className="admin-mobile-card">
+                          <div className="admin-mobile-card-header">
+                            N.E. #{note.transaction_number}
+                          </div>
+                          <div className="admin-mobile-card-row">
+                            <span className="admin-mobile-card-label">
+                              Días Transcurridos
+                            </span>
+                            <span
+                              className={`admin-mobile-card-value ${daysClass}`}
+                              style={{
+                                color:
+                                  daysElapsed > 15 ? '#dc2626' : '#4b5563',
+                                fontWeight: '700',
+                              }}
+                            >
+                              {daysElapsed >= 0 ? `${daysElapsed} días` : '0 días'}
+                            </span>
+                          </div>
+                          <div className="admin-mobile-card-row">
+                            <span className="admin-mobile-card-label">Cliente</span>
+                            <span className="admin-mobile-card-value">
+                              {note.client?.name || 'Cliente'}
+                            </span>
+                          </div>
+                          <div className="admin-mobile-card-row">
+                            <span className="admin-mobile-card-label">Vendedor</span>
+                            <span className="admin-mobile-card-value">
+                              {note.seller?.full_name || 'Vendedor'}
+                            </span>
+                          </div>
+                          <div className="admin-mobile-card-row">
+                            <span className="admin-mobile-card-label">Modalidad</span>
+                            <span className="admin-mobile-card-value">
+                              {String(note.payment_discount) === '53.38'
+                                ? `${globalDiscount53}% ($)`
+                                : `${globalDiscount23}% (Bs)`}
+                            </span>
+                          </div>
+                          <div className="admin-mobile-card-row">
+                            <span className="admin-mobile-card-label">Total</span>
+                            <span className="admin-mobile-card-value">
+                              ${Number(note.final_price_usd).toFixed(2)}
+                            </span>
+                          </div>
+                          <div className="admin-mobile-card-row">
+                            <span className="admin-mobile-card-label">Abonado</span>
+                            <span
+                              className="admin-mobile-card-value"
+                              style={{ color: '#059669' }}
+                            >
+                              ${Number(note.total_paid_usd || 0).toFixed(2)}
+                            </span>
+                          </div>
+                          <div className="admin-mobile-card-row">
+                            <span className="admin-mobile-card-label">Saldo</span>
+                            <span
+                              className="admin-mobile-card-value"
+                              style={{ color: '#dc2626', fontWeight: '700' }}
+                            >
+                              ${Number(note.balance_due_usd).toFixed(2)}
+                            </span>
+                          </div>
+                          <div className="admin-mobile-card-row">
+                            <span className="admin-mobile-card-label">Estado</span>
+                            <span
+                              className="admin-mobile-card-value"
+                              style={{
+                                padding: '2px 8px',
+                                borderRadius: '4px',
+                                fontSize: '10px',
+                                backgroundColor:
+                                  note.payment_status === 'cerrada'
+                                    ? '#d1fae5'
+                                    : '#fef3c7',
+                                color:
+                                  note.payment_status === 'cerrada'
+                                    ? '#065f46'
+                                    : '#b45309',
+                              }}
+                            >
+                              {note.payment_status.toUpperCase()}
+                            </span>
+                          </div>
+                          {rowNotif && (
+                            <div className="admin-mobile-card-row">
+                              <span className="admin-mobile-card-label">
+                                Notificación
+                              </span>
+                              <span
+                                className="admin-mobile-card-value"
+                                style={{ color: '#b91c1c', fontWeight: '700' }}
+                              >
+                                ${Number(rowNotif.amount_usd).toFixed(2)} pend.
+                              </span>
+                            </div>
+                          )}
+                          <div className="admin-mobile-card-actions">
+                            {rowNotif && (
+                              <button
+                                onClick={() => handleOpenViewNotifModal(rowNotif)}
+                                className="admin-action-btn-mobile"
+                                style={{
+                                  padding: '5px 8px',
+                                  backgroundColor: '#1e40af',
+                                  color: '#ffffff',
+                                  border: 'none',
+                                  borderRadius: '4px',
+                                  fontSize: '11px',
+                                  fontWeight: 'bold',
+                                  cursor: 'pointer',
+                                }}
+                              >
+                                Ver Notif.
+                              </button>
+                            )}
+                            {note.payment_status !== 'cerrada' && (
+                              <button
+                                onClick={() => {
+                                  setAbonoModalNote(note);
+                                  setManualAbonoForm({
+                                    payment_date: new Date()
+                                      .toISOString()
+                                      .split('T')[0],
+                                    amount_usd: '',
+                                    payment_method: 'Pago Móvil',
+                                    reference_number: '',
+                                  });
+                                  setManualAbonoFile(null);
+                                }}
+                                className="admin-action-btn-mobile"
+                                style={{
+                                  padding: '5px 8px',
+                                  backgroundColor: '#059669',
+                                  color: '#ffffff',
+                                  border: 'none',
+                                  borderRadius: '4px',
+                                  fontSize: '11px',
+                                  fontWeight: 'bold',
+                                  cursor: 'pointer',
+                                }}
+                              >
+                                + Abono
+                              </button>
+                            )}
+                            <button
+                              onClick={() => setModalGpsNote(note)}
+                              className="admin-action-btn-mobile"
+                              style={{
+                                padding: '5px 8px',
+                                backgroundColor: '#1e3a8a',
+                                color: '#ffffff',
+                                border: 'none',
+                                borderRadius: '4px',
+                                fontSize: '11px',
+                                fontWeight: 'bold',
+                                cursor: 'pointer',
+                              }}
+                            >
+                              GPS
+                            </button>
+                            <button
+                              onClick={() => handleOpenEditNEPanel(note, true)}
+                              className="admin-action-btn-mobile"
+                              style={{
+                                padding: '5px 8px',
+                                backgroundColor: '#4f46e5',
+                                color: '#ffffff',
+                                border: 'none',
+                                borderRadius: '4px',
+                                fontSize: '11px',
+                                fontWeight: 'bold',
+                                cursor: 'pointer',
+                              }}
+                            >
+                              Ver N.E
+                            </button>
+                            <button
+                              onClick={() => handleDownloadPDF(note)}
+                              disabled={loading}
+                              className="admin-action-btn-mobile"
+                              style={{
+                                padding: '5px 8px',
+                                backgroundColor: '#881337',
+                                color: '#ffffff',
+                                border: 'none',
+                                borderRadius: '4px',
+                                fontSize: '11px',
+                                fontWeight: 'bold',
+                                cursor: 'pointer',
+                              }}
+                            >
+                              PDF
+                            </button>
+                            <button
+                              onClick={() => handleDeleteNoteComplete(note)}
+                              className="admin-action-btn-mobile"
+                              style={{
+                                padding: '5px 8px',
+                                backgroundColor: '#dc2626',
+                                color: '#ffffff',
+                                border: 'none',
+                                borderRadius: '4px',
+                                fontSize: '11px',
+                                fontWeight: 'bold',
+                                cursor: 'pointer',
+                              }}
+                            >
+                              Eliminar
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
               </div>
             </>
           )}
-          {/* SUB-PESTAÑA 2: HISTÓRICO DE PAGOS (NUEVA) */}
+
+          {/* SUB-PESTAÑA 2: HISTÓRICO DE PAGOS */}
           {cobranzaInternalTab === 'historico_pagos' && (
             <div
               style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}
@@ -5487,15 +5948,8 @@ ${penaltiesHtml}
                   overflowX: 'auto',
                 }}
               >
-                <table
-                  className="mobile-cards"
-                  style={{
-                    width: '100%',
-                    borderCollapse: 'collapse',
-                    textAlign: 'left',
-                    fontSize: '13px',
-                  }}
-                >
+                {/* --- TABLA ESCRITORIO HISTÓRICO --- */}
+                <table className="admin-table-desktop">
                   <thead>
                     <tr
                       style={{
@@ -5552,11 +6006,10 @@ ${penaltiesHtml}
                         >
                           <td
                             style={{ padding: '10px 14px', fontWeight: '600' }}
-                            data-label="Cliente"
                           >
                             {item.client_name}
                           </td>
-                          <td style={{ padding: '10px 14px' }} data-label="Fecha Pago">
+                          <td style={{ padding: '10px 14px' }}>
                             {new Date(item.payment_date).toLocaleDateString()}
                           </td>
                           <td
@@ -5565,11 +6018,10 @@ ${penaltiesHtml}
                               fontWeight: 'bold',
                               color: '#059669',
                             }}
-                            data-label="Monto ($)"
                           >
                             ${Number(item.amount_usd).toFixed(2)}
                           </td>
-                          <td style={{ padding: '10px 14px' }} data-label="Método">
+                          <td style={{ padding: '10px 14px' }}>
                             {item.payment_method}
                           </td>
                           <td
@@ -5577,13 +6029,11 @@ ${penaltiesHtml}
                               padding: '10px 14px',
                               fontFamily: 'monospace',
                             }}
-                            data-label="N° Referencia"
                           >
                             {item.reference_number}
                           </td>
                           <td
                             style={{ padding: '10px 14px', fontWeight: '600' }}
-                            data-label="Transacción"
                           >
                             #{item.transaction_folio}
                           </td>
@@ -5592,7 +6042,6 @@ ${penaltiesHtml}
                               padding: '10px 14px',
                               textAlign: 'center',
                             }}
-                            data-label="Adjunto"
                           >
                             {item.receipt_image_url ? (
                               <button
@@ -5623,7 +6072,6 @@ ${penaltiesHtml}
                               padding: '10px 14px',
                               textAlign: 'center',
                             }}
-                            data-label="Acción"
                           >
                             <button
                               onClick={async () => {
@@ -5635,13 +6083,11 @@ ${penaltiesHtml}
                                   return;
                                 try {
                                   setLoading(true);
-                                  // 1. Eliminar archivo del Storage si existe
                                   if (item.receipt_image_url) {
                                     await deleteFileFromStorage(
                                       item.receipt_image_url
                                     );
                                   }
-                                  // 2. Eliminar registro de la DB
                                   const { error } = await supabase
                                     .from('payments_independent_history')
                                     .delete()
@@ -5678,10 +6124,154 @@ ${penaltiesHtml}
                     )}
                   </tbody>
                 </table>
+
+                {/* --- TARJETAS MÓVIL HISTÓRICO --- */}
+                <div className="admin-mobile-cards">
+                  {loading ? (
+                    <div
+                      style={{
+                        textAlign: 'center',
+                        padding: '20px',
+                        color: '#6b7280',
+                      }}
+                    >
+                      Cargando histórico...
+                    </div>
+                  ) : filteredPaymentsHistory.length === 0 ? (
+                    <div
+                      style={{
+                        textAlign: 'center',
+                        padding: '24px',
+                        color: '#6b7280',
+                      }}
+                    >
+                      No hay registros en el histórico.
+                    </div>
+                  ) : (
+                    filteredPaymentsHistory.map((item) => (
+                      <div key={item.id} className="admin-mobile-card">
+                        <div className="admin-mobile-card-header">
+                          {item.client_name}
+                        </div>
+                        <div className="admin-mobile-card-row">
+                          <span className="admin-mobile-card-label">Fecha</span>
+                          <span className="admin-mobile-card-value">
+                            {new Date(item.payment_date).toLocaleDateString()}
+                          </span>
+                        </div>
+                        <div className="admin-mobile-card-row">
+                          <span className="admin-mobile-card-label">Monto</span>
+                          <span
+                            className="admin-mobile-card-value"
+                            style={{ color: '#059669', fontWeight: '700' }}
+                          >
+                            ${Number(item.amount_usd).toFixed(2)}
+                          </span>
+                        </div>
+                        <div className="admin-mobile-card-row">
+                          <span className="admin-mobile-card-label">Método</span>
+                          <span className="admin-mobile-card-value">
+                            {item.payment_method}
+                          </span>
+                        </div>
+                        <div className="admin-mobile-card-row">
+                          <span className="admin-mobile-card-label">Referencia</span>
+                          <span
+                            className="admin-mobile-card-value"
+                            style={{ fontFamily: 'monospace' }}
+                          >
+                            {item.reference_number}
+                          </span>
+                        </div>
+                        <div className="admin-mobile-card-row">
+                          <span className="admin-mobile-card-label">Folio</span>
+                          <span className="admin-mobile-card-value">
+                            #{item.transaction_folio}
+                          </span>
+                        </div>
+                        <div className="admin-mobile-card-actions">
+                          {item.receipt_image_url ? (
+                            <button
+                              onClick={() =>
+                                setImagePreviewModal(item.receipt_image_url)
+                              }
+                              className="admin-action-btn-mobile"
+                              style={{
+                                padding: '5px 8px',
+                                backgroundColor: '#eff6ff',
+                                color: '#1d4ed8',
+                                border: '1px solid #bfdbfe',
+                                borderRadius: '4px',
+                                fontSize: '11px',
+                                fontWeight: 'bold',
+                                cursor: 'pointer',
+                              }}
+                            >
+                              Ver Adjunto
+                            </button>
+                          ) : (
+                            <span
+                              style={{
+                                color: '#9ca3af',
+                                fontSize: '11px',
+                                padding: '5px 8px',
+                              }}
+                            >
+                              Sin adjunto
+                            </span>
+                          )}
+                          <button
+                            onClick={async () => {
+                              if (
+                                !window.confirm(
+                                  '¿Eliminar este registro del histórico?'
+                                )
+                              )
+                                return;
+                              try {
+                                setLoading(true);
+                                if (item.receipt_image_url) {
+                                  await deleteFileFromStorage(
+                                    item.receipt_image_url
+                                  );
+                                }
+                                const { error } = await supabase
+                                  .from('payments_independent_history')
+                                  .delete()
+                                  .eq('id', item.id);
+                                if (error) throw error;
+                                showToastSuccess('Registro eliminado.');
+                                fetchIndependentPaymentsHistory();
+                              } catch (err) {
+                                setErrorMsg('Error: ' + err.message);
+                              } finally {
+                                setLoading(false);
+                              }
+                            }}
+                            className="admin-action-btn-mobile"
+                            style={{
+                              padding: '5px 8px',
+                              backgroundColor: '#fee2e2',
+                              color: '#dc2626',
+                              border: 'none',
+                              borderRadius: '4px',
+                              fontSize: '11px',
+                              fontWeight: 'bold',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            Eliminar
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
               </div>
             </div>
           )}
-          {/* PANEL EDITABLE COBRANZA (EXISTENTE, SIN CAMBIOS) */}
+
+          {/* PANEL EDITABLE COBRANZA */}
           {editingNote && isCobranzaNEModal && (
             <div
               style={{
@@ -6304,15 +6894,8 @@ ${penaltiesHtml}
                 overflowX: 'auto',
               }}
             >
-              <table
-                className="mobile-cards"
-                style={{
-                  width: '100%',
-                  borderCollapse: 'collapse',
-                  textAlign: 'left',
-                  fontSize: '14px',
-                }}
-              >
+              {/* --- TABLA ESCRITORIO VALES --- */}
+              <table className="admin-table-desktop">
                 <thead>
                   <tr
                     style={{
@@ -6365,11 +6948,10 @@ ${penaltiesHtml}
                           key={v.id}
                           style={{ borderBottom: '1px solid #e5e7eb' }}
                         >
-                          <td style={{ padding: '12px 16px' }} data-label="Ver N.E.">
+                          <td style={{ padding: '12px 16px' }}>
                             {v.order ? (
                               <button
                                 onClick={() => handleOpenValeVistaNE(v.order)}
-                                className="btn-responsive"
                                 style={{
                                   padding: '5px 10px',
                                   backgroundColor: '#1e40af',
@@ -6394,15 +6976,14 @@ ${penaltiesHtml}
                               </span>
                             )}
                           </td>
-                          <td style={{ padding: '12px 16px' }} data-label="Fecha">
+                          <td style={{ padding: '12px 16px' }}>
                             {new Date(v.created_at).toLocaleDateString()}
                           </td>
-                          <td style={{ padding: '12px 16px' }} data-label="Vendedor">
+                          <td style={{ padding: '12px 16px' }}>
                             {v.seller?.full_name || 'Vendedor'}
                           </td>
                           <td
                             style={{ padding: '12px 16px', fontWeight: 'bold' }}
-                            data-label="N° N.E."
                           >
                             #{v.order?.transaction_number || '-'}
                           </td>
@@ -6411,7 +6992,6 @@ ${penaltiesHtml}
                               padding: '12px 16px',
                               textTransform: 'capitalize',
                             }}
-                            data-label="Categoría"
                           >
                             {v.order?.category || 'bombillos'}
                           </td>
@@ -6421,7 +7001,6 @@ ${penaltiesHtml}
                               fontWeight: 'bold',
                               color: '#059669',
                             }}
-                            data-label="Comisión"
                           >
                             ${comm.toFixed(2)}
                           </td>
@@ -6431,11 +7010,10 @@ ${penaltiesHtml}
                               color: '#dc2626',
                               fontWeight: 'bold',
                             }}
-                            data-label="Solicitado ($)"
                           >
                             ${Number(v.requested_amount_usd).toFixed(2)}
                           </td>
-                          <td style={{ padding: '12px 16px' }} data-label="Estado">
+                          <td style={{ padding: '12px 16px' }}>
                             <span
                               style={{
                                 padding: '4px 8px',
@@ -6466,7 +7044,6 @@ ${penaltiesHtml}
                               padding: '12px 16px',
                               textAlign: 'center',
                             }}
-                            data-label="Acción"
                           >
                             <div
                               style={{
@@ -6544,6 +7121,181 @@ ${penaltiesHtml}
                   )}
                 </tbody>
               </table>
+
+              {/* --- TARJETAS MÓVIL VALES --- */}
+              <div className="admin-mobile-cards">
+                {loading ? (
+                  <div
+                    style={{
+                      textAlign: 'center',
+                      padding: '20px',
+                      color: '#6b7280',
+                    }}
+                  >
+                    Cargando vales...
+                  </div>
+                ) : vales.length === 0 ? (
+                  <div
+                    style={{
+                      textAlign: 'center',
+                      padding: '20px',
+                      color: '#6b7280',
+                    }}
+                  >
+                    No hay solicitudes de vales.
+                  </div>
+                ) : (
+                  vales.map((v) => {
+                    const comm = calcOrderCommissionUSD(v.order, v.seller);
+                    return (
+                      <div key={v.id} className="admin-mobile-card">
+                        <div className="admin-mobile-card-header">
+                          Vale #{v.id.substring(0, 8)}
+                        </div>
+                        <div className="admin-mobile-card-row">
+                          <span className="admin-mobile-card-label">Fecha</span>
+                          <span className="admin-mobile-card-value">
+                            {new Date(v.created_at).toLocaleDateString()}
+                          </span>
+                        </div>
+                        <div className="admin-mobile-card-row">
+                          <span className="admin-mobile-card-label">Vendedor</span>
+                          <span className="admin-mobile-card-value">
+                            {v.seller?.full_name || 'Vendedor'}
+                          </span>
+                        </div>
+                        <div className="admin-mobile-card-row">
+                          <span className="admin-mobile-card-label">N° N.E.</span>
+                          <span className="admin-mobile-card-value">
+                            #{v.order?.transaction_number || '-'}
+                          </span>
+                        </div>
+                        <div className="admin-mobile-card-row">
+                          <span className="admin-mobile-card-label">Comisión</span>
+                          <span
+                            className="admin-mobile-card-value"
+                            style={{ color: '#059669', fontWeight: '700' }}
+                          >
+                            ${comm.toFixed(2)}
+                          </span>
+                        </div>
+                        <div className="admin-mobile-card-row">
+                          <span className="admin-mobile-card-label">Solicitado</span>
+                          <span
+                            className="admin-mobile-card-value"
+                            style={{ color: '#dc2626', fontWeight: '700' }}
+                          >
+                            ${Number(v.requested_amount_usd).toFixed(2)}
+                          </span>
+                        </div>
+                        <div className="admin-mobile-card-row">
+                          <span className="admin-mobile-card-label">Estado</span>
+                          <span
+                            className="admin-mobile-card-value"
+                            style={{
+                              padding: '2px 8px',
+                              borderRadius: '4px',
+                              fontSize: '10px',
+                              backgroundColor:
+                                v.status === 'aprobada'
+                                  ? '#d1fae5'
+                                  : v.status === 'rechazada' ||
+                                    v.status === 'rechazado'
+                                  ? '#fee2e2'
+                                  : '#fef3c7',
+                              color:
+                                v.status === 'aprobada'
+                                  ? '#065f46'
+                                  : v.status === 'rechazada' ||
+                                    v.status === 'rechazado'
+                                  ? '#b91c1c'
+                                  : '#b45309',
+                            }}
+                          >
+                            {v.status.toUpperCase()}
+                          </span>
+                        </div>
+                        <div className="admin-mobile-card-actions">
+                          {v.order && (
+                            <button
+                              onClick={() => handleOpenValeVistaNE(v.order)}
+                              className="admin-action-btn-mobile"
+                              style={{
+                                padding: '5px 10px',
+                                backgroundColor: '#1e40af',
+                                color: '#ffffff',
+                                border: 'none',
+                                borderRadius: '4px',
+                                fontSize: '11px',
+                                fontWeight: '600',
+                                cursor: 'pointer',
+                              }}
+                            >
+                              Ver N.E
+                            </button>
+                          )}
+                          {v.status === 'pendiente' && (
+                            <>
+                              <button
+                                onClick={() => handleValeAction(v.id, 'aprobada')}
+                                className="admin-action-btn-mobile"
+                                style={{
+                                  padding: '5px 10px',
+                                  backgroundColor: '#059669',
+                                  color: '#ffffff',
+                                  border: 'none',
+                                  borderRadius: '4px',
+                                  fontSize: '11px',
+                                  fontWeight: '600',
+                                  cursor: 'pointer',
+                                }}
+                              >
+                                Aprobar
+                              </button>
+                              <button
+                                onClick={() =>
+                                  handleValeAction(v.id, 'rechazada')
+                                }
+                                className="admin-action-btn-mobile"
+                                style={{
+                                  padding: '5px 10px',
+                                  backgroundColor: '#dc2626',
+                                  color: '#ffffff',
+                                  border: 'none',
+                                  borderRadius: '4px',
+                                  fontSize: '11px',
+                                  fontWeight: '600',
+                                  cursor: 'pointer',
+                                }}
+                              >
+                                Rechazar
+                              </button>
+                            </>
+                          )}
+                          {v.status !== 'pendiente' && (
+                            <button
+                              onClick={() => handleDeleteVale(v.id)}
+                              className="admin-action-btn-mobile"
+                              style={{
+                                padding: '5px 10px',
+                                backgroundColor: '#dc2626',
+                                color: '#ffffff',
+                                border: 'none',
+                                borderRadius: '4px',
+                                fontSize: '11px',
+                                fontWeight: 'bold',
+                                cursor: 'pointer',
+                              }}
+                            >
+                              Eliminar
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
             </div>
           )}
           {valesSubTab === 'asignar_vale' && (
@@ -6677,15 +7429,8 @@ ${penaltiesHtml}
                 overflowX: 'auto',
               }}
             >
-              <table
-                className="mobile-cards"
-                style={{
-                  width: '100%',
-                  borderCollapse: 'collapse',
-                  textAlign: 'left',
-                  fontSize: '14px',
-                }}
-              >
+              {/* --- TABLA ESCRITORIO PENALIZACIONES --- */}
+              <table className="admin-table-desktop">
                 <thead>
                   <tr
                     style={{
@@ -6746,18 +7491,16 @@ ${penaltiesHtml}
                           key={pen.id}
                           style={{ borderBottom: '1px solid #e5e7eb' }}
                         >
-                          <td style={{ padding: '12px 16px' }} data-label="Fecha">
+                          <td style={{ padding: '12px 16px' }}>
                             {new Date(pen.created_at).toLocaleDateString()}
                           </td>
                           <td
                             style={{ padding: '12px 16px', fontWeight: '500' }}
-                            data-label="Vendedor"
                           >
                             {sellerName}
                           </td>
                           <td
                             style={{ padding: '12px 16px', fontWeight: 'bold' }}
-                            data-label="N° N.E."
                           >
                             {neNumberDisplay}
                           </td>
@@ -6767,11 +7510,10 @@ ${penaltiesHtml}
                               fontWeight: 'bold',
                               color: '#b91c1c',
                             }}
-                            data-label="Monto ($)"
                           >
                             -${Number(pen.amount || 0).toFixed(2)}
                           </td>
-                          <td style={{ padding: '12px 16px' }} data-label="Estado">
+                          <td style={{ padding: '12px 16px' }}>
                             <span
                               style={{
                                 padding: '4px 8px',
@@ -6792,7 +7534,6 @@ ${penaltiesHtml}
                               padding: '12px 16px',
                               textAlign: 'center',
                             }}
-                            data-label="Acción"
                           >
                             <button
                               onClick={() => handleDeletePenalty(pen.id)}
@@ -6816,6 +7557,112 @@ ${penaltiesHtml}
                   )}
                 </tbody>
               </table>
+
+              {/* --- TARJETAS MÓVIL PENALIZACIONES --- */}
+              <div className="admin-mobile-cards">
+                {penalties.length === 0 ? (
+                  <div
+                    style={{
+                      textAlign: 'center',
+                      padding: '20px',
+                      color: '#6b7280',
+                    }}
+                  >
+                    No hay penalizaciones registradas.
+                  </div>
+                ) : (
+                  penalties.map((pen) => {
+                    const isCobrada =
+                      pen.status === 'cobrada' ||
+                      pen.status === 'paid' ||
+                      pen.status === 'aprobada_pagada';
+                    const displayStatus = isCobrada ? 'COBRADA' : 'PENDIENTE';
+                    const sellerName =
+                      pen.seller?.full_name ||
+                      sellersList.find(
+                        (s) => String(s.id) === String(pen.seller_id)
+                      )?.full_name ||
+                      'Vendedor';
+                    const matchedOrder = allOrdersList.find(
+                      (o) => String(o.id) === String(pen.order_id)
+                    );
+                    const neNumberDisplay = matchedOrder?.transaction_number
+                      ? `#${matchedOrder.transaction_number}`
+                      : pen.linked_order?.transaction_number
+                      ? `#${pen.linked_order.transaction_number}`
+                      : pen.order?.transaction_number
+                      ? `#${pen.order.transaction_number}`
+                      : 'N/A';
+                    return (
+                      <div key={pen.id} className="admin-mobile-card">
+                        <div className="admin-mobile-card-header">
+                          Penalización {neNumberDisplay}
+                        </div>
+                        <div className="admin-mobile-card-row">
+                          <span className="admin-mobile-card-label">Fecha</span>
+                          <span className="admin-mobile-card-value">
+                            {new Date(pen.created_at).toLocaleDateString()}
+                          </span>
+                        </div>
+                        <div className="admin-mobile-card-row">
+                          <span className="admin-mobile-card-label">Vendedor</span>
+                          <span className="admin-mobile-card-value">
+                            {sellerName}
+                          </span>
+                        </div>
+                        <div className="admin-mobile-card-row">
+                          <span className="admin-mobile-card-label">N° N.E.</span>
+                          <span className="admin-mobile-card-value">
+                            {neNumberDisplay}
+                          </span>
+                        </div>
+                        <div className="admin-mobile-card-row">
+                          <span className="admin-mobile-card-label">Monto</span>
+                          <span
+                            className="admin-mobile-card-value"
+                            style={{ color: '#b91c1c', fontWeight: '700' }}
+                          >
+                            -${Number(pen.amount || 0).toFixed(2)}
+                          </span>
+                        </div>
+                        <div className="admin-mobile-card-row">
+                          <span className="admin-mobile-card-label">Estado</span>
+                          <span
+                            className="admin-mobile-card-value"
+                            style={{
+                              padding: '2px 8px',
+                              borderRadius: '4px',
+                              fontSize: '10px',
+                              backgroundColor: isCobrada ? '#d1fae5' : '#fef3c7',
+                              color: isCobrada ? '#065f46' : '#b45309',
+                            }}
+                          >
+                            {displayStatus}
+                          </span>
+                        </div>
+                        <div className="admin-mobile-card-actions">
+                          <button
+                            onClick={() => handleDeletePenalty(pen.id)}
+                            className="admin-action-btn-mobile"
+                            style={{
+                              padding: '5px 10px',
+                              backgroundColor: '#dc2626',
+                              color: '#ffffff',
+                              border: 'none',
+                              borderRadius: '4px',
+                              fontSize: '11px',
+                              fontWeight: 'bold',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            Eliminar
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
             </div>
           )}
           {valesSubTab === 'asignar_penalidad' && (
@@ -7452,15 +8299,8 @@ ${penaltiesHtml}
                   overflowX: 'auto',
                 }}
               >
-                <table
-                  className="mobile-cards"
-                  style={{
-                    width: '100%',
-                    borderCollapse: 'collapse',
-                    textAlign: 'left',
-                    fontSize: '13px',
-                  }}
-                >
+                {/* --- TABLA ESCRITORIO QUINCENA --- */}
+                <table className="admin-table-desktop">
                   <thead>
                     <tr
                       style={{
@@ -7541,7 +8381,6 @@ ${penaltiesHtml}
                                 padding: '12px 14px',
                                 fontWeight: 'bold',
                               }}
-                              data-label="Usuario"
                             >
                               {usr.full_name}
                             </td>
@@ -7550,18 +8389,17 @@ ${penaltiesHtml}
                                 padding: '12px 14px',
                                 textTransform: 'capitalize',
                               }}
-                              data-label="Rol"
                             >
                               {usr.role}
                             </td>
-                            <td style={{ padding: '12px 14px' }} data-label="Asignados">
+                            <td style={{ padding: '12px 14px' }}>
                               <span
                                 style={{ fontWeight: '700', color: '#1e40af' }}
                               >
                                 {assignedLabel}
                               </span>
                             </td>
-                            <td style={{ padding: '12px 14px' }} data-label="Sueldo Base">
+                            <td style={{ padding: '12px 14px' }}>
                               ${Number(usr.sueldo_fijo_usd || 0).toFixed(2)}
                             </td>
                             <td
@@ -7574,14 +8412,13 @@ ${penaltiesHtml}
                                     ? '#059669'
                                     : '#6b7280',
                               }}
-                              data-label="N.E Cerradas"
                             >
                               {userClosedNotes.length}
                             </td>
-                            <td style={{ padding: '12px 14px' }} data-label="% Bombillos">
+                            <td style={{ padding: '12px 14px' }}>
                               {usr.pct_bombillos ?? 3}%
                             </td>
-                            <td style={{ padding: '12px 14px' }} data-label="% Fluidos">
+                            <td style={{ padding: '12px 14px' }}>
                               {usr.pct_fluidos ?? 2}%
                             </td>
                             <td
@@ -7590,7 +8427,6 @@ ${penaltiesHtml}
                                 fontWeight: '700',
                                 color: '#059669',
                               }}
-                              data-label="Neto 53.38%"
                             >
                               ${details.comm53NetUsd.toFixed(2)}
                             </td>
@@ -7600,7 +8436,6 @@ ${penaltiesHtml}
                                 fontWeight: '700',
                                 color: '#0369a1',
                               }}
-                              data-label="Neto 23.08%"
                             >
                               ${details.comm23NetUsd.toFixed(2)}
                             </td>
@@ -7609,7 +8444,6 @@ ${penaltiesHtml}
                                 padding: '12px 14px',
                                 textAlign: 'center',
                               }}
-                              data-label="Acciones"
                             >
                               <button
                                 onClick={() => handleOpenSettlementModal(usr)}
@@ -7633,6 +8467,145 @@ ${penaltiesHtml}
                     )}
                   </tbody>
                 </table>
+
+                {/* --- TARJETAS MÓVIL QUINCENA --- */}
+                <div className="admin-mobile-cards">
+                  {loading ? (
+                    <div
+                      style={{
+                        textAlign: 'center',
+                        padding: '20px',
+                        color: '#6b7280',
+                      }}
+                    >
+                      Cargando datos quincenales...
+                    </div>
+                  ) : liquidaciones.length === 0 ? (
+                    <div
+                      style={{
+                        textAlign: 'center',
+                        padding: '20px',
+                        color: '#6b7280',
+                      }}
+                    >
+                      No se encontraron perfiles para liquidar.
+                    </div>
+                  ) : (
+                    liquidaciones.map((usr) => {
+                      const userClosedNotes = getClosedNotesForUserAndCycle(
+                        usr.id
+                      );
+                      const userVales = getApprovedValesForUserAndCycle(usr.id);
+                      const userPenalties =
+                        getApprovedPenaltiesForUserAndCycle(usr.id);
+                      const details = calculateUserSettlementDetails(
+                        usr,
+                        userClosedNotes,
+                        userVales,
+                        userPenalties,
+                        sueldoFijoCurrency,
+                        bcvRateUsd,
+                        penaltyChargeMethod
+                      );
+                      const assignedLabel =
+                        details.hierarchyData.assignedLabelText;
+                      return (
+                        <div key={usr.id} className="admin-mobile-card">
+                          <div className="admin-mobile-card-header">
+                            {usr.full_name}
+                          </div>
+                          <div className="admin-mobile-card-row">
+                            <span className="admin-mobile-card-label">Rol</span>
+                            <span
+                              className="admin-mobile-card-value"
+                              style={{ textTransform: 'capitalize' }}
+                            >
+                              {usr.role}
+                            </span>
+                          </div>
+                          <div className="admin-mobile-card-row">
+                            <span className="admin-mobile-card-label">Asignados</span>
+                            <span
+                              className="admin-mobile-card-value"
+                              style={{ color: '#1e40af', fontWeight: '700' }}
+                            >
+                              {assignedLabel}
+                            </span>
+                          </div>
+                          <div className="admin-mobile-card-row">
+                            <span className="admin-mobile-card-label">Sueldo Fijo</span>
+                            <span className="admin-mobile-card-value">
+                              ${Number(usr.sueldo_fijo_usd || 0).toFixed(2)}
+                            </span>
+                          </div>
+                          <div className="admin-mobile-card-row">
+                            <span className="admin-mobile-card-label">N.E. Cerradas</span>
+                            <span
+                              className="admin-mobile-card-value"
+                              style={{
+                                color:
+                                  userClosedNotes.length > 0
+                                    ? '#059669'
+                                    : '#6b7280',
+                                fontWeight: '700',
+                              }}
+                            >
+                              {userClosedNotes.length}
+                            </span>
+                          </div>
+                          <div className="admin-mobile-card-row">
+                            <span className="admin-mobile-card-label">% Bombillos</span>
+                            <span className="admin-mobile-card-value">
+                              {usr.pct_bombillos ?? 3}%
+                            </span>
+                          </div>
+                          <div className="admin-mobile-card-row">
+                            <span className="admin-mobile-card-label">% Fluidos</span>
+                            <span className="admin-mobile-card-value">
+                              {usr.pct_fluidos ?? 2}%
+                            </span>
+                          </div>
+                          <div className="admin-mobile-card-row">
+                            <span className="admin-mobile-card-label">Neto 53.38%</span>
+                            <span
+                              className="admin-mobile-card-value"
+                              style={{ color: '#059669', fontWeight: '700' }}
+                            >
+                              ${details.comm53NetUsd.toFixed(2)}
+                            </span>
+                          </div>
+                          <div className="admin-mobile-card-row">
+                            <span className="admin-mobile-card-label">Neto 23.08%</span>
+                            <span
+                              className="admin-mobile-card-value"
+                              style={{ color: '#0369a1', fontWeight: '700' }}
+                            >
+                              ${details.comm23NetUsd.toFixed(2)}
+                            </span>
+                          </div>
+                          <div className="admin-mobile-card-actions">
+                            <button
+                              onClick={() => handleOpenSettlementModal(usr)}
+                              className="admin-action-btn-mobile"
+                              style={{
+                                padding: '6px 12px',
+                                backgroundColor: '#111827',
+                                color: '#ffffff',
+                                border: 'none',
+                                borderRadius: '4px',
+                                fontSize: '11px',
+                                fontWeight: 'bold',
+                                cursor: 'pointer',
+                              }}
+                            >
+                              Ver Detalle / Factura
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
               </div>
             </>
           ) : (
@@ -7693,15 +8666,8 @@ ${penaltiesHtml}
                   overflowX: 'auto',
                 }}
               >
-                <table
-                  className="mobile-cards"
-                  style={{
-                    width: '100%',
-                    borderCollapse: 'collapse',
-                    textAlign: 'left',
-                    fontSize: '13px',
-                  }}
-                >
+                {/* --- TABLA ESCRITORIO HISTORIAL --- */}
+                <table className="admin-table-desktop">
                   <thead>
                     <tr
                       style={{
@@ -7753,20 +8719,19 @@ ${penaltiesHtml}
                         >
                           <td
                             style={{ padding: '12px 14px', fontWeight: 'bold' }}
-                            data-label="ID Liquidación"
                           >
                             {item.id}
                           </td>
-                          <td style={{ padding: '12px 14px' }} data-label="Fecha Pago">
+                          <td style={{ padding: '12px 14px' }}>
                             {item.datePaid}
                           </td>
-                          <td style={{ padding: '12px 14px' }} data-label="Usuario">
+                          <td style={{ padding: '12px 14px' }}>
                             {item.user?.full_name}
                           </td>
-                          <td style={{ padding: '12px 14px' }} data-label="Tasa BCV">
+                          <td style={{ padding: '12px 14px' }}>
                             {Number(item.bcvRate).toFixed(2)}
                           </td>
-                          <td style={{ padding: '12px 14px' }} data-label="Total N.E.">
+                          <td style={{ padding: '12px 14px' }}>
                             ${item.totalNeAmount.toFixed(2)}
                           </td>
                           <td
@@ -7775,7 +8740,6 @@ ${penaltiesHtml}
                               color: '#059669',
                               fontWeight: 'bold',
                             }}
-                            data-label="Neto 53.38%"
                           >
                             ${item.comm53Net.toFixed(2)}
                           </td>
@@ -7785,7 +8749,6 @@ ${penaltiesHtml}
                               color: '#0369a1',
                               fontWeight: 'bold',
                             }}
-                            data-label="Neto 23.08%"
                           >
                             ${item.comm23Net.toFixed(2)}
                           </td>
@@ -7795,7 +8758,6 @@ ${penaltiesHtml}
                               color: '#111827',
                               fontWeight: 'bold',
                             }}
-                            data-label="Total Eq."
                           >
                             ${item.totalEquivalentUsd.toFixed(2)}
                           </td>
@@ -7804,7 +8766,6 @@ ${penaltiesHtml}
                               padding: '12px 14px',
                               textAlign: 'center',
                             }}
-                            data-label="Acciones"
                           >
                             <div
                               style={{
@@ -7882,13 +8843,141 @@ ${penaltiesHtml}
                     )}
                   </tbody>
                 </table>
+
+                {/* --- TARJETAS MÓVIL HISTORIAL LIQUIDACIÓN --- */}
+                <div className="admin-mobile-cards">
+                  {filteredHistory.length === 0 ? (
+                    <div
+                      style={{
+                        padding: '24px',
+                        textAlign: 'center',
+                        color: '#6b7280',
+                      }}
+                    >
+                      No hay historial de pago registrado.
+                    </div>
+                  ) : (
+                    filteredHistory.map((item) => (
+                      <div key={item.id} className="admin-mobile-card">
+                        <div className="admin-mobile-card-header">
+                          {item.id}
+                        </div>
+                        <div className="admin-mobile-card-row">
+                          <span className="admin-mobile-card-label">Fecha Pago</span>
+                          <span className="admin-mobile-card-value">
+                            {item.datePaid}
+                          </span>
+                        </div>
+                        <div className="admin-mobile-card-row">
+                          <span className="admin-mobile-card-label">Usuario</span>
+                          <span className="admin-mobile-card-value">
+                            {item.user?.full_name}
+                          </span>
+                        </div>
+                        <div className="admin-mobile-card-row">
+                          <span className="admin-mobile-card-label">Tasa BCV</span>
+                          <span className="admin-mobile-card-value">
+                            {Number(item.bcvRate).toFixed(2)}
+                          </span>
+                        </div>
+                        <div className="admin-mobile-card-row">
+                          <span className="admin-mobile-card-label">Total N.E.</span>
+                          <span className="admin-mobile-card-value">
+                            ${item.totalNeAmount.toFixed(2)}
+                          </span>
+                        </div>
+                        <div className="admin-mobile-card-row">
+                          <span className="admin-mobile-card-label">Neto 53.38%</span>
+                          <span
+                            className="admin-mobile-card-value"
+                            style={{ color: '#059669', fontWeight: '700' }}
+                          >
+                            ${item.comm53Net.toFixed(2)}
+                          </span>
+                        </div>
+                        <div className="admin-mobile-card-row">
+                          <span className="admin-mobile-card-label">Neto 23.08%</span>
+                          <span
+                            className="admin-mobile-card-value"
+                            style={{ color: '#0369a1', fontWeight: '700' }}
+                          >
+                            ${item.comm23Net.toFixed(2)}
+                          </span>
+                        </div>
+                        <div className="admin-mobile-card-row">
+                          <span className="admin-mobile-card-label">Total Eq.</span>
+                          <span
+                            className="admin-mobile-card-value"
+                            style={{ color: '#111827', fontWeight: '700' }}
+                          >
+                            ${item.totalEquivalentUsd.toFixed(2)}
+                          </span>
+                        </div>
+                        <div className="admin-mobile-card-actions">
+                          <button
+                            onClick={() =>
+                              handleOpenCapturedHistoryInvoiceModal(item)
+                            }
+                            className="admin-action-btn-mobile"
+                            style={{
+                              padding: '6px 10px',
+                              backgroundColor: '#1e40af',
+                              color: '#ffffff',
+                              border: 'none',
+                              borderRadius: '4px',
+                              fontSize: '11px',
+                              fontWeight: 'bold',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            Ver Factura
+                          </button>
+                          <button
+                            onClick={() => handlePrintCapturedInvoicePDF(item)}
+                            className="admin-action-btn-mobile"
+                            style={{
+                              padding: '6px 10px',
+                              backgroundColor: '#881337',
+                              color: '#ffffff',
+                              border: 'none',
+                              borderRadius: '4px',
+                              fontSize: '11px',
+                              fontWeight: 'bold',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            PDF
+                          </button>
+                          <button
+                            onClick={() =>
+                              handleDeleteHistoryInvoice(item.dbId, item.id)
+                            }
+                            className="admin-action-btn-mobile"
+                            style={{
+                              padding: '6px 10px',
+                              backgroundColor: '#dc2626',
+                              color: '#ffffff',
+                              border: 'none',
+                              borderRadius: '4px',
+                              fontSize: '11px',
+                              fontWeight: 'bold',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            Eliminar
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
               </div>
             </div>
           )}
         </div>
       )}
 
-      {/* MODAL DE LIQUIDACIÓN QUINCENAL CORREGIDO */}
+      {/* MODAL DE LIQUIDACIÓN QUINCENAL */}
       {settlementModalData && (
         <div
           style={{
@@ -8008,7 +9097,7 @@ ${penaltiesHtml}
                       display: 'block',
                     }}
                   >
-                    Sueldo Fijo Base Configurado (Quincenal)
+                    Sueldo Fijo Base Configurado (mitad del ciclo)
                   </span>
                   <span
                     style={{
@@ -8180,7 +9269,6 @@ ${penaltiesHtml}
                 </tbody>
               </table>
             </div>
-            {/* COMISIONES DE JERARQUÍA CORREGIDAS CON MODALIDAD (%) */}
             {settlementModalData.hierarchyData?.evaluatedOrders?.length > 0 && (
               <>
                 <h3
@@ -8279,7 +9367,6 @@ ${penaltiesHtml}
                 </div>
               </>
             )}
-            {/* DEDUCCIONES */}
             {(settlementModalData.vales.length > 0 ||
               settlementModalData.penalties?.length > 0) && (
               <>
@@ -8413,7 +9500,6 @@ ${penaltiesHtml}
                 </div>
               </>
             )}
-            {/* SECCIÓN FINAL CON JERARQUÍA MOVIDA A SU RESPECTIVO SITIO */}
             <div
               style={{
                 display: 'grid',
@@ -8422,7 +9508,6 @@ ${penaltiesHtml}
                 marginBottom: '16px',
               }}
             >
-              {/* Bloque N.E. con 53.38% (Pago $) */}
               <div
                 style={{
                   background: '#f0fdf4',
@@ -8535,7 +9620,6 @@ ${penaltiesHtml}
                   </span>
                 </div>
               </div>
-              {/* Bloque N.E. 23.08% */}
               <div
                 style={{
                   background: '#f0f9ff',
@@ -8813,6 +9897,7 @@ ${penaltiesHtml}
           </div>
         </div>
       )}
+
       {/* Modal Historial: Ver Factura Capturada */}
       {historyInvoiceModalData && (
         <div
@@ -8900,7 +9985,8 @@ ${penaltiesHtml}
           </div>
         </div>
       )}
-      {/* MODAL FLOTANTE DE NOTIFICACIONES DE ABONO (GENERAL) */}
+
+      {/* MODAL FLOTANTE DE NOTIFICACIONES DE ABONO */}
       <div
         id="notif-modal-popup"
         style={{
@@ -8993,7 +10079,6 @@ ${penaltiesHtml}
                       </p>
                     </div>
                     <div style={{ display: 'flex', gap: '6px' }}>
-                      {/* MODIFICADO: BOTÓN VER NOTIF EN LUGAR DE APROBAR DIRECTO */}
                       <button
                         onClick={() => handleOpenViewNotifModal(notif)}
                         style={{
@@ -9016,7 +10101,8 @@ ${penaltiesHtml}
           )}
         </div>
       </div>
-      {/* NUEVO MODAL: VER DETALLE NOTIFICACIÓN CON DETECCIÓN DE DUPLICADOS Y BOTÓN ELIMINAR */}
+
+      {/* MODAL VER DETALLE NOTIFICACIÓN */}
       {viewNotifModalData && (
         <div
           style={{
@@ -9067,7 +10153,6 @@ ${penaltiesHtml}
                 <X size={20} />
               </button>
             </div>
-            {/* ALERTA DE DUPLICADO */}
             {duplicateWarning && (
               <div
                 style={{
@@ -9353,7 +10438,8 @@ ${penaltiesHtml}
           </div>
         </div>
       )}
-      {/* NUEVO MODAL: EDITAR MONTO ABONADO */}
+
+      {/* MODAL EDITAR MONTO ABONADO */}
       {editAbonoModalData && (
         <div
           style={{
@@ -9471,7 +10557,8 @@ ${penaltiesHtml}
           </div>
         </div>
       )}
-      {/* MODAL DE ABONO MANUAL (CONTROL DE N.E.) */}
+
+      {/* MODAL DE ABONO MANUAL */}
       {abonoModalNote && (
         <div
           style={{
@@ -9670,7 +10757,6 @@ ${penaltiesHtml}
                 >
                   Adjuntar Comprobante (Opcional)
                 </label>
-                {/* Input real oculto */}
                 <input
                   type="file"
                   id="manual_abono_file_input"
@@ -9678,7 +10764,6 @@ ${penaltiesHtml}
                   onChange={(e) => setManualAbonoFile(e.target.files[0])}
                   style={{ display: 'none' }}
                 />
-                {/* Botón estilizado tipo SalesModule */}
                 <label
                   htmlFor="manual_abono_file_input"
                   style={{
@@ -9759,6 +10844,7 @@ ${penaltiesHtml}
           </div>
         </div>
       )}
+
       {/* MODAL DE BORRADO MASIVO */}
       {bulkDeleteModal.open && (
         <div
@@ -9933,7 +11019,8 @@ ${penaltiesHtml}
           </div>
         </div>
       )}
-      {/* NUEVO MODAL: PREVISUALIZACIÓN DE IMAGEN */}
+
+      {/* MODAL PREVISUALIZACIÓN DE IMAGEN */}
       {imagePreviewModal && (
         <div
           style={{
@@ -10014,7 +11101,8 @@ ${penaltiesHtml}
           </div>
         </div>
       )}
-      {/* MODALES EXISTENTES (RECHAZO, GPS) SIN CAMBIOS */}
+
+      {/* MODAL RECHAZO */}
       {rejectModalNote && (
         <div
           style={{
@@ -10044,7 +11132,7 @@ ${penaltiesHtml}
                 margin: '0 0 16px 0',
               }}
             >
-              Rechazar Nota #${rejectModalNote.transaction_number}
+              Rechazar Nota #{rejectModalNote.transaction_number}
             </h2>
             <form
               onSubmit={handleRejectNote}
@@ -10118,6 +11206,8 @@ ${penaltiesHtml}
           </div>
         </div>
       )}
+
+      {/* MODAL GPS */}
       {modalGpsNote && (
         <div
           style={{
