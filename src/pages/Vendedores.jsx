@@ -2512,6 +2512,10 @@ export default function Vendedores({ currentUser }) {
 
         /* Media queries para pantallas móviles (Breakpoint: 768px) */
         @media (max-width: 768px) {
+          body {
+            max-height: 100vh;
+            overflow-y: auto !important;
+          }
           .desktop-tabs { display: none !important; }
           .mobile-dropdown-menu { display: block !important; }
           .users-table-container { overflow-x: hidden !important; }
@@ -2520,15 +2524,17 @@ export default function Vendedores({ currentUser }) {
           .desktop-cell-normal { display: none !important; }
           .mobile-cell-stacked { display: flex !important; flex-direction: column; gap: 6px; padding: 12px !important; }
           
-          /* Paneles informativos superiores cuadrados y centrados en móvil */
+          /* Paneles informativos superiores cuadrados y limitados al 20% máx de altura en móvil */
           .kpi-card, .kpi-card-responsive {
-            aspect-ratio: 1 / 1 !important;
+            height: auto !important;
+            max-height: 20vh !important;
             padding: 8px !important;
             text-align: center !important;
             display: flex !important;
             flex-direction: column !important;
             justify-content: center !important;
             align-items: center !important;
+            overflow: hidden !important;
           }
           .kpi-card div, .kpi-card-responsive div {
             text-align: center !important;
