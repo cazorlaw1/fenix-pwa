@@ -188,6 +188,7 @@ export default function Profile() {
 
   return (
     <div
+      className="profile-outer-container"
       style={{
         minHeight: 'calc(100vh - 65px)',
         backgroundColor: '#ffffff',
@@ -199,6 +200,7 @@ export default function Profile() {
       }}
     >
       <div
+        className="profile-card-container"
         style={{
           maxWidth: '600px',
           width: '100%',
@@ -401,7 +403,7 @@ export default function Profile() {
               fontWeight: '500',
             }}
           >
-            ⚠️ Tienes el perfil incompleto. Por favor completa tu C.I., Ciudad y
+            ⚠️️ Tienes el perfil incompleto. Por favor completa tu C.I., Ciudad y
             adjunta tus documentos.
           </div>
         )}
@@ -863,6 +865,20 @@ export default function Profile() {
         @keyframes spin {
           from { transform: rotate(0deg); }
           to { transform: rotate(360deg); }
+        }
+
+        @media (max-width: 768px) {
+          .profile-outer-container {
+            min-height: auto !important;
+            padding: 10px 12px !important;
+            align-items: flex-start !important;
+          }
+          .profile-card-container {
+            padding: 16px !important;
+            border-radius: 12px !important;
+            box-shadow: none !important;
+            border: none !important;
+          }
         }
       `}</style>
     </div>
