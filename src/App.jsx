@@ -18,7 +18,6 @@ import { supabase } from './lib/supabase';
 import Dashboard from './pages/Dashboard';
 import Login from './pages/Login';
 import PendingApproval from './pages/PendingApproval';
-import UpdatePassword from './pages/UpdatePassword'; // <--- Importado para recuperación de contraseña
 import Profile from './pages/Profile';
 import Users from './pages/Users';
 import Inventory from './pages/Inventory';
@@ -120,6 +119,8 @@ function Layout({ children, activeTab, setActiveTab }) {
             overflowY: 'auto',
             overflowX: 'hidden',
             width: '100%',
+            height: '100%',
+            boxSizing: 'border-box',
           }}
         >
           {children}
@@ -185,9 +186,6 @@ export default function App() {
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/pending" element={<PendingApproval />} />
-          
-          {/* Ruta pública para actualizar la contraseña desde el correo */}
-          <Route path="/update-password" element={<UpdatePassword />} />
           
           {/* Ruta pública para manejar el retorno seguro de Google OAuth */}
           <Route path="/auth/callback" element={<AuthCallback />} />
