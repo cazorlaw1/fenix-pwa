@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import {
   Search,
@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 
 export default function Vendedores({ currentUser }) {
-  // A. Persistencia y Navegación de Pestañas
+  // Inicialización de pestaña con prioridad: URL (?tab=...) > localStorage > predeterminada ('visitas')
   const [activeTab, setActiveTab] = useState(() => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
@@ -36,6 +36,11 @@ export default function Vendedores({ currentUser }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [teamClients, setTeamClients] = useState([]);
   const [teamPotentials, setTeamPotentials] = useState([]);
+
+  // Estado para el Menú Dropdown en Móvil
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const mobileMenuRef = useRef(null);
+
   const [historyModal, setHistoryModal] = useState({
     open: false,
     seller: null,
@@ -46,28 +51,6 @@ export default function Vendedores({ currentUser }) {
     url: '',
     title: '',
   });
-
-  // C. Menú Dropdown en Móvil - Estados obligatorios
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const mobileMenuRef = useRef(null);
-
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (mobileMenuRef.current && !mobileMenuRef.current.contains(event.target)) {
-        setIsMobileMenuOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  // Sincronizar pestaña activa con localStorage y URL
-  useEffect(() => {
-    localStorage.setItem('vendedores_active_tab', activeTab);
-    const url = new URL(window.location);
-    url.searchParams.set('tab', activeTab);
-    window.history.replaceState({}, '', url);
-  }, [activeTab]);
 
   // ===== Estados de ordenamiento por tabla =====
   const [sortConfig, setSortConfig] = useState({
@@ -82,6 +65,30 @@ export default function Vendedores({ currentUser }) {
     official: true,
     potential: true,
   });
+
+  // Efecto para guardar en localStorage y actualizar la URL sin recargar
+  useEffect(() => {
+    localStorage.setItem('vendedores_active_tab', activeTab);
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location);
+      url.searchParams.set('tab', activeTab);
+      window.history.replaceState({}, '', url);
+    }
+  }, [activeTab]);
+
+  // Efecto para cerrar el menú desplegable móvil al hacer clic fuera
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (
+        mobileMenuRef.current &&
+        !mobileMenuRef.current.contains(event.target)
+      ) {
+        setIsMobileMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   useEffect(() => {
     fetchVendedoresData();
@@ -507,7 +514,7 @@ export default function Vendedores({ currentUser }) {
     ),
   };
 
-  const tabsConfig = [
+  const tabsList = [
     {
       key: 'visitas',
       label: 'Visitas del Equipo',
@@ -551,7 +558,7 @@ export default function Vendedores({ currentUser }) {
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <TrendingUp size={24} color="#DC2626" strokeWidth={2.5} />
+          <TrendingUp size={24} color="#dc2626" strokeWidth={2.5} />
           <h2
             style={{
               fontSize: '20px',
@@ -571,7 +578,7 @@ export default function Vendedores({ currentUser }) {
               position: 'absolute',
               left: '10px',
               top: '50%',
-              transform: 'translateY(-50px)', // Ajustado para evitar solapamiento si cambia altura
+              transform: 'translateY(-50%)',
             }}
           />
           <input
@@ -591,12 +598,10 @@ export default function Vendedores({ currentUser }) {
         </div>
       </div>
 
-      {/* B. Ajuste Responsivo de Paneles Informativos (Móvil y Escritorio) */}
       <div
-        className="kpi-grid-container"
         style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
           gap: '10px',
           marginBottom: '20px',
         }}
@@ -608,13 +613,12 @@ export default function Vendedores({ currentUser }) {
           color="#111827"
         />
         <div
-          className="kpi-card-box"
+          className="kpi-card-responsive"
           style={{
             backgroundColor: '#ffffff',
             border: '1px solid #e5e7eb',
             borderRadius: '8px',
             padding: '10px',
-            textAlign: 'center',
             display: 'flex',
             flexDirection: 'column',
             justifyContent: 'center',
@@ -666,8 +670,8 @@ export default function Vendedores({ currentUser }) {
           title="N.E. Pendientes"
           value={stats.pendientes}
           sub="Por cobrar/cerrar"
-          color="#DC2626"
-          border="#DC2626"
+          color="#dc2626"
+          border="#dc2626"
         />
         {activeTab === 'comisiones' && (
           <KpiCard
@@ -680,18 +684,18 @@ export default function Vendedores({ currentUser }) {
         )}
       </div>
 
-      {/* C. Menú Dropdown en Móvil & Pestañas de Escritorio */}
-      <div style={{ marginBottom: '24px', position: 'relative' }}>
-        {/* Pestañas clásicas escritorio */}
+      {/* Menú de Pestañas: Selector Desplegable en Móvil / Clásico Horizontal en Escritorio */}
+      <div style={{ marginBottom: '24px' }}>
+        {/* Versión Escritorio */}
         <div
-          className="desktop-tabs-container"
+          className="desktop-tabs"
           style={{
             display: 'flex',
             gap: '8px',
             borderBottom: '1px solid #e5e7eb',
           }}
         >
-          {tabsConfig.map((tab) => (
+          {tabsList.map((tab) => (
             <button
               key={tab.key}
               onClick={() => setActiveTab(tab.key)}
@@ -712,36 +716,54 @@ export default function Vendedores({ currentUser }) {
                 gap: '6px',
               }}
             >
-              {tab.icon}
+              <span
+                style={{ color: activeTab === tab.key ? '#dc2626' : '#4b5563' }}
+              >
+                {tab.icon}
+              </span>
               {tab.label}
             </button>
           ))}
         </div>
 
-        {/* Menú Dropdown Móvil OBLIGATORIO */}
-        <div ref={mobileMenuRef} className="mobile-dropdown-container" style={{ display: 'none', position: 'relative' }}>
+        {/* Versión Móvil: Menú Dropdown Elegante */}
+        <div
+          className="mobile-dropdown-menu"
+          ref={mobileMenuRef}
+          style={{ position: 'relative', display: 'none' }}
+        >
           <button
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
             style={{
               width: '100%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              padding: '10px 14px',
+              padding: '12px 16px',
               backgroundColor: '#ffffff',
               border: '1px solid #d1d5db',
               borderRadius: '8px',
-              fontSize: '13px',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              fontSize: '14px',
               fontWeight: '600',
               color: '#111827',
               cursor: 'pointer',
+              boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
             }}
           >
-            <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              {tabsConfig.find((t) => t.key === activeTab)?.icon}
-              {tabsConfig.find((t) => t.key === activeTab)?.label}
-            </span>
-            <ChevronDown size={18} color="#4b5563" />
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ color: '#dc2626' }}>
+                {tabsList.find((t) => t.key === activeTab)?.icon}
+              </span>
+              <span>{tabsList.find((t) => t.key === activeTab)?.label}</span>
+            </div>
+            <ChevronDown
+              size={18}
+              color="#4b5563"
+              style={{
+                transform: isMobileMenuOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+                transition: 'transform 0.2s ease',
+              }}
+            />
           </button>
 
           {isMobileMenuOpen && (
@@ -759,7 +781,7 @@ export default function Vendedores({ currentUser }) {
                 overflow: 'hidden',
               }}
             >
-              {tabsConfig.map((tab) => {
+              {tabsList.map((tab) => {
                 const isActive = activeTab === tab.key;
                 return (
                   <button
@@ -770,24 +792,32 @@ export default function Vendedores({ currentUser }) {
                     }}
                     style={{
                       width: '100%',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      padding: '10px 14px',
+                      padding: '12px 16px',
                       backgroundColor: isActive ? '#fef2f2' : 'transparent',
                       border: 'none',
                       borderBottom: '1px solid #e5e7eb',
-                      textAlign: 'left',
-                      fontSize: '13px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      fontSize: '14px',
                       fontWeight: isActive ? '700' : '500',
                       color: isActive ? '#dc2626' : '#4b5563',
                       cursor: 'pointer',
+                      textAlign: 'left',
                     }}
                   >
-                    <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      {tab.icon}
-                      {tab.label}
-                    </span>
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '10px',
+                      }}
+                    >
+                      <span style={{ color: isActive ? '#dc2626' : '#4b5563' }}>
+                        {tab.icon}
+                      </span>
+                      <span>{tab.label}</span>
+                    </div>
                     {isActive && <Check size={18} color="#dc2626" />}
                   </button>
                 );
@@ -801,7 +831,7 @@ export default function Vendedores({ currentUser }) {
         style={{
           backgroundColor: '#ffffff',
           border: '1px solid #e5e7eb',
-          borderRadius: '8px',
+          borderRadius: '12px',
           padding: '16px',
           overflowX: 'auto',
         }}
@@ -809,6 +839,7 @@ export default function Vendedores({ currentUser }) {
         {/* ============ TAB VISITAS ============ */}
         {activeTab === 'visitas' && (
           <>
+            {/* Filtros de tipo de cliente - DISEÑO DISCRETO Y COMPACTO */}
             <div
               style={{
                 display: 'flex',
@@ -913,7 +944,7 @@ export default function Vendedores({ currentUser }) {
                 textAlign: 'left',
               }}
             >
-              <thead>
+              <thead className="desktop-thead">
                 <tr
                   style={{
                     backgroundColor: '#f9fafb',
@@ -995,9 +1026,14 @@ export default function Vendedores({ currentUser }) {
                     return (
                       <tr
                         key={client.id}
+                        className="responsive-table-row"
                         style={{ borderBottom: '1px solid #e5e7eb' }}
                       >
-                        <td className="mobile-card-cell" data-label="Nombre / CI / RIF" style={{ padding: '10px' }}>
+                        {/* Escritorio */}
+                        <td
+                          className="desktop-cell-normal"
+                          style={{ padding: '10px' }}
+                        >
                           <div
                             style={{
                               display: 'flex',
@@ -1006,7 +1042,9 @@ export default function Vendedores({ currentUser }) {
                               marginBottom: '4px',
                             }}
                           >
-                            <span style={{ fontWeight: '600', color: '#111827' }}>
+                            <span
+                              style={{ fontWeight: '600', color: '#111827' }}
+                            >
                               {client.name}
                             </span>
                             {isPotential ? (
@@ -1042,7 +1080,10 @@ export default function Vendedores({ currentUser }) {
                             {client.rif_number || 'N/A'}
                           </div>
                         </td>
-                        <td className="mobile-card-cell" data-label="Datos Adjuntos" style={{ padding: '10px' }}>
+                        <td
+                          className="desktop-cell-normal"
+                          style={{ padding: '10px' }}
+                        >
                           <div
                             style={{
                               display: 'flex',
@@ -1100,10 +1141,20 @@ export default function Vendedores({ currentUser }) {
                             )}
                           </div>
                         </td>
-                        <td className="mobile-card-cell" data-label="Registrado Por" style={{ padding: '10px', fontSize: '12px', color: '#111827' }}>
+                        <td
+                          className="desktop-cell-normal"
+                          style={{
+                            padding: '10px',
+                            fontSize: '12px',
+                            color: '#111827',
+                          }}
+                        >
                           {client.profiles?.full_name || 'N/A'}
                         </td>
-                        <td className="mobile-card-cell" data-label="GPS Visita" style={{ padding: '10px', textAlign: 'center' }}>
+                        <td
+                          className="desktop-cell-normal"
+                          style={{ padding: '10px', textAlign: 'center' }}
+                        >
                           {mapsUrl ? (
                             <a
                               href={mapsUrl}
@@ -1133,20 +1184,18 @@ export default function Vendedores({ currentUser }) {
                           )}
                         </td>
                         <td
-                          className="mobile-card-cell"
-                          data-label="N.E. Pendientes"
+                          className="desktop-cell-normal"
                           style={{
                             padding: '10px',
                             textAlign: 'center',
-                            color: '#DC2626',
+                            color: '#dc2626',
                             fontWeight: 'bold',
                           }}
                         >
                           {nePendientes}
                         </td>
                         <td
-                          className="mobile-card-cell"
-                          data-label="N.E. Cerradas"
+                          className="desktop-cell-normal"
                           style={{
                             padding: '10px',
                             textAlign: 'center',
@@ -1156,12 +1205,263 @@ export default function Vendedores({ currentUser }) {
                         >
                           {neCerradas}
                         </td>
-                        <td className="mobile-card-cell" data-label="Última Visita" style={{ padding: '10px', fontSize: '12px', color: '#111827' }}>
+                        <td
+                          className="desktop-cell-normal"
+                          style={{
+                            padding: '10px',
+                            fontSize: '12px',
+                            color: '#111827',
+                          }}
+                        >
                           {client.last_visit_at
                             ? new Date(
                                 client.last_visit_at
                               ).toLocaleDateString()
                             : 'Sin registro'}
+                        </td>
+
+                        {/* Móvil: Tarjeta Apilada */}
+                        <td
+                          className="mobile-cell-stacked"
+                          style={{ display: 'none' }}
+                        >
+                          <div
+                            style={{
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                              borderBottom: '1px solid #e5e7eb',
+                              paddingBottom: '6px',
+                            }}
+                          >
+                            <span
+                              style={{
+                                fontWeight: '800',
+                                fontSize: '14px',
+                                color: '#111827',
+                              }}
+                            >
+                              {client.name}
+                            </span>
+                            {isPotential ? (
+                              <span
+                                style={{
+                                  fontSize: '9px',
+                                  backgroundColor: '#FEF3C7',
+                                  color: '#B45309',
+                                  padding: '2px 6px',
+                                  borderRadius: '4px',
+                                  fontWeight: '700',
+                                }}
+                              >
+                                POTENCIAL
+                              </span>
+                            ) : (
+                              <span
+                                style={{
+                                  fontSize: '9px',
+                                  backgroundColor: '#DCFCE7',
+                                  color: '#15803D',
+                                  padding: '2px 6px',
+                                  borderRadius: '4px',
+                                  fontWeight: '700',
+                                }}
+                              >
+                                OFICIAL
+                              </span>
+                            )}
+                          </div>
+                          <div
+                            style={{
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              fontSize: '12px',
+                            }}
+                          >
+                            <span
+                              style={{ color: '#4b5563', fontWeight: '600' }}
+                            >
+                              CI / RIF:
+                            </span>
+                            <span style={{ color: '#111827' }}>
+                              {client.ci_number || 'N/A'} |{' '}
+                              {client.rif_number || 'N/A'}
+                            </span>
+                          </div>
+                          <div
+                            style={{
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              fontSize: '12px',
+                            }}
+                          >
+                            <span
+                              style={{ color: '#4b5563', fontWeight: '600' }}
+                            >
+                              Datos Adjuntos:
+                            </span>
+                            <div
+                              style={{
+                                display: 'flex',
+                                gap: '4px',
+                                flexWrap: 'wrap',
+                              }}
+                            >
+                              {!isPotential && client.ci_photo_url && (
+                                <DocBadge
+                                  label="CI"
+                                  onClick={() =>
+                                    setImageModal({
+                                      open: true,
+                                      url: client.ci_photo_url,
+                                      title: `C.I. de ${client.name}`,
+                                    })
+                                  }
+                                />
+                              )}
+                              {!isPotential && client.rif_photo_url && (
+                                <DocBadge
+                                  label="RIF"
+                                  onClick={() =>
+                                    setImageModal({
+                                      open: true,
+                                      url: client.rif_photo_url,
+                                      title: `RIF de ${client.name}`,
+                                    })
+                                  }
+                                />
+                              )}
+                              {client.additional_doc_url && (
+                                <DocBadge
+                                  label="Adic."
+                                  onClick={() =>
+                                    setImageModal({
+                                      open: true,
+                                      url: client.additional_doc_url,
+                                      title: `Doc. Adic. de ${client.name}`,
+                                    })
+                                  }
+                                />
+                              )}
+                              {client.last_visit_photo_url && (
+                                <DocBadge
+                                  label="Foto"
+                                  onClick={() =>
+                                    setImageModal({
+                                      open: true,
+                                      url: client.last_visit_photo_url,
+                                      title: `Visita a ${client.name}`,
+                                    })
+                                  }
+                                />
+                              )}
+                            </div>
+                          </div>
+                          <div
+                            style={{
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              fontSize: '12px',
+                            }}
+                          >
+                            <span
+                              style={{ color: '#4b5563', fontWeight: '600' }}
+                            >
+                              Registrado Por:
+                            </span>
+                            <span style={{ color: '#111827' }}>
+                              {client.profiles?.full_name || 'N/A'}
+                            </span>
+                          </div>
+                          <div
+                            style={{
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              fontSize: '12px',
+                            }}
+                          >
+                            <span
+                              style={{ color: '#4b5563', fontWeight: '600' }}
+                            >
+                              GPS Visita:
+                            </span>
+                            <span>
+                              {mapsUrl ? (
+                                <a
+                                  href={mapsUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  style={{
+                                    color: '#1D4ED8',
+                                    textDecoration: 'none',
+                                    fontWeight: '700',
+                                  }}
+                                >
+                                  Ver Mapa
+                                </a>
+                              ) : (
+                                <span style={{ color: '#4b5563' }}>
+                                  Sin GPS
+                                </span>
+                              )}
+                            </span>
+                          </div>
+                          <div
+                            style={{
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              fontSize: '12px',
+                            }}
+                          >
+                            <span
+                              style={{ color: '#4b5563', fontWeight: '600' }}
+                            >
+                              N.E. Pendientes:
+                            </span>
+                            <span
+                              style={{ color: '#dc2626', fontWeight: 'bold' }}
+                            >
+                              {nePendientes}
+                            </span>
+                          </div>
+                          <div
+                            style={{
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              fontSize: '12px',
+                            }}
+                          >
+                            <span
+                              style={{ color: '#4b5563', fontWeight: '600' }}
+                            >
+                              N.E. Cerradas:
+                            </span>
+                            <span
+                              style={{ color: '#10B981', fontWeight: 'bold' }}
+                            >
+                              {neCerradas}
+                            </span>
+                          </div>
+                          <div
+                            style={{
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              fontSize: '12px',
+                            }}
+                          >
+                            <span
+                              style={{ color: '#4b5563', fontWeight: '600' }}
+                            >
+                              Última Visita:
+                            </span>
+                            <span style={{ color: '#111827' }}>
+                              {client.last_visit_at
+                                ? new Date(
+                                    client.last_visit_at
+                                  ).toLocaleDateString()
+                                : 'Sin registro'}
+                            </span>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -1183,7 +1483,7 @@ export default function Vendedores({ currentUser }) {
               textAlign: 'left',
             }}
           >
-            <thead>
+            <thead className="desktop-thead">
               <tr
                 style={{
                   backgroundColor: '#f9fafb',
@@ -1253,11 +1553,26 @@ export default function Vendedores({ currentUser }) {
                   sortConfig.resumen.direction,
                   getResumenValue
                 ).map((v) => (
-                  <tr key={v.id} style={{ borderBottom: '1px solid #e5e7eb' }}>
-                    <td className="mobile-card-cell" data-label="Nombre" style={{ padding: '10px', fontWeight: '600', color: '#111827' }}>
+                  <tr
+                    key={v.id}
+                    className="responsive-table-row"
+                    style={{ borderBottom: '1px solid #e5e7eb' }}
+                  >
+                    {/* Escritorio */}
+                    <td
+                      className="desktop-cell-normal"
+                      style={{
+                        padding: '10px',
+                        fontWeight: '600',
+                        color: '#111827',
+                      }}
+                    >
                       {v.full_name || 'Sin Nombre'}
                     </td>
-                    <td className="mobile-card-cell" data-label="Meta vs Acumulado" style={{ padding: '10px' }}>
+                    <td
+                      className="desktop-cell-normal"
+                      style={{ padding: '10px' }}
+                    >
                       <div
                         style={{
                           display: 'flex',
@@ -1312,12 +1627,18 @@ export default function Vendedores({ currentUser }) {
                         {(v.bombillosBruto + v.fluidosBruto).toLocaleString()}
                       </div>
                     </td>
-                    <td className="mobile-card-cell" data-label="N.E. Totales" style={{ padding: '10px', textAlign: 'center', color: '#111827' }}>
+                    <td
+                      className="desktop-cell-normal"
+                      style={{
+                        padding: '10px',
+                        textAlign: 'center',
+                        color: '#111827',
+                      }}
+                    >
                       {v.totalNE}
                     </td>
                     <td
-                      className="mobile-card-cell"
-                      data-label="Cerradas"
+                      className="desktop-cell-normal"
                       style={{
                         padding: '10px',
                         textAlign: 'center',
@@ -1328,18 +1649,20 @@ export default function Vendedores({ currentUser }) {
                       {v.neCerradas}
                     </td>
                     <td
-                      className="mobile-card-cell"
-                      data-label="Pendientes"
+                      className="desktop-cell-normal"
                       style={{
                         padding: '10px',
                         textAlign: 'center',
-                        color: '#DC2626',
+                        color: '#dc2626',
                         fontWeight: 'bold',
                       }}
                     >
                       {v.nePendientes}
                     </td>
-                    <td className="mobile-card-cell" data-label="Acción" style={{ padding: '10px' }}>
+                    <td
+                      className="desktop-cell-normal"
+                      style={{ padding: '10px' }}
+                    >
                       <button
                         onClick={() => openHistoryModal(v)}
                         style={{
@@ -1359,6 +1682,151 @@ export default function Vendedores({ currentUser }) {
                         <Eye size={12} /> Ver Historial
                       </button>
                     </td>
+
+                    {/* Móvil: Tarjeta Apilada */}
+                    <td
+                      className="mobile-cell-stacked"
+                      style={{ display: 'none' }}
+                    >
+                      <div
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          borderBottom: '1px solid #e5e7eb',
+                          paddingBottom: '6px',
+                        }}
+                      >
+                        <span
+                          style={{
+                            fontWeight: '800',
+                            fontSize: '14px',
+                            color: '#111827',
+                          }}
+                        >
+                          {v.full_name || 'Sin Nombre'}
+                        </span>
+                        <button
+                          onClick={() => openHistoryModal(v)}
+                          style={{
+                            backgroundColor: '#111827',
+                            color: '#D4AF37',
+                            border: 'none',
+                            padding: '4px 8px',
+                            borderRadius: '6px',
+                            fontWeight: '700',
+                            fontSize: '10px',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                          }}
+                        >
+                          <Eye size={10} /> Historial
+                        </button>
+                      </div>
+                      <div
+                        style={{
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '4px',
+                          fontSize: '12px',
+                        }}
+                      >
+                        <span style={{ color: '#4b5563', fontWeight: '600' }}>
+                          Meta vs Acumulado:
+                        </span>
+                        <div
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                          }}
+                        >
+                          <input
+                            type="number"
+                            value={v.sales_goal_usd}
+                            onChange={(e) =>
+                              handleGoalChange(v.id, e.target.value)
+                            }
+                            style={{
+                              width: '80px',
+                              padding: '4px',
+                              borderRadius: '4px',
+                              border: '1px solid #d1d5db',
+                              fontSize: '12px',
+                            }}
+                          />
+                          <button
+                            onClick={() => handleSaveSeller(v)}
+                            disabled={savingId === v.id}
+                            style={{
+                              backgroundColor: '#111827',
+                              color: '#D4AF37',
+                              border: 'none',
+                              padding: '4px 8px',
+                              borderRadius: '4px',
+                              fontWeight: '700',
+                              fontSize: '10px',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            <Save size={10} />{' '}
+                            {savingId === v.id ? '...' : 'Guardar'}
+                          </button>
+                        </div>
+                        <div
+                          style={{
+                            fontSize: '11px',
+                            color: '#10B981',
+                            fontWeight: '600',
+                          }}
+                        >
+                          Alcanzado: $
+                          {(v.bombillosBruto + v.fluidosBruto).toLocaleString()}
+                        </div>
+                      </div>
+                      <div
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          fontSize: '12px',
+                        }}
+                      >
+                        <span style={{ color: '#4b5563', fontWeight: '600' }}>
+                          N.E. Totales:
+                        </span>
+                        <span style={{ color: '#111827' }}>{v.totalNE}</span>
+                      </div>
+                      <div
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          fontSize: '12px',
+                        }}
+                      >
+                        <span style={{ color: '#4b5563', fontWeight: '600' }}>
+                          Cerradas:
+                        </span>
+                        <span style={{ color: '#10B981', fontWeight: 'bold' }}>
+                          {v.neCerradas}
+                        </span>
+                      </div>
+                      <div
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          fontSize: '12px',
+                        }}
+                      >
+                        <span style={{ color: '#4b5563', fontWeight: '600' }}>
+                          Pendientes:
+                        </span>
+                        <span style={{ color: '#dc2626', fontWeight: 'bold' }}>
+                          {v.nePendientes}
+                        </span>
+                      </div>
+                    </td>
                   </tr>
                 ))
               )}
@@ -1377,7 +1845,7 @@ export default function Vendedores({ currentUser }) {
               textAlign: 'left',
             }}
           >
-            <thead>
+            <thead className="desktop-thead">
               <tr
                 style={{
                   backgroundColor: '#f9fafb',
@@ -1436,14 +1904,36 @@ export default function Vendedores({ currentUser }) {
                   sortConfig.comisiones.direction,
                   getComisionesValue
                 ).map((v) => (
-                  <tr key={v.id} style={{ borderBottom: '1px solid #e5e7eb' }}>
-                    <td className="mobile-card-cell" data-label="Nombre" style={{ padding: '10px', fontWeight: '600', color: '#111827' }}>
+                  <tr
+                    key={v.id}
+                    className="responsive-table-row"
+                    style={{ borderBottom: '1px solid #e5e7eb' }}
+                  >
+                    {/* Escritorio */}
+                    <td
+                      className="desktop-cell-normal"
+                      style={{
+                        padding: '10px',
+                        fontWeight: '600',
+                        color: '#111827',
+                      }}
+                    >
                       {v.full_name || 'Sin Nombre'}
                     </td>
-                    <td className="mobile-card-cell" data-label="% Asignado" style={{ padding: '10px', fontSize: '12px', color: '#111827' }}>
+                    <td
+                      className="desktop-cell-normal"
+                      style={{
+                        padding: '10px',
+                        fontSize: '12px',
+                        color: '#111827',
+                      }}
+                    >
                       {v.pctAsignado}
                     </td>
-                    <td className="mobile-card-cell" data-label="Bombillos (Cnt / $)" style={{ padding: '10px', textAlign: 'center' }}>
+                    <td
+                      className="desktop-cell-normal"
+                      style={{ padding: '10px', textAlign: 'center' }}
+                    >
                       <div style={{ fontWeight: '700', color: '#111827' }}>
                         {v.bombillosCount} un.
                       </div>
@@ -1451,7 +1941,10 @@ export default function Vendedores({ currentUser }) {
                         ${v.bombillosBruto.toLocaleString()}
                       </div>
                     </td>
-                    <td className="mobile-card-cell" data-label="Fluidos (Cnt / $)" style={{ padding: '10px', textAlign: 'center' }}>
+                    <td
+                      className="desktop-cell-normal"
+                      style={{ padding: '10px', textAlign: 'center' }}
+                    >
                       <div style={{ fontWeight: '700', color: '#111827' }}>
                         {v.fluidosCount} un.
                       </div>
@@ -1460,8 +1953,7 @@ export default function Vendedores({ currentUser }) {
                       </div>
                     </td>
                     <td
-                      className="mobile-card-cell"
-                      data-label="Comisión Total ($)"
+                      className="desktop-cell-normal"
                       style={{
                         padding: '10px',
                         textAlign: 'right',
@@ -1470,6 +1962,91 @@ export default function Vendedores({ currentUser }) {
                       }}
                     >
                       ${v.comisionTotalUSD.toFixed(2)}
+                    </td>
+
+                    {/* Móvil: Tarjeta Apilada */}
+                    <td
+                      className="mobile-cell-stacked"
+                      style={{ display: 'none' }}
+                    >
+                      <div
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          borderBottom: '1px solid #e5e7eb',
+                          paddingBottom: '6px',
+                        }}
+                      >
+                        <span
+                          style={{
+                            fontWeight: '800',
+                            fontSize: '14px',
+                            color: '#111827',
+                          }}
+                        >
+                          {v.full_name || 'Sin Nombre'}
+                        </span>
+                        <span
+                          style={{
+                            fontSize: '11px',
+                            backgroundColor: '#f3f4f6',
+                            padding: '2px 6px',
+                            borderRadius: '4px',
+                            fontWeight: '600',
+                            color: '#4b5563',
+                          }}
+                        >
+                          {v.pctAsignado}
+                        </span>
+                      </div>
+                      <div
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          fontSize: '12px',
+                        }}
+                      >
+                        <span style={{ color: '#4b5563', fontWeight: '600' }}>
+                          Bombillos (Cnt / $):
+                        </span>
+                        <span style={{ color: '#111827' }}>
+                          {v.bombillosCount} un. / $
+                          {v.bombillosBruto.toLocaleString()}
+                        </span>
+                      </div>
+                      <div
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          fontSize: '12px',
+                        }}
+                      >
+                        <span style={{ color: '#4b5563', fontWeight: '600' }}>
+                          Fluidos (Cnt / $):
+                        </span>
+                        <span style={{ color: '#111827' }}>
+                          {v.fluidosCount} un. / $
+                          {v.fluidosBruto.toLocaleString()}
+                        </span>
+                      </div>
+                      <div
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          fontSize: '13px',
+                          borderTop: '1px solid #e5e7eb',
+                          paddingTop: '6px',
+                          marginTop: '4px',
+                        }}
+                      >
+                        <span style={{ color: '#111827', fontWeight: '700' }}>
+                          Comisión Total ($):
+                        </span>
+                        <span style={{ color: '#dc2626', fontWeight: '800' }}>
+                          ${v.comisionTotalUSD.toFixed(2)}
+                        </span>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -1496,7 +2073,7 @@ export default function Vendedores({ currentUser }) {
           <div
             style={{
               backgroundColor: '#fff',
-              borderRadius: '8px',
+              borderRadius: '12px',
               width: '100%',
               maxWidth: '900px',
               maxHeight: '90vh',
@@ -1560,12 +2137,11 @@ export default function Vendedores({ currentUser }) {
                   textAlign: 'left',
                 }}
               >
-                <thead>
+                <thead className="desktop-thead">
                   <tr
                     style={{
                       backgroundColor: '#f9fafb',
                       borderBottom: '1px solid #e5e7eb',
-                      color: '#4b5563',
                     }}
                   >
                     <SortableHeader
@@ -1632,18 +2208,40 @@ export default function Vendedores({ currentUser }) {
                     sortedHistoryOrders.map((nota) => (
                       <tr
                         key={nota.id}
+                        className="responsive-table-row"
                         style={{ borderBottom: '1px solid #e5e7eb' }}
                       >
-                        <td className="mobile-card-cell" data-label="Cliente" style={{ padding: '8px', fontWeight: '600', color: '#111827' }}>
+                        {/* Escritorio */}
+                        <td
+                          className="desktop-cell-normal"
+                          style={{
+                            padding: '8px',
+                            fontWeight: '600',
+                            color: '#111827',
+                          }}
+                        >
                           {nota.clients?.name || 'N/A'}
                         </td>
-                        <td className="mobile-card-cell" data-label="Transacción" style={{ padding: '8px', fontFamily: 'monospace', color: '#111827' }}>
+                        <td
+                          className="desktop-cell-normal"
+                          style={{
+                            padding: '8px',
+                            fontFamily: 'monospace',
+                            color: '#111827',
+                          }}
+                        >
                           #{nota.transaction_number || nota.id.substring(0, 6)}
                         </td>
-                        <td className="mobile-card-cell" data-label="Fecha" style={{ padding: '8px', color: '#111827' }}>
+                        <td
+                          className="desktop-cell-normal"
+                          style={{ padding: '8px', color: '#111827' }}
+                        >
                           {new Date(nota.created_at).toLocaleDateString()}
                         </td>
-                        <td className="mobile-card-cell" data-label="Estado" style={{ padding: '8px' }}>
+                        <td
+                          className="desktop-cell-normal"
+                          style={{ padding: '8px' }}
+                        >
                           <span
                             style={{
                               padding: '2px 6px',
@@ -1664,8 +2262,7 @@ export default function Vendedores({ currentUser }) {
                           </span>
                         </td>
                         <td
-                          className="mobile-card-cell"
-                          data-label="Total ($)"
+                          className="desktop-cell-normal"
                           style={{
                             padding: '8px',
                             textAlign: 'right',
@@ -1676,16 +2273,133 @@ export default function Vendedores({ currentUser }) {
                           ${Number(nota.final_price_usd).toFixed(2)}
                         </td>
                         <td
-                          className="mobile-card-cell"
-                          data-label="Saldo ($)"
+                          className="desktop-cell-normal"
                           style={{
                             padding: '8px',
                             textAlign: 'right',
-                            color: '#DC2626',
-                            fontWeight: '700',
+                            color: '#dc2626',
                           }}
                         >
                           ${Number(nota.balance_due_usd).toFixed(2)}
+                        </td>
+
+                        {/* Móvil: Tarjeta Apilada */}
+                        <td
+                          className="mobile-cell-stacked"
+                          style={{ display: 'none' }}
+                        >
+                          <div
+                            style={{
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                              borderBottom: '1px solid #e5e7eb',
+                              paddingBottom: '6px',
+                            }}
+                          >
+                            <span
+                              style={{
+                                fontWeight: '800',
+                                fontSize: '13px',
+                                color: '#111827',
+                              }}
+                            >
+                              {nota.clients?.name || 'N/A'}
+                            </span>
+                            <span
+                              style={{
+                                padding: '2px 6px',
+                                borderRadius: '4px',
+                                fontSize: '10px',
+                                fontWeight: '700',
+                                backgroundColor:
+                                  nota.payment_status === 'cerrada'
+                                    ? '#DCFCE7'
+                                    : '#FEF3C7',
+                                color:
+                                  nota.payment_status === 'cerrada'
+                                    ? '#15803D'
+                                    : '#B45309',
+                              }}
+                            >
+                              {nota.payment_status.toUpperCase()}
+                            </span>
+                          </div>
+                          <div
+                            style={{
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              fontSize: '12px',
+                            }}
+                          >
+                            <span
+                              style={{ color: '#4b5563', fontWeight: '600' }}
+                            >
+                              Transacción:
+                            </span>
+                            <span
+                              style={{
+                                fontFamily: 'monospace',
+                                color: '#111827',
+                              }}
+                            >
+                              #
+                              {nota.transaction_number ||
+                                nota.id.substring(0, 6)}
+                            </span>
+                          </div>
+                          <div
+                            style={{
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              fontSize: '12px',
+                            }}
+                          >
+                            <span
+                              style={{ color: '#4b5563', fontWeight: '600' }}
+                            >
+                              Fecha:
+                            </span>
+                            <span style={{ color: '#111827' }}>
+                              {new Date(nota.created_at).toLocaleDateString()}
+                            </span>
+                          </div>
+                          <div
+                            style={{
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              fontSize: '12px',
+                            }}
+                          >
+                            <span
+                              style={{ color: '#4b5563', fontWeight: '600' }}
+                            >
+                              Total ($):
+                            </span>
+                            <span
+                              style={{ fontWeight: '700', color: '#111827' }}
+                            >
+                              ${Number(nota.final_price_usd).toFixed(2)}
+                            </span>
+                          </div>
+                          <div
+                            style={{
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              fontSize: '12px',
+                            }}
+                          >
+                            <span
+                              style={{ color: '#4b5563', fontWeight: '600' }}
+                            >
+                              Saldo ($):
+                            </span>
+                            <span
+                              style={{ color: '#dc2626', fontWeight: '700' }}
+                            >
+                              ${Number(nota.balance_due_usd).toFixed(2)}
+                            </span>
+                          </div>
                         </td>
                       </tr>
                     ))
@@ -1714,7 +2428,7 @@ export default function Vendedores({ currentUser }) {
           <div
             style={{
               backgroundColor: '#fff',
-              borderRadius: '8px',
+              borderRadius: '12px',
               maxWidth: '90vw',
               maxHeight: '90vh',
               padding: '16px',
@@ -1787,99 +2501,39 @@ export default function Vendedores({ currentUser }) {
         </div>
       )}
 
-      {/* D & E. Guía de Estilos y Requisitos Técnicos para Móvil y Escritorio */}
       <style>{`
-        /* B. Paneles informativos adaptativos y pequeños en móvil */
-        @media (max-width: 768px) {
-          .kpi-grid-container {
-            grid-template-columns: repeat(3, 1fr) !important;
-            gap: 6px !important;
-          }
-          .kpi-card-box {
-            padding: 6px !important;
-            max-height: 75px !important;
-            overflow: hidden !important;
-          }
-          .kpi-card-box div:nth-child(1) {
-            font-size: 8px !important;
-            line-height: 1rem !important;
-            white-space: nowrap !important;
-            overflow: hidden !important;
-            text-overflow: ellipsis !important;
-          }
-          .kpi-card-box div:nth-child(2) {
-            font-size: 13px !important;
-            line-height: 1.1rem !important;
-          }
-          .kpi-card-box div:nth-child(3) {
-            font-size: 8px !important;
-          }
-
-          /* C. Intercambio de navegación en móvil */
-          .desktop-tabs-container {
-            display: none !important;
-          }
-          .mobile-dropdown-container {
-            display: block !important;
-          }
-
-          /* D. Tablas con tarjetas apiladas en móvil */
-          .custom-responsive-table thead {
-            display: none !important;
-          }
-          .custom-responsive-table, 
-          .custom-responsive-table tbody, 
-          .custom-responsive-table tr, 
-          .custom-responsive-table td {
-            display: block !important;
-            width: 100% !important;
-          }
-          .custom-responsive-table tr {
-            margin-bottom: 12px !important;
-            border: 1px solid #d1d5db !important;
-            border-radius: 8px !important;
-            background-color: #ffffff !important;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.05) !important;
-            overflow: hidden !important;
-          }
-          .custom-responsive-table tr:first-child td:first-child {
-            background-color: #f9fafb !important;
-            border-bottom: 1px solid #e5e7eb !important;
-            font-size: 14px !important;
-            font-weight: 700 !important;
-          }
-          .custom-responsive-table td {
-            display: flex !important;
-            justify-content: space-between !important;
-            align-items: center !important;
-            padding: 8px 12px !important;
-            border-bottom: 1px solid #e5e7eb !important;
-            text-align: right !important;
-          }
-          .custom-responsive-table td:last-child {
-            border-bottom: none !important;
-          }
-          .custom-responsive-table td::before {
-            content: attr(data-label);
-            font-weight: 600;
-            color: #4b5563;
-            text-align: left;
-            font-size: 12px;
-            margin-right: 12px;
-          }
-        }
-
-        @media (min-width: 769px) {
-          .desktop-tabs-container {
-            display: flex !important;
-          }
-          .mobile-dropdown-container {
-            display: none !important;
-          }
-        }
-
+        .users-table-container { width: 100%; overflow-x: auto; }
+        .custom-responsive-table { width: 100%; border-collapse: collapse; font-size: 13px; text-align: left; }
+        .mobile-thead { display: none; }
+        .mobile-cell-stacked { display: none; }
+        .desktop-cell-normal { display: table-cell; }
         .sortable-header { cursor: pointer; user-select: none; transition: background-color 0.15s; }
         .sortable-header:hover { background-color: #f3f4f6 !important; }
+
+        /* Media queries para pantallas móviles (Breakpoint: 768px) */
+        @media (max-width: 768px) {
+          .desktop-tabs { display: none !important; }
+          .mobile-dropdown-menu { display: block !important; }
+          .users-table-container { overflow-x: hidden !important; }
+          .desktop-thead { display: none !important; }
+          .mobile-thead { display: table-header-group !important; }
+          .desktop-cell-normal { display: none !important; }
+          .mobile-cell-stacked { display: flex !important; flex-direction: column; gap: 6px; padding: 12px !important; }
+          
+          /* Paneles informativos superiores cuadrados y centrados en móvil */
+          .kpi-card, .kpi-card-responsive {
+            aspect-ratio: 1 / 1 !important;
+            padding: 8px !important;
+            text-align: center !important;
+            display: flex !important;
+            flex-direction: column !important;
+            justify-content: center !important;
+            align-items: center !important;
+          }
+          .kpi-card div, .kpi-card-responsive div {
+            text-align: center !important;
+          }
+        }
       `}</style>
     </div>
   );
@@ -1898,7 +2552,7 @@ function SortableHeader({
   const direction = isActive ? sortConfig.direction : null;
 
   let Icon = ChevronsUpDown;
-  let iconColor = '#4b5563';
+  let iconColor = '#9ca3af';
   if (direction === 'asc') {
     Icon = ArrowUp;
     iconColor = '#111827';
@@ -1940,16 +2594,12 @@ function SortableHeader({
 function KpiCard({ title, value, sub, color, border }) {
   return (
     <div
-      className="kpi-card-box"
+      className="kpi-card"
       style={{
         backgroundColor: '#ffffff',
         border: `1px solid ${border || '#e5e7eb'}`,
         borderRadius: '8px',
         padding: '10px',
-        textAlign: 'center',
-        display: 'flex',
-        flexDirection: 'column',
-        justifyContent: 'center',
       }}
     >
       <div
@@ -1964,7 +2614,7 @@ function KpiCard({ title, value, sub, color, border }) {
       </div>
       <div
         style={{
-          fontSize: '20px',
+          fontSize: '18px',
           fontWeight: '800',
           color: color,
           marginTop: '2px',
