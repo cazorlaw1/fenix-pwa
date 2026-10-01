@@ -34,8 +34,11 @@ function AuthCallback() {
     const handleCallback = async () => {
       try {
         // Obtener sesión tras el redirect de Google desde /auth/v1/callback
-        const { data: { session }, error } = await supabase.auth.getSession();
-        
+        const {
+          data: { session },
+          error,
+        } = await supabase.auth.getSession();
+
         if (error || !session) {
           console.error('Error en callback de auth:', error);
           navigate('/login');
@@ -44,7 +47,7 @@ function AuthCallback() {
 
         // Verificar perfil y redirigir según rol
         const userProfile = await fetchProfile(session.user.id);
-        
+
         if (userProfile?.role === 'pendiente' || !userProfile?.role) {
           navigate('/pending');
         } else {
@@ -60,14 +63,16 @@ function AuthCallback() {
   }, [navigate, fetchProfile]);
 
   return (
-    <div style={{ 
-      display: 'flex', 
-      alignItems: 'center', 
-      justifyContent: 'center', 
-      height: '100vh',
-      fontFamily: 'system-ui, sans-serif',
-      color: '#6b7280'
-    }}>
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        height: '100vh',
+        fontFamily: 'system-ui, sans-serif',
+        color: '#6b7280',
+      }}
+    >
       <p>Verificando credenciales de Google...</p>
     </div>
   );
@@ -86,8 +91,8 @@ function Layout({ children, activeTab, setActiveTab }) {
       style={{
         display: 'flex',
         width: '100vw',
-        height: '100vh',
-        maxHeight: '100vh',
+        height: '100dvh', // <-- Cambiado de 100vh a 100dvh para adaptarse al celular
+        maxHeight: '100dvh',
         backgroundColor: '#f9fafb',
         position: 'relative',
         overflow: 'hidden',
@@ -121,6 +126,8 @@ function Layout({ children, activeTab, setActiveTab }) {
             width: '100%',
             height: '100%',
             boxSizing: 'border-box',
+            // Esto empuja el contenido hacia arriba para que la barra de Android no lo tape
+            paddingBottom: 'env(safe-area-inset-bottom, 24px)',
           }}
         >
           {children}
@@ -139,7 +146,7 @@ function Layout({ children, activeTab, setActiveTab }) {
           margin: 0;
           padding: 0;
           width: 100%;
-          height: 100%;
+          height: 100dvh; /* <-- Asegura que el html/body use la altura dinámica */
           overflow: hidden;
           font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
         }
@@ -186,10 +193,10 @@ export default function App() {
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/pending" element={<PendingApproval />} />
-          
+
           {/* Ruta pública para manejar el retorno seguro de Google OAuth */}
           <Route path="/auth/callback" element={<AuthCallback />} />
-          
+
           <Route element={<ProtectedRoute />}>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard" element={<DashboardWrapper />} />
