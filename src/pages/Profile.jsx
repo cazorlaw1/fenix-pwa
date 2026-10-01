@@ -188,39 +188,41 @@ export default function Profile() {
 
   return (
     <div
-      className="profile-container"
+      className="fixed top-0 right-0 h-full w-full md:w-auto flex flex-col justify-between overflow-y-auto md:overflow-y-visible"
       style={{
         minHeight: 'calc(100vh - 65px)',
         backgroundColor: '#ffffff',
         color: '#111827',
-        padding: '30px 20px',
+        padding: '20px 16px',
         display: 'flex',
         justifyContent: 'center',
         fontFamily: 'system-ui, -apple-system, sans-serif',
+        zIndex: 50,
       }}
     >
       <div
-        className="profile-card"
+        className="my-auto md:my-0"
         style={{
           maxWidth: '600px',
           width: '100%',
           backgroundColor: '#ffffff',
           border: '1px solid #e5e7eb',
           borderRadius: '16px',
-          padding: '32px',
+          padding: '20px 24px',
           boxShadow: '0 10px 25px rgba(0,0,0,0.05)',
           height: 'fit-content',
+          maxHeight: '100%',
+          overflowY: 'auto',
         }}
       >
         <h1
-          className="profile-title"
           style={{
-            fontSize: '22px',
+            fontSize: '20px',
             fontWeight: 'bold',
             color: '#000000',
             borderBottom: '1px solid #f3f4f6',
-            paddingBottom: '16px',
-            marginBottom: '24px',
+            paddingBottom: '12px',
+            marginBottom: '16px',
           }}
         >
           Perfil de Usuario
@@ -228,20 +230,18 @@ export default function Profile() {
 
         {/* ===== AVATAR REDONDO Y CENTRADO ===== */}
         <div
-          className="profile-avatar-section"
           style={{
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
-            marginBottom: '28px',
+            marginBottom: '18px',
           }}
         >
           <div
-            className="profile-avatar-img-container"
             onClick={() => !uploadingAvatar && avatarInputRef.current?.click()}
             style={{
-              width: '130px',
-              height: '130px',
+              width: '90px',
+              height: '90px',
               borderRadius: '50%',
               overflow: 'hidden',
               backgroundColor: '#f3f4f6',
@@ -275,8 +275,8 @@ export default function Profile() {
             ) : (
               <svg
                 xmlns="http://www.w3.org/2000/svg"
-                width="48"
-                height="48"
+                width="36"
+                height="36"
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="#9ca3af"
@@ -310,8 +310,8 @@ export default function Profile() {
               {uploadingAvatar ? (
                 <div
                   style={{
-                    width: '28px',
-                    height: '28px',
+                    width: '24px',
+                    height: '24px',
                     border: '3px solid #ffffff',
                     borderTopColor: 'transparent',
                     borderRadius: '50%',
@@ -321,8 +321,8 @@ export default function Profile() {
               ) : (
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
-                  width="32"
-                  height="32"
+                  width="26"
+                  height="26"
                   viewBox="0 0 24 24"
                   fill="none"
                   stroke="#ffffff"
@@ -350,13 +350,13 @@ export default function Profile() {
             onClick={() => avatarInputRef.current?.click()}
             disabled={uploadingAvatar}
             style={{
-              marginTop: '12px',
+              marginTop: '8px',
               backgroundColor: 'transparent',
               color: '#000000',
               border: '1px solid #000000',
               borderRadius: '8px',
-              padding: '8px 16px',
-              fontSize: '13px',
+              padding: '6px 12px',
+              fontSize: '12px',
               fontWeight: '600',
               cursor: uploadingAvatar ? 'wait' : 'pointer',
               display: 'flex',
@@ -366,8 +366,8 @@ export default function Profile() {
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
-              width="14"
-              height="14"
+              width="13"
+              height="13"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
@@ -386,7 +386,7 @@ export default function Profile() {
               : 'Subir foto de perfil'}
           </button>
           <span
-            style={{ fontSize: '11px', color: '#9ca3af', marginTop: '6px' }}
+            style={{ fontSize: '10px', color: '#9ca3af', marginTop: '4px' }}
           >
             JPG, PNG o WEBP · Máx. 5MB
           </span>
@@ -395,15 +395,14 @@ export default function Profile() {
         {/* ALERTA DE PERFIL INCOMPLETO (Incluye Ciudad) */}
         {isIncomplete && (
           <div
-            className="profile-alert"
             style={{
               backgroundColor: '#fef2f2',
               borderLeft: '4px solid #dc2626',
               color: '#991b1b',
-              padding: '12px 16px',
+              padding: '10px 14px',
               borderRadius: '0 8px 8px 0',
-              marginBottom: '24px',
-              fontSize: '13px',
+              marginBottom: '16px',
+              fontSize: '12px',
               fontWeight: '500',
             }}
           >
@@ -418,10 +417,10 @@ export default function Profile() {
               backgroundColor: '#f3f4f6',
               border: '1px solid #d1d5db',
               color: '#1f2937',
-              padding: '12px',
+              padding: '10px',
               borderRadius: '8px',
-              marginBottom: '24px',
-              fontSize: '13px',
+              marginBottom: '16px',
+              fontSize: '12px',
             }}
           >
             {message}
@@ -429,19 +428,18 @@ export default function Profile() {
         )}
 
         <form
-          className="profile-form"
           onSubmit={handleSave}
-          style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}
+          style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}
         >
           <div>
             <label
               style={{
                 display: 'block',
-                fontSize: '12px',
+                fontSize: '11px',
                 fontWeight: '600',
                 color: '#6b7280',
                 textTransform: 'uppercase',
-                marginBottom: '6px',
+                marginBottom: '4px',
               }}
             >
               Nombre Completo
@@ -455,8 +453,8 @@ export default function Profile() {
                 backgroundColor: '#f9fafb',
                 border: '1px solid #d1d5db',
                 borderRadius: '8px',
-                padding: '10px 14px',
-                fontSize: '14px',
+                padding: '8px 12px',
+                fontSize: '13px',
                 color: '#111827',
                 outline: 'none',
                 boxSizing: 'border-box',
@@ -469,18 +467,18 @@ export default function Profile() {
             style={{
               display: 'grid',
               gridTemplateColumns: '1fr 1fr',
-              gap: '16px',
+              gap: '12px',
             }}
           >
             <div>
               <label
                 style={{
                   display: 'block',
-                  fontSize: '12px',
+                  fontSize: '11px',
                   fontWeight: '600',
                   color: '#6b7280',
                   textTransform: 'uppercase',
-                  marginBottom: '6px',
+                  marginBottom: '4px',
                 }}
               >
                 Cédula de Identidad (C.I.)
@@ -495,8 +493,8 @@ export default function Profile() {
                   backgroundColor: '#f9fafb',
                   border: '1px solid #d1d5db',
                   borderRadius: '8px',
-                  padding: '10px 14px',
-                  fontSize: '14px',
+                  padding: '8px 12px',
+                  fontSize: '13px',
                   color: '#111827',
                   outline: 'none',
                   boxSizing: 'border-box',
@@ -507,11 +505,11 @@ export default function Profile() {
               <label
                 style={{
                   display: 'block',
-                  fontSize: '12px',
+                  fontSize: '11px',
                   fontWeight: '600',
                   color: '#6b7280',
                   textTransform: 'uppercase',
-                  marginBottom: '6px',
+                  marginBottom: '4px',
                 }}
               >
                 Ciudad
@@ -526,8 +524,8 @@ export default function Profile() {
                   backgroundColor: '#f9fafb',
                   border: '1px solid #d1d5db',
                   borderRadius: '8px',
-                  padding: '10px 14px',
-                  fontSize: '14px',
+                  padding: '8px 12px',
+                  fontSize: '13px',
                   color: '#111827',
                   outline: 'none',
                   boxSizing: 'border-box',
@@ -541,11 +539,11 @@ export default function Profile() {
             <label
               style={{
                 display: 'block',
-                fontSize: '12px',
+                fontSize: '11px',
                 fontWeight: '600',
                 color: '#6b7280',
                 textTransform: 'uppercase',
-                marginBottom: '6px',
+                marginBottom: '4px',
               }}
             >
               Documento de Identidad (CI)
@@ -554,18 +552,18 @@ export default function Profile() {
               style={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: '12px',
+                gap: '10px',
                 backgroundColor: '#f9fafb',
                 border: '1px solid #d1d5db',
                 borderRadius: '8px',
-                padding: '10px 14px',
+                padding: '8px 12px',
                 boxSizing: 'border-box',
               }}
             >
               <div
                 style={{
-                  width: '36px',
-                  height: '36px',
+                  width: '32px',
+                  height: '32px',
                   borderRadius: '8px',
                   backgroundColor: ciUrl ? '#dcfce7' : '#f3f4f6',
                   display: 'flex',
@@ -576,8 +574,8 @@ export default function Profile() {
               >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
-                  width="18"
-                  height="18"
+                  width="16"
+                  height="16"
                   viewBox="0 0 24 24"
                   fill="none"
                   stroke={ciUrl ? '#16a34a' : '#9ca3af'}
@@ -595,7 +593,7 @@ export default function Profile() {
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div
                   style={{
-                    fontSize: '13px',
+                    fontSize: '12px',
                     color: ciUrl ? '#111827' : '#9ca3af',
                     whiteSpace: 'nowrap',
                     overflow: 'hidden',
@@ -612,7 +610,7 @@ export default function Profile() {
                       setShowCiModal(true);
                     }}
                     style={{
-                      fontSize: '11px',
+                      fontSize: '10px',
                       color: '#2563eb',
                       background: 'none',
                       border: 'none',
@@ -635,8 +633,8 @@ export default function Profile() {
                   color: '#ffffff',
                   border: 'none',
                   borderRadius: '6px',
-                  padding: '6px 12px',
-                  fontSize: '12px',
+                  padding: '5px 10px',
+                  fontSize: '11px',
                   fontWeight: '600',
                   cursor: uploadingCi ? 'wait' : 'pointer',
                   whiteSpace: 'nowrap',
@@ -658,9 +656,9 @@ export default function Profile() {
             </div>
             <span
               style={{
-                fontSize: '11px',
+                fontSize: '10px',
                 color: '#9ca3af',
-                marginTop: '6px',
+                marginTop: '4px',
                 display: 'block',
               }}
             >
@@ -672,11 +670,11 @@ export default function Profile() {
             <label
               style={{
                 display: 'block',
-                fontSize: '12px',
+                fontSize: '11px',
                 fontWeight: '600',
                 color: '#6b7280',
                 textTransform: 'uppercase',
-                marginBottom: '6px',
+                marginBottom: '4px',
               }}
             >
               Correo Electrónico
@@ -690,8 +688,8 @@ export default function Profile() {
                 backgroundColor: '#f3f4f6',
                 border: '1px solid #e5e7eb',
                 borderRadius: '8px',
-                padding: '10px 14px',
-                fontSize: '14px',
+                padding: '8px 12px',
+                fontSize: '13px',
                 color: '#9ca3af',
                 cursor: 'not-allowed',
                 boxSizing: 'border-box',
@@ -703,11 +701,11 @@ export default function Profile() {
             <label
               style={{
                 display: 'block',
-                fontSize: '12px',
+                fontSize: '11px',
                 fontWeight: '600',
                 color: '#6b7280',
                 textTransform: 'uppercase',
-                marginBottom: '6px',
+                marginBottom: '4px',
               }}
             >
               Rol Asignado
@@ -721,8 +719,8 @@ export default function Profile() {
                 backgroundColor: '#f3f4f6',
                 border: '1px solid #e5e7eb',
                 borderRadius: '8px',
-                padding: '10px 14px',
-                fontSize: '14px',
+                padding: '8px 12px',
+                fontSize: '13px',
                 color: '#9ca3af',
                 textTransform: 'capitalize',
                 cursor: 'not-allowed',
@@ -739,12 +737,12 @@ export default function Profile() {
               backgroundColor: '#000000',
               color: '#ffffff',
               fontWeight: '600',
-              padding: '12px',
+              padding: '10px',
               borderRadius: '10px',
               border: 'none',
               cursor: 'pointer',
-              marginTop: '10px',
-              fontSize: '14px',
+              marginTop: '6px',
+              fontSize: '13px',
             }}
           >
             {saving ? 'Guardando...' : 'Guardar Cambios'}
@@ -870,81 +868,6 @@ export default function Profile() {
         @keyframes spin {
           from { transform: rotate(0deg); }
           to { transform: rotate(360deg); }
-        }
-
-        /* ===== ESTILOS ADAPTATIVOS EXCLUSIVOS PARA MÓVIL (Sin Scroll y Elementos Reducidos) ===== */
-        @media (max-width: 768px) {
-          .profile-container {
-            min-height: calc(100vh - 65px) !important;
-            height: calc(100vh - 65px) !important;
-            max-height: calc(100vh - 65px) !important;
-            padding: 8px 12px !important;
-            box-sizing: border-box !important;
-            overflow: hidden !important;
-            align-items: center !important;
-          }
-
-          .profile-card {
-            padding: 14px 16px !important;
-            border-radius: 12px !important;
-            max-height: 100% !important;
-            display: flex !important;
-            flex-direction: column !important;
-            justify-content: space-between !important;
-            overflow: hidden !important;
-            box-sizing: border-box !important;
-          }
-
-          .profile-title {
-            font-size: 17px !important;
-            padding-bottom: 6px !important;
-            margin-bottom: 10px !important;
-          }
-
-          .profile-avatar-section {
-            margin-bottom: 10px !important;
-          }
-
-          .profile-avatar-img-container {
-            width: 80px !important;
-            height: 80px !important;
-          }
-
-          .profile-avatar-section button {
-            margin-top: 6px !important;
-            padding: 4px 10px !important;
-            font-size: 11px !important;
-          }
-
-          .profile-avatar-section span {
-            display: none !important; /* Oculta texto secundario pequeño para ganar espacio */
-          }
-
-          .profile-alert {
-            padding: 6px 10px !important;
-            margin-bottom: 10px !important;
-            font-size: 11px !important;
-          }
-
-          .profile-form {
-            gap: 10px !important;
-          }
-
-          .profile-form input {
-            padding: 6px 10px !important;
-            font-size: 13px !important;
-          }
-
-          .profile-form label {
-            margin-bottom: 2px !important;
-            font-size: 10px !important;
-          }
-
-          .profile-form button[type="submit"] {
-            margin-top: 4px !important;
-            padding: 9px !important;
-            font-size: 13px !important;
-          }
         }
       `}</style>
     </div>
