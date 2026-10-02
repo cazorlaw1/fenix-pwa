@@ -567,7 +567,7 @@ export default function Dashboard({ overrideRole }) {
           style={{
             display: 'flex',
             alignItems: 'center',
-            gap: '6px',
+            gap: '4px',
             marginBottom: '14px',
             overflowX: 'auto',
             paddingBottom: '4px',
