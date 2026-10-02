@@ -6656,9 +6656,10 @@ const handleDeleteClient = async (clientId, clientName) => {
                 {/* TABLA DESKTOP */}
                 <div className="desktop-table"
                   style={{
-                    width: '100%',
-                    overflowX: 'auto',
-                    WebkitOverflowScrolling: 'touch',
+                        width: '100%', 
+    display: 'block', // <--- AGREGAR ESTO
+    overflowX: 'auto', 
+    WebkitOverflowScrolling: 'touch' ,
                   }}
                 >
                   <table
