@@ -571,6 +571,9 @@ export default function Dashboard({ overrideRole }) {
             marginBottom: '14px',
             overflowX: 'auto',
             paddingBottom: '4px',
+            scrollbarWidth: 'none', // Oculta barra de scroll en Firefox
+            msOverflowStyle: 'none', // Oculta barra de scroll en IE/Edge
+    
           }}
         >
           {/* Botón Nueva NE con mismo estilo que los accesos */}
