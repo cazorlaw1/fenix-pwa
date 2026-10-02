@@ -918,7 +918,7 @@ export default function AdminModule() {
     }
   };
 
-  const fetchTabData = async () => {
+const fetchTabData = async () => {
     setLoading(true);
     setErrorMsg('');
     try {
@@ -963,6 +963,11 @@ export default function AdminModule() {
           .order('created_at', { ascending: false });
         if (error) throw error;
         setCobranzaNotes(data || []);
+
+        // 🛑 👉 AQUÍ ESTÁ LA LLAMADA AUTOMÁTICA DE LAS ALERTAS DE ANTIGÜEDAD:
+        if (data && data.length > 0) {
+          await checkAndNotifyAgingNotes(data);
+        }
 
         const { data: notifs, error: notifErr } = await supabase
           .from('seller_payment_notifications')
@@ -1061,6 +1066,71 @@ export default function AdminModule() {
       setErrorMsg('No se pudieron recuperar los datos del servidor.');
     } finally {
       setLoading(false);
+    }
+  };
+ // --- COLOQUÉ ESTA FUNCIÓN AQUÍ (Línea 1066 en adelante) ---
+  const checkAndNotifyAgingNotes = async (notesList) => {
+    try {
+      const today = new Date();
+      
+      for (const note of notesList) {
+        if (note.payment_status === 'cerrada') continue;
+
+        const createdAt = new Date(note.created_at);
+        const diffTime = Math.abs(today - createdAt);
+        const days = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+        let milestoneHit = null;
+        let updateField = null;
+
+        if (days >= 60 && !note.notified_60) {
+          milestoneHit = '60';
+          updateField = 'notified_60';
+        } else if (days >= 45 && days < 60 && !note.notified_45) {
+          milestoneHit = '45';
+          updateField = 'notified_45';
+        } else if (days >= 30 && days < 45 && !note.notified_30) {
+          milestoneHit = '30';
+          updateField = 'notified_30';
+        }
+
+        if (milestoneHit && updateField) {
+          const { data: adminProfile } = await supabase
+            .from('profiles')
+            .select('email')
+            .eq('role', 'administrador')
+            .single();
+
+          const vendedorEmail = note.seller?.email;
+          const vendedorNombre = note.seller?.full_name || 'Vendedor';
+          const clienteNombre = note.client?.name || 'Cliente';
+          const nroTransaccion = note.transaction_number;
+          const saldoPendiente = Number(note.balance_due_usd || 0).toFixed(2);
+
+          await supabase.functions.invoke('send-notification', {
+            body: {
+              type: 'note_aging',
+              payload: {
+                vendedorEmail,
+                adminEmail: adminProfile?.email,
+                vendedorNombre,
+                clienteNombre,
+                nroTransaccion,
+                diasAntiguedad: days,
+                hito: milestoneHit,
+                saldoPendiente,
+              },
+            },
+          });
+
+          await supabase
+            .from('sales_orders')
+            .update({ [updateField]: true })
+            .eq('id', note.id);
+        }
+      }
+    } catch (err) {
+      console.error('Error procesando alertas de antigüedad:', err);
     }
   };
 
