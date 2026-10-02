@@ -32,6 +32,7 @@ import {
   Target,
   Banknote,
   ShoppingCart,
+  Check, // Agregado para el menú responsivo
 } from 'lucide-react';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -194,12 +195,47 @@ function SearchableDropdown({
 export default function SalesModule() {
   const { user, role } = useAuth();
 
-  // Navegación Submenú Principal
-  const [activeSubMenu, setActiveSubMenu] = useState('clientes');
+  // Referencias para el menú móvil
+  const mobileMenuRef = useRef(null);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  // --- A. PERSISTENCIA Y NAVEGACIÓN DE PESTAÑAS ---
+  // Inicialización con prioridad: URL Param > localStorage > Default
+  const getInitialSubMenu = () => {
+    const params = new URLSearchParams(window.location.search);
+    const urlTab = params.get('tab');
+    if (urlTab) return urlTab;
+    
+    const savedTab = localStorage.getItem('salesModule_activeTab');
+    if (savedTab) return savedTab;
+    
+    return 'clientes';
+  };
+
+  const [activeSubMenu, setActiveSubMenu] = useState(getInitialSubMenu());
+
+  // Efecto para guardar en localStorage y actualizar URL cuando cambia la pestaña
+  useEffect(() => {
+    localStorage.setItem('salesModule_activeTab', activeSubMenu);
+    // Opcional: Actualizar URL sin recargar
+    const url = new URL(window.location);
+    url.searchParams.set('tab', activeSubMenu);
+    window.history.replaceState({}, '', url);
+  }, [activeSubMenu]);
+
+  // Efecto para cerrar menú móvil al hacer clic fuera
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (mobileMenuRef.current && !mobileMenuRef.current.contains(event.target)) {
+        setIsMobileMenuOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // Pestañas específicas de la sección Clientes (Predeterminada: 'registrar')
   const [clienteTab, setClienteTab] = useState('registrar');
-
   // Pestañas de Visitas y Nota de Entrega
   const [visitasTab, setVisitasTab] = useState('potenciales');
   const [neTab, setNeTab] = useState('crear_ne');
@@ -236,8 +272,8 @@ export default function SalesModule() {
   const [globalDiscount23, setGlobalDiscount23] = useState(23.08);
   const [globalTerms, setGlobalTerms] = useState('Cargando términos...');
   const [estimatedNextFolio, setEstimatedNextFolio] = useState('...');
-
   // -------------------------------------------------
+
   // NUEVO ESTADO PARA HISTORIAL DE FACTURACIÓN DEL USUARIO
   const [userSettlementHistory, setUserSettlementHistory] = useState([]);
   const [historySearch, setHistorySearch] = useState('');
@@ -389,27 +425,29 @@ export default function SalesModule() {
     fetchUserSettlementHistory();
   }, [user, role]);
 
-  const fetchGlobalSettings = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('global_settings')
-        .select('*');
-      if (!error && data) {
-        const settingsMap = {};
-        data.forEach((item) => {
-          settingsMap[item.setting_key] = item.setting_value;
-        });
-        if (settingsMap['ne_discount_53'])
-          setGlobalDiscount53(Number(settingsMap['ne_discount_53']));
-        if (settingsMap['ne_discount_23'])
-          setGlobalDiscount23(Number(settingsMap['ne_discount_23']));
-        if (settingsMap['ne_terms_conditions'])
-          setGlobalTerms(settingsMap['ne_terms_conditions']);
-      }
-    } catch (err) {
-      console.error('Error cargando configuración global:', err);
+const fetchGlobalSettings = async () => {
+  try {
+    const { data, error } = await supabase
+      .from('global_settings')
+      .select('*');
+    
+    if (!error && data) {
+      const settingsMap = {};
+      data.forEach((item) => {
+        settingsMap[item.setting_key] = item.setting_value;
+      });
+      
+      // Actualizar estados con los valores de la BD
+      if (settingsMap['ne_discount_53']) setGlobalDiscount53(Number(settingsMap['ne_discount_53']));
+      if (settingsMap['ne_discount_23']) setGlobalDiscount23(Number(settingsMap['ne_discount_23']));
+      if (settingsMap['ne_terms_conditions']) setGlobalTerms(settingsMap['ne_terms_conditions']);
+    } else if (error) {
+      console.error("Error cargando configuración global:", error);
     }
-  };
+  } catch (err) {
+    console.error('Error inesperado cargando configuración:', err);
+  }
+};
 
   const fetchEstimatedFolio = async () => {
     try {
@@ -470,7 +508,6 @@ export default function SalesModule() {
       .select('*, profiles:assigned_seller_id(full_name, email, role)')
       .eq('is_potential', false)
       .eq('assigned_seller_id', user?.id);
-
     const { data } = await query.order('name', { ascending: true });
     if (data) setClients(data);
   };
@@ -481,7 +518,6 @@ export default function SalesModule() {
       .select('*, profiles:assigned_seller_id(full_name)')
       .eq('is_potential', true)
       .eq('assigned_seller_id', user?.id);
-
     const { data } = await query.order('created_at', { ascending: false });
     if (data) setPotenciales(data);
   };
@@ -501,7 +537,6 @@ export default function SalesModule() {
         '*, clients(name), profiles:seller_id(full_name, email, role, pct_bombillos, pct_fluidos, sales_goal_usd), vales(id, requested_amount_usd, status)'
       )
       .eq('seller_id', user?.id);
-
     const { data } = await query.order('created_at', { ascending: false });
     if (data) setSalesHistory(data);
   };
@@ -577,7 +612,6 @@ export default function SalesModule() {
       const { data: salesData } = await salesQuery;
       let totalCerradas = 0;
       let totalPendientesNe = 0;
-
       if (salesData) {
         salesData.forEach((s) => {
           const precio = Number(s.final_price_usd) || 0;
@@ -587,7 +621,6 @@ export default function SalesModule() {
           const porcentajeAplicado =
             cat === 'fluidos' ? pctFluidos : pctBombillos;
           const comisionOrden = precio * (porcentajeAplicado / 100);
-
           if (s.payment_status === 'cerrada') {
             totalCerradas += comisionOrden;
           } else {
@@ -639,7 +672,6 @@ export default function SalesModule() {
     0
   );
   const grandTotalNe = totalNeFromHistory + totalNeFromSettlements;
-
   const sellerSalesTotal = grandTotalNe;
   const sellerMetaGoal = Number(sellerProfile?.sales_goal_usd || 0);
   const remainingToGoal = Math.max(0, sellerMetaGoal - sellerSalesTotal);
@@ -676,13 +708,10 @@ export default function SalesModule() {
       .toString(36)
       .substring(7)}.${fileExt}`;
     const filePath = `${pathFolder}/${fileName}`;
-
     const { error } = await supabase.storage
       .from(bucketName)
       .upload(filePath, file);
-
     if (error) throw error;
-
     const { data } = supabase.storage.from(bucketName).getPublicUrl(filePath);
     return data.publicUrl;
   };
@@ -747,7 +776,6 @@ export default function SalesModule() {
       ]);
 
       if (error) throw error;
-
       setMessage({
         type: 'success',
         text: 'Cliente registrado correctamente.',
@@ -792,7 +820,6 @@ export default function SalesModule() {
 
   const handleUpdateClient = async (e) => {
     e.preventDefault();
-
     // Validaciones de formato imagen
     if (editCiFile && !validateImageFile(editCiFile)) {
       alert('La nueva foto de C.I. debe ser una imagen.');
@@ -857,7 +884,6 @@ export default function SalesModule() {
         .eq('id', editClientModal.clientData.id);
 
       if (error) throw error;
-
       setMessage({
         type: 'success',
         text: 'Datos y documentos del cliente actualizados correctamente.',
@@ -871,69 +897,88 @@ export default function SalesModule() {
     }
   };
 
-  const handleDeleteClient = async (clientId, clientName) => {
-    if (
-      !window.confirm(
-        `¿Estás seguro de que deseas eliminar a "${clientName}"? Esta acción eliminará el registro y sus archivos.`
-      )
-    ) {
-      return;
-    }
+const handleDeleteClient = async (clientId, clientName) => {
+  setLoading(true);
+  try {
+    // 1. Verificar si existen Notas de Entrega pendientes o aprobadas para este cliente
+    const { data: activeOrders, error: ordersErr } = await supabase
+      .from('sales_orders')
+      .select('id, status, transaction_number')
+      .eq('client_id', clientId)
+      .in('status', ['pendiente', 'aprobada']); // Bloqueamos si hay notas en proceso
 
-    setLoading(true);
-    try {
-      const { data: client, error: fetchErr } = await supabase
-        .from('clients')
-        .select('*')
-        .eq('id', clientId)
-        .single();
+    if (ordersErr) throw ordersErr;
 
-      if (fetchErr) throw fetchErr;
-
-      // Recopilar rutas de archivos para eliminar
-      const docPaths = [
-        getStoragePathFromUrl(client.ci_photo_url, 'documents'),
-        getStoragePathFromUrl(client.rif_photo_url, 'documents'),
-        getStoragePathFromUrl(client.additional_doc_url, 'documents'),
-      ].filter(Boolean);
-
-      const visitPath = getStoragePathFromUrl(
-        client.last_visit_photo_url,
-        'visits'
-      );
-
-      // Eliminar archivos del storage primero
-      if (docPaths.length > 0) {
-        await supabase.storage.from('documents').remove(docPaths);
-      }
-      if (visitPath) {
-        await supabase.storage.from('visits').remove([visitPath]);
-      }
-
-      // Finalmente eliminar el registro de la base de datos
-      const { error: deleteErr } = await supabase
-        .from('clients')
-        .delete()
-        .eq('id', clientId);
-
-      if (deleteErr) throw deleteErr;
-
-      setMessage({
-        type: 'success',
-        text: `El cliente "${clientName}" fue eliminado exitosamente.`,
-      });
-      fetchClients();
-      fetchPotenciales();
-      fetchSalesHistory();
-    } catch (err) {
+    // Si encuentra al menos una nota activa, bloqueamos la eliminación
+    if (activeOrders && activeOrders.length > 0) {
+      const count = activeOrders.length;
+      const firstTrans = activeOrders[0].transaction_number || activeOrders[0].id.substring(0, 6);
+      
       setMessage({
         type: 'error',
-        text: 'Error al eliminar cliente: ' + err.message,
+        text: `No se puede eliminar al cliente "${clientName}" porque tiene ${count} Nota(s) de Entrega activa(s) (Ej: #${firstTrans}). Finalice o elimine las notas primero.`,
       });
-    } finally {
       setLoading(false);
+      return; // Detenemos la ejecución aquí
     }
-  };
+
+    // 2. Si no hay notas activas, procedemos a obtener los datos del cliente para borrar sus archivos
+    const { data: client, error: fetchErr } = await supabase
+      .from('clients')
+      .select('*')
+      .eq('id', clientId)
+      .single();
+
+    if (fetchErr) throw fetchErr;
+
+    // Recopilar rutas de archivos para eliminar
+    const docPaths = [
+      getStoragePathFromUrl(client.ci_photo_url, 'documents'),
+      getStoragePathFromUrl(client.rif_photo_url, 'documents'),
+      getStoragePathFromUrl(client.additional_doc_url, 'documents'),
+    ].filter(Boolean);
+
+    const visitPath = getStoragePathFromUrl(
+      client.last_visit_photo_url,
+      'visits'
+    );
+
+    // Eliminar archivos del storage primero
+    if (docPaths.length > 0) {
+      await supabase.storage.from('documents').remove(docPaths);
+    }
+    if (visitPath) {
+      await supabase.storage.from('visits').remove([visitPath]);
+    }
+
+    // Finalmente eliminar el registro de la base de datos
+    const { error: deleteErr } = await supabase
+      .from('clients')
+      .delete()
+      .eq('id', clientId);
+
+    if (deleteErr) throw deleteErr;
+
+    setMessage({
+      type: 'success',
+      text: `El cliente "${clientName}" fue eliminado exitosamente.`,
+    });
+    
+    // Refrescar las listas
+    fetchClients();
+    fetchPotenciales();
+    // No es estrictamente necesario refrescar salesHistory aquí si solo borramos clientes sin notas, 
+    // pero lo dejamos por consistencia si hubiera notas cerradas huérfanas (aunque la lógica de negocio usualmente lo evita).
+    
+  } catch (err) {
+    setMessage({
+      type: 'error',
+      text: 'Error al eliminar cliente: ' + err.message,
+    });
+  } finally {
+    setLoading(false);
+  }
+};
 
   // ---------------------------------------------------------------------------
   // MANEJADORES: POTENCIALES CLIENTES Y VISITAS EXIGIDAS (CON GPS)
@@ -974,7 +1019,6 @@ export default function SalesModule() {
       ]);
 
       if (error) throw error;
-
       setMessage({
         type: 'success',
         text: 'Cliente Potencial guardado y registrado con GPS.',
@@ -993,7 +1037,6 @@ export default function SalesModule() {
   const handleCaptureVisitaGps = async (id) => {
     getDeviceLocation(async (coords) => {
       setVisitasGps((prev) => ({ ...prev, [id]: coords }));
-
       // Guardar inmediatamente en la base de datos como solicitado
       try {
         await supabase
@@ -1016,7 +1059,6 @@ export default function SalesModule() {
       );
       return;
     }
-
     const file = visitasFiles[id];
     if (file && !validateImageFile(file)) {
       alert('La foto de la visita debe ser una imagen.');
@@ -1026,7 +1068,6 @@ export default function SalesModule() {
     setLoading(true);
     try {
       let adjuntoUrl = null;
-
       // Si hay nuevo archivo, subirlo. Si ya había uno, la lógica simple aquí sobrescribe la URL.
       if (file) {
         adjuntoUrl = await uploadFile(file, 'visits', 'visitas');
@@ -1037,7 +1078,6 @@ export default function SalesModule() {
         // Actualizar GPS también por seguridad si cambió
         last_gps_location: { lat: gps.lat, lng: gps.lng },
       };
-
       if (adjuntoUrl) updateData.last_visit_photo_url = adjuntoUrl;
 
       const { error } = await supabase
@@ -1126,7 +1166,6 @@ export default function SalesModule() {
       // Nota: Al convertir, asumimos que no hay CI/RIF previos en 'documents' porque era potencial.
       // Pero si hubiera foto de visita en 'visits', esa se mantiene o se limpia según lógica de negocio.
       // Aquí solo actualizamos los campos oficiales.
-
       const { error } = await supabase
         .from('clients')
         .update({
@@ -1146,7 +1185,6 @@ export default function SalesModule() {
         .eq('id', convertModal.potencialData.id);
 
       if (error) throw error;
-
       setMessage({
         type: 'success',
         text: `¡El cliente "${convertForm.nombre}" ha sido promovido a Cliente Oficial!`,
@@ -1178,13 +1216,10 @@ export default function SalesModule() {
     if (!neSelectedProdId) return;
     const prod = products.find((p) => p.id === neSelectedProdId);
     if (!prod) return;
-
     const qty = Number(neQuantity);
     if (qty <= 0) return alert('Cantidad debe ser mayor a 0');
-
     const inCart = neCart.find((item) => item.product_id === prod.id);
     const currentQty = inCart ? inCart.quantity : 0;
-
     if (currentQty + qty > prod.stock_current) {
       alert(`Stock insuficiente. Disponible: ${prod.stock_current}`);
       return;
@@ -1266,17 +1301,14 @@ export default function SalesModule() {
       if (editModeId) {
         // --- LÓGICA DE EDICIÓN ---
         // Aquí iría tu lógica existente para restaurar stock si es necesario...
-
         const { data: updatedData, error } = await supabase
           .from('sales_orders')
           .update(payload)
           .eq('id', editModeId)
           .select() // Agregamos select para obtener los datos actualizados
           .single();
-
         if (error) throw error;
         transactionNumber = updatedData?.transaction_number; // Obtenemos el número de la nota editada
-
         await supabase.from('order_items').delete().eq('order_id', editModeId);
       } else {
         // --- LÓGICA DE CREACIÓN ---
@@ -1285,7 +1317,6 @@ export default function SalesModule() {
           .insert([payload])
           .select()
           .single();
-
         if (error) throw error;
         orderId = newNota.id;
         transactionNumber = newNota.transaction_number; // Obtenemos el número de la nueva nota
@@ -1326,13 +1357,11 @@ export default function SalesModule() {
           ? 'Nota de Entrega editada correctamente.'
           : 'Nota de Entrega enviada a revisión con coordenadas GPS guardadas.',
       });
-
       setNeCart([]);
       setNeClientId('');
       setNeObservacion('');
       setNeGpsLocation(null);
       setEditModeId(null);
-
       fetchSalesHistory();
       fetchComisionesYVales();
       fetchEstimatedFolio();
@@ -1410,7 +1439,6 @@ export default function SalesModule() {
               .select('stock_current')
               .eq('id', item.product_id)
               .single();
-
             if (prodData) {
               const restoredStock = prodData.stock_current + item.quantity;
               await supabase
@@ -1428,7 +1456,6 @@ export default function SalesModule() {
         .eq('id', nota.id);
 
       if (error) throw error;
-
       setMessage({
         type: 'success',
         text: 'Nota de Entrega eliminada correctamente.',
@@ -1481,27 +1508,27 @@ export default function SalesModule() {
             item.quantity * item.discounted_unit_price_usd;
           subTotal += totalLine;
           itemsHtml += `
-    <tr>
-      <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; font-family: monospace;">${
-        item.products?.code || 'S/C'
-      }</td>
-      <td style="padding: 6px 8px; border-bottom: 1px solid #ddd;">${
-        item.products?.description || 'Producto'
-      }</td>
-      <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: center;">${
-        item.quantity
-      }</td>
-      <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: right;">$${Number(
-        item.unit_price_usd || 0
-      ).toFixed(2)}</td>
-      <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: right; color: #B45309;">$${Number(
-        item.discounted_unit_price_usd || 0
-      ).toFixed(2)}</td>
-      <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: right; font-weight: bold;">$${Number(
-        totalLine
-      ).toFixed(2)}</td>
-    </tr>
-  `;
+<tr>
+  <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; font-family: monospace;">${
+    item.products?.code || 'S/C'
+  }</td>
+  <td style="padding: 6px 8px; border-bottom: 1px solid #ddd;">${
+    item.products?.description || 'Producto'
+  }</td>
+  <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: center;">${
+    item.quantity
+  }</td>
+  <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: right;">$${Number(
+    item.unit_price_usd || 0
+  ).toFixed(2)}</td>
+  <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: right; color: #B45309;">$${Number(
+    item.discounted_unit_price_usd || 0
+  ).toFixed(2)}</td>
+  <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: right; font-weight: bold;">$${Number(
+    totalLine
+  ).toFixed(2)}</td>
+</tr>
+`;
         });
       }
 
@@ -1545,9 +1572,7 @@ export default function SalesModule() {
       <div style="width: 280px; background: #f9fafb; padding: 12px; border: 1px solid #ddd; border-radius: 6px;">
         <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
           <span>Total Base:</span>
-          <strong>$${Number(nota.total_base_usd || subTotal).toFixed(
-            2
-          )}</strong>
+          <strong>$${Number(nota.total_base_usd || subTotal).toFixed(2)}</strong>
         </div>
         <div style="display: flex; justify-content: space-between; margin-bottom: 6px; color: #B45309;">
           <span>Descuento Aplicado:</span>
@@ -1582,7 +1607,6 @@ export default function SalesModule() {
         html2canvas: { scale: 2, useCORS: true },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
       };
-
       await window.html2pdf().from(container).set(opciones).save();
     } catch (err) {
       alert('Error al generar PDF: ' + err.message);
@@ -1619,7 +1643,6 @@ export default function SalesModule() {
         html2canvas: { scale: 2, useCORS: true },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
       };
-
       await window.html2pdf().from(container).set(opciones).save();
     } catch (err) {
       alert('Error al generar PDF de factura histórica: ' + err.message);
@@ -1646,6 +1669,7 @@ export default function SalesModule() {
   const handleSolicitarVale = async () => {
     if (!valeModal.monto || Number(valeModal.monto) <= 0)
       return alert('Ingrese un monto válido');
+
     setLoading(true);
     try {
       // Obtener datos de la nota para el correo
@@ -1665,6 +1689,7 @@ export default function SalesModule() {
           status: 'pendiente',
         },
       ]);
+
       if (error) throw error;
 
       // ✅ ENVIAR CORREO AL ADMINISTRADOR SOBRE LA SOLICITUD DE VALE
@@ -1730,7 +1755,6 @@ export default function SalesModule() {
   const handleEnviarNotificacionAbono = async (e) => {
     e.preventDefault();
     if (!abonoNotifModal.notaId) return;
-
     const fileToUpload = abonoFiles[abonoNotifModal.notaId];
     if (!fileToUpload) {
       alert('Es obligatorio adjuntar una foto del billete o recibo.');
@@ -1808,7 +1832,6 @@ export default function SalesModule() {
         type: 'success',
         text: 'Notificación de abono registrada y administrador notificado.',
       });
-
       setAbonoNotifModal({ open: false, notaId: null });
       setAbonoForm({
         payment_date: new Date().toISOString().split('T')[0],
@@ -1911,7 +1934,6 @@ export default function SalesModule() {
       alert('El archivo debe ser una imagen.');
       return;
     }
-
     const { clientId, fieldName, url: oldUrl } = imageModal;
     if (!clientId || !fieldName) return;
 
@@ -1948,11 +1970,9 @@ export default function SalesModule() {
 
       // Actualizar estado local y cerrar modal
       setImageModal((prev) => ({ ...prev, url: newUrl }));
-
       // Refrescar listas
       fetchClients();
       fetchPotenciales();
-
       setMessage({ type: 'success', text: 'Imagen sustituida correctamente.' });
     } catch (err) {
       setMessage({
@@ -1964,16 +1984,51 @@ export default function SalesModule() {
     }
   };
 
+  // Lista de pestañas para el menú
+  const menuTabs = [
+    { id: 'clientes', label: 'Clientes', icon: Users },
+    { id: 'visitas', label: 'Visitas', icon: MapPin },
+    { id: 'nota_entrega', label: 'Nota de Entrega', icon: FileText },
+    { id: 'historial_ventas', label: 'Historial de Ventas', icon: History },
+  ];
+
   return (
     <div
       style={{
         padding: '24px',
-        maxWidth: '1280px',
+        maxWidth: '1200px',
         margin: '0 auto',
         fontFamily: 'sans-serif',
         boxSizing: 'border-box',
       }}
     >
+      {/* BLOQUE DE ESTILOS GLOBALES PARA RESPONSIVIDAD */}
+      <style>{`
+        @media (max-width: 768px) {
+          .desktop-tabs { display: none !important; }
+          .mobile-menu-container { display: block !important; }
+          .desktop-table { display: none !important; }
+          .mobile-cards-container { display: flex !important; flex-direction: column; gap: 12px; }
+          
+          /* Ajuste de botones internos en móvil */
+          .action-buttons-wrapper {
+            flex-wrap: wrap !important;
+            justify-content: center !important;
+          }
+          .action-buttons-wrapper button {
+            padding: 4px 6px !important;
+            font-size: 10px !important;
+            min-width: 30% !important;
+          }
+        }
+        @media (min-width: 769px) {
+          .desktop-tabs { display: flex !important; }
+          .mobile-menu-container { display: none !important; }
+          .desktop-table { display: table !important; }
+          .mobile-cards-container { display: none !important; }
+        }
+      `}</style>
+
       <div
         style={{
           display: 'flex',
@@ -2003,7 +2058,8 @@ export default function SalesModule() {
         </div>
       </div>
 
-      <div
+      {/* MENÚ HORIZONTAL (DESKTOP) */}
+      <div className="desktop-tabs"
         style={{
           display: 'flex',
           gap: '8px',
@@ -2012,16 +2068,7 @@ export default function SalesModule() {
           overflowX: 'auto',
         }}
       >
-        {[
-          { id: 'clientes', label: 'Clientes', icon: Users },
-          { id: 'visitas', label: 'Visitas', icon: MapPin },
-          { id: 'nota_entrega', label: 'Nota de Entrega', icon: FileText },
-          {
-            id: 'historial_ventas',
-            label: 'Historial de Ventas',
-            icon: History,
-          },
-        ].map((tab) => {
+        {menuTabs.map((tab) => {
           const Icon = tab.icon;
           const isActive = activeSubMenu === tab.id;
           return (
@@ -2050,6 +2097,87 @@ export default function SalesModule() {
             </button>
           );
         })}
+      </div>
+
+      {/* MENÚ DROPDOWN (MÓVIL) */}
+      <div className="mobile-menu-container" ref={mobileMenuRef} style={{ display: 'none', marginBottom: '24px', position: 'relative' }}>
+        <button
+          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+          style={{
+            width: '100%',
+            padding: '12px 16px',
+            backgroundColor: '#ffffff',
+            border: '1px solid #d1d5db',
+            borderRadius: '8px',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            fontSize: '14px',
+            fontWeight: '600',
+            color: '#111827',
+            boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+          }}
+        >
+          <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            {(() => {
+              const ActiveIcon = menuTabs.find(t => t.id === activeSubMenu)?.icon || Users;
+              return <ActiveIcon size={18} color="#dc2626" />;
+            })()}
+            {menuTabs.find((t) => t.id === activeSubMenu)?.label || 'Seleccionar'}
+          </span>
+          <ChevronDown size={18} color="#6b7280" />
+        </button>
+
+        {isMobileMenuOpen && (
+          <div
+            style={{
+              position: 'absolute',
+              top: '100%',
+              left: 0,
+              right: 0,
+              marginTop: '4px',
+              backgroundColor: '#ffffff',
+              border: '1px solid #e5e7eb',
+              borderRadius: '8px',
+              boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)',
+              zIndex: 50,
+              overflow: 'hidden',
+            }}
+          >
+            {menuTabs.map((tab) => {
+              const Icon = tab.icon;
+              const isActive = activeSubMenu === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => {
+                    setActiveSubMenu(tab.id);
+                    setIsMobileMenuOpen(false);
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '12px 16px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    backgroundColor: isActive ? '#fef2f2' : 'transparent',
+                    color: isActive ? '#dc2626' : '#4b5563',
+                    border: 'none',
+                    borderBottom: '1px solid #f3f4f6',
+                    fontSize: '14px',
+                    fontWeight: isActive ? '600' : '500',
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                  }}
+                >
+                  <Icon size={18} color={isActive ? '#dc2626' : '#9ca3af'} />
+                  <span>{tab.label}</span>
+                  {isActive && <Check size={16} color="#dc2626" style={{ marginLeft: 'auto' }} />}
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {message.text && (
@@ -2125,7 +2253,6 @@ export default function SalesModule() {
               <Users style={{ width: '14px', height: '14px' }} /> Mis Clientes
             </button>
           </div>
-
           {clienteTab === 'registrar' && (
             <div
               style={{
@@ -2471,7 +2598,6 @@ export default function SalesModule() {
               </form>
             </div>
           )}
-
           {clienteTab === 'cartera' && (
             <div
               style={{
@@ -2533,8 +2659,9 @@ export default function SalesModule() {
                   />
                 </div>
               </div>
-              <div
-                className="desktop-table"
+              
+              {/* TABLA DESKTOP */}
+              <div className="desktop-table"
                 style={{
                   width: '100%',
                   overflowX: 'auto',
@@ -2787,6 +2914,7 @@ export default function SalesModule() {
                               }}
                             >
                               <div
+                                className="action-buttons-wrapper"
                                 style={{
                                   display: 'flex',
                                   gap: '6px',
@@ -2871,10 +2999,9 @@ export default function SalesModule() {
                   </tbody>
                 </table>
               </div>
-              <div
-                className="mobile-cards-container"
-                style={{ display: 'none' }}
-              >
+
+              {/* TARJETAS MÓVIL */}
+              <div className="mobile-cards-container">
                 {clients.filter((c) =>
                   c.name
                     ?.toLowerCase()
@@ -2909,7 +3036,7 @@ export default function SalesModule() {
                           gap: '8px',
                         }}
                       >
-                        <div>
+                        <div style={{ borderBottom: '1px solid #E5E7EB', paddingBottom: '8px', marginBottom: '4px' }}>
                           <span
                             style={{
                               fontSize: '10px',
@@ -2923,7 +3050,7 @@ export default function SalesModule() {
                           </span>
                           <span
                             style={{
-                              fontSize: '14px',
+                              fontSize: '16px',
                               fontWeight: '900',
                               color: '#111827',
                             }}
@@ -3100,6 +3227,7 @@ export default function SalesModule() {
                           {currentSellerName}
                         </div>
                         <div
+                          className="action-buttons-wrapper"
                           style={{
                             display: 'flex',
                             gap: '8px',
@@ -3185,7 +3313,8 @@ export default function SalesModule() {
           )}
         </div>
       )}
-
+      
+      {/* MODAL IMAGEN (Global) */}
       {imageModal.open && (
         <div
           style={{
@@ -3256,7 +3385,6 @@ export default function SalesModule() {
                   <Download style={{ width: '14px', height: '14px' }} />{' '}
                   Descargar
                 </a>
-
                 {/* Botón Sustituir */}
                 <label
                   style={{
@@ -3286,7 +3414,6 @@ export default function SalesModule() {
                     }}
                   />
                 </label>
-
                 <button
                   onClick={() =>
                     setImageModal({
@@ -3338,6 +3465,7 @@ export default function SalesModule() {
         </div>
       )}
 
+      {/* MODAL EDITAR CLIENTE */}
       {editClientModal.open && (
         <div
           style={{
@@ -3804,7 +3932,6 @@ export default function SalesModule() {
               Mis Clientes Registrados
             </button>
           </div>
-
           {visitasTab === 'potenciales' && (
             <div
               style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}
@@ -3998,7 +4125,6 @@ export default function SalesModule() {
                   </div>
                 </form>
               </div>
-
               <div
                 style={{
                   backgroundColor: '#FFFFFF',
@@ -4061,8 +4187,9 @@ export default function SalesModule() {
                     />
                   </div>
                 </div>
-                <div
-                  className="desktop-table"
+                
+                {/* TABLA DESKTOP */}
+                <div className="desktop-table"
                   style={{
                     width: '100%',
                     overflowX: 'auto',
@@ -4277,6 +4404,7 @@ export default function SalesModule() {
                                 }}
                               >
                                 <div
+                                  className="action-buttons-wrapper"
                                   style={{
                                     display: 'flex',
                                     gap: '6px',
@@ -4347,10 +4475,9 @@ export default function SalesModule() {
                     </tbody>
                   </table>
                 </div>
-                <div
-                  className="mobile-cards-container"
-                  style={{ display: 'none' }}
-                >
+
+                {/* TARJETAS MÓVIL */}
+                <div className="mobile-cards-container">
                   {potenciales.filter((p) =>
                     p.name
                       ?.toLowerCase()
@@ -4385,7 +4512,7 @@ export default function SalesModule() {
                             gap: '8px',
                           }}
                         >
-                          <div>
+                          <div style={{ borderBottom: '1px solid #E5E7EB', paddingBottom: '8px', marginBottom: '4px' }}>
                             <span
                               style={{
                                 fontSize: '10px',
@@ -4399,7 +4526,7 @@ export default function SalesModule() {
                             </span>
                             <span
                               style={{
-                                fontSize: '14px',
+                                fontSize: '16px',
                                 fontWeight: '900',
                                 color: '#111827',
                               }}
@@ -4538,6 +4665,7 @@ export default function SalesModule() {
                             </button>
                           </div>
                           <div
+                            className="action-buttons-wrapper"
                             style={{
                               display: 'flex',
                               gap: '8px',
@@ -4609,7 +4737,6 @@ export default function SalesModule() {
               </div>
             </div>
           )}
-
           {visitasTab === 'clientes' && (
             <div
               style={{
@@ -4642,8 +4769,9 @@ export default function SalesModule() {
                   }}
                 />
               </div>
-              <div
-                className="desktop-table"
+              
+              {/* TABLA DESKTOP */}
+              <div className="desktop-table"
                 style={{
                   width: '100%',
                   overflowX: 'auto',
@@ -4846,6 +4974,7 @@ export default function SalesModule() {
                             style={{ padding: '8px 12px', textAlign: 'center' }}
                           >
                             <div
+                              className="action-buttons-wrapper"
                               style={{
                                 display: 'flex',
                                 gap: '6px',
@@ -4891,10 +5020,9 @@ export default function SalesModule() {
                   </tbody>
                 </table>
               </div>
-              <div
-                className="mobile-cards-container"
-                style={{ display: 'none' }}
-              >
+
+              {/* TARJETAS MÓVIL */}
+              <div className="mobile-cards-container">
                 {clients
                   .filter((c) =>
                     c.name
@@ -4914,7 +5042,7 @@ export default function SalesModule() {
                         gap: '8px',
                       }}
                     >
-                      <div>
+                      <div style={{ borderBottom: '1px solid #E5E7EB', paddingBottom: '8px', marginBottom: '4px' }}>
                         <span
                           style={{
                             fontSize: '10px',
@@ -4928,7 +5056,7 @@ export default function SalesModule() {
                         </span>
                         <span
                           style={{
-                            fontSize: '14px',
+                            fontSize: '16px',
                             fontWeight: '900',
                             color: '#111827',
                           }}
@@ -5061,6 +5189,7 @@ export default function SalesModule() {
                         </button>
                       </div>
                       <div
+                        className="action-buttons-wrapper"
                         style={{
                           display: 'flex',
                           gap: '8px',
@@ -5108,6 +5237,7 @@ export default function SalesModule() {
         </div>
       )}
 
+      {/* MODAL CONVERTIR POTENCIAL */}
       {convertModal.open && (
         <div
           style={{
@@ -5547,7 +5677,6 @@ export default function SalesModule() {
               Mis Notas de Entrega
             </button>
           </div>
-
           {neTab === 'comisiones' && (
             <div
               style={{
@@ -5686,7 +5815,6 @@ export default function SalesModule() {
               </div>
             </div>
           )}
-
           {neTab === 'crear_ne' && (
             <div
               style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}
@@ -5725,7 +5853,6 @@ export default function SalesModule() {
                   </div>
                 </div>
               </div>
-
               <div
                 style={{
                   backgroundColor: '#ffffff',
@@ -5824,7 +5951,6 @@ export default function SalesModule() {
                   </select>
                 </div>
               </div>
-
               <div
                 style={{
                   backgroundColor: '#ffffff',
@@ -5913,7 +6039,6 @@ export default function SalesModule() {
                   </button>
                 </div>
               </div>
-
               <div
                 style={{
                   backgroundColor: '#FFFFFF',
@@ -5961,7 +6086,6 @@ export default function SalesModule() {
                     </p>
                   </div>
                 </div>
-
                 <div
                   style={{
                     width: '100%',
@@ -6085,7 +6209,6 @@ export default function SalesModule() {
                     </tbody>
                   </table>
                 </div>
-
                 <div
                   style={{
                     display: 'flex',
@@ -6143,7 +6266,6 @@ export default function SalesModule() {
                     </div>
                   </div>
                 </div>
-
                 <div style={{ marginBottom: '12px' }}>
                   <label
                     style={{
@@ -6170,7 +6292,6 @@ export default function SalesModule() {
                     }}
                   ></textarea>
                 </div>
-
                 <div
                   style={{
                     backgroundColor: '#F3F4F6',
@@ -6185,7 +6306,6 @@ export default function SalesModule() {
                 >
                   <strong>Términos y condiciones:</strong> {globalTerms}
                 </div>
-
                 <div
                   style={{
                     display: 'flex',
@@ -6247,7 +6367,6 @@ export default function SalesModule() {
               </div>
             </div>
           )}
-
           {neTab === 'historial' && (
             <div
               style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}
@@ -6343,7 +6462,6 @@ export default function SalesModule() {
                     )}
                   </button>
                 </div>
-
                 {showFullSellerCard && (
                   <div
                     style={{
@@ -6493,7 +6611,6 @@ export default function SalesModule() {
                   </div>
                 )}
               </div>
-
               <div
                 style={{
                   backgroundColor: '#FFFFFF',
@@ -6528,7 +6645,6 @@ export default function SalesModule() {
                   }}
                 />
               </div>
-
               <div
                 style={{
                   backgroundColor: '#FFFFFF',
@@ -6537,8 +6653,8 @@ export default function SalesModule() {
                   overflow: 'hidden',
                 }}
               >
-                <div
-                  className="desktop-table"
+                {/* TABLA DESKTOP */}
+                <div className="desktop-table"
                   style={{
                     width: '100%',
                     overflowX: 'auto',
@@ -6635,7 +6751,6 @@ export default function SalesModule() {
                           const pendingNotif = paymentNotificationsMap[nota.id];
                           const hasPendingNotif =
                             pendingNotif && pendingNotif.status === 'pending';
-
                           return (
                             <tr
                               key={nota.id}
@@ -6931,10 +7046,9 @@ export default function SalesModule() {
                     </tbody>
                   </table>
                 </div>
-                <div
-                  className="mobile-cards-container"
-                  style={{ display: 'none', padding: '12px' }}
-                >
+
+                {/* TARJETAS MÓVIL */}
+                <div className="mobile-cards-container" style={{ padding: '12px' }}>
                   {filteredSalesHistory.length === 0 ? (
                     <div
                       style={{
@@ -6960,7 +7074,6 @@ export default function SalesModule() {
                       const pendingNotif = paymentNotificationsMap[nota.id];
                       const hasPendingNotif =
                         pendingNotif && pendingNotif.status === 'pending';
-
                       return (
                         <div
                           key={nota.id}
@@ -6975,7 +7088,7 @@ export default function SalesModule() {
                             marginBottom: '8px',
                           }}
                         >
-                          <div>
+                          <div style={{ borderBottom: '1px solid #E5E7EB', paddingBottom: '8px', marginBottom: '4px' }}>
                             <span
                               style={{
                                 fontSize: '10px',
@@ -6989,7 +7102,7 @@ export default function SalesModule() {
                             </span>
                             <span
                               style={{
-                                fontSize: '14px',
+                                fontSize: '16px',
                                 fontWeight: '900',
                                 color: '#111827',
                               }}
@@ -7218,6 +7331,7 @@ export default function SalesModule() {
                             )}
                           </div>
                           <div
+                            className="action-buttons-wrapper"
                             style={{
                               display: 'flex',
                               gap: '8px',
@@ -7322,8 +7436,9 @@ export default function SalesModule() {
         </div>
       )}
 
-      {activeSubMenu === 'historial_ventas' && (
+{activeSubMenu === 'historial_ventas' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          {/* Encabezado y Buscador */}
           <div
             style={{
               display: 'flex',
@@ -7380,172 +7495,353 @@ export default function SalesModule() {
             </div>
           </div>
 
+          {/* Contenedor Principal de Datos */}
           <div
             style={{
               backgroundColor: '#ffffff',
               borderRadius: '8px',
               boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-              overflowX: 'auto',
+              overflow: 'hidden', // Importante para los bordes redondeados
             }}
           >
-            <table
+            {/* --- TABLA DESKTOP --- */}
+            <div className="desktop-table"
               style={{
                 width: '100%',
-                borderCollapse: 'collapse',
-                textAlign: 'left',
-                fontSize: '13px',
+                overflowX: 'auto',
+                WebkitOverflowScrolling: 'touch',
               }}
             >
-              <thead>
-                <tr
-                  style={{
-                    backgroundColor: '#f3f4f6',
-                    color: '#374151',
-                    borderBottom: '1px solid #e5e7eb',
-                  }}
-                >
-                  <th style={{ padding: '12px 14px' }}>ID Liquidación</th>
-                  <th style={{ padding: '12px 14px' }}>Fecha Pago</th>
-                  <th style={{ padding: '12px 14px' }}>Periodo</th>
-                  <th style={{ padding: '12px 14px' }}>Tasa BCV</th>
-                  <th style={{ padding: '12px 14px' }}>Total N.E. ($)</th>
-                  <th style={{ padding: '12px 14px' }}>Neto 53.38% Net ($)</th>
-                  <th style={{ padding: '12px 14px' }}>Neto 23.08% Net ($)</th>
-                  <th style={{ padding: '12px 14px' }}>
-                    Total Equivalente ($)
-                  </th>
-                  <th style={{ padding: '12px 14px', textAlign: 'center' }}>
-                    Acciones
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredSettlementHistory.length === 0 ? (
-                  <tr>
-                    <td
-                      colSpan="9"
-                      style={{
-                        padding: '24px',
-                        textAlign: 'center',
-                        color: '#6b7280',
-                      }}
-                    >
-                      No hay historial de facturación registrado para ti.
-                    </td>
+              <table
+                style={{
+                  width: '100%',
+                  minWidth: '900px', // Ancho mínimo para que no se rompa en desktop pequeño
+                  borderCollapse: 'collapse',
+                  textAlign: 'left',
+                  fontSize: '13px',
+                }}
+              >
+                <thead>
+                  <tr
+                    style={{
+                      backgroundColor: '#f3f4f6',
+                      color: '#374151',
+                      borderBottom: '1px solid #e5e7eb',
+                    }}
+                  >
+                    <th style={{ padding: '12px 14px' }}>ID Liquidación</th>
+                    <th style={{ padding: '12px 14px' }}>Fecha Pago</th>
+                    <th style={{ padding: '12px 14px' }}>Periodo</th>
+                    <th style={{ padding: '12px 14px' }}>Tasa BCV</th>
+                    <th style={{ padding: '12px 14px' }}>Total N.E. ($)</th>
+                    <th style={{ padding: '12px 14px' }}>Neto 53.38% Net ($)</th>
+                    <th style={{ padding: '12px 14px' }}>Neto 23.08% Net ($)</th>
+                    <th style={{ padding: '12px 14px' }}>
+                      Total Equivalente ($)
+                    </th>
+                    <th style={{ padding: '12px 14px', textAlign: 'center' }}>
+                      Acciones
+                    </th>
                   </tr>
-                ) : (
-                  filteredSettlementHistory.map((item) => (
-                    <tr
-                      key={item.id}
-                      style={{ borderBottom: '1px solid #e5e7eb' }}
-                    >
-                      <td style={{ padding: '12px 14px', fontWeight: 'bold' }}>
-                        {item.id}
-                      </td>
-                      <td style={{ padding: '12px 14px' }}>{item.datePaid}</td>
-                      <td style={{ padding: '12px 14px' }}>
-                        Ciclo #{item.cycle} ({item.month}/{item.year})
-                      </td>
-                      <td style={{ padding: '12px 14px' }}>
-                        {Number(item.bcvRate).toFixed(2)}
-                      </td>
-                      <td style={{ padding: '12px 14px' }}>
-                        ${item.totalNeAmount.toFixed(2)}
-                      </td>
+                </thead>
+                <tbody>
+                  {filteredSettlementHistory.length === 0 ? (
+                    <tr>
                       <td
+                        colSpan="9"
                         style={{
-                          padding: '12px 14px',
-                          color: '#059669',
-                          fontWeight: 'bold',
+                          padding: '24px',
+                          textAlign: 'center',
+                          color: '#6b7280',
                         }}
                       >
-                        ${item.comm53Net.toFixed(2)}
-                      </td>
-                      <td
-                        style={{
-                          padding: '12px 14px',
-                          color: '#0369a1',
-                          fontWeight: 'bold',
-                        }}
-                      >
-                        ${item.comm23Net.toFixed(2)}
-                      </td>
-                      <td
-                        style={{
-                          padding: '12px 14px',
-                          color: '#111827',
-                          fontWeight: 'bold',
-                        }}
-                      >
-                        ${item.totalEquivalentUsd.toFixed(2)}
-                      </td>
-                      <td style={{ padding: '12px 14px', textAlign: 'center' }}>
-                        <div
-                          style={{
-                            display: 'flex',
-                            gap: '6px',
-                            justifyContent: 'center',
-                            flexWrap: 'wrap',
-                          }}
-                        >
-                          <button
-                            onClick={() => {
-                              const modal = document.getElementById(
-                                'captured-history-modal'
-                              );
-                              if (modal) {
-                                modal.querySelector(
-                                  '#captured-html-content'
-                                ).innerHTML =
-                                  item.capturedHTML || '<p>Sin contenido.</p>';
-                                modal.style.display = 'flex';
-                              }
-                            }}
-                            style={{
-                              padding: '6px 10px',
-                              backgroundColor: '#1e40af',
-                              color: '#ffffff',
-                              border: 'none',
-                              borderRadius: '4px',
-                              fontSize: '11px',
-                              fontWeight: 'bold',
-                              cursor: 'pointer',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '4px',
-                            }}
-                          >
-                            <Eye size={13} /> Ver Factura
-                          </button>
-                          <button
-                            onClick={() => handlePrintCapturedInvoicePDF(item)}
-                            style={{
-                              padding: '6px 10px',
-                              backgroundColor: '#881337',
-                              color: '#ffffff',
-                              border: 'none',
-                              borderRadius: '4px',
-                              fontSize: '11px',
-                              fontWeight: 'bold',
-                              cursor: 'pointer',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '4px',
-                            }}
-                          >
-                            <Download size={13} /> PDF
-                          </button>
-                        </div>
+                        No hay historial de facturación registrado para ti.
                       </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+                  ) : (
+                    filteredSettlementHistory.map((item) => (
+                      <tr
+                        key={item.id}
+                        style={{ borderBottom: '1px solid #e5e7eb' }}
+                      >
+                        <td style={{ padding: '12px 14px', fontWeight: 'bold' }}>
+                          {item.id}
+                        </td>
+                        <td style={{ padding: '12px 14px' }}>{item.datePaid}</td>
+                        <td style={{ padding: '12px 14px' }}>
+                          Ciclo #{item.cycle} ({item.month}/{item.year})
+                        </td>
+                        <td style={{ padding: '12px 14px' }}>
+                          {Number(item.bcvRate).toFixed(2)}
+                        </td>
+                        <td style={{ padding: '12px 14px' }}>
+                          ${item.totalNeAmount.toFixed(2)}
+                        </td>
+                        <td
+                          style={{
+                            padding: '12px 14px',
+                            color: '#059669',
+                            fontWeight: 'bold',
+                          }}
+                        >
+                          ${item.comm53Net.toFixed(2)}
+                        </td>
+                        <td
+                          style={{
+                            padding: '12px 14px',
+                            color: '#0369a1',
+                            fontWeight: 'bold',
+                          }}
+                        >
+                          ${item.comm23Net.toFixed(2)}
+                        </td>
+                        <td
+                          style={{
+                            padding: '12px 14px',
+                            color: '#111827',
+                            fontWeight: 'bold',
+                          }}
+                        >
+                          ${item.totalEquivalentUsd.toFixed(2)}
+                        </td>
+                        <td style={{ padding: '12px 14px', textAlign: 'center' }}>
+                          <div
+                            className="action-buttons-wrapper"
+                            style={{
+                              display: 'flex',
+                              gap: '6px',
+                              justifyContent: 'center',
+                              flexWrap: 'wrap',
+                            }}
+                          >
+                            <button
+                              onClick={() => {
+                                const modal = document.getElementById(
+                                  'captured-history-modal'
+                                );
+                                if (modal) {
+                                  modal.querySelector(
+                                    '#captured-html-content'
+                                  ).innerHTML =
+                                    item.capturedHTML || '<p>Sin contenido.</p>';
+                                  modal.style.display = 'flex';
+                                }
+                              }}
+                              style={{
+                                padding: '6px 10px',
+                                backgroundColor: '#1e40af',
+                                color: '#ffffff',
+                                border: 'none',
+                                borderRadius: '4px',
+                                fontSize: '11px',
+                                fontWeight: 'bold',
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                              }}
+                            >
+                              <Eye size={13} /> Ver Factura
+                            </button>
+                            <button
+                              onClick={() => handlePrintCapturedInvoicePDF(item)}
+                              style={{
+                                padding: '6px 10px',
+                                backgroundColor: '#881337',
+                                color: '#ffffff',
+                                border: 'none',
+                                borderRadius: '4px',
+                                fontSize: '11px',
+                                fontWeight: 'bold',
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                              }}
+                            >
+                              <Download size={13} /> PDF
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* --- TARJETAS MÓVIL (NUEVO) --- */}
+            <div className="mobile-cards-container" style={{ padding: '12px' }}>
+              {filteredSettlementHistory.length === 0 ? (
+                <div
+                  style={{
+                    padding: '16px',
+                    textAlign: 'center',
+                    color: '#6B7280',
+                  }}
+                >
+                  No hay historial de facturación registrado para ti.
+                </div>
+              ) : (
+                filteredSettlementHistory.map((item) => (
+                  <div
+                    key={item.id}
+                    style={{
+                      backgroundColor: '#F9FAFB',
+                      border: '1px solid #E5E7EB',
+                      borderRadius: '8px',
+                      padding: '12px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '8px',
+                      marginBottom: '8px',
+                    }}
+                  >
+                    {/* Encabezado de la Tarjeta */}
+                    <div style={{ borderBottom: '1px solid #E5E7EB', paddingBottom: '8px', marginBottom: '4px' }}>
+                      <span
+                        style={{
+                          fontSize: '10px',
+                          fontWeight: '700',
+                          color: '#6B7280',
+                          textTransform: 'uppercase',
+                          display: 'block',
+                        }}
+                      >
+                        ID Liquidación
+                      </span>
+                      <span
+                        style={{
+                          fontSize: '16px',
+                          fontWeight: '900',
+                          color: '#111827',
+                        }}
+                      >
+                        {item.id}
+                      </span>
+                    </div>
+
+                    {/* Campos Verticales */}
+                    <div style={{ fontSize: '12px' }}>
+                      <span style={{ fontWeight: '700', color: '#4B5563' }}>
+                        Fecha de Pago:
+                      </span>{' '}
+                      {item.datePaid}
+                    </div>
+                    
+                    <div style={{ fontSize: '12px' }}>
+                      <span style={{ fontWeight: '700', color: '#4B5563' }}>
+                        Periodo:
+                      </span>{' '}
+                      Ciclo #{item.cycle} ({item.month}/{item.year})
+                    </div>
+
+                    <div style={{ fontSize: '12px' }}>
+                      <span style={{ fontWeight: '700', color: '#4B5563' }}>
+                        Tasa BCV:
+                      </span>{' '}
+                      {Number(item.bcvRate).toFixed(2)}
+                    </div>
+
+                    <div style={{ fontSize: '12px' }}>
+                      <span style={{ fontWeight: '700', color: '#4B5563' }}>
+                        Total N.E.:
+                      </span>{' '}
+                      ${item.totalNeAmount.toFixed(2)}
+                    </div>
+
+                    <div style={{ fontSize: '12px', color: '#059669' }}>
+                      <span style={{ fontWeight: '700', color: '#059669' }}>
+                        Neto 53.38%:
+                      </span>{' '}
+                      ${item.comm53Net.toFixed(2)}
+                    </div>
+
+                    <div style={{ fontSize: '12px', color: '#0369a1' }}>
+                      <span style={{ fontWeight: '700', color: '#0369a1' }}>
+                        Neto 23.08%:
+                      </span>{' '}
+                      ${item.comm23Net.toFixed(2)}
+                    </div>
+
+                    <div style={{ fontSize: '14px', fontWeight: '900', color: '#111827', marginTop: '4px' }}>
+                      Total Equivalente: ${item.totalEquivalentUsd.toFixed(2)}
+                    </div>
+
+                    {/* Botones de Acción */}
+                    <div
+                      className="action-buttons-wrapper"
+                      style={{
+                        display: 'flex',
+                        gap: '8px',
+                        marginTop: '6px',
+                        flexWrap: 'wrap',
+                        borderTop: '1px solid #E5E7EB',
+                        paddingTop: '8px',
+                        justifyContent: 'space-between',
+                      }}
+                    >
+                      <button
+                        onClick={() => {
+                          const modal = document.getElementById(
+                            'captured-history-modal'
+                          );
+                          if (modal) {
+                            modal.querySelector(
+                              '#captured-html-content'
+                            ).innerHTML =
+                              item.capturedHTML || '<p>Sin contenido.</p>';
+                            modal.style.display = 'flex';
+                          }
+                        }}
+                        style={{
+                          flex: 1,
+                          padding: '6px',
+                          backgroundColor: '#1e40af',
+                          color: '#ffffff',
+                          border: 'none',
+                          borderRadius: '6px',
+                          fontSize: '11px',
+                          fontWeight: 'bold',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          justifyContent: 'center',
+                          alignItems: 'center',
+                          gap: '4px',
+                        }}
+                      >
+                        <Eye size={13} /> Ver Factura
+                      </button>
+                      <button
+                        onClick={() => handlePrintCapturedInvoicePDF(item)}
+                        style={{
+                          flex: 1,
+                          padding: '6px',
+                          backgroundColor: '#881337',
+                          color: '#ffffff',
+                          border: 'none',
+                          borderRadius: '6px',
+                          fontSize: '11px',
+                          fontWeight: 'bold',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          justifyContent: 'center',
+                          alignItems: 'center',
+                          gap: '4px',
+                        }}
+                      >
+                        <Download size={13} /> PDF
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
           </div>
         </div>
       )}
 
+      {/* MODAL VALE */}
       {valeModal.open && (
         <div
           style={{
@@ -7647,6 +7943,7 @@ export default function SalesModule() {
         </div>
       )}
 
+      {/* MODAL ABONO */}
       {abonoNotifModal.open && (
         <div
           style={{
@@ -7697,7 +7994,6 @@ export default function SalesModule() {
                 <X size={18} />
               </button>
             </div>
-
             {/* Mostrar Nombre del Cliente (No editable) */}
             {(() => {
               const nota = salesHistory.find(
@@ -7736,7 +8032,6 @@ export default function SalesModule() {
                 </div>
               );
             })()}
-
             <form
               onSubmit={handleEnviarNotificacionAbono}
               style={{
@@ -7958,6 +8253,7 @@ export default function SalesModule() {
         </div>
       )}
 
+      {/* MODAL HISTORIAL CAPTURADO */}
       <div
         id="captured-history-modal"
         style={{
