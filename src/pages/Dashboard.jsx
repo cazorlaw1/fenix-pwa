@@ -205,23 +205,23 @@ export default function Dashboard({ overrideRole }) {
 
     // Generar datos para la gráfica basados en las ventas recuperadas
     const last7Days = Array.from({ length: 7 }, (_, i) => {
-      const d = new Date();
-      d.setDate(d.getDate() - (6 - i));
-      return getLocalDateStr(d);
-    });
+  const d = new Date();
+  d.setDate(d.getDate() - (6 - i));
+  return getLocalDateStr(d);
+});
 
-    const dailyData = last7Days.map((dateStr) => {
-      // Contar órdenes creadas en este día específico (usando UTC-4)
-      const count =
-        sales?.filter((s) => {
-          if (!s.created_at) return false;
-          const orderDateStr = getLocalDateStr(new Date(s.created_at));
-          return orderDateStr === dateStr;
-        }).length || 0;
-      return { date: dateStr, amount: count };
-    });
+const dailyData = last7Days.map((dateStr) => {
+  // Filtramos sobre teamSales completo para contar órdenes de cada día
+  const count = (teamSales || []).filter((s) => {
+    if (!s.created_at) return false;
+    const orderDateStr = getLocalDateStr(new Date(s.created_at));
+    return orderDateStr === dateStr;
+  }).length;
+  
+  return { date: dateStr, amount: count };
+});
 
-    setDailySalesData(dailyData);
+setDailySalesData(dailyData);
   };
 
   // --- LÓGICA GERENTE/SUPERVISOR (FILTROS IDÉNTICOS A VENDEDORES.JSX) ---
