@@ -679,7 +679,7 @@ export default function Dashboard({ overrideRole }) {
         {/* ALERTAS DE ADMINISTRADOR - Diseño original en escritorio, cuadrado en móvil */}
         {effectiveRole === 'administrador' && (
           <div
-            onClick={() => (window.location.href = '/usuarios?tab=pendientes')}
+            onClick={handleGoToPendingUsers}
             style={{
               backgroundColor:
                 adminAlerts.pendingUsers > 0 ? '#FEF2F2' : '#F0FDF4',
