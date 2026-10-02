@@ -1,6 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
-  <!-- Fondo negro sólido -->
-  <rect width="512" height="512" fill="#000000" />
-  <!-- Logo centrado y reducido a un tamaño adecuado para que no se vea gigante -->
-  <image href="https://hxlwrlzucnpdqofxjelg.supabase.co/storage/v1/object/public/assets/LOGOF.png" x="96" y="96" width="320" height="320" preserveAspectRatio="xMidYMid meet" />
-</svg>
