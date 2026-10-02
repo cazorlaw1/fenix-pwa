@@ -567,7 +567,7 @@ export default function Dashboard({ overrideRole }) {
           style={{
             display: 'flex',
             alignItems: 'center',
-            gap: '4px',
+            gap: '2px',
             marginBottom: '14px',
             overflowX: 'auto',
             paddingBottom: '4px',
@@ -668,7 +668,7 @@ export default function Dashboard({ overrideRole }) {
 
               {/* POTENCIALES (EXISTENTE) */}
               <QuickLinkMobile
-                label="Gistorial"
+                label="Historial"
                 icon={<Clock size={13} />}
                 color="#16A34A"
                 onClick={() => (window.location.href = '/ventas?tab=historial_ventas')}
