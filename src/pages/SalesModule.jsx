@@ -1517,7 +1517,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
       const clientName = nota.clients?.name || 'Cliente';
       const transNo = nota.transaction_number || nota.id.substring(0, 8);
       const total = Number(nota.final_price_usd || 0).toFixed(2);
-      const mensaje = `Hola! Adjunto resumen de la Nota de Entrega Aprobada N° ${transNo} para el cliente *${clientName}*. Total Final: *$${total}*. Por favor verificar.`;
+      const mensaje = `*SOLICITUD DE REVISIÓN N.E.* 📋\n\nHola Admin, se ha generado la Nota de Entrega N° *#${transNo}* para el cliente *${clientName}*.\n\n💰 *Monto Total:* $${total}\n\nQuedo atento a tu aprobación para proceder. Gracias.`;
       window.open(
         `https://wa.me/?text=${encodeURIComponent(mensaje)}`,
         '_blank'
