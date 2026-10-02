@@ -1662,19 +1662,19 @@ export default function Dashboard({ overrideRole }) {
                   label="Visitas Equipo"
                   icon={<MapPin size={16} />}
                   color="#2563EB"
-                  onClick={() => (window.location.href = '/vendedores')}
+                  onClick={() => (window.location.href = '/vendedores?tab=visitas')}
                 />
                 <QuickLink
-                  label="Reportes"
+                  label="Equipo"
                   icon={<FileText size={16} />}
                   color="#7c3aed"
-                  onClick={() => (window.location.href = '/vendedores')}
+                  onClick={() => (window.location.href = '/vendedores?tab=resumen')}
                 />
                 <QuickLink
                   label="Comisiones"
                   icon={<DollarSign size={16} />}
                   color="#059669"
-                  onClick={() => (window.location.href = '/vendedores')}
+                  onClick={() => (window.location.href = '/vendedores?tab=comisiones')}
                 />
               </>
             )}
