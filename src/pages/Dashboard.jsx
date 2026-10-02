@@ -222,7 +222,6 @@ const dailyData = last7Days.map((dateStr) => {
 });
 
 setDailySalesData(dailyData);
-  };
 
   // --- LÓGICA GERENTE/SUPERVISOR (FILTROS IDÉNTICOS A VENDEDORES.JSX) ---
   const fetchManagerData = async () => {
@@ -1662,19 +1661,19 @@ setDailySalesData(dailyData);
                   label="Visitas Equipo"
                   icon={<MapPin size={16} />}
                   color="#2563EB"
-                  onClick={() => (window.location.href = '/vendedores')}
+                  onClick={() => (window.location.href = '/vendedores?tab=visitas')}
                 />
                 <QuickLink
-                  label="Reportes"
-                  icon={<FileText size={16} />}
+                  label="Equipo"
+                  icon={<Users size={16} />}
                   color="#7c3aed"
-                  onClick={() => (window.location.href = '/vendedores')}
+                  onClick={() => (window.location.href = '/vendedores?tab=resumen')}
                 />
                 <QuickLink
                   label="Comisiones"
                   icon={<DollarSign size={16} />}
                   color="#059669"
-                  onClick={() => (window.location.href = '/vendedores')}
+                  onClick={() => (window.location.href = '/vendedores?tab=comisiones')}
                 />
               </>
             )}
