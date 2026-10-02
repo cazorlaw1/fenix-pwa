@@ -642,23 +642,36 @@ export default function Dashboard({ overrideRole }) {
           )}
           {effectiveRole === 'vendedor' && (
             <>
+              {/* NUEVO BOTÓN VISITAS */}
+              <QuickLinkMobile
+                label="Visitas"
+                icon={<MapPin size={13} />}
+                color="#059669" // Verde consistente con acciones de visita/equipo
+                onClick={() => (window.location.href = '/ventas?tab=visitas')}
+              />
+
+              {/* CLIENTES (EXISTENTE) */}
               <QuickLinkMobile
                 label="Clientes"
                 icon={<Users size={13} />}
                 color="#2563EB"
-                onClick={() => (window.location.href = '/ventas')}
+                onClick={() => (window.location.href = '/ventas?tab=clientes')}
               />
+
+              {/* N.E. (EXISTENTE) */}
               <QuickLinkMobile
                 label="N.E."
                 icon={<FileText size={13} />}
                 color="#7c3aed"
-                onClick={() => (window.location.href = '/ventas')}
+                onClick={() => (window.location.href = 'ventas?tab=nota_entrega')}
               />
+
+              {/* POTENCIALES (EXISTENTE) */}
               <QuickLinkMobile
-                label="Potenciales"
-                icon={<UserCheck size={13} />}
+                label="Gistorial"
+                icon={<History size={13} />}
                 color="#16A34A"
-                onClick={() => (window.location.href = '/ventas')}
+                onClick={() => (window.location.href = '/ventas?tab=historial_ventas')}
               />
             </>
           )}
