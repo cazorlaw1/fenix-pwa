@@ -627,19 +627,19 @@ export default function Dashboard({ overrideRole }) {
                 label="Visitas"
                 icon={<MapPin size={13} />}
                 color="#2563EB"
-                onClick={() => (window.location.href = '/vendedores')}
+                onClick={() => (window.location.href = '/vendedores?tab=visitas')}
               />
               <QuickLinkMobile
-                label="Reportes"
-                icon={<FileText size={13} />}
+                label="Equipo"
+                icon={<Users size={13} />}
                 color="#7c3aed"
-                onClick={() => (window.location.href = '/vendedores')}
+                onClick={() => (window.location.href = '/vendedores?tab=resumen')}
               />
               <QuickLinkMobile
                 label="Comisiones"
                 icon={<DollarSign size={13} />}
                 color="#059669"
-                onClick={() => (window.location.href = '/vendedores')}
+                onClick={() => (window.location.href = '/vendedores?tab=comisiones')}
               />
             </>
           )}
