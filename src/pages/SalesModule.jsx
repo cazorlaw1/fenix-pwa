@@ -32,7 +32,6 @@ import {
   Target,
   Banknote,
   ShoppingCart,
-  Check, // Agregado para el menú responsivo
 } from 'lucide-react';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -195,47 +194,12 @@ function SearchableDropdown({
 export default function SalesModule() {
   const { user, role } = useAuth();
 
-  // Referencias para el menú móvil
-  const mobileMenuRef = useRef(null);
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-
-  // --- A. PERSISTENCIA Y NAVEGACIÓN DE PESTAÑAS ---
-  // Inicialización con prioridad: URL Param > localStorage > Default
-  const getInitialSubMenu = () => {
-    const params = new URLSearchParams(window.location.search);
-    const urlTab = params.get('tab');
-    if (urlTab) return urlTab;
-    
-    const savedTab = localStorage.getItem('salesModule_activeTab');
-    if (savedTab) return savedTab;
-    
-    return 'clientes';
-  };
-
-  const [activeSubMenu, setActiveSubMenu] = useState(getInitialSubMenu());
-
-  // Efecto para guardar en localStorage y actualizar URL cuando cambia la pestaña
-  useEffect(() => {
-    localStorage.setItem('salesModule_activeTab', activeSubMenu);
-    // Opcional: Actualizar URL sin recargar
-    const url = new URL(window.location);
-    url.searchParams.set('tab', activeSubMenu);
-    window.history.replaceState({}, '', url);
-  }, [activeSubMenu]);
-
-  // Efecto para cerrar menú móvil al hacer clic fuera
-  useEffect(() => {
-    function handleClickOutside(event) {
-      if (mobileMenuRef.current && !mobileMenuRef.current.contains(event.target)) {
-        setIsMobileMenuOpen(false);
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+  // Navegación Submenú Principal
+  const [activeSubMenu, setActiveSubMenu] = useState('clientes');
 
   // Pestañas específicas de la sección Clientes (Predeterminada: 'registrar')
   const [clienteTab, setClienteTab] = useState('registrar');
+
   // Pestañas de Visitas y Nota de Entrega
   const [visitasTab, setVisitasTab] = useState('potenciales');
   const [neTab, setNeTab] = useState('crear_ne');
@@ -272,8 +236,8 @@ export default function SalesModule() {
   const [globalDiscount23, setGlobalDiscount23] = useState(23.08);
   const [globalTerms, setGlobalTerms] = useState('Cargando términos...');
   const [estimatedNextFolio, setEstimatedNextFolio] = useState('...');
-  // -------------------------------------------------
 
+  // -------------------------------------------------
   // NUEVO ESTADO PARA HISTORIAL DE FACTURACIÓN DEL USUARIO
   const [userSettlementHistory, setUserSettlementHistory] = useState([]);
   const [historySearch, setHistorySearch] = useState('');
@@ -425,29 +389,27 @@ export default function SalesModule() {
     fetchUserSettlementHistory();
   }, [user, role]);
 
-const fetchGlobalSettings = async () => {
-  try {
-    const { data, error } = await supabase
-      .from('global_settings')
-      .select('*');
-    
-    if (!error && data) {
-      const settingsMap = {};
-      data.forEach((item) => {
-        settingsMap[item.setting_key] = item.setting_value;
-      });
-      
-      // Actualizar estados con los valores de la BD
-      if (settingsMap['ne_discount_53']) setGlobalDiscount53(Number(settingsMap['ne_discount_53']));
-      if (settingsMap['ne_discount_23']) setGlobalDiscount23(Number(settingsMap['ne_discount_23']));
-      if (settingsMap['ne_terms_conditions']) setGlobalTerms(settingsMap['ne_terms_conditions']);
-    } else if (error) {
-      console.error("Error cargando configuración global:", error);
+  const fetchGlobalSettings = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('global_settings')
+        .select('*');
+      if (!error && data) {
+        const settingsMap = {};
+        data.forEach((item) => {
+          settingsMap[item.setting_key] = item.setting_value;
+        });
+        if (settingsMap['ne_discount_53'])
+          setGlobalDiscount53(Number(settingsMap['ne_discount_53']));
+        if (settingsMap['ne_discount_23'])
+          setGlobalDiscount23(Number(settingsMap['ne_discount_23']));
+        if (settingsMap['ne_terms_conditions'])
+          setGlobalTerms(settingsMap['ne_terms_conditions']);
+      }
+    } catch (err) {
+      console.error('Error cargando configuración global:', err);
     }
-  } catch (err) {
-    console.error('Error inesperado cargando configuración:', err);
-  }
-};
+  };
 
   const fetchEstimatedFolio = async () => {
     try {
@@ -508,6 +470,7 @@ const fetchGlobalSettings = async () => {
       .select('*, profiles:assigned_seller_id(full_name, email, role)')
       .eq('is_potential', false)
       .eq('assigned_seller_id', user?.id);
+
     const { data } = await query.order('name', { ascending: true });
     if (data) setClients(data);
   };
@@ -518,6 +481,7 @@ const fetchGlobalSettings = async () => {
       .select('*, profiles:assigned_seller_id(full_name)')
       .eq('is_potential', true)
       .eq('assigned_seller_id', user?.id);
+
     const { data } = await query.order('created_at', { ascending: false });
     if (data) setPotenciales(data);
   };
@@ -537,6 +501,7 @@ const fetchGlobalSettings = async () => {
         '*, clients(name), profiles:seller_id(full_name, email, role, pct_bombillos, pct_fluidos, sales_goal_usd), vales(id, requested_amount_usd, status)'
       )
       .eq('seller_id', user?.id);
+
     const { data } = await query.order('created_at', { ascending: false });
     if (data) setSalesHistory(data);
   };
@@ -612,6 +577,7 @@ const fetchGlobalSettings = async () => {
       const { data: salesData } = await salesQuery;
       let totalCerradas = 0;
       let totalPendientesNe = 0;
+
       if (salesData) {
         salesData.forEach((s) => {
           const precio = Number(s.final_price_usd) || 0;
@@ -621,6 +587,7 @@ const fetchGlobalSettings = async () => {
           const porcentajeAplicado =
             cat === 'fluidos' ? pctFluidos : pctBombillos;
           const comisionOrden = precio * (porcentajeAplicado / 100);
+
           if (s.payment_status === 'cerrada') {
             totalCerradas += comisionOrden;
           } else {
@@ -672,6 +639,7 @@ const fetchGlobalSettings = async () => {
     0
   );
   const grandTotalNe = totalNeFromHistory + totalNeFromSettlements;
+
   const sellerSalesTotal = grandTotalNe;
   const sellerMetaGoal = Number(sellerProfile?.sales_goal_usd || 0);
   const remainingToGoal = Math.max(0, sellerMetaGoal - sellerSalesTotal);
@@ -708,10 +676,13 @@ const fetchGlobalSettings = async () => {
       .toString(36)
       .substring(7)}.${fileExt}`;
     const filePath = `${pathFolder}/${fileName}`;
+
     const { error } = await supabase.storage
       .from(bucketName)
       .upload(filePath, file);
+
     if (error) throw error;
+
     const { data } = supabase.storage.from(bucketName).getPublicUrl(filePath);
     return data.publicUrl;
   };
@@ -776,6 +747,7 @@ const fetchGlobalSettings = async () => {
       ]);
 
       if (error) throw error;
+
       setMessage({
         type: 'success',
         text: 'Cliente registrado correctamente.',
@@ -820,6 +792,7 @@ const fetchGlobalSettings = async () => {
 
   const handleUpdateClient = async (e) => {
     e.preventDefault();
+
     // Validaciones de formato imagen
     if (editCiFile && !validateImageFile(editCiFile)) {
       alert('La nueva foto de C.I. debe ser una imagen.');
@@ -884,6 +857,7 @@ const fetchGlobalSettings = async () => {
         .eq('id', editClientModal.clientData.id);
 
       if (error) throw error;
+
       setMessage({
         type: 'success',
         text: 'Datos y documentos del cliente actualizados correctamente.',
@@ -897,88 +871,69 @@ const fetchGlobalSettings = async () => {
     }
   };
 
-const handleDeleteClient = async (clientId, clientName) => {
-  setLoading(true);
-  try {
-    // 1. Verificar si existen Notas de Entrega pendientes o aprobadas para este cliente
-    const { data: activeOrders, error: ordersErr } = await supabase
-      .from('sales_orders')
-      .select('id, status, transaction_number')
-      .eq('client_id', clientId)
-      .in('status', ['pendiente', 'aprobada']); // Bloqueamos si hay notas en proceso
+  const handleDeleteClient = async (clientId, clientName) => {
+    if (
+      !window.confirm(
+        `¿Estás seguro de que deseas eliminar a "${clientName}"? Esta acción eliminará el registro y sus archivos.`
+      )
+    ) {
+      return;
+    }
 
-    if (ordersErr) throw ordersErr;
+    setLoading(true);
+    try {
+      const { data: client, error: fetchErr } = await supabase
+        .from('clients')
+        .select('*')
+        .eq('id', clientId)
+        .single();
 
-    // Si encuentra al menos una nota activa, bloqueamos la eliminación
-    if (activeOrders && activeOrders.length > 0) {
-      const count = activeOrders.length;
-      const firstTrans = activeOrders[0].transaction_number || activeOrders[0].id.substring(0, 6);
-      
+      if (fetchErr) throw fetchErr;
+
+      // Recopilar rutas de archivos para eliminar
+      const docPaths = [
+        getStoragePathFromUrl(client.ci_photo_url, 'documents'),
+        getStoragePathFromUrl(client.rif_photo_url, 'documents'),
+        getStoragePathFromUrl(client.additional_doc_url, 'documents'),
+      ].filter(Boolean);
+
+      const visitPath = getStoragePathFromUrl(
+        client.last_visit_photo_url,
+        'visits'
+      );
+
+      // Eliminar archivos del storage primero
+      if (docPaths.length > 0) {
+        await supabase.storage.from('documents').remove(docPaths);
+      }
+      if (visitPath) {
+        await supabase.storage.from('visits').remove([visitPath]);
+      }
+
+      // Finalmente eliminar el registro de la base de datos
+      const { error: deleteErr } = await supabase
+        .from('clients')
+        .delete()
+        .eq('id', clientId);
+
+      if (deleteErr) throw deleteErr;
+
+      setMessage({
+        type: 'success',
+        text: `El cliente "${clientName}" fue eliminado exitosamente.`,
+      });
+      fetchClients();
+      fetchPotenciales();
+      fetchSalesHistory();
+    } catch (err) {
       setMessage({
         type: 'error',
-        text: `No se puede eliminar al cliente "${clientName}" porque tiene ${count} Nota(s) de Entrega activa(s) (Ej: #${firstTrans}). Finalice o elimine las notas primero.`,
+        text: 'Error al eliminar cliente: ' + err.message,
       });
+    } finally {
       setLoading(false);
-      return; // Detenemos la ejecución aquí
     }
-
-    // 2. Si no hay notas activas, procedemos a obtener los datos del cliente para borrar sus archivos
-    const { data: client, error: fetchErr } = await supabase
-      .from('clients')
-      .select('*')
-      .eq('id', clientId)
-      .single();
-
-    if (fetchErr) throw fetchErr;
-
-    // Recopilar rutas de archivos para eliminar
-    const docPaths = [
-      getStoragePathFromUrl(client.ci_photo_url, 'documents'),
-      getStoragePathFromUrl(client.rif_photo_url, 'documents'),
-      getStoragePathFromUrl(client.additional_doc_url, 'documents'),
-    ].filter(Boolean);
-
-    const visitPath = getStoragePathFromUrl(
-      client.last_visit_photo_url,
-      'visits'
-    );
-
-    // Eliminar archivos del storage primero
-    if (docPaths.length > 0) {
-      await supabase.storage.from('documents').remove(docPaths);
-    }
-    if (visitPath) {
-      await supabase.storage.from('visits').remove([visitPath]);
-    }
-
-    // Finalmente eliminar el registro de la base de datos
-    const { error: deleteErr } = await supabase
-      .from('clients')
-      .delete()
-      .eq('id', clientId);
-
-    if (deleteErr) throw deleteErr;
-
-    setMessage({
-      type: 'success',
-      text: `El cliente "${clientName}" fue eliminado exitosamente.`,
-    });
-    
-    // Refrescar las listas
-    fetchClients();
-    fetchPotenciales();
-    // No es estrictamente necesario refrescar salesHistory aquí si solo borramos clientes sin notas, 
-    // pero lo dejamos por consistencia si hubiera notas cerradas huérfanas (aunque la lógica de negocio usualmente lo evita).
-    
-  } catch (err) {
-    setMessage({
-      type: 'error',
-      text: 'Error al eliminar cliente: ' + err.message,
-    });
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
   // ---------------------------------------------------------------------------
   // MANEJADORES: POTENCIALES CLIENTES Y VISITAS EXIGIDAS (CON GPS)
@@ -1019,6 +974,7 @@ const handleDeleteClient = async (clientId, clientName) => {
       ]);
 
       if (error) throw error;
+
       setMessage({
         type: 'success',
         text: 'Cliente Potencial guardado y registrado con GPS.',
@@ -1037,6 +993,7 @@ const handleDeleteClient = async (clientId, clientName) => {
   const handleCaptureVisitaGps = async (id) => {
     getDeviceLocation(async (coords) => {
       setVisitasGps((prev) => ({ ...prev, [id]: coords }));
+
       // Guardar inmediatamente en la base de datos como solicitado
       try {
         await supabase
@@ -1059,6 +1016,7 @@ const handleDeleteClient = async (clientId, clientName) => {
       );
       return;
     }
+
     const file = visitasFiles[id];
     if (file && !validateImageFile(file)) {
       alert('La foto de la visita debe ser una imagen.');
@@ -1068,6 +1026,7 @@ const handleDeleteClient = async (clientId, clientName) => {
     setLoading(true);
     try {
       let adjuntoUrl = null;
+
       // Si hay nuevo archivo, subirlo. Si ya había uno, la lógica simple aquí sobrescribe la URL.
       if (file) {
         adjuntoUrl = await uploadFile(file, 'visits', 'visitas');
@@ -1078,6 +1037,7 @@ const handleDeleteClient = async (clientId, clientName) => {
         // Actualizar GPS también por seguridad si cambió
         last_gps_location: { lat: gps.lat, lng: gps.lng },
       };
+
       if (adjuntoUrl) updateData.last_visit_photo_url = adjuntoUrl;
 
       const { error } = await supabase
@@ -1166,6 +1126,7 @@ const handleDeleteClient = async (clientId, clientName) => {
       // Nota: Al convertir, asumimos que no hay CI/RIF previos en 'documents' porque era potencial.
       // Pero si hubiera foto de visita en 'visits', esa se mantiene o se limpia según lógica de negocio.
       // Aquí solo actualizamos los campos oficiales.
+
       const { error } = await supabase
         .from('clients')
         .update({
@@ -1185,6 +1146,7 @@ const handleDeleteClient = async (clientId, clientName) => {
         .eq('id', convertModal.potencialData.id);
 
       if (error) throw error;
+
       setMessage({
         type: 'success',
         text: `¡El cliente "${convertForm.nombre}" ha sido promovido a Cliente Oficial!`,
@@ -1216,10 +1178,13 @@ const handleDeleteClient = async (clientId, clientName) => {
     if (!neSelectedProdId) return;
     const prod = products.find((p) => p.id === neSelectedProdId);
     if (!prod) return;
+
     const qty = Number(neQuantity);
     if (qty <= 0) return alert('Cantidad debe ser mayor a 0');
+
     const inCart = neCart.find((item) => item.product_id === prod.id);
     const currentQty = inCart ? inCart.quantity : 0;
+
     if (currentQty + qty > prod.stock_current) {
       alert(`Stock insuficiente. Disponible: ${prod.stock_current}`);
       return;
@@ -1301,14 +1266,17 @@ const handleDeleteClient = async (clientId, clientName) => {
       if (editModeId) {
         // --- LÓGICA DE EDICIÓN ---
         // Aquí iría tu lógica existente para restaurar stock si es necesario...
+
         const { data: updatedData, error } = await supabase
           .from('sales_orders')
           .update(payload)
           .eq('id', editModeId)
           .select() // Agregamos select para obtener los datos actualizados
           .single();
+
         if (error) throw error;
         transactionNumber = updatedData?.transaction_number; // Obtenemos el número de la nota editada
+
         await supabase.from('order_items').delete().eq('order_id', editModeId);
       } else {
         // --- LÓGICA DE CREACIÓN ---
@@ -1317,6 +1285,7 @@ const handleDeleteClient = async (clientId, clientName) => {
           .insert([payload])
           .select()
           .single();
+
         if (error) throw error;
         orderId = newNota.id;
         transactionNumber = newNota.transaction_number; // Obtenemos el número de la nueva nota
@@ -1357,11 +1326,13 @@ const handleDeleteClient = async (clientId, clientName) => {
           ? 'Nota de Entrega editada correctamente.'
           : 'Nota de Entrega enviada a revisión con coordenadas GPS guardadas.',
       });
+
       setNeCart([]);
       setNeClientId('');
       setNeObservacion('');
       setNeGpsLocation(null);
       setEditModeId(null);
+
       fetchSalesHistory();
       fetchComisionesYVales();
       fetchEstimatedFolio();
@@ -1439,6 +1410,7 @@ const handleDeleteClient = async (clientId, clientName) => {
               .select('stock_current')
               .eq('id', item.product_id)
               .single();
+
             if (prodData) {
               const restoredStock = prodData.stock_current + item.quantity;
               await supabase
@@ -1456,6 +1428,7 @@ const handleDeleteClient = async (clientId, clientName) => {
         .eq('id', nota.id);
 
       if (error) throw error;
+
       setMessage({
         type: 'success',
         text: 'Nota de Entrega eliminada correctamente.',
@@ -1508,27 +1481,27 @@ const handleDeleteClient = async (clientId, clientName) => {
             item.quantity * item.discounted_unit_price_usd;
           subTotal += totalLine;
           itemsHtml += `
-<tr>
-  <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; font-family: monospace;">${
-    item.products?.code || 'S/C'
-  }</td>
-  <td style="padding: 6px 8px; border-bottom: 1px solid #ddd;">${
-    item.products?.description || 'Producto'
-  }</td>
-  <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: center;">${
-    item.quantity
-  }</td>
-  <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: right;">$${Number(
-    item.unit_price_usd || 0
-  ).toFixed(2)}</td>
-  <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: right; color: #B45309;">$${Number(
-    item.discounted_unit_price_usd || 0
-  ).toFixed(2)}</td>
-  <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: right; font-weight: bold;">$${Number(
-    totalLine
-  ).toFixed(2)}</td>
-</tr>
-`;
+    <tr>
+      <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; font-family: monospace;">${
+        item.products?.code || 'S/C'
+      }</td>
+      <td style="padding: 6px 8px; border-bottom: 1px solid #ddd;">${
+        item.products?.description || 'Producto'
+      }</td>
+      <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: center;">${
+        item.quantity
+      }</td>
+      <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: right;">$${Number(
+        item.unit_price_usd || 0
+      ).toFixed(2)}</td>
+      <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: right; color: #B45309;">$${Number(
+        item.discounted_unit_price_usd || 0
+      ).toFixed(2)}</td>
+      <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: right; font-weight: bold;">$${Number(
+        totalLine
+      ).toFixed(2)}</td>
+    </tr>
+  `;
         });
       }
 
@@ -1572,7 +1545,9 @@ const handleDeleteClient = async (clientId, clientName) => {
       <div style="width: 280px; background: #f9fafb; padding: 12px; border: 1px solid #ddd; border-radius: 6px;">
         <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
           <span>Total Base:</span>
-          <strong>$${Number(nota.total_base_usd || subTotal).toFixed(2)}</strong>
+          <strong>$${Number(nota.total_base_usd || subTotal).toFixed(
+            2
+          )}</strong>
         </div>
         <div style="display: flex; justify-content: space-between; margin-bottom: 6px; color: #B45309;">
           <span>Descuento Aplicado:</span>
@@ -1607,6 +1582,7 @@ const handleDeleteClient = async (clientId, clientName) => {
         html2canvas: { scale: 2, useCORS: true },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
       };
+
       await window.html2pdf().from(container).set(opciones).save();
     } catch (err) {
       alert('Error al generar PDF: ' + err.message);
@@ -1643,6 +1619,7 @@ const handleDeleteClient = async (clientId, clientName) => {
         html2canvas: { scale: 2, useCORS: true },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
       };
+
       await window.html2pdf().from(container).set(opciones).save();
     } catch (err) {
       alert('Error al generar PDF de factura histórica: ' + err.message);
@@ -1669,7 +1646,6 @@ const handleDeleteClient = async (clientId, clientName) => {
   const handleSolicitarVale = async () => {
     if (!valeModal.monto || Number(valeModal.monto) <= 0)
       return alert('Ingrese un monto válido');
-
     setLoading(true);
     try {
       // Obtener datos de la nota para el correo
@@ -1689,7 +1665,6 @@ const handleDeleteClient = async (clientId, clientName) => {
           status: 'pendiente',
         },
       ]);
-
       if (error) throw error;
 
       // ✅ ENVIAR CORREO AL ADMINISTRADOR SOBRE LA SOLICITUD DE VALE
@@ -1755,6 +1730,7 @@ const handleDeleteClient = async (clientId, clientName) => {
   const handleEnviarNotificacionAbono = async (e) => {
     e.preventDefault();
     if (!abonoNotifModal.notaId) return;
+
     const fileToUpload = abonoFiles[abonoNotifModal.notaId];
     if (!fileToUpload) {
       alert('Es obligatorio adjuntar una foto del billete o recibo.');
@@ -1832,6 +1808,7 @@ const handleDeleteClient = async (clientId, clientName) => {
         type: 'success',
         text: 'Notificación de abono registrada y administrador notificado.',
       });
+
       setAbonoNotifModal({ open: false, notaId: null });
       setAbonoForm({
         payment_date: new Date().toISOString().split('T')[0],
@@ -1934,6 +1911,7 @@ const handleDeleteClient = async (clientId, clientName) => {
       alert('El archivo debe ser una imagen.');
       return;
     }
+
     const { clientId, fieldName, url: oldUrl } = imageModal;
     if (!clientId || !fieldName) return;
 
@@ -1970,9 +1948,11 @@ const handleDeleteClient = async (clientId, clientName) => {
 
       // Actualizar estado local y cerrar modal
       setImageModal((prev) => ({ ...prev, url: newUrl }));
+
       // Refrescar listas
       fetchClients();
       fetchPotenciales();
+
       setMessage({ type: 'success', text: 'Imagen sustituida correctamente.' });
     } catch (err) {
       setMessage({
@@ -1984,51 +1964,16 @@ const handleDeleteClient = async (clientId, clientName) => {
     }
   };
 
-  // Lista de pestañas para el menú
-  const menuTabs = [
-    { id: 'clientes', label: 'Clientes', icon: Users },
-    { id: 'visitas', label: 'Visitas', icon: MapPin },
-    { id: 'nota_entrega', label: 'Nota de Entrega', icon: FileText },
-    { id: 'historial_ventas', label: 'Historial de Ventas', icon: History },
-  ];
-
   return (
     <div
       style={{
         padding: '24px',
-        maxWidth: '1200px',
+        maxWidth: '1280px',
         margin: '0 auto',
         fontFamily: 'sans-serif',
         boxSizing: 'border-box',
       }}
     >
-      {/* BLOQUE DE ESTILOS GLOBALES PARA RESPONSIVIDAD */}
-      <style>{`
-        @media (max-width: 768px) {
-          .desktop-tabs { display: none !important; }
-          .mobile-menu-container { display: block !important; }
-          .desktop-table { display: none !important; }
-          .mobile-cards-container { display: flex !important; flex-direction: column; gap: 12px; }
-          
-          /* Ajuste de botones internos en móvil */
-          .action-buttons-wrapper {
-            flex-wrap: wrap !important;
-            justify-content: center !important;
-          }
-          .action-buttons-wrapper button {
-            padding: 4px 6px !important;
-            font-size: 10px !important;
-            min-width: 30% !important;
-          }
-        }
-        @media (min-width: 769px) {
-          .desktop-tabs { display: flex !important; }
-          .mobile-menu-container { display: none !important; }
-          .desktop-table { display: table !important; }
-          .mobile-cards-container { display: none !important; }
-        }
-      `}</style>
-
       <div
         style={{
           display: 'flex',
@@ -2058,8 +2003,7 @@ const handleDeleteClient = async (clientId, clientName) => {
         </div>
       </div>
 
-      {/* MENÚ HORIZONTAL (DESKTOP) */}
-      <div className="desktop-tabs"
+      <div
         style={{
           display: 'flex',
           gap: '8px',
@@ -2068,7 +2012,16 @@ const handleDeleteClient = async (clientId, clientName) => {
           overflowX: 'auto',
         }}
       >
-        {menuTabs.map((tab) => {
+        {[
+          { id: 'clientes', label: 'Clientes', icon: Users },
+          { id: 'visitas', label: 'Visitas', icon: MapPin },
+          { id: 'nota_entrega', label: 'Nota de Entrega', icon: FileText },
+          {
+            id: 'historial_ventas',
+            label: 'Historial de Ventas',
+            icon: History,
+          },
+        ].map((tab) => {
           const Icon = tab.icon;
           const isActive = activeSubMenu === tab.id;
           return (
@@ -2097,87 +2050,6 @@ const handleDeleteClient = async (clientId, clientName) => {
             </button>
           );
         })}
-      </div>
-
-      {/* MENÚ DROPDOWN (MÓVIL) */}
-      <div className="mobile-menu-container" ref={mobileMenuRef} style={{ display: 'none', marginBottom: '24px', position: 'relative' }}>
-        <button
-          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-          style={{
-            width: '100%',
-            padding: '12px 16px',
-            backgroundColor: '#ffffff',
-            border: '1px solid #d1d5db',
-            borderRadius: '8px',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            fontSize: '14px',
-            fontWeight: '600',
-            color: '#111827',
-            boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
-          }}
-        >
-          <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            {(() => {
-              const ActiveIcon = menuTabs.find(t => t.id === activeSubMenu)?.icon || Users;
-              return <ActiveIcon size={18} color="#dc2626" />;
-            })()}
-            {menuTabs.find((t) => t.id === activeSubMenu)?.label || 'Seleccionar'}
-          </span>
-          <ChevronDown size={18} color="#6b7280" />
-        </button>
-
-        {isMobileMenuOpen && (
-          <div
-            style={{
-              position: 'absolute',
-              top: '100%',
-              left: 0,
-              right: 0,
-              marginTop: '4px',
-              backgroundColor: '#ffffff',
-              border: '1px solid #e5e7eb',
-              borderRadius: '8px',
-              boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)',
-              zIndex: 50,
-              overflow: 'hidden',
-            }}
-          >
-            {menuTabs.map((tab) => {
-              const Icon = tab.icon;
-              const isActive = activeSubMenu === tab.id;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => {
-                    setActiveSubMenu(tab.id);
-                    setIsMobileMenuOpen(false);
-                  }}
-                  style={{
-                    width: '100%',
-                    padding: '12px 16px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '12px',
-                    backgroundColor: isActive ? '#fef2f2' : 'transparent',
-                    color: isActive ? '#dc2626' : '#4b5563',
-                    border: 'none',
-                    borderBottom: '1px solid #f3f4f6',
-                    fontSize: '14px',
-                    fontWeight: isActive ? '600' : '500',
-                    cursor: 'pointer',
-                    textAlign: 'left',
-                  }}
-                >
-                  <Icon size={18} color={isActive ? '#dc2626' : '#9ca3af'} />
-                  <span>{tab.label}</span>
-                  {isActive && <Check size={16} color="#dc2626" style={{ marginLeft: 'auto' }} />}
-                </button>
-              );
-            })}
-          </div>
-        )}
       </div>
 
       {message.text && (
@@ -2253,6 +2125,7 @@ const handleDeleteClient = async (clientId, clientName) => {
               <Users style={{ width: '14px', height: '14px' }} /> Mis Clientes
             </button>
           </div>
+
           {clienteTab === 'registrar' && (
             <div
               style={{
@@ -2598,6 +2471,7 @@ const handleDeleteClient = async (clientId, clientName) => {
               </form>
             </div>
           )}
+
           {clienteTab === 'cartera' && (
             <div
               style={{
@@ -2659,9 +2533,8 @@ const handleDeleteClient = async (clientId, clientName) => {
                   />
                 </div>
               </div>
-              
-              {/* TABLA DESKTOP */}
-              <div className="desktop-table"
+              <div
+                className="desktop-table"
                 style={{
                   width: '100%',
                   overflowX: 'auto',
@@ -2914,7 +2787,6 @@ const handleDeleteClient = async (clientId, clientName) => {
                               }}
                             >
                               <div
-                                className="action-buttons-wrapper"
                                 style={{
                                   display: 'flex',
                                   gap: '6px',
@@ -2999,9 +2871,10 @@ const handleDeleteClient = async (clientId, clientName) => {
                   </tbody>
                 </table>
               </div>
-
-              {/* TARJETAS MÓVIL */}
-              <div className="mobile-cards-container">
+              <div
+                className="mobile-cards-container"
+                style={{ display: 'none' }}
+              >
                 {clients.filter((c) =>
                   c.name
                     ?.toLowerCase()
@@ -3036,7 +2909,7 @@ const handleDeleteClient = async (clientId, clientName) => {
                           gap: '8px',
                         }}
                       >
-                        <div style={{ borderBottom: '1px solid #E5E7EB', paddingBottom: '8px', marginBottom: '4px' }}>
+                        <div>
                           <span
                             style={{
                               fontSize: '10px',
@@ -3050,7 +2923,7 @@ const handleDeleteClient = async (clientId, clientName) => {
                           </span>
                           <span
                             style={{
-                              fontSize: '16px',
+                              fontSize: '14px',
                               fontWeight: '900',
                               color: '#111827',
                             }}
@@ -3227,7 +3100,6 @@ const handleDeleteClient = async (clientId, clientName) => {
                           {currentSellerName}
                         </div>
                         <div
-                          className="action-buttons-wrapper"
                           style={{
                             display: 'flex',
                             gap: '8px',
@@ -3313,8 +3185,7 @@ const handleDeleteClient = async (clientId, clientName) => {
           )}
         </div>
       )}
-      
-      {/* MODAL IMAGEN (Global) */}
+
       {imageModal.open && (
         <div
           style={{
@@ -3385,6 +3256,7 @@ const handleDeleteClient = async (clientId, clientName) => {
                   <Download style={{ width: '14px', height: '14px' }} />{' '}
                   Descargar
                 </a>
+
                 {/* Botón Sustituir */}
                 <label
                   style={{
@@ -3414,6 +3286,7 @@ const handleDeleteClient = async (clientId, clientName) => {
                     }}
                   />
                 </label>
+
                 <button
                   onClick={() =>
                     setImageModal({
@@ -3465,7 +3338,6 @@ const handleDeleteClient = async (clientId, clientName) => {
         </div>
       )}
 
-      {/* MODAL EDITAR CLIENTE */}
       {editClientModal.open && (
         <div
           style={{
@@ -3932,6 +3804,7 @@ const handleDeleteClient = async (clientId, clientName) => {
               Mis Clientes Registrados
             </button>
           </div>
+
           {visitasTab === 'potenciales' && (
             <div
               style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}
@@ -4125,6 +3998,7 @@ const handleDeleteClient = async (clientId, clientName) => {
                   </div>
                 </form>
               </div>
+
               <div
                 style={{
                   backgroundColor: '#FFFFFF',
@@ -4187,9 +4061,8 @@ const handleDeleteClient = async (clientId, clientName) => {
                     />
                   </div>
                 </div>
-                
-                {/* TABLA DESKTOP */}
-                <div className="desktop-table"
+                <div
+                  className="desktop-table"
                   style={{
                     width: '100%',
                     overflowX: 'auto',
@@ -4404,7 +4277,6 @@ const handleDeleteClient = async (clientId, clientName) => {
                                 }}
                               >
                                 <div
-                                  className="action-buttons-wrapper"
                                   style={{
                                     display: 'flex',
                                     gap: '6px',
@@ -4475,9 +4347,10 @@ const handleDeleteClient = async (clientId, clientName) => {
                     </tbody>
                   </table>
                 </div>
-
-                {/* TARJETAS MÓVIL */}
-                <div className="mobile-cards-container">
+                <div
+                  className="mobile-cards-container"
+                  style={{ display: 'none' }}
+                >
                   {potenciales.filter((p) =>
                     p.name
                       ?.toLowerCase()
@@ -4512,7 +4385,7 @@ const handleDeleteClient = async (clientId, clientName) => {
                             gap: '8px',
                           }}
                         >
-                          <div style={{ borderBottom: '1px solid #E5E7EB', paddingBottom: '8px', marginBottom: '4px' }}>
+                          <div>
                             <span
                               style={{
                                 fontSize: '10px',
@@ -4526,7 +4399,7 @@ const handleDeleteClient = async (clientId, clientName) => {
                             </span>
                             <span
                               style={{
-                                fontSize: '16px',
+                                fontSize: '14px',
                                 fontWeight: '900',
                                 color: '#111827',
                               }}
@@ -4665,7 +4538,6 @@ const handleDeleteClient = async (clientId, clientName) => {
                             </button>
                           </div>
                           <div
-                            className="action-buttons-wrapper"
                             style={{
                               display: 'flex',
                               gap: '8px',
@@ -4737,6 +4609,7 @@ const handleDeleteClient = async (clientId, clientName) => {
               </div>
             </div>
           )}
+
           {visitasTab === 'clientes' && (
             <div
               style={{
@@ -4769,9 +4642,8 @@ const handleDeleteClient = async (clientId, clientName) => {
                   }}
                 />
               </div>
-              
-              {/* TABLA DESKTOP */}
-              <div className="desktop-table"
+              <div
+                className="desktop-table"
                 style={{
                   width: '100%',
                   overflowX: 'auto',
@@ -4974,7 +4846,6 @@ const handleDeleteClient = async (clientId, clientName) => {
                             style={{ padding: '8px 12px', textAlign: 'center' }}
                           >
                             <div
-                              className="action-buttons-wrapper"
                               style={{
                                 display: 'flex',
                                 gap: '6px',
@@ -5020,9 +4891,10 @@ const handleDeleteClient = async (clientId, clientName) => {
                   </tbody>
                 </table>
               </div>
-
-              {/* TARJETAS MÓVIL */}
-              <div className="mobile-cards-container">
+              <div
+                className="mobile-cards-container"
+                style={{ display: 'none' }}
+              >
                 {clients
                   .filter((c) =>
                     c.name
@@ -5042,7 +4914,7 @@ const handleDeleteClient = async (clientId, clientName) => {
                         gap: '8px',
                       }}
                     >
-                      <div style={{ borderBottom: '1px solid #E5E7EB', paddingBottom: '8px', marginBottom: '4px' }}>
+                      <div>
                         <span
                           style={{
                             fontSize: '10px',
@@ -5056,7 +4928,7 @@ const handleDeleteClient = async (clientId, clientName) => {
                         </span>
                         <span
                           style={{
-                            fontSize: '16px',
+                            fontSize: '14px',
                             fontWeight: '900',
                             color: '#111827',
                           }}
@@ -5189,7 +5061,6 @@ const handleDeleteClient = async (clientId, clientName) => {
                         </button>
                       </div>
                       <div
-                        className="action-buttons-wrapper"
                         style={{
                           display: 'flex',
                           gap: '8px',
@@ -5237,7 +5108,6 @@ const handleDeleteClient = async (clientId, clientName) => {
         </div>
       )}
 
-      {/* MODAL CONVERTIR POTENCIAL */}
       {convertModal.open && (
         <div
           style={{
@@ -5677,6 +5547,7 @@ const handleDeleteClient = async (clientId, clientName) => {
               Mis Notas de Entrega
             </button>
           </div>
+
           {neTab === 'comisiones' && (
             <div
               style={{
@@ -5815,6 +5686,7 @@ const handleDeleteClient = async (clientId, clientName) => {
               </div>
             </div>
           )}
+
           {neTab === 'crear_ne' && (
             <div
               style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}
@@ -5853,6 +5725,7 @@ const handleDeleteClient = async (clientId, clientName) => {
                   </div>
                 </div>
               </div>
+
               <div
                 style={{
                   backgroundColor: '#ffffff',
@@ -5951,6 +5824,7 @@ const handleDeleteClient = async (clientId, clientName) => {
                   </select>
                 </div>
               </div>
+
               <div
                 style={{
                   backgroundColor: '#ffffff',
@@ -6039,6 +5913,7 @@ const handleDeleteClient = async (clientId, clientName) => {
                   </button>
                 </div>
               </div>
+
               <div
                 style={{
                   backgroundColor: '#FFFFFF',
@@ -6086,6 +5961,7 @@ const handleDeleteClient = async (clientId, clientName) => {
                     </p>
                   </div>
                 </div>
+
                 <div
                   style={{
                     width: '100%',
@@ -6209,6 +6085,7 @@ const handleDeleteClient = async (clientId, clientName) => {
                     </tbody>
                   </table>
                 </div>
+
                 <div
                   style={{
                     display: 'flex',
@@ -6266,6 +6143,7 @@ const handleDeleteClient = async (clientId, clientName) => {
                     </div>
                   </div>
                 </div>
+
                 <div style={{ marginBottom: '12px' }}>
                   <label
                     style={{
@@ -6292,6 +6170,7 @@ const handleDeleteClient = async (clientId, clientName) => {
                     }}
                   ></textarea>
                 </div>
+
                 <div
                   style={{
                     backgroundColor: '#F3F4F6',
@@ -6306,6 +6185,7 @@ const handleDeleteClient = async (clientId, clientName) => {
                 >
                   <strong>Términos y condiciones:</strong> {globalTerms}
                 </div>
+
                 <div
                   style={{
                     display: 'flex',
@@ -6367,233 +6247,1083 @@ const handleDeleteClient = async (clientId, clientName) => {
               </div>
             </div>
           )}
+
           {neTab === 'historial' && (
-  <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-    {/* TARJETA DEL VENDEDOR */}
-    <div style={{ backgroundColor: '#FFFFFF', padding: '16px', borderRadius: '12px', border: '1px solid #E5E7EB', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div style={{ width: '40px', height: '40px', borderRadius: '50%', backgroundColor: '#111827', color: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '900', fontSize: '16px', flexShrink: 0 }}>
-            {currentSellerName.substring(0, 2).toUpperCase()}
-          </div>
-          <div>
-            <h3 style={{ fontSize: '14px', fontWeight: '900', margin: 0, color: '#111827' }}>{currentSellerName}</h3>
-            <p style={{ fontSize: '11px', color: '#6B7280', margin: '2px 0 0 0' }}>
-              {user?.email || 'vendedor@fenix.com'} | Rol: <strong style={{ textTransform: 'capitalize' }}>{currentUserRole}</strong>
-            </p>
-          </div>
-        </div>
-        <button onClick={() => setShowFullSellerCard(!showFullSellerCard)} style={{ padding: '6px 12px', backgroundColor: '#F3F4F6', border: '1px solid #D1D5DB', borderRadius: '8px', fontSize: '12px', fontWeight: '700', color: '#374151', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
-          {showFullSellerCard ? 'Ocultar todo' : 'Ver todo'}
-          {showFullSellerCard ? <ChevronUp style={{ width: '16px', height: '16px' }} /> : <ChevronDown style={{ width: '16px', height: '16px' }} />}
-        </button>
-      </div>
-      {showFullSellerCard && (
-        <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #E5E7EB', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px', fontSize: '12px' }}>
-          <div style={{ backgroundColor: '#F9FAFB', padding: '10px', borderRadius: '8px', border: '1px solid #F3F4F6' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
-              <Target style={{ width: '14px', height: '14px', color: '#6B7280' }} />
-              <span style={{ color: '#6B7280', fontWeight: '600' }}>Meta Mensual (Vendido / Meta):</span>
-            </div>
-            <p style={{ margin: '4px 0 0 0', fontWeight: '900', color: '#111827', fontSize: '13px' }}>${sellerSalesTotal.toFixed(2)} / ${sellerMetaGoal.toFixed(2)}</p>
-            {sellerMetaGoal > 0 && (
-              <p style={{ margin: '2px 0 0 0', fontSize: '11px', color: remainingToGoal > 0 ? '#DC2626' : '#16A34A', fontWeight: '700' }}>
-                {remainingToGoal > 0 ? `Faltan: $${remainingToGoal.toFixed(2)} para alcanzar la meta` : '¡Meta alcanzada! '}
-              </p>
-            )}
-          </div>
-          {fixedSalary > 0 && (
-            <div style={{ backgroundColor: '#F9FAFB', padding: '10px', borderRadius: '8px', border: '1px solid #F3F4F6' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
-                <Banknote style={{ width: '14px', height: '14px', color: '#6B7280' }} />
-                <span style={{ color: '#6B7280', fontWeight: '600' }}>Sueldo Fijo Base:</span>
+            <div
+              style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}
+            >
+              <div
+                style={{
+                  backgroundColor: '#FFFFFF',
+                  padding: '16px',
+                  borderRadius: '12px',
+                  border: '1px solid #E5E7EB',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+                }}
+              >
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    flexWrap: 'wrap',
+                    gap: '12px',
+                  }}
+                >
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '12px',
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: '40px',
+                        height: '40px',
+                        borderRadius: '50%',
+                        backgroundColor: '#111827',
+                        color: '#FFFFFF',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontWeight: '900',
+                        fontSize: '16px',
+                        flexShrink: 0,
+                      }}
+                    >
+                      {currentSellerName.substring(0, 2).toUpperCase()}
+                    </div>
+                    <div>
+                      <h3
+                        style={{
+                          fontSize: '14px',
+                          fontWeight: '900',
+                          margin: 0,
+                          color: '#111827',
+                        }}
+                      >
+                        {currentSellerName}
+                      </h3>
+                      <p
+                        style={{
+                          fontSize: '11px',
+                          color: '#6B7280',
+                          margin: '2px 0 0 0',
+                        }}
+                      >
+                        {user?.email || 'vendedor@fenix.com'} | Rol:{' '}
+                        <strong style={{ textTransform: 'capitalize' }}>
+                          {currentUserRole}
+                        </strong>
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setShowFullSellerCard(!showFullSellerCard)}
+                    style={{
+                      padding: '6px 12px',
+                      backgroundColor: '#F3F4F6',
+                      border: '1px solid #D1D5DB',
+                      borderRadius: '8px',
+                      fontSize: '12px',
+                      fontWeight: '700',
+                      color: '#374151',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                    }}
+                  >
+                    {showFullSellerCard ? 'Ocultar todo' : 'Ver todo'}
+                    {showFullSellerCard ? (
+                      <ChevronUp style={{ width: '16px', height: '16px' }} />
+                    ) : (
+                      <ChevronDown style={{ width: '16px', height: '16px' }} />
+                    )}
+                  </button>
+                </div>
+
+                {showFullSellerCard && (
+                  <div
+                    style={{
+                      marginTop: '12px',
+                      paddingTop: '12px',
+                      borderTop: '1px solid #E5E7EB',
+                      display: 'grid',
+                      gridTemplateColumns:
+                        'repeat(auto-fit, minmax(200px, 1fr))',
+                      gap: '12px',
+                      fontSize: '12px',
+                    }}
+                  >
+                    <div
+                      style={{
+                        backgroundColor: '#F9FAFB',
+                        padding: '10px',
+                        borderRadius: '8px',
+                        border: '1px solid #F3F4F6',
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          marginBottom: '4px',
+                        }}
+                      >
+                        <Target
+                          style={{
+                            width: '14px',
+                            height: '14px',
+                            color: '#6B7280',
+                          }}
+                        />
+                        <span style={{ color: '#6B7280', fontWeight: '600' }}>
+                          Meta Mensual (Vendido / Meta):
+                        </span>
+                      </div>
+                      <p
+                        style={{
+                          margin: '4px 0 0 0',
+                          fontWeight: '900',
+                          color: '#111827',
+                          fontSize: '13px',
+                        }}
+                      >
+                        ${sellerSalesTotal.toFixed(2)} / $
+                        {sellerMetaGoal.toFixed(2)}
+                      </p>
+                      {sellerMetaGoal > 0 && (
+                        <p
+                          style={{
+                            margin: '2px 0 0 0',
+                            fontSize: '11px',
+                            color: remainingToGoal > 0 ? '#DC2626' : '#16A34A',
+                            fontWeight: '700',
+                          }}
+                        >
+                          {remainingToGoal > 0
+                            ? `Faltan: $${remainingToGoal.toFixed(
+                                2
+                              )} para alcanzar la meta`
+                            : '¡Meta alcanzada! '}
+                        </p>
+                      )}
+                    </div>
+                    {fixedSalary > 0 && (
+                      <div
+                        style={{
+                          backgroundColor: '#F9FAFB',
+                          padding: '10px',
+                          borderRadius: '8px',
+                          border: '1px solid #F3F4F6',
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            marginBottom: '4px',
+                          }}
+                        >
+                          <Banknote
+                            style={{
+                              width: '14px',
+                              height: '14px',
+                              color: '#6B7280',
+                            }}
+                          />
+                          <span style={{ color: '#6B7280', fontWeight: '600' }}>
+                            Sueldo Fijo Base:
+                          </span>
+                        </div>
+                        <p
+                          style={{
+                            margin: '4px 0 0 0',
+                            fontWeight: '900',
+                            color: '#16A34A',
+                            fontSize: '14px',
+                          }}
+                        >
+                          ${fixedSalary.toFixed(2)} USD
+                        </p>
+                      </div>
+                    )}
+                    <div
+                      style={{
+                        backgroundColor: '#F9FAFB',
+                        padding: '10px',
+                        borderRadius: '8px',
+                        border: '1px solid #F3F4F6',
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          marginBottom: '4px',
+                        }}
+                      >
+                        <DollarSign
+                          style={{
+                            width: '14px',
+                            height: '14px',
+                            color: '#6B7280',
+                          }}
+                        />
+                        <span style={{ color: '#6B7280', fontWeight: '600' }}>
+                          Comisiones Recibidas (Histórico):
+                        </span>
+                      </div>
+                      <p
+                        style={{
+                          margin: '4px 0 0 0',
+                          fontWeight: '900',
+                          color: '#16A34A',
+                          fontSize: '14px',
+                        }}
+                      >
+                        ${totalCommissionsReceived.toFixed(2)} USD
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
-              <p style={{ margin: '4px 0 0 0', fontWeight: '900', color: '#16A34A', fontSize: '14px' }}>${fixedSalary.toFixed(2)} USD</p>
+
+              <div
+                style={{
+                  backgroundColor: '#FFFFFF',
+                  padding: '12px 16px',
+                  borderRadius: '12px',
+                  border: '1px solid #E5E7EB',
+                  display: 'flex',
+                  gap: '12px',
+                  alignItems: 'center',
+                }}
+              >
+                <Search
+                  style={{
+                    color: '#9CA3AF',
+                    width: '18px',
+                    height: '18px',
+                    flexShrink: 0,
+                  }}
+                />
+                <input
+                  type="text"
+                  placeholder="Buscar en mis notas de entrega por cliente o N° de transacción..."
+                  value={searchHistoryQuery}
+                  onChange={(e) => setSearchHistoryQuery(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '6px 8px',
+                    fontSize: '12px',
+                    border: '1px solid #D1D5DB',
+                    borderRadius: '8px',
+                    outline: 'none',
+                  }}
+                />
+              </div>
+
+              <div
+                style={{
+                  backgroundColor: '#FFFFFF',
+                  borderRadius: '12px',
+                  border: '1px solid #E5E7EB',
+                  overflow: 'hidden',
+                }}
+              >
+                <div
+                  className="desktop-table"
+                  style={{
+                    width: '100%',
+                    overflowX: 'auto',
+                    WebkitOverflowScrolling: 'touch',
+                  }}
+                >
+                  <table
+                    style={{
+                      width: '100%',
+                      minWidth: '1150px',
+                      borderCollapse: 'collapse',
+                      textAlign: 'left',
+                      fontSize: '12px',
+                    }}
+                  >
+                    <thead>
+                      <tr
+                        style={{
+                          backgroundColor: '#F3F4F6',
+                          borderBottom: '1px solid #E5E7EB',
+                          fontWeight: '700',
+                        }}
+                      >
+                        <th style={{ padding: '8px 12px', minWidth: '150px' }}>
+                          Cliente
+                        </th>
+                        <th style={{ padding: '8px 12px', minWidth: '130px' }}>
+                          N° Transacción
+                        </th>
+                        <th style={{ padding: '8px 12px', minWidth: '100px' }}>
+                          Fecha
+                        </th>
+                        <th style={{ padding: '8px 12px', minWidth: '140px' }}>
+                          Registrado Por
+                        </th>
+                        <th style={{ padding: '8px 12px', minWidth: '90px' }}>
+                          Estado
+                        </th>
+                        <th style={{ padding: '8px 12px', minWidth: '100px' }}>
+                          Pago N.E.
+                        </th>
+                        <th style={{ padding: '8px 12px', minWidth: '80px' }}>
+                          Abono
+                        </th>
+                        <th style={{ padding: '8px 12px', minWidth: '80px' }}>
+                          Deuda
+                        </th>
+                        <th style={{ padding: '8px 12px', minWidth: '120px' }}>
+                          Notif. Abono
+                        </th>
+                        <th style={{ padding: '8px 12px', minWidth: '90px' }}>
+                          Vale
+                        </th>
+                        <th style={{ padding: '8px 12px', minWidth: '70px' }}>
+                          Editar
+                        </th>
+                        <th style={{ padding: '8px 12px', minWidth: '80px' }}>
+                          Eliminar
+                        </th>
+                        <th style={{ padding: '8px 12px', minWidth: '90px' }}>
+                          Descargar
+                        </th>
+                        <th style={{ padding: '8px 12px', minWidth: '80px' }}>
+                          Enviar
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredSalesHistory.length === 0 ? (
+                        <tr>
+                          <td
+                            colSpan="14"
+                            style={{
+                              padding: '16px',
+                              textAlign: 'center',
+                              color: '#6B7280',
+                            }}
+                          >
+                            No se encontraron Notas de Entrega creadas por ti.
+                          </td>
+                        </tr>
+                      ) : (
+                        filteredSalesHistory.map((nota) => {
+                          const isAprobada = nota.status === 'aprobada';
+                          const isCerrada = nota.payment_status === 'cerrada';
+                          const totalAbonado = Number(nota.total_paid_usd) || 0;
+                          const valeAsociado =
+                            nota.vales && nota.vales.length > 0
+                              ? nota.vales[0]
+                              : null;
+                          const valeEstado = valeAsociado
+                            ? valeAsociado.status
+                            : null;
+                          const pendingNotif = paymentNotificationsMap[nota.id];
+                          const hasPendingNotif =
+                            pendingNotif && pendingNotif.status === 'pending';
+
+                          return (
+                            <tr
+                              key={nota.id}
+                              style={{ borderBottom: '1px solid #E5E7EB' }}
+                            >
+                              <td
+                                style={{
+                                  padding: '8px 12px',
+                                  fontWeight: '700',
+                                }}
+                              >
+                                {nota.clients?.name || 'Cliente N/A'}
+                              </td>
+                              <td
+                                style={{
+                                  padding: '8px 12px',
+                                  fontFamily: 'monospace',
+                                }}
+                              >
+                                #
+                                {nota.transaction_number ||
+                                  nota.id.substring(0, 6)}
+                              </td>
+                              <td style={{ padding: '8px 12px' }}>
+                                {new Date(nota.created_at).toLocaleDateString()}
+                              </td>
+                              <td style={{ padding: '8px 12px' }}>
+                                <span
+                                  style={{
+                                    padding: '4px 8px',
+                                    backgroundColor: '#F3F4F6',
+                                    borderRadius: '6px',
+                                    fontWeight: '700',
+                                    color: '#374151',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '4px',
+                                  }}
+                                >
+                                  <UserCheck
+                                    style={{
+                                      width: '12px',
+                                      height: '12px',
+                                      color: '#16A34A',
+                                    }}
+                                  />
+                                  {currentSellerName}
+                                </span>
+                              </td>
+                              <td style={{ padding: '8px 12px' }}>
+                                <span
+                                  style={{
+                                    padding: '4px 8px',
+                                    borderRadius: '4px',
+                                    fontSize: '10px',
+                                    fontWeight: '900',
+                                    backgroundColor: isAprobada
+                                      ? '#DCFCE7'
+                                      : '#FEF3C7',
+                                    color: isAprobada ? '#15803D' : '#B45309',
+                                  }}
+                                >
+                                  {nota.status}
+                                </span>
+                              </td>
+                              <td style={{ padding: '8px 12px' }}>
+                                <span
+                                  style={{
+                                    padding: '4px 8px',
+                                    borderRadius: '4px',
+                                    fontSize: '10px',
+                                    fontWeight: '900',
+                                    backgroundColor: isCerrada
+                                      ? '#DCFCE7'
+                                      : '#FEF3C7',
+                                    color: isCerrada ? '#15803D' : '#B45309',
+                                  }}
+                                >
+                                  {isCerrada ? 'Cerrada' : 'Pendiente'}
+                                </span>
+                              </td>
+                              <td
+                                style={{
+                                  padding: '8px 12px',
+                                  fontWeight: '700',
+                                  color: '#2563EB',
+                                }}
+                              >
+                                ${totalAbonado.toFixed(2)}
+                              </td>
+                              <td
+                                style={{
+                                  padding: '8px 12px',
+                                  fontWeight: '700',
+                                }}
+                              >
+                                {nota.balance_due_usd > 0 ? (
+                                  `$${Number(nota.balance_due_usd).toFixed(2)}`
+                                ) : (
+                                  <span style={{ color: '#16A34A' }}>
+                                    Cerrada
+                                  </span>
+                                )}
+                              </td>
+                              <td style={{ padding: '8px 12px' }}>
+                                {hasPendingNotif ? (
+                                  <button
+                                    onClick={() =>
+                                      handleOpenAbonoNotifModal(nota.id)
+                                    }
+                                    style={{
+                                      padding: '4px 8px',
+                                      backgroundColor: '#FEF3C7',
+                                      color: '#B45309',
+                                      border: '1px solid #FDE68A',
+                                      borderRadius: '4px',
+                                      fontSize: '10px',
+                                      cursor: 'pointer',
+                                      fontWeight: '700',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '4px',
+                                    }}
+                                    title="Notificación pendiente de aprobación"
+                                  >
+                                    <Bell size={11} /> $
+                                    {Number(pendingNotif.amount_usd).toFixed(2)}
+                                  </button>
+                                ) : (
+                                  <button
+                                    onClick={() =>
+                                      handleOpenAbonoNotifModal(nota.id)
+                                    }
+                                    style={{
+                                      padding: '4px 8px',
+                                      backgroundColor: '#0284C7',
+                                      color: '#FFFFFF',
+                                      border: 'none',
+                                      borderRadius: '4px',
+                                      fontSize: '10px',
+                                      cursor: 'pointer',
+                                      fontWeight: '700',
+                                    }}
+                                  >
+                                    Notif. Abono
+                                  </button>
+                                )}
+                              </td>
+                              <td style={{ padding: '8px 12px' }}>
+                                {valeEstado && valeEstado !== 'rechazada' ? (
+                                  <span
+                                    style={{
+                                      padding: '4px 8px',
+                                      borderRadius: '4px',
+                                      fontSize: '10px',
+                                      fontWeight: '900',
+                                      textTransform: 'capitalize',
+                                      backgroundColor:
+                                        valeEstado === 'aprobada'
+                                          ? '#DCFCE7'
+                                          : '#FEF3C7',
+                                      color:
+                                        valeEstado === 'aprobada'
+                                          ? '#15803D'
+                                          : '#B45309',
+                                    }}
+                                  >
+                                    {valeEstado}
+                                  </span>
+                                ) : (
+                                  <button
+                                    onClick={() =>
+                                      setValeModal({
+                                        open: true,
+                                        notaId: nota.id,
+                                        monto: '',
+                                      })
+                                    }
+                                    style={{
+                                      padding: '4px 8px',
+                                      backgroundColor:
+                                        valeEstado === 'rechazada'
+                                          ? '#DC2626'
+                                          : '#F59E0B',
+                                      color: '#FFFFFF',
+                                      border: 'none',
+                                      borderRadius: '4px',
+                                      fontSize: '10px',
+                                      cursor: 'pointer',
+                                      fontWeight: '700',
+                                    }}
+                                    title={
+                                      valeEstado === 'rechazada'
+                                        ? 'Rechazado. Volver a solicitar'
+                                        : 'Solicitar vale'
+                                    }
+                                  >
+                                    {valeEstado === 'rechazada'
+                                      ? 'Reintentar Vale'
+                                      : 'Solicitar'}
+                                  </button>
+                                )}
+                              </td>
+                              <td style={{ padding: '8px 12px' }}>
+                                <button
+                                  onClick={() => handleEditNE(nota)}
+                                  style={{
+                                    border: 'none',
+                                    background: 'none',
+                                    cursor: 'pointer',
+                                    color: '#4F46E5',
+                                  }}
+                                >
+                                  <Edit
+                                    style={{ width: '16px', height: '16px' }}
+                                  />
+                                </button>
+                              </td>
+                              <td style={{ padding: '8px 12px' }}>
+                                <button
+                                  onClick={() => handleDeleteNE(nota)}
+                                  style={{
+                                    border: 'none',
+                                    background: 'none',
+                                    cursor:
+                                      totalAbonado > 0
+                                        ? 'not-allowed'
+                                        : 'pointer',
+                                    color:
+                                      totalAbonado > 0 ? '#9CA3AF' : '#DC2626',
+                                  }}
+                                  title={
+                                    totalAbonado > 0
+                                      ? 'No se puede eliminar porque ya registra abonos'
+                                      : 'Eliminar Nota de Entrega'
+                                  }
+                                >
+                                  <Trash2
+                                    style={{ width: '16px', height: '16px' }}
+                                  />
+                                </button>
+                              </td>
+                              <td style={{ padding: '8px 12px' }}>
+                                <button
+                                  disabled={!isAprobada || loading}
+                                  onClick={() => handleDownloadPDF(nota)}
+                                  style={{
+                                    border: 'none',
+                                    background: 'none',
+                                    cursor: isAprobada
+                                      ? 'pointer'
+                                      : 'not-allowed',
+                                    color: isAprobada ? '#111827' : '#D1D5DB',
+                                  }}
+                                  title={
+                                    isAprobada
+                                      ? 'Descargar PDF directo'
+                                      : 'Nota no aprobada'
+                                  }
+                                >
+                                  <Download
+                                    style={{ width: '16px', height: '16px' }}
+                                  />
+                                </button>
+                              </td>
+                              <td style={{ padding: '8px 12px' }}>
+                                <button
+                                  disabled={!isAprobada}
+                                  onClick={() => handleSendPDF(nota)}
+                                  style={{
+                                    border: 'none',
+                                    background: 'none',
+                                    cursor: isAprobada
+                                      ? 'pointer'
+                                      : 'not-allowed',
+                                    color: isAprobada ? '#16A34A' : '#D1D5DB',
+                                  }}
+                                  title={
+                                    isAprobada
+                                      ? 'Enviar resumen por WhatsApp'
+                                      : 'Nota no aprobada'
+                                  }
+                                >
+                                  <Send
+                                    style={{ width: '16px', height: '16px' }}
+                                  />
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+                <div
+                  className="mobile-cards-container"
+                  style={{ display: 'none', padding: '12px' }}
+                >
+                  {filteredSalesHistory.length === 0 ? (
+                    <div
+                      style={{
+                        padding: '16px',
+                        textAlign: 'center',
+                        color: '#6B7280',
+                      }}
+                    >
+                      No se encontraron Notas de Entrega creadas por ti.
+                    </div>
+                  ) : (
+                    filteredSalesHistory.map((nota) => {
+                      const isAprobada = nota.status === 'aprobada';
+                      const isCerrada = nota.payment_status === 'cerrada';
+                      const totalAbonado = Number(nota.total_paid_usd) || 0;
+                      const valeAsociado =
+                        nota.vales && nota.vales.length > 0
+                          ? nota.vales[0]
+                          : null;
+                      const valeEstado = valeAsociado
+                        ? valeAsociado.status
+                        : null;
+                      const pendingNotif = paymentNotificationsMap[nota.id];
+                      const hasPendingNotif =
+                        pendingNotif && pendingNotif.status === 'pending';
+
+                      return (
+                        <div
+                          key={nota.id}
+                          style={{
+                            backgroundColor: '#F9FAFB',
+                            border: '1px solid #E5E7EB',
+                            borderRadius: '8px',
+                            padding: '12px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '8px',
+                            marginBottom: '8px',
+                          }}
+                        >
+                          <div>
+                            <span
+                              style={{
+                                fontSize: '10px',
+                                fontWeight: '700',
+                                color: '#6B7280',
+                                textTransform: 'uppercase',
+                                display: 'block',
+                              }}
+                            >
+                              Cliente
+                            </span>
+                            <span
+                              style={{
+                                fontSize: '14px',
+                                fontWeight: '900',
+                                color: '#111827',
+                              }}
+                            >
+                              {nota.clients?.name || 'Cliente N/A'}
+                            </span>
+                          </div>
+                          <div
+                            style={{
+                              display: 'grid',
+                              gridTemplateColumns: '1fr 1fr',
+                              gap: '8px',
+                              fontSize: '12px',
+                            }}
+                          >
+                            <div>
+                              <span
+                                style={{ fontWeight: '700', color: '#4B5563' }}
+                              >
+                                Transacción:
+                              </span>{' '}
+                              #
+                              {nota.transaction_number ||
+                                nota.id.substring(0, 6)}
+                            </div>
+                            <div>
+                              <span
+                                style={{ fontWeight: '700', color: '#4B5563' }}
+                              >
+                                Fecha:
+                              </span>{' '}
+                              {new Date(nota.created_at).toLocaleDateString()}
+                            </div>
+                          </div>
+                          <div style={{ fontSize: '12px' }}>
+                            <span
+                              style={{ fontWeight: '700', color: '#4B5563' }}
+                            >
+                              Registrado Por:
+                            </span>{' '}
+                            {currentSellerName}
+                          </div>
+                          <div
+                            style={{
+                              display: 'grid',
+                              gridTemplateColumns: '1fr 1fr',
+                              gap: '8px',
+                              fontSize: '12px',
+                            }}
+                          >
+                            <div>
+                              <span
+                                style={{ fontWeight: '700', color: '#4B5563' }}
+                              >
+                                Estado:
+                              </span>{' '}
+                              <span
+                                style={{
+                                  padding: '2px 6px',
+                                  borderRadius: '4px',
+                                  fontSize: '10px',
+                                  fontWeight: '900',
+                                  backgroundColor: isAprobada
+                                    ? '#DCFCE7'
+                                    : '#FEF3C7',
+                                  color: isAprobada ? '#15803D' : '#B45309',
+                                }}
+                              >
+                                {nota.status}
+                              </span>
+                            </div>
+                            <div>
+                              <span
+                                style={{ fontWeight: '700', color: '#4B5563' }}
+                              >
+                                Pago N.E.:
+                              </span>{' '}
+                              <span
+                                style={{
+                                  padding: '2px 6px',
+                                  borderRadius: '4px',
+                                  fontSize: '10px',
+                                  fontWeight: '900',
+                                  backgroundColor: isCerrada
+                                    ? '#DCFCE7'
+                                    : '#FEF3C7',
+                                  color: isCerrada ? '#15803D' : '#B45309',
+                                }}
+                              >
+                                {isCerrada ? 'Cerrada' : 'Pendiente'}
+                              </span>
+                            </div>
+                          </div>
+                          <div
+                            style={{
+                              display: 'grid',
+                              gridTemplateColumns: '1fr 1fr',
+                              gap: '8px',
+                              fontSize: '12px',
+                            }}
+                          >
+                            <div>
+                              <span
+                                style={{ fontWeight: '700', color: '#4B5563' }}
+                              >
+                                Abono:
+                              </span>{' '}
+                              <strong style={{ color: '#2563EB' }}>
+                                ${totalAbonado.toFixed(2)}
+                              </strong>
+                            </div>
+                            <div>
+                              <span
+                                style={{ fontWeight: '700', color: '#4B5563' }}
+                              >
+                                Deuda:
+                              </span>{' '}
+                              {nota.balance_due_usd > 0 ? (
+                                `$${Number(nota.balance_due_usd).toFixed(2)}`
+                              ) : (
+                                <span
+                                  style={{
+                                    color: '#16A34A',
+                                    fontWeight: '700',
+                                  }}
+                                >
+                                  Cerrada
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <div
+                            style={{
+                              display: 'flex',
+                              gap: '8px',
+                              alignItems: 'center',
+                              flexWrap: 'wrap',
+                              marginTop: '4px',
+                            }}
+                          >
+                            {hasPendingNotif ? (
+                              <button
+                                onClick={() =>
+                                  handleOpenAbonoNotifModal(nota.id)
+                                }
+                                style={{
+                                  padding: '4px 8px',
+                                  backgroundColor: '#FEF3C7',
+                                  color: '#B45309',
+                                  border: '1px solid #FDE68A',
+                                  borderRadius: '6px',
+                                  fontSize: '11px',
+                                  cursor: 'pointer',
+                                  fontWeight: '700',
+                                }}
+                              >
+                                ${Number(pendingNotif.amount_usd).toFixed(2)}{' '}
+                                (Pend.)
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() =>
+                                  handleOpenAbonoNotifModal(nota.id)
+                                }
+                                style={{
+                                  padding: '4px 8px',
+                                  backgroundColor: '#0284C7',
+                                  color: '#FFFFFF',
+                                  border: 'none',
+                                  borderRadius: '6px',
+                                  fontSize: '11px',
+                                  cursor: 'pointer',
+                                  fontWeight: '700',
+                                }}
+                              >
+                                Notif. Abono
+                              </button>
+                            )}
+                            {valeEstado && valeEstado !== 'rechazada' ? (
+                              <span
+                                style={{
+                                  padding: '4px 8px',
+                                  borderRadius: '6px',
+                                  fontSize: '11px',
+                                  fontWeight: '900',
+                                  textTransform: 'capitalize',
+                                  backgroundColor:
+                                    valeEstado === 'aprobada'
+                                      ? '#DCFCE7'
+                                      : '#FEF3C7',
+                                  color:
+                                    valeEstado === 'aprobada'
+                                      ? '#15803D'
+                                      : '#B45309',
+                                }}
+                              >
+                                Vale: {valeEstado}
+                              </span>
+                            ) : (
+                              <button
+                                onClick={() =>
+                                  setValeModal({
+                                    open: true,
+                                    notaId: nota.id,
+                                    monto: '',
+                                  })
+                                }
+                                style={{
+                                  padding: '4px 8px',
+                                  backgroundColor:
+                                    valeEstado === 'rechazada'
+                                      ? '#DC2626'
+                                      : '#F59E0B',
+                                  color: '#FFFFFF',
+                                  border: 'none',
+                                  borderRadius: '6px',
+                                  fontSize: '11px',
+                                  cursor: 'pointer',
+                                  fontWeight: '700',
+                                }}
+                              >
+                                {valeEstado === 'rechazada'
+                                  ? 'Reintentar Vale'
+                                  : 'Solicitar Vale'}
+                              </button>
+                            )}
+                          </div>
+                          <div
+                            style={{
+                              display: 'flex',
+                              gap: '8px',
+                              marginTop: '6px',
+                              flexWrap: 'wrap',
+                              borderTop: '1px solid #E5E7EB',
+                              paddingTop: '8px',
+                              justifyContent: 'space-between',
+                            }}
+                          >
+                            <button
+                              onClick={() => handleEditNE(nota)}
+                              style={{
+                                padding: '4px 8px',
+                                backgroundColor: '#F3F4F6',
+                                color: '#4F46E5',
+                                border: '1px solid #D1D5DB',
+                                borderRadius: '6px',
+                                fontSize: '11px',
+                                fontWeight: '700',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                              }}
+                            >
+                              <Edit style={{ width: '13px', height: '13px' }} />{' '}
+                              Editar
+                            </button>
+                            <button
+                              disabled={!isAprobada || loading}
+                              onClick={() => handleDownloadPDF(nota)}
+                              style={{
+                                padding: '4px 8px',
+                                backgroundColor: isAprobada
+                                  ? '#111827'
+                                  : '#E5E7EB',
+                                color: isAprobada ? '#FFFFFF' : '#9CA3AF',
+                                border: 'none',
+                                borderRadius: '6px',
+                                fontSize: '11px',
+                                fontWeight: '700',
+                                cursor: isAprobada ? 'pointer' : 'not-allowed',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                              }}
+                            >
+                              <Download
+                                style={{ width: '13px', height: '13px' }}
+                              />{' '}
+                              PDF
+                            </button>
+                            <button
+                              disabled={!isAprobada}
+                              onClick={() => handleSendPDF(nota)}
+                              style={{
+                                padding: '4px 8px',
+                                backgroundColor: isAprobada
+                                  ? '#16A34A'
+                                  : '#E5E7EB',
+                                color: isAprobada ? '#FFFFFF' : '#9CA3AF',
+                                border: 'none',
+                                borderRadius: '6px',
+                                fontSize: '11px',
+                                fontWeight: '700',
+                                cursor: isAprobada ? 'pointer' : 'not-allowed',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                              }}
+                            >
+                              <Send style={{ width: '13px', height: '13px' }} />{' '}
+                              WhatsApp
+                            </button>
+                            <button
+                              disabled={totalAbonado > 0}
+                              onClick={() => handleDeleteNE(nota)}
+                              style={{
+                                padding: '4px 8px',
+                                backgroundColor: '#FEF2F2',
+                                color: totalAbonado > 0 ? '#9CA3AF' : '#DC2626',
+                                border: '1px solid #FECACA',
+                                borderRadius: '6px',
+                                cursor:
+                                  totalAbonado > 0 ? 'not-allowed' : 'pointer',
+                              }}
+                            >
+                              <Trash2
+                                style={{ width: '14px', height: '14px' }}
+                              />
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
             </div>
           )}
-          <div style={{ backgroundColor: '#F9FAFB', padding: '10px', borderRadius: '8px', border: '1px solid #F3F4F6' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
-              <DollarSign style={{ width: '14px', height: '14px', color: '#6B7280' }} />
-              <span style={{ color: '#6B7280', fontWeight: '600' }}>Comisiones Recibidas (Histórico):</span>
-            </div>
-            <p style={{ margin: '4px 0 0 0', fontWeight: '900', color: '#16A34A', fontSize: '14px' }}>${totalCommissionsReceived.toFixed(2)} USD</p>
-          </div>
-        </div>
-      )}
-    </div>
-
-    {/* BUSCADOR */}
-    <div style={{ backgroundColor: '#FFFFFF', padding: '12px 16px', borderRadius: '12px', border: '1px solid #E5E7EB', display: 'flex', gap: '12px', alignItems: 'center' }}>
-      <Search style={{ color: '#9CA3AF', width: '18px', height: '18px', flexShrink: 0 }} />
-      <input type="text" placeholder="Buscar en mis notas de entrega por cliente o N° de transacción..." value={searchHistoryQuery} onChange={(e) => setSearchHistoryQuery(e.target.value)} style={{ width: '100%', padding: '6px 8px', fontSize: '12px', border: '1px solid #D1D5DB', borderRadius: '8px', outline: 'none' }} />
-    </div>
-
-    {/* CONTENEDOR DE TABLA DESKTOP Y MÓVIL */}
-    <div style={{ backgroundColor: '#FFFFFF', borderRadius: '12px', border: '1px solid #E5E7EB', overflow: 'hidden' }}>
-      
-      {/* --- TABLA DESKTOP CORREGIDA --- */}
-      <div className="desktop-table" style={{ width: '100%', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
-        <table style={{ width: '100%', minWidth: '1150px', borderCollapse: 'collapse', textAlign: 'left', fontSize: '12px' }}>
-          <thead>
-            <tr style={{ backgroundColor: '#F3F4F6', borderBottom: '1px solid #E5E7EB', fontWeight: '700' }}>
-              <th style={{ padding: '8px 12px', minWidth: '150px' }}>Cliente</th>
-              <th style={{ padding: '8px 12px', minWidth: '130px' }}>N° Transacción</th>
-              <th style={{ padding: '8px 12px', minWidth: '100px' }}>Fecha</th>
-              <th style={{ padding: '8px 12px', minWidth: '140px' }}>Registrado Por</th>
-              <th style={{ padding: '8px 12px', minWidth: '90px' }}>Estado</th>
-              <th style={{ padding: '8px 12px', minWidth: '100px' }}>Pago N.E.</th>
-              <th style={{ padding: '8px 12px', minWidth: '80px' }}>Abono</th>
-              <th style={{ padding: '8px 12px', minWidth: '80px' }}>Deuda</th>
-              <th style={{ padding: '8px 12px', minWidth: '120px' }}>Notif. Abono</th>
-              <th style={{ padding: '8px 12px', minWidth: '90px' }}>Vale</th>
-              <th style={{ padding: '8px 12px', minWidth: '70px' }}>Editar</th>
-              <th style={{ padding: '8px 12px', minWidth: '80px' }}>Eliminar</th>
-              <th style={{ padding: '8px 12px', minWidth: '90px' }}>Descargar</th>
-              <th style={{ padding: '8px 12px', minWidth: '80px' }}>Enviar</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredSalesHistory.length === 0 ? (
-              <tr><td colSpan="14" style={{ padding: '16px', textAlign: 'center', color: '#6B7280' }}>No se encontraron Notas de Entrega creadas por ti.</td></tr>
-            ) : (
-              filteredSalesHistory.map((nota) => {
-                const isAprobada = nota.status === 'aprobada';
-                const isCerrada = nota.payment_status === 'cerrada';
-                const totalAbonado = Number(nota.total_paid_usd) || 0;
-                const valeAsociado = nota.vales && nota.vales.length > 0 ? nota.vales[0] : null;
-                const valeEstado = valeAsociado ? valeAsociado.status : null;
-                const pendingNotif = paymentNotificationsMap[nota.id];
-                const hasPendingNotif = pendingNotif && pendingNotif.status === 'pending';
-                
-                return (
-                  <tr key={nota.id} style={{ borderBottom: '1px solid #E5E7EB' }}>
-                    <td style={{ padding: '8px 12px', fontWeight: '700' }}>{nota.clients?.name || 'Cliente N/A'}</td>
-                    <td style={{ padding: '8px 12px', fontFamily: 'monospace' }}>#{nota.transaction_number || nota.id.substring(0, 6)}</td>
-                    <td style={{ padding: '8px 12px' }}>{new Date(nota.created_at).toLocaleDateString()}</td>
-                    <td style={{ padding: '8px 12px' }}>
-                      <span style={{ padding: '4px 8px', backgroundColor: '#F3F4F6', borderRadius: '6px', fontWeight: '700', color: '#374151', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                        <UserCheck style={{ width: '12px', height: '12px', color: '#16A34A' }} />{currentSellerName}
-                      </span>
-                    </td>
-                    <td style={{ padding: '8px 12px' }}>
-                      <span style={{ padding: '4px 8px', borderRadius: '4px', fontSize: '10px', fontWeight: '900', backgroundColor: isAprobada ? '#DCFCE7' : '#FEF3C7', color: isAprobada ? '#15803D' : '#B45309' }}>{nota.status}</span>
-                    </td>
-                    <td style={{ padding: '8px 12px' }}>
-                      <span style={{ padding: '4px 8px', borderRadius: '4px', fontSize: '10px', fontWeight: '900', backgroundColor: isCerrada ? '#DCFCE7' : '#FEF3C7', color: isCerrada ? '#15803D' : '#B45309' }}>{isCerrada ? 'Cerrada' : 'Pendiente'}</span>
-                    </td>
-                    <td style={{ padding: '8px 12px', fontWeight: '700', color: '#2563EB' }}>${totalAbonado.toFixed(2)}</td>
-                    <td style={{ padding: '8px 12px', fontWeight: '700' }}>
-                      {nota.balance_due_usd > 0 ? `$${Number(nota.balance_due_usd).toFixed(2)}` : <span style={{ color: '#16A34A' }}>Cerrada</span>}
-                    </td>
-                    <td style={{ padding: '8px 12px' }}>
-                      {hasPendingNotif ? (
-                        <button onClick={() => handleOpenAbonoNotifModal(nota.id)} style={{ padding: '4px 8px', backgroundColor: '#FEF3C7', color: '#B45309', border: '1px solid #FDE68A', borderRadius: '4px', fontSize: '10px', cursor: 'pointer', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '4px' }} title="Notificación pendiente">
-                          <Bell size={11} /> ${Number(pendingNotif.amount_usd).toFixed(2)}
-                        </button>
-                      ) : (
-                        <button onClick={() => handleOpenAbonoNotifModal(nota.id)} style={{ padding: '4px 8px', backgroundColor: '#0284C7', color: '#FFFFFF', border: 'none', borderRadius: '4px', fontSize: '10px', cursor: 'pointer', fontWeight: '700' }}>Notif. Abono</button>
-                      )}
-                    </td>
-                    <td style={{ padding: '8px 12px' }}>
-                      {valeEstado && valeEstado !== 'rechazada' ? (
-                        <span style={{ padding: '4px 8px', borderRadius: '4px', fontSize: '10px', fontWeight: '900', textTransform: 'capitalize', backgroundColor: valeEstado === 'aprobada' ? '#DCFCE7' : '#FEF3C7', color: valeEstado === 'aprobada' ? '#15803D' : '#B45309' }}>{valeEstado}</span>
-                      ) : (
-                        <button onClick={() => setValeModal({ open: true, notaId: nota.id, monto: '' })} style={{ padding: '4px 8px', backgroundColor: valeEstado === 'rechazada' ? '#DC2626' : '#F59E0B', color: '#FFFFFF', border: 'none', borderRadius: '4px', fontSize: '10px', cursor: 'pointer', fontWeight: '700' }}>
-                          {valeEstado === 'rechazada' ? 'Reintentar Vale' : 'Solicitar'}
-                        </button>
-                      )}
-                    </td>
-                    <td style={{ padding: '8px 12px' }}>
-                      <button onClick={() => handleEditNE(nota)} style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#4F46E5' }}><Edit style={{ width: '16px', height: '16px' }} /></button>
-                    </td>
-                    <td style={{ padding: '8px 12px' }}>
-                      <button onClick={() => handleDeleteNE(nota)} style={{ border: 'none', background: 'none', cursor: totalAbonado > 0 ? 'not-allowed' : 'pointer', color: totalAbonado > 0 ? '#9CA3AF' : '#DC2626' }} title={totalAbonado > 0 ? 'No se puede eliminar porque ya registra abonos' : 'Eliminar Nota de Entrega'}>
-                        <Trash2 style={{ width: '16px', height: '16px' }} />
-                      </button>
-                    </td>
-                    <td style={{ padding: '8px 12px' }}>
-                      <button disabled={!isAprobada || loading} onClick={() => handleDownloadPDF(nota)} style={{ border: 'none', background: 'none', cursor: isAprobada ? 'pointer' : 'not-allowed', color: isAprobada ? '#111827' : '#D1D5DB' }} title={isAprobada ? 'Descargar PDF directo' : 'Nota no aprobada'}>
-                        <Download style={{ width: '16px', height: '16px' }} />
-                      </button>
-                    </td>
-                    <td style={{ padding: '8px 12px' }}>
-                      <button disabled={!isAprobada} onClick={() => handleSendPDF(nota)} style={{ border: 'none', background: 'none', cursor: isAprobada ? 'pointer' : 'not-allowed', color: isAprobada ? '#16A34A' : '#D1D5DB' }} title={isAprobada ? 'Enviar resumen por WhatsApp' : 'Nota no aprobada'}>
-                        <Send style={{ width: '16px', height: '16px' }} />
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      {/* --- TARJETAS MÓVIL (Ya funcionaban bien, las mantenemos igual) --- */}
-      <div className="mobile-cards-container" style={{ padding: '12px' }}>
-        {filteredSalesHistory.length === 0 ? (
-          <div style={{ padding: '16px', textAlign: 'center', color: '#6B7280' }}>No se encontraron Notas de Entrega creadas por ti.</div>
-        ) : (
-          filteredSalesHistory.map((nota) => {
-            const isAprobada = nota.status === 'aprobada';
-            const isCerrada = nota.payment_status === 'cerrada';
-            const totalAbonado = Number(nota.total_paid_usd) || 0;
-            const valeAsociado = nota.vales && nota.vales.length > 0 ? nota.vales[0] : null;
-            const valeEstado = valeAsociado ? valeAsociado.status : null;
-            const pendingNotif = paymentNotificationsMap[nota.id];
-            const hasPendingNotif = pendingNotif && pendingNotif.status === 'pending';
-            
-            return (
-              <div key={nota.id} style={{ backgroundColor: '#F9FAFB', border: '1px solid #E5E7EB', borderRadius: '8px', padding: '12px', display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '8px' }}>
-                <div style={{ borderBottom: '1px solid #E5E7EB', paddingBottom: '8px', marginBottom: '4px' }}>
-                  <span style={{ fontSize: '10px', fontWeight: '700', color: '#6B7280', textTransform: 'uppercase', display: 'block' }}>Cliente</span>
-                  <span style={{ fontSize: '16px', fontWeight: '900', color: '#111827' }}>{nota.clients?.name || 'Cliente N/A'}</span>
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '12px' }}>
-                  <div><span style={{ fontWeight: '700', color: '#4B5563' }}>Transacción:</span> #{nota.transaction_number || nota.id.substring(0, 6)}</div>
-                  <div><span style={{ fontWeight: '700', color: '#4B5563' }}>Fecha:</span> {new Date(nota.created_at).toLocaleDateString()}</div>
-                </div>
-                <div style={{ fontSize: '12px' }}><span style={{ fontWeight: '700', color: '#4B5563' }}>Registrado Por:</span> {currentSellerName}</div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '12px' }}>
-                  <div><span style={{ fontWeight: '700', color: '#4B5563' }}>Estado:</span> <span style={{ padding: '2px 6px', borderRadius: '4px', fontSize: '10px', fontWeight: '900', backgroundColor: isAprobada ? '#DCFCE7' : '#FEF3C7', color: isAprobada ? '#15803D' : '#B45309' }}>{nota.status}</span></div>
-                  <div><span style={{ fontWeight: '700', color: '#4B5563' }}>Pago N.E.:</span> <span style={{ padding: '2px 6px', borderRadius: '4px', fontSize: '10px', fontWeight: '900', backgroundColor: isCerrada ? '#DCFCE7' : '#FEF3C7', color: isCerrada ? '#15803D' : '#B45309' }}>{isCerrada ? 'Cerrada' : 'Pendiente'}</span></div>
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '12px' }}>
-                  <div><span style={{ fontWeight: '700', color: '#4B5563' }}>Abono:</span> <strong style={{ color: '#2563EB' }}>${totalAbonado.toFixed(2)}</strong></div>
-                  <div><span style={{ fontWeight: '700', color: '#4B5563' }}>Deuda:</span> {nota.balance_due_usd > 0 ? `$${Number(nota.balance_due_usd).toFixed(2)}` : <span style={{ color: '#16A34A', fontWeight: '700' }}>Cerrada</span>}</div>
-                </div>
-                <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', marginTop: '4px' }}>
-                  {hasPendingNotif ? (
-                    <button onClick={() => handleOpenAbonoNotifModal(nota.id)} style={{ padding: '4px 8px', backgroundColor: '#FEF3C7', color: '#B45309', border: '1px solid #FDE68A', borderRadius: '6px', fontSize: '11px', cursor: 'pointer', fontWeight: '700' }}>${Number(pendingNotif.amount_usd).toFixed(2)} (Pend.)</button>
-                  ) : (
-                    <button onClick={() => handleOpenAbonoNotifModal(nota.id)} style={{ padding: '4px 8px', backgroundColor: '#0284C7', color: '#FFFFFF', border: 'none', borderRadius: '6px', fontSize: '11px', cursor: 'pointer', fontWeight: '700' }}>Notif. Abono</button>
-                  )}
-                  {valeEstado && valeEstado !== 'rechazada' ? (
-                    <span style={{ padding: '4px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: '900', textTransform: 'capitalize', backgroundColor: valeEstado === 'aprobada' ? '#DCFCE7' : '#FEF3C7', color: valeEstado === 'aprobada' ? '#15803D' : '#B45309' }}>Vale: {valeEstado}</span>
-                  ) : (
-                    <button onClick={() => setValeModal({ open: true, notaId: nota.id, monto: '' })} style={{ padding: '4px 8px', backgroundColor: valeEstado === 'rechazada' ? '#DC2626' : '#F59E0B', color: '#FFFFFF', border: 'none', borderRadius: '6px', fontSize: '11px', cursor: 'pointer', fontWeight: '700' }}>{valeEstado === 'rechazada' ? 'Reintentar Vale' : 'Solicitar Vale'}</button>
-                  )}
-                </div>
-                <div className="action-buttons-wrapper" style={{ display: 'flex', gap: '8px', marginTop: '6px', flexWrap: 'wrap', borderTop: '1px solid #E5E7EB', paddingTop: '8px', justifyContent: 'space-between' }}>
-                  <button onClick={() => handleEditNE(nota)} style={{ padding: '4px 8px', backgroundColor: '#F3F4F6', color: '#4F46E5', border: '1px solid #D1D5DB', borderRadius: '6px', fontSize: '11px', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}><Edit style={{ width: '13px', height: '13px' }} /> Editar</button>
-                  <button disabled={!isAprobada || loading} onClick={() => handleDownloadPDF(nota)} style={{ padding: '4px 8px', backgroundColor: isAprobada ? '#111827' : '#E5E7EB', color: isAprobada ? '#FFFFFF' : '#9CA3AF', border: 'none', borderRadius: '6px', fontSize: '11px', fontWeight: '700', cursor: isAprobada ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', gap: '4px' }}><Download style={{ width: '13px', height: '13px' }} /> PDF</button>
-                  <button disabled={!isAprobada} onClick={() => handleSendPDF(nota)} style={{ padding: '4px 8px', backgroundColor: isAprobada ? '#16A34A' : '#E5E7EB', color: isAprobada ? '#FFFFFF' : '#9CA3AF', border: 'none', borderRadius: '6px', fontSize: '11px', fontWeight: '700', cursor: isAprobada ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', gap: '4px' }}><Send style={{ width: '13px', height: '13px' }} /> WhatsApp</button>
-                  <button disabled={totalAbonado > 0} onClick={() => handleDeleteNE(nota)} style={{ padding: '4px 8px', backgroundColor: '#FEF2F2', color: totalAbonado > 0 ? '#9CA3AF' : '#DC2626', border: '1px solid #FECACA', borderRadius: '6px', cursor: totalAbonado > 0 ? 'not-allowed' : 'pointer' }}><Trash2 style={{ width: '14px', height: '14px' }} /></button>
-                </div>
-              </div>
-            );
-          })
-        )}
-      </div>
-    </div>
-  </div>
-)}
         </div>
       )}
 
-{activeSubMenu === 'historial_ventas' && (
+      {activeSubMenu === 'historial_ventas' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          {/* Encabezado y Buscador */}
           <div
             style={{
               display: 'flex',
@@ -6650,353 +7380,172 @@ const handleDeleteClient = async (clientId, clientName) => {
             </div>
           </div>
 
-          {/* Contenedor Principal de Datos */}
           <div
             style={{
               backgroundColor: '#ffffff',
               borderRadius: '8px',
               boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-              overflow: 'hidden', // Importante para los bordes redondeados
+              overflowX: 'auto',
             }}
           >
-            {/* --- TABLA DESKTOP --- */}
-            <div className="desktop-table"
+            <table
               style={{
                 width: '100%',
-                overflowX: 'auto',
-                WebkitOverflowScrolling: 'touch',
+                borderCollapse: 'collapse',
+                textAlign: 'left',
+                fontSize: '13px',
               }}
             >
-              <table
-                style={{
-                  width: '100%',
-                  minWidth: '900px', // Ancho mínimo para que no se rompa en desktop pequeño
-                  borderCollapse: 'collapse',
-                  textAlign: 'left',
-                  fontSize: '13px',
-                }}
-              >
-                <thead>
-                  <tr
-                    style={{
-                      backgroundColor: '#f3f4f6',
-                      color: '#374151',
-                      borderBottom: '1px solid #e5e7eb',
-                    }}
-                  >
-                    <th style={{ padding: '12px 14px' }}>ID Liquidación</th>
-                    <th style={{ padding: '12px 14px' }}>Fecha Pago</th>
-                    <th style={{ padding: '12px 14px' }}>Periodo</th>
-                    <th style={{ padding: '12px 14px' }}>Tasa BCV</th>
-                    <th style={{ padding: '12px 14px' }}>Total N.E. ($)</th>
-                    <th style={{ padding: '12px 14px' }}>Neto 53.38% Net ($)</th>
-                    <th style={{ padding: '12px 14px' }}>Neto 23.08% Net ($)</th>
-                    <th style={{ padding: '12px 14px' }}>
-                      Total Equivalente ($)
-                    </th>
-                    <th style={{ padding: '12px 14px', textAlign: 'center' }}>
-                      Acciones
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredSettlementHistory.length === 0 ? (
-                    <tr>
-                      <td
-                        colSpan="9"
-                        style={{
-                          padding: '24px',
-                          textAlign: 'center',
-                          color: '#6b7280',
-                        }}
-                      >
-                        No hay historial de facturación registrado para ti.
-                      </td>
-                    </tr>
-                  ) : (
-                    filteredSettlementHistory.map((item) => (
-                      <tr
-                        key={item.id}
-                        style={{ borderBottom: '1px solid #e5e7eb' }}
-                      >
-                        <td style={{ padding: '12px 14px', fontWeight: 'bold' }}>
-                          {item.id}
-                        </td>
-                        <td style={{ padding: '12px 14px' }}>{item.datePaid}</td>
-                        <td style={{ padding: '12px 14px' }}>
-                          Ciclo #{item.cycle} ({item.month}/{item.year})
-                        </td>
-                        <td style={{ padding: '12px 14px' }}>
-                          {Number(item.bcvRate).toFixed(2)}
-                        </td>
-                        <td style={{ padding: '12px 14px' }}>
-                          ${item.totalNeAmount.toFixed(2)}
-                        </td>
-                        <td
-                          style={{
-                            padding: '12px 14px',
-                            color: '#059669',
-                            fontWeight: 'bold',
-                          }}
-                        >
-                          ${item.comm53Net.toFixed(2)}
-                        </td>
-                        <td
-                          style={{
-                            padding: '12px 14px',
-                            color: '#0369a1',
-                            fontWeight: 'bold',
-                          }}
-                        >
-                          ${item.comm23Net.toFixed(2)}
-                        </td>
-                        <td
-                          style={{
-                            padding: '12px 14px',
-                            color: '#111827',
-                            fontWeight: 'bold',
-                          }}
-                        >
-                          ${item.totalEquivalentUsd.toFixed(2)}
-                        </td>
-                        <td style={{ padding: '12px 14px', textAlign: 'center' }}>
-                          <div
-                            className="action-buttons-wrapper"
-                            style={{
-                              display: 'flex',
-                              gap: '6px',
-                              justifyContent: 'center',
-                              flexWrap: 'wrap',
-                            }}
-                          >
-                            <button
-                              onClick={() => {
-                                const modal = document.getElementById(
-                                  'captured-history-modal'
-                                );
-                                if (modal) {
-                                  modal.querySelector(
-                                    '#captured-html-content'
-                                  ).innerHTML =
-                                    item.capturedHTML || '<p>Sin contenido.</p>';
-                                  modal.style.display = 'flex';
-                                }
-                              }}
-                              style={{
-                                padding: '6px 10px',
-                                backgroundColor: '#1e40af',
-                                color: '#ffffff',
-                                border: 'none',
-                                borderRadius: '4px',
-                                fontSize: '11px',
-                                fontWeight: 'bold',
-                                cursor: 'pointer',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '4px',
-                              }}
-                            >
-                              <Eye size={13} /> Ver Factura
-                            </button>
-                            <button
-                              onClick={() => handlePrintCapturedInvoicePDF(item)}
-                              style={{
-                                padding: '6px 10px',
-                                backgroundColor: '#881337',
-                                color: '#ffffff',
-                                border: 'none',
-                                borderRadius: '4px',
-                                fontSize: '11px',
-                                fontWeight: 'bold',
-                                cursor: 'pointer',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '4px',
-                              }}
-                            >
-                              <Download size={13} /> PDF
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-
-            {/* --- TARJETAS MÓVIL (NUEVO) --- */}
-            <div className="mobile-cards-container" style={{ padding: '12px' }}>
-              {filteredSettlementHistory.length === 0 ? (
-                <div
+              <thead>
+                <tr
                   style={{
-                    padding: '16px',
-                    textAlign: 'center',
-                    color: '#6B7280',
+                    backgroundColor: '#f3f4f6',
+                    color: '#374151',
+                    borderBottom: '1px solid #e5e7eb',
                   }}
                 >
-                  No hay historial de facturación registrado para ti.
-                </div>
-              ) : (
-                filteredSettlementHistory.map((item) => (
-                  <div
-                    key={item.id}
-                    style={{
-                      backgroundColor: '#F9FAFB',
-                      border: '1px solid #E5E7EB',
-                      borderRadius: '8px',
-                      padding: '12px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '8px',
-                      marginBottom: '8px',
-                    }}
-                  >
-                    {/* Encabezado de la Tarjeta */}
-                    <div style={{ borderBottom: '1px solid #E5E7EB', paddingBottom: '8px', marginBottom: '4px' }}>
-                      <span
-                        style={{
-                          fontSize: '10px',
-                          fontWeight: '700',
-                          color: '#6B7280',
-                          textTransform: 'uppercase',
-                          display: 'block',
-                        }}
-                      >
-                        ID Liquidación
-                      </span>
-                      <span
-                        style={{
-                          fontSize: '16px',
-                          fontWeight: '900',
-                          color: '#111827',
-                        }}
-                      >
-                        {item.id}
-                      </span>
-                    </div>
-
-                    {/* Campos Verticales */}
-                    <div style={{ fontSize: '12px' }}>
-                      <span style={{ fontWeight: '700', color: '#4B5563' }}>
-                        Fecha de Pago:
-                      </span>{' '}
-                      {item.datePaid}
-                    </div>
-                    
-                    <div style={{ fontSize: '12px' }}>
-                      <span style={{ fontWeight: '700', color: '#4B5563' }}>
-                        Periodo:
-                      </span>{' '}
-                      Ciclo #{item.cycle} ({item.month}/{item.year})
-                    </div>
-
-                    <div style={{ fontSize: '12px' }}>
-                      <span style={{ fontWeight: '700', color: '#4B5563' }}>
-                        Tasa BCV:
-                      </span>{' '}
-                      {Number(item.bcvRate).toFixed(2)}
-                    </div>
-
-                    <div style={{ fontSize: '12px' }}>
-                      <span style={{ fontWeight: '700', color: '#4B5563' }}>
-                        Total N.E.:
-                      </span>{' '}
-                      ${item.totalNeAmount.toFixed(2)}
-                    </div>
-
-                    <div style={{ fontSize: '12px', color: '#059669' }}>
-                      <span style={{ fontWeight: '700', color: '#059669' }}>
-                        Neto 53.38%:
-                      </span>{' '}
-                      ${item.comm53Net.toFixed(2)}
-                    </div>
-
-                    <div style={{ fontSize: '12px', color: '#0369a1' }}>
-                      <span style={{ fontWeight: '700', color: '#0369a1' }}>
-                        Neto 23.08%:
-                      </span>{' '}
-                      ${item.comm23Net.toFixed(2)}
-                    </div>
-
-                    <div style={{ fontSize: '14px', fontWeight: '900', color: '#111827', marginTop: '4px' }}>
-                      Total Equivalente: ${item.totalEquivalentUsd.toFixed(2)}
-                    </div>
-
-                    {/* Botones de Acción */}
-                    <div
-                      className="action-buttons-wrapper"
+                  <th style={{ padding: '12px 14px' }}>ID Liquidación</th>
+                  <th style={{ padding: '12px 14px' }}>Fecha Pago</th>
+                  <th style={{ padding: '12px 14px' }}>Periodo</th>
+                  <th style={{ padding: '12px 14px' }}>Tasa BCV</th>
+                  <th style={{ padding: '12px 14px' }}>Total N.E. ($)</th>
+                  <th style={{ padding: '12px 14px' }}>Neto 53.38% Net ($)</th>
+                  <th style={{ padding: '12px 14px' }}>Neto 23.08% Net ($)</th>
+                  <th style={{ padding: '12px 14px' }}>
+                    Total Equivalente ($)
+                  </th>
+                  <th style={{ padding: '12px 14px', textAlign: 'center' }}>
+                    Acciones
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredSettlementHistory.length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan="9"
                       style={{
-                        display: 'flex',
-                        gap: '8px',
-                        marginTop: '6px',
-                        flexWrap: 'wrap',
-                        borderTop: '1px solid #E5E7EB',
-                        paddingTop: '8px',
-                        justifyContent: 'space-between',
+                        padding: '24px',
+                        textAlign: 'center',
+                        color: '#6b7280',
                       }}
                     >
-                      <button
-                        onClick={() => {
-                          const modal = document.getElementById(
-                            'captured-history-modal'
-                          );
-                          if (modal) {
-                            modal.querySelector(
-                              '#captured-html-content'
-                            ).innerHTML =
-                              item.capturedHTML || '<p>Sin contenido.</p>';
-                            modal.style.display = 'flex';
-                          }
-                        }}
+                      No hay historial de facturación registrado para ti.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredSettlementHistory.map((item) => (
+                    <tr
+                      key={item.id}
+                      style={{ borderBottom: '1px solid #e5e7eb' }}
+                    >
+                      <td style={{ padding: '12px 14px', fontWeight: 'bold' }}>
+                        {item.id}
+                      </td>
+                      <td style={{ padding: '12px 14px' }}>{item.datePaid}</td>
+                      <td style={{ padding: '12px 14px' }}>
+                        Ciclo #{item.cycle} ({item.month}/{item.year})
+                      </td>
+                      <td style={{ padding: '12px 14px' }}>
+                        {Number(item.bcvRate).toFixed(2)}
+                      </td>
+                      <td style={{ padding: '12px 14px' }}>
+                        ${item.totalNeAmount.toFixed(2)}
+                      </td>
+                      <td
                         style={{
-                          flex: 1,
-                          padding: '6px',
-                          backgroundColor: '#1e40af',
-                          color: '#ffffff',
-                          border: 'none',
-                          borderRadius: '6px',
-                          fontSize: '11px',
+                          padding: '12px 14px',
+                          color: '#059669',
                           fontWeight: 'bold',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          justifyContent: 'center',
-                          alignItems: 'center',
-                          gap: '4px',
                         }}
                       >
-                        <Eye size={13} /> Ver Factura
-                      </button>
-                      <button
-                        onClick={() => handlePrintCapturedInvoicePDF(item)}
+                        ${item.comm53Net.toFixed(2)}
+                      </td>
+                      <td
                         style={{
-                          flex: 1,
-                          padding: '6px',
-                          backgroundColor: '#881337',
-                          color: '#ffffff',
-                          border: 'none',
-                          borderRadius: '6px',
-                          fontSize: '11px',
+                          padding: '12px 14px',
+                          color: '#0369a1',
                           fontWeight: 'bold',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          justifyContent: 'center',
-                          alignItems: 'center',
-                          gap: '4px',
                         }}
                       >
-                        <Download size={13} /> PDF
-                      </button>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
+                        ${item.comm23Net.toFixed(2)}
+                      </td>
+                      <td
+                        style={{
+                          padding: '12px 14px',
+                          color: '#111827',
+                          fontWeight: 'bold',
+                        }}
+                      >
+                        ${item.totalEquivalentUsd.toFixed(2)}
+                      </td>
+                      <td style={{ padding: '12px 14px', textAlign: 'center' }}>
+                        <div
+                          style={{
+                            display: 'flex',
+                            gap: '6px',
+                            justifyContent: 'center',
+                            flexWrap: 'wrap',
+                          }}
+                        >
+                          <button
+                            onClick={() => {
+                              const modal = document.getElementById(
+                                'captured-history-modal'
+                              );
+                              if (modal) {
+                                modal.querySelector(
+                                  '#captured-html-content'
+                                ).innerHTML =
+                                  item.capturedHTML || '<p>Sin contenido.</p>';
+                                modal.style.display = 'flex';
+                              }
+                            }}
+                            style={{
+                              padding: '6px 10px',
+                              backgroundColor: '#1e40af',
+                              color: '#ffffff',
+                              border: 'none',
+                              borderRadius: '4px',
+                              fontSize: '11px',
+                              fontWeight: 'bold',
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                            }}
+                          >
+                            <Eye size={13} /> Ver Factura
+                          </button>
+                          <button
+                            onClick={() => handlePrintCapturedInvoicePDF(item)}
+                            style={{
+                              padding: '6px 10px',
+                              backgroundColor: '#881337',
+                              color: '#ffffff',
+                              border: 'none',
+                              borderRadius: '4px',
+                              fontSize: '11px',
+                              fontWeight: 'bold',
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                            }}
+                          >
+                            <Download size={13} /> PDF
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
       )}
 
-      {/* MODAL VALE */}
       {valeModal.open && (
         <div
           style={{
@@ -7098,7 +7647,6 @@ const handleDeleteClient = async (clientId, clientName) => {
         </div>
       )}
 
-      {/* MODAL ABONO */}
       {abonoNotifModal.open && (
         <div
           style={{
@@ -7149,6 +7697,7 @@ const handleDeleteClient = async (clientId, clientName) => {
                 <X size={18} />
               </button>
             </div>
+
             {/* Mostrar Nombre del Cliente (No editable) */}
             {(() => {
               const nota = salesHistory.find(
@@ -7187,6 +7736,7 @@ const handleDeleteClient = async (clientId, clientName) => {
                 </div>
               );
             })()}
+
             <form
               onSubmit={handleEnviarNotificacionAbono}
               style={{
@@ -7408,7 +7958,6 @@ const handleDeleteClient = async (clientId, clientName) => {
         </div>
       )}
 
-      {/* MODAL HISTORIAL CAPTURADO */}
       <div
         id="captured-history-modal"
         style={{
