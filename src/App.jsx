@@ -184,6 +184,17 @@ function VendedoresWrapper() {
 }
 
 export default function App() {
+  // Registro del Service Worker para habilitar la PWA
+  useEffect(() => {
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js')
+          .then((reg) => console.log('Service Worker registrado con éxito:', reg.scope))
+          .catch((err) => console.error('Error al registrar Service Worker:', err));
+      });
+    }
+  }, []);
+
   return (
     <AuthProvider>
       <Router>
