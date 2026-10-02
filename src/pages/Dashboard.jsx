@@ -461,6 +461,10 @@ export default function Dashboard({ overrideRole }) {
     window.location.href = '/ventas';
   };
 
+  const handleGoToPendingUsers = () => {
+  window.location.href = '/usuarios?tab=pendientes'; // Ajusta la ruta según tu estructura real
+  };
+
   const handleGoToPendingApprovals = () => {
     window.location.href = '/administrativo?tab=aprobaciones';
   };
@@ -671,93 +675,113 @@ export default function Dashboard({ overrideRole }) {
       >
         {/* ALERTAS DE ADMINISTRADOR - Diseño original en escritorio, cuadrado en móvil */}
         {effectiveRole === 'administrador' && (
-          <div
+  <div
+    onClick={() => (window.location.href = '/usuarios?tab=pendientes')}
+    style={{
+      backgroundColor: adminAlerts.pendingUsers > 0 ? '#FEF2F2' : '#F0FDF4',
+      border: `1px solid ${adminAlerts.pendingUsers > 0 ? '#FECACA' : '#BBF7D0'}`,
+      borderRadius: isMobile ? '10px' : '12px',
+      padding: isMobile ? '8px' : '14px',
+      display: 'flex',
+      flexDirection: isMobile ? 'column' : 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: isMobile ? '4px' : '12px',
+      cursor: 'pointer', // ← Hace que el mouse cambie a manito
+      transition: 'transform 0.2s, background-color 0.2s',
+      aspectRatio: isMobile ? '1' : 'auto',
+    }}
+    onMouseEnter={(e) => {
+      e.currentTarget.style.transform = 'translateY(-2px)';
+      e.currentTarget.style.backgroundColor = adminAlerts.pendingUsers > 0 ? '#FEE2E2' : '#DCFCE7';
+    }}
+    onMouseLeave={(e) => {
+      e.currentTarget.style.transform = 'translateY(0)';
+      e.currentTarget.style.backgroundColor = adminAlerts.pendingUsers > 0 ? '#FEF2F2' : '#F0FDF4';
+    }}
+  >
+    <div
+      style={{
+        backgroundColor: adminAlerts.pendingUsers > 0 ? '#FEE2E2' : '#DCFCE7',
+        padding: isMobile ? '4px' : '8px',
+        borderRadius: '8px',
+        display: 'flex',
+        alignItems: 'center',
+      }}
+    >
+      <UserCheck
+        size={isMobile ? 13 : 20}
+        color={adminAlerts.pendingUsers > 0 ? '#DC2626' : '#16A34A'}
+      />
+    </div>
+    {isMobile ? (
+      <>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '4px',
+          }}
+        >
+          <span
             style={{
-              backgroundColor:
-                adminAlerts.pendingUsers > 0 ? '#FEF2F2' : '#F0FDF4',
-              border: `1px solid ${
-                adminAlerts.pendingUsers > 0 ? '#FECACA' : '#BBF7D0'
-              }`,
-              borderRadius: isMobile ? '10px' : '12px',
-              padding: isMobile ? '8px' : '14px',
-              display: 'flex',
-              flexDirection: isMobile ? 'column' : 'row',
-              alignItems: isMobile ? 'center' : 'center',
-              justifyContent: 'center',
-              gap: isMobile ? '4px' : '12px',
-              aspectRatio: isMobile ? '1' : 'auto',
+              fontSize: '8px',
+              color: '#6b7280',
+              fontWeight: '600',
+              whiteSpace: 'nowrap',
             }}
           >
-            <div
-              style={{
-                backgroundColor:
-                  adminAlerts.pendingUsers > 0 ? '#FEE2E2' : '#DCFCE7',
-                padding: isMobile ? '4px' : '8px',
-                borderRadius: '8px',
-                display: 'flex',
-                alignItems: 'center',
-              }}
-            >
-              <UserCheck
-                size={isMobile ? 13 : 20}
-                color={adminAlerts.pendingUsers > 0 ? '#DC2626' : '#16A34A'}
-              />
-            </div>
-            {isMobile ? (
-              <>
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '4px',
-                  }}
-                >
-                  <span
-                    style={{
-                      fontSize: '8px',
-                      color: '#6b7280',
-                      fontWeight: '600',
-                      whiteSpace: 'nowrap',
-                    }}
-                  >
-                    Pend.
-                  </span>
-                </div>
-                <div
-                  style={{
-                    fontSize: '16px',
-                    fontWeight: '800',
-                    color: adminAlerts.pendingUsers > 0 ? '#DC2626' : '#166534',
-                  }}
-                >
-                  {adminAlerts.pendingUsers}
-                </div>
-              </>
-            ) : (
-              <div>
-                <div
-                  style={{
-                    fontSize: '11px',
-                    color: '#6b7280',
-                    fontWeight: '600',
-                  }}
-                >
-                  Usuarios Pendientes
-                </div>
-                <div
-                  style={{
-                    fontSize: '18px',
-                    fontWeight: '800',
-                    color: adminAlerts.pendingUsers > 0 ? '#DC2626' : '#166534',
-                  }}
-                >
-                  {adminAlerts.pendingUsers}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
+            Pend.
+          </span>
+        </div>
+        <div
+          style={{
+            fontSize: '16px',
+            fontWeight: '800',
+            color: adminAlerts.pendingUsers > 0 ? '#DC2626' : '#166534',
+          }}
+        >
+          {adminAlerts.pendingUsers}
+        </div>
+      </>
+    ) : (
+      <div style={{ flex: 1 }}>
+        <div
+          style={{
+            fontSize: '11px',
+            color: '#6b7280',
+            fontWeight: '600',
+          }}
+        >
+          Usuarios Pendientes
+        </div>
+        <div
+          style={{
+            fontSize: '18px',
+            fontWeight: '800',
+            color: adminAlerts.pendingUsers > 0 ? '#DC2626' : '#166534',
+          }}
+        >
+          {adminAlerts.pendingUsers}
+        </div>
+      </div>
+    )}
+    {/* Indicador visual opcional en escritorio */}
+    {adminAlerts.pendingUsers > 0 && !isMobile && (
+      <div
+        style={{
+          fontSize: '10px',
+          fontWeight: '700',
+          color: '#DC2626',
+          textDecoration: 'underline',
+        }}
+      >
+        Ver Ahora
+      </div>
+    )}
+  </div>
+)}
 
         {effectiveRole === 'administrador' && (
           <div
