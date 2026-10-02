@@ -1512,11 +1512,11 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
       setLoading(false);
     }
   };
-    const handleSendPDF = async (nota) => {
+      const handleSendPDF = async (nota) => {
     try {
       setLoading(true);
       
-      // 1. Generar el PDF en memoria (Blob) sin descargarlo automáticamente primero
+      // 1. Obtener datos necesarios
       const { data: items, error } = await supabase
         .from('order_items')
         .select('*, products(code, description)')
@@ -1560,71 +1560,89 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
         });
       }
 
-      // Crear el contenedor HTML para el PDF
+      // 2. Usar EXACTAMENTE el mismo HTML que handleDownloadPDF para mantener el diseño
       const container = document.createElement('div');
       container.innerHTML = `
-        <div style="font-family: Arial, sans-serif; color: #111; padding: 25px; background: #fff; width: 700px; box-sizing: border-box;">
-          <div style="display: flex; justify-content: space-between; border-bottom: 2px solid #111; padding-bottom: 15px; margin-bottom: 20px;">
-            <div>
-              <h2 style="margin: 0; font-size: 20px; text-transform: uppercase;">FENIX AUTO PART C.A</h2>
-              <p style="margin: 2px 0; font-size: 12px;"><strong>RIF:</strong> J-50261925-2</p>
-              <p style="margin: 8px 0 0 0; font-size: 12px;"><strong>Cliente:</strong> ${clientName}</p>
+        <div style="font-family: Arial, sans-serif; color: #111; padding: 25px; background: #fff; width: 700px; height: 1000px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between; margin: 0 auto;">
+          <div>
+            <div style="display: flex; justify-content: space-between; border-bottom: 2px solid #111; padding-bottom: 15px; margin-bottom: 20px;">
+              <div>
+                <h2 style="margin: 0; font-size: 20px; text-transform: uppercase;">FENIX AUTO PART C.A</h2>
+                <p style="margin: 2px 0; font-size: 12px;"><strong>RIF:</strong> J-50261925-2</p>
+                <p style="margin: 8px 0 0 0; font-size: 12px;"><strong>Cliente:</strong> ${clientName}</p>
+              </div>
+              <div style="text-align: right; font-size: 12px;">
+                <p style="margin: 2px 0;"><strong>N° Transacción:</strong> #${transNo}</p>
+                <p style="margin: 2px 0;"><strong>Fecha/Hora:</strong> ${fecha}</p>
+                <p style="margin: 2px 0;"><strong>Vendedor:</strong> ${vendedorName}</p>
+                <p style="margin: 2px 0;"><strong>Categoría:</strong> ${nota.category || 'General'}</p>
+              </div>
             </div>
-            <div style="text-align: right; font-size: 12px;">
-              <p style="margin: 2px 0;"><strong>N° Transacción:</strong> #${transNo}</p>
-              <p style="margin: 2px 0;"><strong>Fecha/Hora:</strong> ${fecha}</p>
-              <p style="margin: 2px 0;"><strong>Vendedor:</strong> ${vendedorName}</p>
+            <table style="width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 20px;">
+              <thead>
+                <tr style="background-color: #f3f4f6;">
+                  <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: left;">Código</th>
+                  <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: left;">Descripción</th>
+                  <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: center;">Cantidad</th>
+                  <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: right;">V. Unitario</th>
+                  <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: right;">V. U. con Descuento</th>
+                  <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: right;">Total Línea</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${itemsHtml}
+              </tbody>
+            </table>
+          </div>
+          <div>
+            <div style="display: flex; justify-content: flex-end; font-size: 12px; margin-bottom: 15px;">
+              <div style="width: 280px; background: #f9fafb; padding: 12px; border: 1px solid #ddd; border-radius: 6px;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+                  <span>Total Base:</span>
+                  <strong>$${Number(nota.total_base_usd || subTotal).toFixed(2)}</strong>
+                </div>
+                <div style="display: flex; justify-content: space-between; margin-bottom: 6px; color: #B45309;">
+                  <span>Descuento Aplicado:</span>
+                  <strong>-$${Number(nota.discount_amount_usd || 0).toFixed(2)}</strong>
+                </div>
+                <div style="display: flex; justify-content: space-between; border-top: 1px solid #ccc; padding-top: 6px; font-weight: bold; font-size: 14px; color: #DC2626;">
+                  <span>Precio Final:</span>
+                  <span>$${Number(nota.final_price_usd || subTotal).toFixed(2)}</span>
+                </div>
+              </div>
+            </div>
+            ${
+              nota.observation
+                ? `
+            <div style="font-size: 11px; color: #333; background: #fffbeb; border: 1px solid #fde68a; padding: 10px; border-radius: 4px; margin-bottom: 10px; text-align: justify;">
+              <strong>Observación:</strong> ${nota.observation}
+            </div>
+            `
+                : ''
+            }
+            <div style="font-size: 10px; color: #555; background: #f3f4f6; padding: 10px; border-radius: 4px; line-height: 1.4; text-align: justify;">
+              <strong>Términos y condiciones:</strong> ${globalTerms}
             </div>
           </div>
-          <table style="width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 20px;">
-            <thead>
-              <tr style="background-color: #f3f4f6;">
-                <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: left;">Código</th>
-                <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: left;">Descripción</th>
-                <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: center;">Cantidad</th>
-                <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: right;">V. Unitario</th>
-                <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: right;">V. U. con Descuento</th>
-                <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: right;">Total Línea</th>
-              </tr>
-            </thead>
-            <tbody>${itemsHtml}</tbody>
-          </table>
-          <div style="display: flex; justify-content: flex-end; font-size: 12px;">
-            <div style="width: 280px; background: #f9fafb; padding: 12px; border: 1px solid #ddd; border-radius: 6px;">
-              <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
-                <span>Total Base:</span>
-                <strong>$${Number(nota.total_base_usd || subTotal).toFixed(2)}</strong>
-              </div>
-              <div style="display: flex; justify-content: space-between; margin-bottom: 6px; color: #B45309;">
-                <span>Descuento Aplicado:</span>
-                <strong>-$${Number(nota.discount_amount_usd || 0).toFixed(2)}</strong>
-              </div>
-              <div style="display: flex; justify-content: space-between; border-top: 1px solid #ccc; padding-top: 6px; font-weight: bold; font-size: 14px; color: #DC2626;">
-                <span>Precio Final:</span>
-                <span>$${Number(nota.final_price_usd || subTotal).toFixed(2)}</span>
-              </div>
-            </div>
-          </div>
-          ${nota.observation ? `<div style="font-size: 11px; color: #333; background: #fffbeb; border: 1px solid #fde68a; padding: 10px; border-radius: 4px; margin-top: 10px;"><strong>Obs:</strong> ${nota.observation}</div>` : ''}
         </div>
       `;
 
-      // 2. Convertir HTML a Blob (Archivo en memoria)
+      // 3. Generar Blob con las mismas opciones de calidad
       const opt = {
         margin: 0,
         filename: `Nota-${transNo}.pdf`,
         image: { type: 'jpeg', quality: 0.98 },
         html2canvas: { scale: 2, useCORS: true },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-        output: 'blob' // IMPORTANTE: Esto devuelve un Blob en lugar de descargar
+        output: 'blob' 
       };
 
       const pdfBlob = await window.html2pdf().from(container).set(opt).output('blob');
       
-      // Crear un objeto File desde el Blob para poder compartirlo
+      // Crear un objeto File desde el Blob
       const file = new File([pdfBlob], `Nota-Entrega-${transNo}.pdf`, { type: 'application/pdf' });
 
-      // 3. Verificar si el navegador soporta compartir archivos
+      // 4. Intentar compartir nativamente
       if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
         await navigator.share({
           title: `Nota de Entrega #${transNo}`,
@@ -1632,7 +1650,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
           files: [file]
         });
       } else {
-        // Fallback: Si no soporta compartir archivos (ej. PC antigua), descarga el archivo y abre WhatsApp solo con texto
+        // Fallback: Si no soporta compartir archivos, descarga y abre WhatsApp
         await window.html2pdf().from(container).set({ ...opt, output: 'save' }).save();
         
         const mensaje = `Hola! Adjunto resumen de la Nota de Entrega Aprobada N° ${transNo} para el cliente *${clientName}*. Total Final: *$${Number(nota.final_price_usd).toFixed(2)}*. (El PDF se descargó en tu dispositivo, por favor adjúntalo manualmente).`;
