@@ -895,68 +895,88 @@ export default function SalesModule() {
     }
   };
 
-  const handleDeleteClient = async (clientId, clientName) => {
-    if (
-      !window.confirm(
-        `¿Estás seguro de que deseas eliminar a "${clientName}"? Esta acción eliminará el registro y sus archivos.`
-      )
-    ) {
-      return;
-    }
+const handleDeleteClient = async (clientId, clientName) => {
+  setLoading(true);
+  try {
+    // 1. Verificar si existen Notas de Entrega pendientes o aprobadas para este cliente
+    const { data: activeOrders, error: ordersErr } = await supabase
+      .from('sales_orders')
+      .select('id, status, transaction_number')
+      .eq('client_id', clientId)
+      .in('status', ['pendiente', 'aprobada']); // Bloqueamos si hay notas en proceso
 
-    setLoading(true);
-    try {
-      const { data: client, error: fetchErr } = await supabase
-        .from('clients')
-        .select('*')
-        .eq('id', clientId)
-        .single();
+    if (ordersErr) throw ordersErr;
 
-      if (fetchErr) throw fetchErr;
-
-      // Recopilar rutas de archivos para eliminar
-      const docPaths = [
-        getStoragePathFromUrl(client.ci_photo_url, 'documents'),
-        getStoragePathFromUrl(client.rif_photo_url, 'documents'),
-        getStoragePathFromUrl(client.additional_doc_url, 'documents'),
-      ].filter(Boolean);
-
-      const visitPath = getStoragePathFromUrl(
-        client.last_visit_photo_url,
-        'visits'
-      );
-
-      // Eliminar archivos del storage primero
-      if (docPaths.length > 0) {
-        await supabase.storage.from('documents').remove(docPaths);
-      }
-      if (visitPath) {
-        await supabase.storage.from('visits').remove([visitPath]);
-      }
-
-      // Finalmente eliminar el registro de la base de datos
-      const { error: deleteErr } = await supabase
-        .from('clients')
-        .delete()
-        .eq('id', clientId);
-
-      if (deleteErr) throw deleteErr;
-      setMessage({
-        type: 'success',
-        text: `El cliente "${clientName}" fue eliminado exitosamente.`,
-      });
-      fetchClients();
-      fetchPotenciales();
-      fetchSalesHistory();
-    } catch (err) {
+    // Si encuentra al menos una nota activa, bloqueamos la eliminación
+    if (activeOrders && activeOrders.length > 0) {
+      const count = activeOrders.length;
+      const firstTrans = activeOrders[0].transaction_number || activeOrders[0].id.substring(0, 6);
+      
       setMessage({
         type: 'error',
-        text: 'Error al eliminar cliente: ' + err.message,
+        text: `No se puede eliminar al cliente "${clientName}" porque tiene ${count} Nota(s) de Entrega activa(s) (Ej: #${firstTrans}). Finalice o elimine las notas primero.`,
       });
-    } finally {
       setLoading(false);
+      return; // Detenemos la ejecución aquí
     }
-  };
+
+    // 2. Si no hay notas activas, procedemos a obtener los datos del cliente para borrar sus archivos
+    const { data: client, error: fetchErr } = await supabase
+      .from('clients')
+      .select('*')
+      .eq('id', clientId)
+      .single();
+
+    if (fetchErr) throw fetchErr;
+
+    // Recopilar rutas de archivos para eliminar
+    const docPaths = [
+      getStoragePathFromUrl(client.ci_photo_url, 'documents'),
+      getStoragePathFromUrl(client.rif_photo_url, 'documents'),
+      getStoragePathFromUrl(client.additional_doc_url, 'documents'),
+    ].filter(Boolean);
+
+    const visitPath = getStoragePathFromUrl(
+      client.last_visit_photo_url,
+      'visits'
+    );
+
+    // Eliminar archivos del storage primero
+    if (docPaths.length > 0) {
+      await supabase.storage.from('documents').remove(docPaths);
+    }
+    if (visitPath) {
+      await supabase.storage.from('visits').remove([visitPath]);
+    }
+
+    // Finalmente eliminar el registro de la base de datos
+    const { error: deleteErr } = await supabase
+      .from('clients')
+      .delete()
+      .eq('id', clientId);
+
+    if (deleteErr) throw deleteErr;
+
+    setMessage({
+      type: 'success',
+      text: `El cliente "${clientName}" fue eliminado exitosamente.`,
+    });
+    
+    // Refrescar las listas
+    fetchClients();
+    fetchPotenciales();
+    // No es estrictamente necesario refrescar salesHistory aquí si solo borramos clientes sin notas, 
+    // pero lo dejamos por consistencia si hubiera notas cerradas huérfanas (aunque la lógica de negocio usualmente lo evita).
+    
+  } catch (err) {
+    setMessage({
+      type: 'error',
+      text: 'Error al eliminar cliente: ' + err.message,
+    });
+  } finally {
+    setLoading(false);
+  }
+};
 
   // ---------------------------------------------------------------------------
   // MANEJADORES: POTENCIALES CLIENTES Y VISITAS EXIGIDAS (CON GPS)
