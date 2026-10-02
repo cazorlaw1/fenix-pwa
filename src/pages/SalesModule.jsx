@@ -1512,18 +1512,138 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
       setLoading(false);
     }
   };
-  const handleSendPDF = async (nota) => {
+    const handleSendPDF = async (nota) => {
     try {
+      setLoading(true);
+      
+      // 1. Generar el PDF en memoria (Blob) sin descargarlo automáticamente primero
+      const { data: items, error } = await supabase
+        .from('order_items')
+        .select('*, products(code, description)')
+        .eq('order_id', nota.id);
+        
+      if (error) throw error;
+
+      // Asegurarnos de tener html2pdf cargado
+      if (!window.html2pdf) {
+        await new Promise((resolve, reject) => {
+          const script = document.createElement('script');
+          script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
+          script.onload = resolve;
+          script.onerror = reject;
+          document.head.appendChild(script);
+        });
+      }
+
       const clientName = nota.clients?.name || 'Cliente';
       const transNo = nota.transaction_number || nota.id.substring(0, 8);
-      const total = Number(nota.final_price_usd || 0).toFixed(2);
-      const mensaje = `*SOLICITUD DE REVISIÓN N.E.* 📋\n\nHola Admin, se ha generado la Nota de Entrega N° *#${transNo}* para el cliente *${clientName}*.\n\n💰 *Monto Total:* $${total}\n\nQuedo atento a tu aprobación para proceder. Gracias.`;
-      window.open(
-        `https://wa.me/?text=${encodeURIComponent(mensaje)}`,
-        '_blank'
-      );
+      const fecha = new Date(nota.created_at).toLocaleString();
+      const vendedorName = currentSellerName;
+      
+      let itemsHtml = '';
+      let subTotal = 0;
+      
+      if (items && items.length > 0) {
+        items.forEach((item) => {
+          const totalLine = item.total_line_usd || item.quantity * item.discounted_unit_price_usd;
+          subTotal += totalLine;
+          itemsHtml += `
+            <tr>
+              <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; font-family: monospace;">${item.products?.code || 'S/C'}</td>
+              <td style="padding: 6px 8px; border-bottom: 1px solid #ddd;">${item.products?.description || 'Producto'}</td>
+              <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: center;">${item.quantity}</td>
+              <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: right;">$${Number(item.unit_price_usd || 0).toFixed(2)}</td>
+              <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: right; color: #B45309;">$${Number(item.discounted_unit_price_usd || 0).toFixed(2)}</td>
+              <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: right; font-weight: bold;">$${Number(totalLine).toFixed(2)}</td>
+            </tr>
+          `;
+        });
+      }
+
+      // Crear el contenedor HTML para el PDF
+      const container = document.createElement('div');
+      container.innerHTML = `
+        <div style="font-family: Arial, sans-serif; color: #111; padding: 25px; background: #fff; width: 700px; box-sizing: border-box;">
+          <div style="display: flex; justify-content: space-between; border-bottom: 2px solid #111; padding-bottom: 15px; margin-bottom: 20px;">
+            <div>
+              <h2 style="margin: 0; font-size: 20px; text-transform: uppercase;">FENIX AUTO PART C.A</h2>
+              <p style="margin: 2px 0; font-size: 12px;"><strong>RIF:</strong> J-50261925-2</p>
+              <p style="margin: 8px 0 0 0; font-size: 12px;"><strong>Cliente:</strong> ${clientName}</p>
+            </div>
+            <div style="text-align: right; font-size: 12px;">
+              <p style="margin: 2px 0;"><strong>N° Transacción:</strong> #${transNo}</p>
+              <p style="margin: 2px 0;"><strong>Fecha/Hora:</strong> ${fecha}</p>
+              <p style="margin: 2px 0;"><strong>Vendedor:</strong> ${vendedorName}</p>
+            </div>
+          </div>
+          <table style="width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 20px;">
+            <thead>
+              <tr style="background-color: #f3f4f6;">
+                <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: left;">Código</th>
+                <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: left;">Descripción</th>
+                <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: center;">Cantidad</th>
+                <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: right;">V. Unitario</th>
+                <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: right;">V. U. con Descuento</th>
+                <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: right;">Total Línea</th>
+              </tr>
+            </thead>
+            <tbody>${itemsHtml}</tbody>
+          </table>
+          <div style="display: flex; justify-content: flex-end; font-size: 12px;">
+            <div style="width: 280px; background: #f9fafb; padding: 12px; border: 1px solid #ddd; border-radius: 6px;">
+              <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+                <span>Total Base:</span>
+                <strong>$${Number(nota.total_base_usd || subTotal).toFixed(2)}</strong>
+              </div>
+              <div style="display: flex; justify-content: space-between; margin-bottom: 6px; color: #B45309;">
+                <span>Descuento Aplicado:</span>
+                <strong>-$${Number(nota.discount_amount_usd || 0).toFixed(2)}</strong>
+              </div>
+              <div style="display: flex; justify-content: space-between; border-top: 1px solid #ccc; padding-top: 6px; font-weight: bold; font-size: 14px; color: #DC2626;">
+                <span>Precio Final:</span>
+                <span>$${Number(nota.final_price_usd || subTotal).toFixed(2)}</span>
+              </div>
+            </div>
+          </div>
+          ${nota.observation ? `<div style="font-size: 11px; color: #333; background: #fffbeb; border: 1px solid #fde68a; padding: 10px; border-radius: 4px; margin-top: 10px;"><strong>Obs:</strong> ${nota.observation}</div>` : ''}
+        </div>
+      `;
+
+      // 2. Convertir HTML a Blob (Archivo en memoria)
+      const opt = {
+        margin: 0,
+        filename: `Nota-${transNo}.pdf`,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+        output: 'blob' // IMPORTANTE: Esto devuelve un Blob en lugar de descargar
+      };
+
+      const pdfBlob = await window.html2pdf().from(container).set(opt).output('blob');
+      
+      // Crear un objeto File desde el Blob para poder compartirlo
+      const file = new File([pdfBlob], `Nota-Entrega-${transNo}.pdf`, { type: 'application/pdf' });
+
+      // 3. Verificar si el navegador soporta compartir archivos
+      if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({
+          title: `Nota de Entrega #${transNo}`,
+          text: `Hola, adjunto la Nota de Entrega #${transNo} para el cliente ${clientName}. Total: $${Number(nota.final_price_usd).toFixed(2)}`,
+          files: [file]
+        });
+      } else {
+        // Fallback: Si no soporta compartir archivos (ej. PC antigua), descarga el archivo y abre WhatsApp solo con texto
+        await window.html2pdf().from(container).set({ ...opt, output: 'save' }).save();
+        
+        const mensaje = `Hola! Adjunto resumen de la Nota de Entrega Aprobada N° ${transNo} para el cliente *${clientName}*. Total Final: *$${Number(nota.final_price_usd).toFixed(2)}*. (El PDF se descargó en tu dispositivo, por favor adjúntalo manualmente).`;
+        window.open(`https://wa.me/?text=${encodeURIComponent(mensaje)}`, '_blank');
+      }
+
     } catch (err) {
-      alert('Error al compartir: ' + err.message);
+      console.error(err);
+      alert('Error al generar o compartir el PDF: ' + err.message);
+    } finally {
+      setLoading(false);
     }
   };
   const handleSolicitarVale = async () => {
