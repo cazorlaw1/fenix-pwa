@@ -1665,7 +1665,7 @@ setDailySalesData(dailyData);
                 />
                 <QuickLink
                   label="Equipo"
-                  icon={<Users size={16} />}
+                  icon={<FileText size={16} />}
                   color="#7c3aed"
                   onClick={() => (window.location.href = '/vendedores?tab=resumen')}
                 />
