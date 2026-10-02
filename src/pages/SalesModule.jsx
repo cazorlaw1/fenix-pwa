@@ -425,27 +425,29 @@ export default function SalesModule() {
     fetchUserSettlementHistory();
   }, [user, role]);
 
-  const fetchGlobalSettings = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('global_settings')
-        .select('*');
-      if (!error && data) {
-        const settingsMap = {};
-        data.forEach((item) => {
-          settingsMap[item.setting_key] = item.setting_value;
-        });
-        if (settingsMap['ne_discount_53'])
-          setGlobalDiscount53(Number(settingsMap['ne_discount_53']));
-        if (settingsMap['ne_discount_23'])
-          setGlobalDiscount23(Number(settingsMap['ne_discount_23']));
-        if (settingsMap['ne_terms_conditions'])
-          setGlobalTerms(settingsMap['ne_terms_conditions']);
-      }
-    } catch (err) {
-      console.error('Error cargando configuración global:', err);
+const fetchGlobalSettings = async () => {
+  try {
+    const { data, error } = await supabase
+      .from('global_settings')
+      .select('*');
+    
+    if (!error && data) {
+      const settingsMap = {};
+      data.forEach((item) => {
+        settingsMap[item.setting_key] = item.setting_value;
+      });
+      
+      // Actualizar estados con los valores de la BD
+      if (settingsMap['ne_discount_53']) setGlobalDiscount53(Number(settingsMap['ne_discount_53']));
+      if (settingsMap['ne_discount_23']) setGlobalDiscount23(Number(settingsMap['ne_discount_23']));
+      if (settingsMap['ne_terms_conditions']) setGlobalTerms(settingsMap['ne_terms_conditions']);
+    } else if (error) {
+      console.error("Error cargando configuración global:", error);
     }
-  };
+  } catch (err) {
+    console.error('Error inesperado cargando configuración:', err);
+  }
+};
 
   const fetchEstimatedFolio = async () => {
     try {
