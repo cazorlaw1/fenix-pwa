@@ -212,11 +212,12 @@ export default function Dashboard({ overrideRole }) {
 
     const dailyData = last7Days.map((dateStr) => {
       // Contar órdenes creadas en este día específico (usando UTC-4)
-      const count = sales?.filter((s) => {
-        if (!s.created_at) return false;
-        const orderDateStr = getLocalDateStr(new Date(s.created_at));
-        return orderDateStr === dateStr;
-      }).length || 0;
+      const count =
+        sales?.filter((s) => {
+          if (!s.created_at) return false;
+          const orderDateStr = getLocalDateStr(new Date(s.created_at));
+          return orderDateStr === dateStr;
+        }).length || 0;
       return { date: dateStr, amount: count };
     });
 
@@ -377,11 +378,12 @@ export default function Dashboard({ overrideRole }) {
 
     const dailyData = last7Days.map((dateStr) => {
       // Contar órdenes creadas en este día específico
-      const count = teamSales?.filter((s) => {
-        if (!s.created_at) return false;
-        const orderDateStr = getLocalDateStr(new Date(s.created_at));
-        return orderDateStr === dateStr;
-      }).length || 0;
+      const count =
+        teamSales?.filter((s) => {
+          if (!s.created_at) return false;
+          const orderDateStr = getLocalDateStr(new Date(s.created_at));
+          return orderDateStr === dateStr;
+        }).length || 0;
       return { date: dateStr, amount: count };
     });
 
@@ -446,11 +448,12 @@ export default function Dashboard({ overrideRole }) {
 
     const dailyData = last7Days.map((dateStr) => {
       // Contar órdenes creadas en este día específico
-      const count = mySales?.filter((s) => {
-        if (!s.created_at) return false;
-        const orderDateStr = getLocalDateStr(new Date(s.created_at));
-        return orderDateStr === dateStr;
-      }).length || 0;
+      const count =
+        mySales?.filter((s) => {
+          if (!s.created_at) return false;
+          const orderDateStr = getLocalDateStr(new Date(s.created_at));
+          return orderDateStr === dateStr;
+        }).length || 0;
       return { date: dateStr, amount: count };
     });
 
@@ -462,7 +465,7 @@ export default function Dashboard({ overrideRole }) {
   };
 
   const handleGoToPendingUsers = () => {
-  window.location.href = '/usuarios?tab=pendientes'; // Ajusta la ruta según tu estructura real
+    window.location.href = '/usuarios?tab=admitir'; // Ajusta la ruta según tu estructura real
   };
 
   const handleGoToPendingApprovals = () => {
@@ -675,113 +678,119 @@ export default function Dashboard({ overrideRole }) {
       >
         {/* ALERTAS DE ADMINISTRADOR - Diseño original en escritorio, cuadrado en móvil */}
         {effectiveRole === 'administrador' && (
-  <div
-    onClick={() => (window.location.href = '/usuarios?tab=pendientes')}
-    style={{
-      backgroundColor: adminAlerts.pendingUsers > 0 ? '#FEF2F2' : '#F0FDF4',
-      border: `1px solid ${adminAlerts.pendingUsers > 0 ? '#FECACA' : '#BBF7D0'}`,
-      borderRadius: isMobile ? '10px' : '12px',
-      padding: isMobile ? '8px' : '14px',
-      display: 'flex',
-      flexDirection: isMobile ? 'column' : 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: isMobile ? '4px' : '12px',
-      cursor: 'pointer', // ← Hace que el mouse cambie a manito
-      transition: 'transform 0.2s, background-color 0.2s',
-      aspectRatio: isMobile ? '1' : 'auto',
-    }}
-    onMouseEnter={(e) => {
-      e.currentTarget.style.transform = 'translateY(-2px)';
-      e.currentTarget.style.backgroundColor = adminAlerts.pendingUsers > 0 ? '#FEE2E2' : '#DCFCE7';
-    }}
-    onMouseLeave={(e) => {
-      e.currentTarget.style.transform = 'translateY(0)';
-      e.currentTarget.style.backgroundColor = adminAlerts.pendingUsers > 0 ? '#FEF2F2' : '#F0FDF4';
-    }}
-  >
-    <div
-      style={{
-        backgroundColor: adminAlerts.pendingUsers > 0 ? '#FEE2E2' : '#DCFCE7',
-        padding: isMobile ? '4px' : '8px',
-        borderRadius: '8px',
-        display: 'flex',
-        alignItems: 'center',
-      }}
-    >
-      <UserCheck
-        size={isMobile ? 13 : 20}
-        color={adminAlerts.pendingUsers > 0 ? '#DC2626' : '#16A34A'}
-      />
-    </div>
-    {isMobile ? (
-      <>
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '4px',
-          }}
-        >
-          <span
+          <div
+            onClick={() => (window.location.href = '/usuarios?tab=pendientes')}
             style={{
-              fontSize: '8px',
-              color: '#6b7280',
-              fontWeight: '600',
-              whiteSpace: 'nowrap',
+              backgroundColor:
+                adminAlerts.pendingUsers > 0 ? '#FEF2F2' : '#F0FDF4',
+              border: `1px solid ${
+                adminAlerts.pendingUsers > 0 ? '#FECACA' : '#BBF7D0'
+              }`,
+              borderRadius: isMobile ? '10px' : '12px',
+              padding: isMobile ? '8px' : '14px',
+              display: 'flex',
+              flexDirection: isMobile ? 'column' : 'row',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: isMobile ? '4px' : '12px',
+              cursor: 'pointer', // ← Hace que el mouse cambie a manito
+              transition: 'transform 0.2s, background-color 0.2s',
+              aspectRatio: isMobile ? '1' : 'auto',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = 'translateY(-2px)';
+              e.currentTarget.style.backgroundColor =
+                adminAlerts.pendingUsers > 0 ? '#FEE2E2' : '#DCFCE7';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = 'translateY(0)';
+              e.currentTarget.style.backgroundColor =
+                adminAlerts.pendingUsers > 0 ? '#FEF2F2' : '#F0FDF4';
             }}
           >
-            Pend.
-          </span>
-        </div>
-        <div
-          style={{
-            fontSize: '16px',
-            fontWeight: '800',
-            color: adminAlerts.pendingUsers > 0 ? '#DC2626' : '#166534',
-          }}
-        >
-          {adminAlerts.pendingUsers}
-        </div>
-      </>
-    ) : (
-      <div style={{ flex: 1 }}>
-        <div
-          style={{
-            fontSize: '11px',
-            color: '#6b7280',
-            fontWeight: '600',
-          }}
-        >
-          Usuarios Pendientes
-        </div>
-        <div
-          style={{
-            fontSize: '18px',
-            fontWeight: '800',
-            color: adminAlerts.pendingUsers > 0 ? '#DC2626' : '#166534',
-          }}
-        >
-          {adminAlerts.pendingUsers}
-        </div>
-      </div>
-    )}
-    {/* Indicador visual opcional en escritorio */}
-    {adminAlerts.pendingUsers > 0 && !isMobile && (
-      <div
-        style={{
-          fontSize: '10px',
-          fontWeight: '700',
-          color: '#DC2626',
-          textDecoration: 'underline',
-        }}
-      >
-        Ver Ahora
-      </div>
-    )}
-  </div>
-)}
+            <div
+              style={{
+                backgroundColor:
+                  adminAlerts.pendingUsers > 0 ? '#FEE2E2' : '#DCFCE7',
+                padding: isMobile ? '4px' : '8px',
+                borderRadius: '8px',
+                display: 'flex',
+                alignItems: 'center',
+              }}
+            >
+              <UserCheck
+                size={isMobile ? 13 : 20}
+                color={adminAlerts.pendingUsers > 0 ? '#DC2626' : '#16A34A'}
+              />
+            </div>
+            {isMobile ? (
+              <>
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '4px',
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: '8px',
+                      color: '#6b7280',
+                      fontWeight: '600',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    Pend.
+                  </span>
+                </div>
+                <div
+                  style={{
+                    fontSize: '16px',
+                    fontWeight: '800',
+                    color: adminAlerts.pendingUsers > 0 ? '#DC2626' : '#166534',
+                  }}
+                >
+                  {adminAlerts.pendingUsers}
+                </div>
+              </>
+            ) : (
+              <div style={{ flex: 1 }}>
+                <div
+                  style={{
+                    fontSize: '11px',
+                    color: '#6b7280',
+                    fontWeight: '600',
+                  }}
+                >
+                  Usuarios Pendientes
+                </div>
+                <div
+                  style={{
+                    fontSize: '18px',
+                    fontWeight: '800',
+                    color: adminAlerts.pendingUsers > 0 ? '#DC2626' : '#166534',
+                  }}
+                >
+                  {adminAlerts.pendingUsers}
+                </div>
+              </div>
+            )}
+            {/* Indicador visual opcional en escritorio */}
+            {adminAlerts.pendingUsers > 0 && !isMobile && (
+              <div
+                style={{
+                  fontSize: '10px',
+                  fontWeight: '700',
+                  color: '#DC2626',
+                  textDecoration: 'underline',
+                }}
+              >
+                Ver Ahora
+              </div>
+            )}
+          </div>
+        )}
 
         {effectiveRole === 'administrador' && (
           <div
@@ -799,11 +808,22 @@ export default function Dashboard({ overrideRole }) {
               alignItems: 'center',
               justifyContent: 'center',
               gap: isMobile ? '4px' : '12px',
-              cursor: adminAlerts.pendingNE > 0 ? 'pointer' : 'default',
-              transition: 'transform 0.2s',
+              cursor: 'pointer', // ← Siempre pointer para consistencia visual
+              transition: 'transform 0.2s, background-color 0.2s',
               aspectRatio: isMobile ? '1' : 'auto',
             }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = 'translateY(-2px)';
+              e.currentTarget.style.backgroundColor =
+                adminAlerts.pendingNE > 0 ? '#FEE2E2' : '#DCFCE7';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = 'translateY(0)';
+              e.currentTarget.style.backgroundColor =
+                adminAlerts.pendingNE > 0 ? '#FEF2F2' : '#F0FDF4';
+            }}
           >
+            {/* ... contenido interno se mantiene igual ... */}
             <div
               style={{
                 backgroundColor:
@@ -905,11 +925,22 @@ export default function Dashboard({ overrideRole }) {
               alignItems: 'center',
               justifyContent: 'center',
               gap: isMobile ? '4px' : '12px',
-              cursor: adminAlerts.pendingPayments > 0 ? 'pointer' : 'default',
-              transition: 'transform 0.2s',
+              cursor: 'pointer', // ← Siempre pointer
+              transition: 'transform 0.2s, background-color 0.2s',
               aspectRatio: isMobile ? '1' : 'auto',
             }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = 'translateY(-2px)';
+              e.currentTarget.style.backgroundColor =
+                adminAlerts.pendingPayments > 0 ? '#FEF3C7' : '#DCFCE7';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = 'translateY(0)';
+              e.currentTarget.style.backgroundColor =
+                adminAlerts.pendingPayments > 0 ? '#FFFBEB' : '#F0FDF4';
+            }}
           >
+            {/* ... contenido interno se mantiene igual ... */}
             <div
               style={{
                 backgroundColor:
@@ -1093,7 +1124,11 @@ export default function Dashboard({ overrideRole }) {
                     {teamStats.activeSellers}
                   </div>
                   <div
-                    style={{ fontSize: '10px', color: '#6b7280', marginTop: '2px' }}
+                    style={{
+                      fontSize: '10px',
+                      color: '#6b7280',
+                      marginTop: '2px',
+                    }}
                   >
                     En estructura
                   </div>
@@ -1177,7 +1212,11 @@ export default function Dashboard({ overrideRole }) {
                     {teamStats.closedNECount}
                   </div>
                   <div
-                    style={{ fontSize: '10px', color: '#6b7280', marginTop: '2px' }}
+                    style={{
+                      fontSize: '10px',
+                      color: '#6b7280',
+                      marginTop: '2px',
+                    }}
                   >
                     Esta quincena
                   </div>
@@ -1212,7 +1251,11 @@ export default function Dashboard({ overrideRole }) {
                     {teamStats.pendingNECount}
                   </div>
                   <div
-                    style={{ fontSize: '10px', color: '#6b7280', marginTop: '2px' }}
+                    style={{
+                      fontSize: '10px',
+                      color: '#6b7280',
+                      marginTop: '2px',
+                    }}
                   >
                     Por cobrar/cerrar
                   </div>
@@ -1384,7 +1427,9 @@ export default function Dashboard({ overrideRole }) {
                 const heightPct = (day.amount / scaleBase) * 100;
                 // Formatear fecha para mostrar (ej: 27/09)
                 const dateObj = new Date(day.date + 'T12:00:00');
-                const dayLabel = `${dateObj.getDate()}/${dateObj.getMonth() + 1}`;
+                const dayLabel = `${dateObj.getDate()}/${
+                  dateObj.getMonth() + 1
+                }`;
                 return (
                   <div
                     key={idx}
@@ -1515,7 +1560,8 @@ export default function Dashboard({ overrideRole }) {
                       }}
                     >
                       <span>
-                        N.E. #{act.transaction_number || act.id?.substring(0, 6)}
+                        N.E. #
+                        {act.transaction_number || act.id?.substring(0, 6)}
                       </span>
                       <span style={{ color: '#dc2626' }}>
                         ${Number(act.final_price_usd || 0).toFixed(2)}
@@ -1593,7 +1639,8 @@ export default function Dashboard({ overrideRole }) {
                 />
               </>
             )}
-            {(effectiveRole === 'gerente' || effectiveRole === 'supervisor') && (
+            {(effectiveRole === 'gerente' ||
+              effectiveRole === 'supervisor') && (
               <>
                 <QuickLink
                   label="Visitas Equipo"
