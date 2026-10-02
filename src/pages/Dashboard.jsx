@@ -581,7 +581,7 @@ export default function Dashboard({ overrideRole }) {
               alignItems: 'center',
               justifyContent: 'center',
               gap: '4px',
-              padding: '7px 10px',
+              padding: '6px 18px',
               backgroundColor: '#DC2626',
               color: '#fff',
               border: 'none',
