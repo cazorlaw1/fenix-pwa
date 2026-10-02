@@ -669,7 +669,7 @@ export default function Dashboard({ overrideRole }) {
               {/* POTENCIALES (EXISTENTE) */}
               <QuickLinkMobile
                 label="Gistorial"
-                icon={<History size={13} />}
+                icon={<Clock size={13} />}
                 color="#16A34A"
                 onClick={() => (window.location.href = '/ventas?tab=historial_ventas')}
               />
