@@ -34,11 +34,9 @@ import {
   ShoppingCart,
   Check, // Agregado para el menú responsivo
 } from 'lucide-react';
-
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
-
 // --- COMPONENTE SEARCHABLE DROPDOWN (CORREGIDO) ---
 function SearchableDropdown({
   options,
@@ -51,7 +49,6 @@ function SearchableDropdown({
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState('');
   const containerRef = useRef(null);
-
   useEffect(() => {
     function handleClickOutside(event) {
       if (
@@ -64,16 +61,13 @@ function SearchableDropdown({
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
-
   const filtered = options.filter((opt) => {
     const text = String(opt[labelKey] || '').toLowerCase();
     return text.includes(search.toLowerCase());
   });
-
   const selectedOption = options.find(
     (o) => String(o[valueKey]) === String(value)
   );
-
   return (
     <div ref={containerRef} style={{ position: 'relative', width: '100%' }}>
       <div
@@ -189,31 +183,23 @@ function SearchableDropdown({
     </div>
   );
 }
-
 // ---------------------------------------------------------------
-
 export default function SalesModule() {
   const { user, role } = useAuth();
-
   // Referencias para el menú móvil
   const mobileMenuRef = useRef(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-
   // --- A. PERSISTENCIA Y NAVEGACIÓN DE PESTAÑAS ---
   // Inicialización con prioridad: URL Param > localStorage > Default
   const getInitialSubMenu = () => {
     const params = new URLSearchParams(window.location.search);
     const urlTab = params.get('tab');
     if (urlTab) return urlTab;
-    
     const savedTab = localStorage.getItem('salesModule_activeTab');
     if (savedTab) return savedTab;
-    
     return 'clientes';
   };
-
   const [activeSubMenu, setActiveSubMenu] = useState(getInitialSubMenu());
-
   // Efecto para guardar en localStorage y actualizar URL cuando cambia la pestaña
   useEffect(() => {
     localStorage.setItem('salesModule_activeTab', activeSubMenu);
@@ -222,7 +208,6 @@ export default function SalesModule() {
     url.searchParams.set('tab', activeSubMenu);
     window.history.replaceState({}, '', url);
   }, [activeSubMenu]);
-
   // Efecto para cerrar menú móvil al hacer clic fuera
   useEffect(() => {
     function handleClickOutside(event) {
@@ -233,17 +218,14 @@ export default function SalesModule() {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
-
   // Pestañas específicas de la sección Clientes (Predeterminada: 'registrar')
   const [clienteTab, setClienteTab] = useState('registrar');
   // Pestañas de Visitas y Nota de Entrega
   const [visitasTab, setVisitasTab] = useState('potenciales');
   const [neTab, setNeTab] = useState('crear_ne');
-
   // Mensajes globales y Loader
   const [message, setMessage] = useState({ type: '', text: '' });
   const [loading, setLoading] = useState(false);
-
   // Data Global
   const [sellersList, setSellersList] = useState([]);
   const [clients, setClients] = useState([]);
@@ -257,7 +239,6 @@ export default function SalesModule() {
     vales: 0.0,
   });
   const [paymentNotificationsMap, setPaymentNotificationsMap] = useState({});
-
   // Estado para el Visor Flotante de Imágenes (Modal)
   const [imageModal, setImageModal] = useState({
     open: false,
@@ -266,18 +247,15 @@ export default function SalesModule() {
     clientId: null,
     fieldName: null,
   });
-
   // --- ESTADOS PARA CONFIGURACIÓN GLOBAL Y FOLIO ---
   const [globalDiscount53, setGlobalDiscount53] = useState(53.38);
   const [globalDiscount23, setGlobalDiscount23] = useState(23.08);
   const [globalTerms, setGlobalTerms] = useState('Cargando términos...');
   const [estimatedNextFolio, setEstimatedNextFolio] = useState('...');
   // -------------------------------------------------
-
   // NUEVO ESTADO PARA HISTORIAL DE FACTURACIÓN DEL USUARIO
   const [userSettlementHistory, setUserSettlementHistory] = useState([]);
   const [historySearch, setHistorySearch] = useState('');
-
   // ---------------------------------------------------------------------------
   // 1. ESTADOS: SECCIÓN CLIENTES (CREAR Y EDITAR)
   // ---------------------------------------------------------------------------
@@ -294,10 +272,8 @@ export default function SalesModule() {
   const [ciFile, setCiFile] = useState(null);
   const [rifFile, setRifFile] = useState(null);
   const [adicionalFile, setAdicionalFile] = useState(null);
-
   // Filtros adicionales para tablas
   const [searchPotencialesQuery, setSearchPotencialesQuery] = useState('');
-
   // Modal para Editar Cliente Oficial de Cartera y sustitución de archivos
   const [editClientModal, setEditClientModal] = useState({
     open: false,
@@ -316,14 +292,12 @@ export default function SalesModule() {
   const [editCiFile, setEditCiFile] = useState(null);
   const [editRifFile, setEditRifFile] = useState(null);
   const [editAdicionalFile, setEditAdicionalFile] = useState(null);
-
   // ---------------------------------------------------------------------------
   // 2. ESTADOS: SECCIÓN VISITAS & POTENCIALES CLIENTES
   // ---------------------------------------------------------------------------
   const [searchClientQuery, setSearchClientQuery] = useState('');
   const [visitasGps, setVisitasGps] = useState({});
   const [visitasFiles, setVisitasFiles] = useState({});
-
   // Formulario en la tabla de potenciales para agregar nuevo
   const [potencialForm, setPotencialForm] = useState({
     nombre: '',
@@ -332,7 +306,6 @@ export default function SalesModule() {
   });
   const [potencialFile, setPotencialFile] = useState(null);
   const [potencialGps, setPotencialGps] = useState(null);
-
   // Modal para convertir de Potencial a Cliente Oficial
   const [convertModal, setConvertModal] = useState({
     open: false,
@@ -351,12 +324,10 @@ export default function SalesModule() {
   const [convertCiFile, setConvertCiFile] = useState(null);
   const [convertRifFile, setConvertRifFile] = useState(null);
   const [convertAdicionalFile, setConvertAdicionalFile] = useState(null);
-
   // ---------------------------------------------------------------------------
   // 3. ESTADOS: SECCIÓN NOTA DE ENTREGA & TARJETA DE VENDEDOR
   // ---------------------------------------------------------------------------
   const [editModeId, setEditModeId] = useState(null);
-
   // Estados para SearchableDropdowns en Crear N.E.
   const [neClientId, setNeClientId] = useState('');
   const [neSearchProduct, setNeSearchProduct] = useState('');
@@ -367,19 +338,15 @@ export default function SalesModule() {
   const [neCart, setNeCart] = useState([]);
   const [neObservacion, setNeObservacion] = useState('');
   const [neGpsLocation, setNeGpsLocation] = useState(null);
-
   // Filtro Buscador para Historial de N.E.
   const [searchHistoryQuery, setSearchHistoryQuery] = useState('');
-
   // Control de expansión de Tarjeta del Vendedor en Historial N.E. (Abierta por defecto)
   const [showFullSellerCard, setShowFullSellerCard] = useState(true);
-
   const [valeModal, setValeModal] = useState({
     open: false,
     notaId: null,
     monto: '',
   });
-
   // Estado para el Modal de Notificación de Abono (con campo de nota del usuario)
   const [abonoNotifModal, setAbonoNotifModal] = useState({
     open: false,
@@ -392,10 +359,8 @@ export default function SalesModule() {
     reference_number: '',
     user_note: '',
   });
-
   // Nuevo estado para manejar archivos de abono por ID de orden
   const [abonoFiles, setAbonoFiles] = useState({});
-
   // ---------------------------------------------------------------------------
   // EFECTO PARA AUTO-OCULTAR NOTIFICACIONES A LOS 5 SEGUNDOS
   // ---------------------------------------------------------------------------
@@ -407,7 +372,6 @@ export default function SalesModule() {
       return () => clearTimeout(timer);
     }
   }, [message]);
-
   // ---------------------------------------------------------------------------
   // CARGA DE DATOS INICIALES CON SUPABASE
   // ---------------------------------------------------------------------------
@@ -424,31 +388,27 @@ export default function SalesModule() {
     fetchPaymentNotifications();
     fetchUserSettlementHistory();
   }, [user, role]);
-
-const fetchGlobalSettings = async () => {
-  try {
-    const { data, error } = await supabase
-      .from('global_settings')
-      .select('*');
-    
-    if (!error && data) {
-      const settingsMap = {};
-      data.forEach((item) => {
-        settingsMap[item.setting_key] = item.setting_value;
-      });
-      
-      // Actualizar estados con los valores de la BD
-      if (settingsMap['ne_discount_53']) setGlobalDiscount53(Number(settingsMap['ne_discount_53']));
-      if (settingsMap['ne_discount_23']) setGlobalDiscount23(Number(settingsMap['ne_discount_23']));
-      if (settingsMap['ne_terms_conditions']) setGlobalTerms(settingsMap['ne_terms_conditions']);
-    } else if (error) {
-      console.error("Error cargando configuración global:", error);
+  const fetchGlobalSettings = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('global_settings')
+        .select('*');
+      if (!error && data) {
+        const settingsMap = {};
+        data.forEach((item) => {
+          settingsMap[item.setting_key] = item.setting_value;
+        });
+        // Actualizar estados con los valores de la BD
+        if (settingsMap['ne_discount_53']) setGlobalDiscount53(Number(settingsMap['ne_discount_53']));
+        if (settingsMap['ne_discount_23']) setGlobalDiscount23(Number(settingsMap['ne_discount_23']));
+        if (settingsMap['ne_terms_conditions']) setGlobalTerms(settingsMap['ne_terms_conditions']);
+      } else if (error) {
+        console.error("Error cargando configuración global:", error);
+      }
+    } catch (err) {
+      console.error('Error inesperado cargando configuración:', err);
     }
-  } catch (err) {
-    console.error('Error inesperado cargando configuración:', err);
-  }
-};
-
+  };
   const fetchEstimatedFolio = async () => {
     try {
       const { data, error } = await supabase
@@ -456,7 +416,6 @@ const fetchGlobalSettings = async () => {
         .select('transaction_number')
         .order('transaction_number', { ascending: false })
         .limit(1);
-
       if (!error && data && data.length > 0) {
         const maxNum = Number(data[0].transaction_number || 1000);
         setEstimatedNextFolio(String(maxNum + 1));
@@ -467,14 +426,12 @@ const fetchGlobalSettings = async () => {
       setEstimatedNextFolio('1001');
     }
   };
-
   const fetchPaymentNotifications = async () => {
     try {
       const { data, error } = await supabase
         .from('seller_payment_notifications')
         .select('*')
         .order('created_at', { ascending: false });
-
       if (!error && data) {
         const map = {};
         data.forEach((item) => {
@@ -492,7 +449,6 @@ const fetchGlobalSettings = async () => {
       console.error('Error cargando seller_payment_notifications:', e);
     }
   };
-
   const fetchSellers = async () => {
     const { data } = await supabase
       .from('profiles')
@@ -501,7 +457,6 @@ const fetchGlobalSettings = async () => {
       );
     if (data) setSellersList(data);
   };
-
   const fetchClients = async () => {
     let query = supabase
       .from('clients')
@@ -511,7 +466,6 @@ const fetchGlobalSettings = async () => {
     const { data } = await query.order('name', { ascending: true });
     if (data) setClients(data);
   };
-
   const fetchPotenciales = async () => {
     let query = supabase
       .from('clients')
@@ -521,7 +475,6 @@ const fetchGlobalSettings = async () => {
     const { data } = await query.order('created_at', { ascending: false });
     if (data) setPotenciales(data);
   };
-
   const fetchProducts = async () => {
     const { data } = await supabase
       .from('products')
@@ -529,7 +482,6 @@ const fetchGlobalSettings = async () => {
       .order('description', { ascending: true });
     if (data) setProducts(data);
   };
-
   const fetchSalesHistory = async () => {
     let query = supabase
       .from('sales_orders')
@@ -540,7 +492,6 @@ const fetchGlobalSettings = async () => {
     const { data } = await query.order('created_at', { ascending: false });
     if (data) setSalesHistory(data);
   };
-
   const fetchUserSettlementHistory = async () => {
     try {
       const { data, error } = await supabase
@@ -550,7 +501,6 @@ const fetchGlobalSettings = async () => {
         )
         .eq('user_id', user?.id)
         .order('created_at', { ascending: false });
-
       if (!error && data) {
         const formatted = data.map((inv) => {
           const c53g = Number(inv.comm_53_gross_usd || 0);
@@ -587,28 +537,24 @@ const fetchGlobalSettings = async () => {
       console.error('Error obteniendo historial de facturación:', err);
     }
   };
-
   const fetchComisionesYVales = async () => {
     try {
       let valesQuery = supabase
         .from('vales')
         .select('requested_amount_usd, status')
         .eq('seller_id', user?.id);
-
       const { data: valesData } = await valesQuery;
       const totalVales = valesData
         ? valesData
             .filter((v) => v.status === 'aprobada')
             .reduce((acc, v) => acc + (Number(v.requested_amount_usd) || 0), 0)
         : 0;
-
       let salesQuery = supabase
         .from('sales_orders')
         .select(
           'final_price_usd, payment_status, category, seller_id, profiles:seller_id(pct_bombillos, pct_fluidos)'
         )
         .eq('seller_id', user?.id);
-
       const { data: salesData } = await salesQuery;
       let totalCerradas = 0;
       let totalPendientesNe = 0;
@@ -628,18 +574,15 @@ const fetchGlobalSettings = async () => {
           }
         });
       }
-
       const { data: penaltiesData, error: penErr } = await supabase
         .from('penalties')
         .select('amount, status')
         .eq('seller_id', user?.id)
         .in('status', ['pendiente', 'aprobada', 'approved']);
-
       const totalPenalizaciones =
         !penErr && penaltiesData
           ? penaltiesData.reduce((acc, p) => acc + (Number(p.amount) || 0), 0)
           : 0;
-
       setComisionesData({
         pendientes: totalCerradas,
         pendientesNe: totalPendientesNe,
@@ -650,7 +593,6 @@ const fetchGlobalSettings = async () => {
       console.error('Error obteniendo comisiones/vales:', err);
     }
   };
-
   const sellerProfile = sellersList.find((s) => s.id === user?.id);
   const currentSellerName =
     sellerProfile?.full_name ||
@@ -658,11 +600,9 @@ const fetchGlobalSettings = async () => {
     user?.user_metadata?.full_name ||
     'Vendedor Registrado';
   const currentUserRole = sellerProfile?.role || role || 'vendedor';
-
   const now = new Date();
   const currentMonth = now.getMonth() + 1;
   const currentYear = now.getFullYear();
-
   const totalNeFromHistory = salesHistory.reduce(
     (acc, n) => acc + (Number(n.final_price_usd) || 0),
     0
@@ -680,7 +620,6 @@ const fetchGlobalSettings = async () => {
     0
   );
   const fixedSalary = Number(sellerProfile?.sueldo_fijo_usd || 0);
-
   // ---------------------------------------------------------------------------
   // HELPER GPS & STORAGE
   // ---------------------------------------------------------------------------
@@ -700,7 +639,6 @@ const fetchGlobalSettings = async () => {
       (error) => alert('Error GPS: ' + error.message)
     );
   };
-
   const uploadFile = async (file, bucketName, pathFolder) => {
     if (!file) return null;
     const fileExt = file.name.split('.').pop();
@@ -715,7 +653,6 @@ const fetchGlobalSettings = async () => {
     const { data } = supabase.storage.from(bucketName).getPublicUrl(filePath);
     return data.publicUrl;
   };
-
   const getStoragePathFromUrl = (url, bucketName) => {
     if (!url) return null;
     try {
@@ -725,13 +662,11 @@ const fetchGlobalSettings = async () => {
       return null;
     }
   };
-
   // Función auxiliar para validar que sea imagen
   const validateImageFile = (file) => {
     if (!file) return true;
     return file.type.startsWith('image/');
   };
-
   // ---------------------------------------------------------------------------
   // MANEJADORES: CLIENTES OFICIALES Y EDICIÓN/ELIMINACIÓN SEGURA
   // ---------------------------------------------------------------------------
@@ -749,7 +684,6 @@ const fetchGlobalSettings = async () => {
       alert('El documento adicional debe ser una imagen.');
       return;
     }
-
     setLoading(true);
     try {
       const ciUrl = await uploadFile(ciFile, 'documents', 'ci');
@@ -757,7 +691,6 @@ const fetchGlobalSettings = async () => {
       const adicUrl = adicionalFile
         ? await uploadFile(adicionalFile, 'documents', 'adicional')
         : null;
-
       const { error } = await supabase.from('clients').insert([
         {
           name: clientForm.nombre,
@@ -774,7 +707,6 @@ const fetchGlobalSettings = async () => {
           is_potential: false,
         },
       ]);
-
       if (error) throw error;
       setMessage({
         type: 'success',
@@ -800,7 +732,6 @@ const fetchGlobalSettings = async () => {
       setLoading(false);
     }
   };
-
   const handleOpenEditClient = (client) => {
     setEditClientForm({
       nombre: client.name || '',
@@ -817,7 +748,6 @@ const fetchGlobalSettings = async () => {
     setEditAdicionalFile(null);
     setEditClientModal({ open: true, clientData: client });
   };
-
   const handleUpdateClient = async (e) => {
     e.preventDefault();
     // Validaciones de formato imagen
@@ -833,13 +763,11 @@ const fetchGlobalSettings = async () => {
       alert('El nuevo documento adicional debe ser una imagen.');
       return;
     }
-
     setLoading(true);
     try {
       let ciUrl = editClientModal.clientData.ci_photo_url;
       let rifUrl = editClientModal.clientData.rif_photo_url;
       let adicUrl = editClientModal.clientData.additional_doc_url;
-
       // Lógica de eliminación de archivos antiguos antes de subir nuevos
       if (editCiFile) {
         if (ciUrl) {
@@ -865,7 +793,6 @@ const fetchGlobalSettings = async () => {
         }
         adicUrl = await uploadFile(editAdicionalFile, 'documents', 'adicional');
       }
-
       const { error } = await supabase
         .from('clients')
         .update({
@@ -882,7 +809,6 @@ const fetchGlobalSettings = async () => {
           additional_doc_url: adicUrl,
         })
         .eq('id', editClientModal.clientData.id);
-
       if (error) throw error;
       setMessage({
         type: 'success',
@@ -896,90 +822,75 @@ const fetchGlobalSettings = async () => {
       setLoading(false);
     }
   };
-
-const handleDeleteClient = async (clientId, clientName) => {
-  setLoading(true);
-  try {
-    // 1. Verificar si existen Notas de Entrega pendientes o aprobadas para este cliente
-    const { data: activeOrders, error: ordersErr } = await supabase
-      .from('sales_orders')
-      .select('id, status, transaction_number')
-      .eq('client_id', clientId)
-      .in('status', ['pendiente', 'aprobada']); // Bloqueamos si hay notas en proceso
-
-    if (ordersErr) throw ordersErr;
-
-    // Si encuentra al menos una nota activa, bloqueamos la eliminación
-    if (activeOrders && activeOrders.length > 0) {
-      const count = activeOrders.length;
-      const firstTrans = activeOrders[0].transaction_number || activeOrders[0].id.substring(0, 6);
-      
+  const handleDeleteClient = async (clientId, clientName) => {
+    setLoading(true);
+    try {
+      // 1. Verificar si existen Notas de Entrega pendientes o aprobadas para este cliente
+      const { data: activeOrders, error: ordersErr } = await supabase
+        .from('sales_orders')
+        .select('id, status, transaction_number')
+        .eq('client_id', clientId)
+        .in('status', ['pendiente', 'aprobada']); // Bloqueamos si hay notas en proceso
+      if (ordersErr) throw ordersErr;
+      // Si encuentra al menos una nota activa, bloqueamos la eliminación
+      if (activeOrders && activeOrders.length > 0) {
+        const count = activeOrders.length;
+        const firstTrans = activeOrders[0].transaction_number || activeOrders[0].id.substring(0, 6);
+        setMessage({
+          type: 'error',
+          text: `No se puede eliminar al cliente "${clientName}" porque tiene ${count} Nota(s) de Entrega activa(s) (Ej: #${firstTrans}). Finalice o elimine las notas primero.`,
+        });
+        setLoading(false);
+        return; // Detenemos la ejecución aquí
+      }
+      // 2. Si no hay notas activas, procedemos a obtener los datos del cliente para borrar sus archivos
+      const { data: client, error: fetchErr } = await supabase
+        .from('clients')
+        .select('*')
+        .eq('id', clientId)
+        .single();
+      if (fetchErr) throw fetchErr;
+      // Recopilar rutas de archivos para eliminar
+      const docPaths = [
+        getStoragePathFromUrl(client.ci_photo_url, 'documents'),
+        getStoragePathFromUrl(client.rif_photo_url, 'documents'),
+        getStoragePathFromUrl(client.additional_doc_url, 'documents'),
+      ].filter(Boolean);
+      const visitPath = getStoragePathFromUrl(
+        client.last_visit_photo_url,
+        'visits'
+      );
+      // Eliminar archivos del storage primero
+      if (docPaths.length > 0) {
+        await supabase.storage.from('documents').remove(docPaths);
+      }
+      if (visitPath) {
+        await supabase.storage.from('visits').remove([visitPath]);
+      }
+      // Finalmente eliminar el registro de la base de datos
+      const { error: deleteErr } = await supabase
+        .from('clients')
+        .delete()
+        .eq('id', clientId);
+      if (deleteErr) throw deleteErr;
+      setMessage({
+        type: 'success',
+        text: `El cliente "${clientName}" fue eliminado exitosamente.`,
+      });
+      // Refrescar las listas
+      fetchClients();
+      fetchPotenciales();
+      // No es estrictamente necesario refrescar salesHistory aquí si solo borramos clientes sin notas,
+      // pero lo dejamos por consistencia si hubiera notas cerradas huérfanas (aunque la lógica de negocio usualmente lo evita).
+    } catch (err) {
       setMessage({
         type: 'error',
-        text: `No se puede eliminar al cliente "${clientName}" porque tiene ${count} Nota(s) de Entrega activa(s) (Ej: #${firstTrans}). Finalice o elimine las notas primero.`,
+        text: 'Error al eliminar cliente: ' + err.message,
       });
+    } finally {
       setLoading(false);
-      return; // Detenemos la ejecución aquí
     }
-
-    // 2. Si no hay notas activas, procedemos a obtener los datos del cliente para borrar sus archivos
-    const { data: client, error: fetchErr } = await supabase
-      .from('clients')
-      .select('*')
-      .eq('id', clientId)
-      .single();
-
-    if (fetchErr) throw fetchErr;
-
-    // Recopilar rutas de archivos para eliminar
-    const docPaths = [
-      getStoragePathFromUrl(client.ci_photo_url, 'documents'),
-      getStoragePathFromUrl(client.rif_photo_url, 'documents'),
-      getStoragePathFromUrl(client.additional_doc_url, 'documents'),
-    ].filter(Boolean);
-
-    const visitPath = getStoragePathFromUrl(
-      client.last_visit_photo_url,
-      'visits'
-    );
-
-    // Eliminar archivos del storage primero
-    if (docPaths.length > 0) {
-      await supabase.storage.from('documents').remove(docPaths);
-    }
-    if (visitPath) {
-      await supabase.storage.from('visits').remove([visitPath]);
-    }
-
-    // Finalmente eliminar el registro de la base de datos
-    const { error: deleteErr } = await supabase
-      .from('clients')
-      .delete()
-      .eq('id', clientId);
-
-    if (deleteErr) throw deleteErr;
-
-    setMessage({
-      type: 'success',
-      text: `El cliente "${clientName}" fue eliminado exitosamente.`,
-    });
-    
-    // Refrescar las listas
-    fetchClients();
-    fetchPotenciales();
-    // No es estrictamente necesario refrescar salesHistory aquí si solo borramos clientes sin notas, 
-    // pero lo dejamos por consistencia si hubiera notas cerradas huérfanas (aunque la lógica de negocio usualmente lo evita).
-    
-  } catch (err) {
-    setMessage({
-      type: 'error',
-      text: 'Error al eliminar cliente: ' + err.message,
-    });
-  } finally {
-    setLoading(false);
-  }
-};
-
+  };
   // ---------------------------------------------------------------------------
   // MANEJADORES: POTENCIALES CLIENTES Y VISITAS EXIGIDAS (CON GPS)
   // ---------------------------------------------------------------------------
@@ -995,14 +906,12 @@ const handleDeleteClient = async (clientId, clientName) => {
       alert('La foto adjunta debe ser una imagen.');
       return;
     }
-
     setLoading(true);
     try {
       let adjuntoUrl = null;
       if (potencialFile) {
         adjuntoUrl = await uploadFile(potencialFile, 'visits', 'potenciales');
       }
-
       const { error } = await supabase.from('clients').insert([
         {
           name: potencialForm.nombre,
@@ -1017,7 +926,6 @@ const handleDeleteClient = async (clientId, clientName) => {
           is_potential: true,
         },
       ]);
-
       if (error) throw error;
       setMessage({
         type: 'success',
@@ -1033,7 +941,6 @@ const handleDeleteClient = async (clientId, clientName) => {
       setLoading(false);
     }
   };
-
   const handleCaptureVisitaGps = async (id) => {
     getDeviceLocation(async (coords) => {
       setVisitasGps((prev) => ({ ...prev, [id]: coords }));
@@ -1050,7 +957,6 @@ const handleDeleteClient = async (clientId, clientName) => {
       }
     });
   };
-
   const handleSaveVisita = async (id, isPotencial) => {
     const gps = visitasGps[id];
     if (!gps) {
@@ -1064,7 +970,6 @@ const handleDeleteClient = async (clientId, clientName) => {
       alert('La foto de la visita debe ser una imagen.');
       return;
     }
-
     setLoading(true);
     try {
       let adjuntoUrl = null;
@@ -1072,21 +977,17 @@ const handleDeleteClient = async (clientId, clientName) => {
       if (file) {
         adjuntoUrl = await uploadFile(file, 'visits', 'visitas');
       }
-
       const updateData = {
         last_visit_at: new Date().toISOString(),
         // Actualizar GPS también por seguridad si cambió
         last_gps_location: { lat: gps.lat, lng: gps.lng },
       };
       if (adjuntoUrl) updateData.last_visit_photo_url = adjuntoUrl;
-
       const { error } = await supabase
         .from('clients')
         .update(updateData)
         .eq('id', id);
-
       if (error) throw error;
-
       // CORRECCIÓN: Usar try/catch en lugar de .catch()
       try {
         await supabase.from('client_visits').insert([
@@ -1104,7 +1005,6 @@ const handleDeleteClient = async (clientId, clientName) => {
           visitErr
         );
       }
-
       setMessage({
         type: 'success',
         text: 'Visita actualizada y coordenadas GPS guardadas con éxito.',
@@ -1117,7 +1017,6 @@ const handleDeleteClient = async (clientId, clientName) => {
       setLoading(false);
     }
   };
-
   const handleOpenConvertModal = (potencial) => {
     setConvertForm({
       nombre: potencial.name || '',
@@ -1134,7 +1033,6 @@ const handleDeleteClient = async (clientId, clientName) => {
     setConvertAdicionalFile(null);
     setConvertModal({ open: true, potencialData: potencial });
   };
-
   const handleSaveConvertion = async (e) => {
     e.preventDefault();
     if (!convertCiFile || !convertRifFile) {
@@ -1154,7 +1052,6 @@ const handleDeleteClient = async (clientId, clientName) => {
       alert('El documento adicional debe ser una imagen.');
       return;
     }
-
     setLoading(true);
     try {
       const ciUrl = await uploadFile(convertCiFile, 'documents', 'ci');
@@ -1162,7 +1059,6 @@ const handleDeleteClient = async (clientId, clientName) => {
       const adicUrl = convertAdicionalFile
         ? await uploadFile(convertAdicionalFile, 'documents', 'adicional')
         : null;
-
       // Nota: Al convertir, asumimos que no hay CI/RIF previos en 'documents' porque era potencial.
       // Pero si hubiera foto de visita en 'visits', esa se mantiene o se limpia según lógica de negocio.
       // Aquí solo actualizamos los campos oficiales.
@@ -1183,7 +1079,6 @@ const handleDeleteClient = async (clientId, clientName) => {
           is_potential: false,
         })
         .eq('id', convertModal.potencialData.id);
-
       if (error) throw error;
       setMessage({
         type: 'success',
@@ -1198,20 +1093,17 @@ const handleDeleteClient = async (clientId, clientName) => {
       setLoading(false);
     }
   };
-
   // ---------------------------------------------------------------------------
   // MANEJADORES: NOTA DE ENTREGA & DESCARGA/ENVÍO PDF DIRECTO (CON GPS)
   // ---------------------------------------------------------------------------
   const porcentajeDescuento =
     neTipoPago === '53.38' ? globalDiscount53 : globalDiscount23;
-
   const filteredProducts = products.filter(
     (p) =>
       (!p.category || p.category.toLowerCase() === neCategoria.toLowerCase()) &&
       (p.description?.toLowerCase().includes(neSearchProduct.toLowerCase()) ||
         p.code?.toLowerCase().includes(neSearchProduct.toLowerCase()))
   );
-
   const handleAddToCart = () => {
     if (!neSelectedProdId) return;
     const prod = products.find((p) => p.id === neSelectedProdId);
@@ -1224,10 +1116,8 @@ const handleDeleteClient = async (clientId, clientName) => {
       alert(`Stock insuficiente. Disponible: ${prod.stock_current}`);
       return;
     }
-
     const valorUnitario = prod.price_usd;
     const vuConDescuento = valorUnitario * (1 - porcentajeDescuento / 100);
-
     if (inCart) {
       setNeCart(
         neCart.map((item) =>
@@ -1257,24 +1147,20 @@ const handleDeleteClient = async (clientId, clientName) => {
     setNeSelectedProdId('');
     setNeQuantity(1);
   };
-
   const handleRemoveFromCart = (id) => {
     setNeCart(neCart.filter((item) => item.product_id !== id));
   };
-
   const totalSinDescuento = neCart.reduce(
     (acc, i) => acc + i.unit_price_usd * i.quantity,
     0
   );
   const precioFinal = neCart.reduce((acc, i) => acc + i.total_line_usd, 0);
   const montoAhorrado = totalSinDescuento - precioFinal;
-
   const handleSendProposal = async () => {
     if (!neClientId) return alert('Seleccione un cliente.');
     if (neCart.length === 0) return alert('El carrito está vacío.');
     if (!neGpsLocation)
       return alert('Debe extraer la ubicación GPS para enviar la propuesta.');
-
     setLoading(true);
     try {
       const payload = {
@@ -1294,10 +1180,8 @@ const handleDeleteClient = async (clientId, clientName) => {
         longitude: neGpsLocation.lng,
         gps_captured_at: neGpsLocation.timestamp || new Date().toISOString(),
       };
-
       let orderId = editModeId;
       let transactionNumber = null; // Variable clave para guardar el número real
-
       if (editModeId) {
         // --- LÓGICA DE EDICIÓN ---
         // Aquí iría tu lógica existente para restaurar stock si es necesario...
@@ -1321,7 +1205,6 @@ const handleDeleteClient = async (clientId, clientName) => {
         orderId = newNota.id;
         transactionNumber = newNota.transaction_number; // Obtenemos el número de la nueva nota
       }
-
       // Insertar detalles de la orden
       const detalles = neCart.map((item) => ({
         order_id: orderId,
@@ -1332,7 +1215,6 @@ const handleDeleteClient = async (clientId, clientName) => {
         total_line_usd: item.total_line_usd,
       }));
       await supabase.from('order_items').insert(detalles);
-
       // ==========================================
       // 🚀 LLAMADA A LA NUEVA EDGE FUNCTION
       // ==========================================
@@ -1350,7 +1232,6 @@ const handleDeleteClient = async (clientId, clientName) => {
         );
       }
       // ==========================================
-
       setMessage({
         type: 'success',
         text: editModeId
@@ -1372,19 +1253,16 @@ const handleDeleteClient = async (clientId, clientName) => {
       setLoading(false);
     }
   };
-
   const handleEditNE = async (nota) => {
     setEditModeId(nota.id);
     setNeClientId(nota.client_id);
     setNeCategoria(nota.category || 'bombillos');
     setNeTipoPago(nota.payment_discount || '53.38');
     setNeObservacion(nota.observation || '');
-
     const { data: detalles } = await supabase
       .from('order_items')
       .select('*, products()')
       .eq('order_id', nota.id);
-
     if (detalles) {
       const loadedCart = detalles.map((d) => ({
         product_id: d.product_id,
@@ -1399,7 +1277,6 @@ const handleDeleteClient = async (clientId, clientName) => {
     }
     setNeTab('crear_ne');
   };
-
   const handleDeleteNE = async (nota) => {
     const totalAbonado = Number(nota.total_paid_usd) || 0;
     if (totalAbonado > 0) {
@@ -1412,7 +1289,6 @@ const handleDeleteClient = async (clientId, clientName) => {
       );
       return;
     }
-
     if (
       !window.confirm(
         `¿Estás seguro de que deseas eliminar la Nota de Entrega N° #${
@@ -1422,7 +1298,6 @@ const handleDeleteClient = async (clientId, clientName) => {
     ) {
       return;
     }
-
     setLoading(true);
     try {
       // Restaurar stock si estaba aprobada
@@ -1431,7 +1306,6 @@ const handleDeleteClient = async (clientId, clientName) => {
           .from('order_items')
           .select('product_id, quantity')
           .eq('order_id', nota.id);
-
         if (!itemsErr && items) {
           for (const item of items) {
             const { data: prodData } = await supabase
@@ -1449,12 +1323,10 @@ const handleDeleteClient = async (clientId, clientName) => {
           }
         }
       }
-
       const { error } = await supabase
         .from('sales_orders')
         .delete()
         .eq('id', nota.id);
-
       if (error) throw error;
       setMessage({
         type: 'success',
@@ -1472,7 +1344,6 @@ const handleDeleteClient = async (clientId, clientName) => {
       setLoading(false);
     }
   };
-
   const handleDownloadPDF = async (nota) => {
     try {
       setLoading(true);
@@ -1480,9 +1351,7 @@ const handleDeleteClient = async (clientId, clientName) => {
         .from('order_items')
         .select('*, products(code, description)')
         .eq('order_id', nota.id);
-
       if (error) throw error;
-
       if (!window.html2pdf) {
         await new Promise((resolve, reject) => {
           const script = document.createElement('script');
@@ -1493,12 +1362,10 @@ const handleDeleteClient = async (clientId, clientName) => {
           document.head.appendChild(script);
         });
       }
-
       const clientName = nota.clients?.name || 'Cliente';
       const transNo = nota.transaction_number || nota.id.substring(0, 8);
       const fecha = new Date(nota.created_at).toLocaleString();
       const vendedorName = currentSellerName;
-
       let itemsHtml = '';
       let subTotal = 0;
       if (items && items.length > 0) {
@@ -1509,97 +1376,95 @@ const handleDeleteClient = async (clientId, clientName) => {
           subTotal += totalLine;
           itemsHtml += `
 <tr>
-  <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; font-family: monospace;">${
-    item.products?.code || 'S/C'
-  }</td>
-  <td style="padding: 6px 8px; border-bottom: 1px solid #ddd;">${
-    item.products?.description || 'Producto'
-  }</td>
-  <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: center;">${
-    item.quantity
-  }</td>
-  <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: right;">$${Number(
-    item.unit_price_usd || 0
-  ).toFixed(2)}</td>
-  <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: right; color: #B45309;">$${Number(
-    item.discounted_unit_price_usd || 0
-  ).toFixed(2)}</td>
-  <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: right; font-weight: bold;">$${Number(
-    totalLine
-  ).toFixed(2)}</td>
+<td style="padding: 6px 8px; border-bottom: 1px solid #ddd; font-family: monospace;">${
+            item.products?.code || 'S/C'
+          }</td>
+<td style="padding: 6px 8px; border-bottom: 1px solid #ddd;">${
+            item.products?.description || 'Producto'
+          }</td>
+<td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: center;">${
+            item.quantity
+          }</td>
+<td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: right;">$${Number(
+            item.unit_price_usd || 0
+          ).toFixed(2)}</td>
+<td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: right; color: #B45309;">$${Number(
+            item.discounted_unit_price_usd || 0
+          ).toFixed(2)}</td>
+<td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: right; font-weight: bold;">$${Number(
+            totalLine
+          ).toFixed(2)}</td>
 </tr>
 `;
         });
       }
-
       const container = document.createElement('div');
       container.innerHTML = `
 <div style="font-family: Arial, sans-serif; color: #111; padding: 25px; background: #fff; width: 700px; height: 1000px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between; margin: 0 auto;">
-  <div>
-    <div style="display: flex; justify-content: space-between; border-bottom: 2px solid #111; padding-bottom: 15px; margin-bottom: 20px;">
-      <div>
-        <h2 style="margin: 0; font-size: 20px; text-transform: uppercase;">FENIX AUTO PART C.A</h2>
-        <p style="margin: 2px 0; font-size: 12px;"><strong>RIF:</strong> J-50261925-2</p>
-        <p style="margin: 8px 0 0 0; font-size: 12px;"><strong>Cliente:</strong> ${clientName}</p>
-      </div>
-      <div style="text-align: right; font-size: 12px;">
-        <p style="margin: 2px 0;"><strong>N° Transacción:</strong> #${transNo}</p>
-        <p style="margin: 2px 0;"><strong>Fecha/Hora:</strong> ${fecha}</p>
-        <p style="margin: 2px 0;"><strong>Vendedor:</strong> ${vendedorName}</p>
-        <p style="margin: 2px 0;"><strong>Categoría:</strong> ${
-          nota.category || 'General'
-        }</p>
-      </div>
-    </div>
-    <table style="width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 20px;">
-      <thead>
-        <tr style="background-color: #f3f4f6;">
-          <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: left;">Código</th>
-          <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: left;">Descripción</th>
-          <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: center;">Cantidad</th>
-          <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: right;">V. Unitario</th>
-          <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: right;">V. U. con Descuento</th>
-          <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: right;">Total Línea</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${itemsHtml}
-      </tbody>
-    </table>
-  </div>
-  <div>
-    <div style="display: flex; justify-content: flex-end; font-size: 12px; margin-bottom: 15px;">
-      <div style="width: 280px; background: #f9fafb; padding: 12px; border: 1px solid #ddd; border-radius: 6px;">
-        <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
-          <span>Total Base:</span>
-          <strong>$${Number(nota.total_base_usd || subTotal).toFixed(2)}</strong>
-        </div>
-        <div style="display: flex; justify-content: space-between; margin-bottom: 6px; color: #B45309;">
-          <span>Descuento Aplicado:</span>
-          <strong>-$${Number(nota.discount_amount_usd || 0).toFixed(2)}</strong>
-        </div>
-        <div style="display: flex; justify-content: space-between; border-top: 1px solid #ccc; padding-top: 6px; font-weight: bold; font-size: 14px; color: #DC2626;">
-          <span>Precio Final:</span>
-          <span>$${Number(nota.final_price_usd || subTotal).toFixed(2)}</span>
-        </div>
-      </div>
-    </div>
-    ${
-      nota.observation
-        ? `
-    <div style="font-size: 11px; color: #333; background: #fffbeb; border: 1px solid #fde68a; padding: 10px; border-radius: 4px; margin-bottom: 10px; text-align: justify;">
-      <strong>Observación:</strong> ${nota.observation}
-    </div>
-    `
-        : ''
-    }
-    <div style="font-size: 10px; color: #555; background: #f3f4f6; padding: 10px; border-radius: 4px; line-height: 1.4; text-align: justify;">
-      <strong>Términos y condiciones:</strong> ${globalTerms}
-    </div>
-  </div>
+<div>
+<div style="display: flex; justify-content: space-between; border-bottom: 2px solid #111; padding-bottom: 15px; margin-bottom: 20px;">
+<div>
+<h2 style="margin: 0; font-size: 20px; text-transform: uppercase;">FENIX AUTO PART C.A</h2>
+<p style="margin: 2px 0; font-size: 12px;"><strong>RIF:</strong> J-50261925-2</p>
+<p style="margin: 8px 0 0 0; font-size: 12px;"><strong>Cliente:</strong> ${clientName}</p>
+</div>
+<div style="text-align: right; font-size: 12px;">
+<p style="margin: 2px 0;"><strong>N° Transacción:</strong> #${transNo}</p>
+<p style="margin: 2px 0;"><strong>Fecha/Hora:</strong> ${fecha}</p>
+<p style="margin: 2px 0;"><strong>Vendedor:</strong> ${vendedorName}</p>
+<p style="margin: 2px 0;"><strong>Categoría:</strong> ${
+        nota.category || 'General'
+      }</p>
+</div>
+</div>
+<table style="width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 20px;">
+<thead>
+<tr style="background-color: #f3f4f6;">
+<th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: left;">Código</th>
+<th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: left;">Descripción</th>
+<th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: center;">Cantidad</th>
+<th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: right;">V. Unitario</th>
+<th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: right;">V. U. con Descuento</th>
+<th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: right;">Total Línea</th>
+</tr>
+</thead>
+<tbody>
+${itemsHtml}
+</tbody>
+</table>
+</div>
+<div>
+<div style="display: flex; justify-content: flex-end; font-size: 12px; margin-bottom: 15px;">
+<div style="width: 280px; background: #f9fafb; padding: 12px; border: 1px solid #ddd; border-radius: 6px;">
+<div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+<span>Total Base:</span>
+<strong>$${Number(nota.total_base_usd || subTotal).toFixed(2)}</strong>
+</div>
+<div style="display: flex; justify-content: space-between; margin-bottom: 6px; color: #B45309;">
+<span>Descuento Aplicado:</span>
+<strong>-$${Number(nota.discount_amount_usd || 0).toFixed(2)}</strong>
+</div>
+<div style="display: flex; justify-content: space-between; border-top: 1px solid #ccc; padding-top: 6px; font-weight: bold; font-size: 14px; color: #DC2626;">
+<span>Precio Final:</span>
+<span>$${Number(nota.final_price_usd || subTotal).toFixed(2)}</span>
+</div>
+</div>
+</div>
+${
+  nota.observation
+    ? `
+<div style="font-size: 11px; color: #333; background: #fffbeb; border: 1px solid #fde68a; padding: 10px; border-radius: 4px; margin-bottom: 10px; text-align: justify;">
+<strong>Observación:</strong> ${nota.observation}
+</div>
+`
+    : ''
+}
+<div style="font-size: 10px; color: #555; background: #f3f4f6; padding: 10px; border-radius: 4px; line-height: 1.4; text-align: justify;">
+<strong>Términos y condiciones:</strong> ${globalTerms}
+</div>
+</div>
 </div>
 `;
-
       const opciones = {
         margin: 0,
         filename: `nota-entrega-${transNo}.pdf`,
@@ -1614,7 +1479,6 @@ const handleDeleteClient = async (clientId, clientName) => {
       setLoading(false);
     }
   };
-
   const handlePrintCapturedInvoicePDF = async (histItem) => {
     try {
       setLoading(true);
@@ -1628,14 +1492,12 @@ const handleDeleteClient = async (clientId, clientName) => {
           document.head.appendChild(script);
         });
       }
-
       const container = document.createElement('div');
       container.innerHTML = `
 <div style="font-family: Arial, sans-serif; color: #111; padding: 25px; background: #fff; width: 720px; box-sizing: border-box; margin: 0 auto;">
-  ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
+${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
 </div>
 `;
-
       const opciones = {
         margin: 0,
         filename: `factura-liquidacion-${histItem.id}.pdf`,
@@ -1650,7 +1512,6 @@ const handleDeleteClient = async (clientId, clientName) => {
       setLoading(false);
     }
   };
-
   const handleSendPDF = async (nota) => {
     try {
       const clientName = nota.clients?.name || 'Cliente';
@@ -1665,11 +1526,9 @@ const handleDeleteClient = async (clientId, clientName) => {
       alert('Error al compartir: ' + err.message);
     }
   };
-
   const handleSolicitarVale = async () => {
     if (!valeModal.monto || Number(valeModal.monto) <= 0)
       return alert('Ingrese un monto válido');
-
     setLoading(true);
     try {
       // Obtener datos de la nota para el correo
@@ -1679,7 +1538,6 @@ const handleDeleteClient = async (clientId, clientName) => {
         valeModal.notaId?.substring(0, 6) ||
         'N/A';
       const clienteNombre = notaAsociada?.clients?.name || 'Cliente';
-
       const { error } = await supabase.from('vales').insert([
         {
           order_id: valeModal.notaId,
@@ -1689,9 +1547,7 @@ const handleDeleteClient = async (clientId, clientName) => {
           status: 'pendiente',
         },
       ]);
-
       if (error) throw error;
-
       // ✅ ENVIAR CORREO AL ADMINISTRADOR SOBRE LA SOLICITUD DE VALE
       try {
         await supabase.functions.invoke('send-notification', {
@@ -1712,7 +1568,6 @@ const handleDeleteClient = async (clientId, clientName) => {
           notifErr
         );
       }
-
       setMessage({
         type: 'success',
         text: 'Solicitud de vale enviada y administrador notificado.',
@@ -1726,7 +1581,6 @@ const handleDeleteClient = async (clientId, clientName) => {
       setLoading(false);
     }
   };
-
   const handleOpenAbonoNotifModal = (notaId) => {
     const existing = paymentNotificationsMap[notaId];
     if (existing && existing.status === 'pending') {
@@ -1751,7 +1605,6 @@ const handleDeleteClient = async (clientId, clientName) => {
     setAbonoFiles((prev) => ({ ...prev, [notaId]: null }));
     setAbonoNotifModal({ open: true, notaId });
   };
-
   const handleEnviarNotificacionAbono = async (e) => {
     e.preventDefault();
     if (!abonoNotifModal.notaId) return;
@@ -1764,17 +1617,14 @@ const handleDeleteClient = async (clientId, clientName) => {
       alert('El comprobante debe ser una imagen.');
       return;
     }
-
     setLoading(true);
     try {
       const montoNum = parseFloat(abonoForm.amount_usd);
       if (isNaN(montoNum) || montoNum <= 0) {
         throw new Error('Ingrese un monto válido.');
       }
-
       // Subir archivo primero
       const receiptUrl = await uploadFile(fileToUpload, 'visits', 'abonos');
-
       const { data: newNotif, error: notifErr } = await supabase
         .from('seller_payment_notifications')
         .insert([
@@ -1792,14 +1642,11 @@ const handleDeleteClient = async (clientId, clientName) => {
         ])
         .select()
         .single();
-
       if (notifErr) throw notifErr;
-
       setPaymentNotificationsMap((prev) => ({
         ...prev,
         [abonoNotifModal.notaId]: newNotif,
       }));
-
       // ✅ ENVIAR CORREO AL ADMINISTRADOR Y VENDEDOR SOBRE EL ABONO
       try {
         const notaActual = salesHistory.find(
@@ -1807,7 +1654,6 @@ const handleDeleteClient = async (clientId, clientName) => {
         );
         const saldoPendiente =
           Number(notaActual?.balance_due_usd || 0) - montoNum;
-
         await supabase.functions.invoke('send-notification', {
           body: {
             type: 'abono_registered',
@@ -1827,7 +1673,6 @@ const handleDeleteClient = async (clientId, clientName) => {
         console.warn('Error enviando correo de abono:', mailErr);
         // No bloqueamos el flujo si falla el correo
       }
-
       setMessage({
         type: 'success',
         text: 'Notificación de abono registrada y administrador notificado.',
@@ -1851,9 +1696,7 @@ const handleDeleteClient = async (clientId, clientName) => {
       setLoading(false);
     }
   };
-
   const selectedClientData = clients.find((c) => c.id === neClientId);
-
   const CustomFileInput = ({
     id,
     onChange,
@@ -1908,7 +1751,6 @@ const handleDeleteClient = async (clientId, clientName) => {
       </label>
     </div>
   );
-
   const filteredSalesHistory = salesHistory.filter((nota) => {
     const q = searchHistoryQuery.toLowerCase();
     const clientName = nota.clients?.name?.toLowerCase() || '';
@@ -1917,7 +1759,6 @@ const handleDeleteClient = async (clientId, clientName) => {
       .toLowerCase();
     return clientName.includes(q) || transNo.includes(q);
   });
-
   const filteredSettlementHistory = userSettlementHistory.filter((item) => {
     if (!historySearch.trim()) return true;
     const q = historySearch.toLowerCase();
@@ -1926,7 +1767,6 @@ const handleDeleteClient = async (clientId, clientName) => {
       item.user?.full_name?.toLowerCase().includes(q)
     );
   });
-
   // Función para manejar la sustitución de imagen desde el Modal
   const handleReplaceImageFromModal = async (newFile) => {
     if (!newFile) return;
@@ -1936,7 +1776,6 @@ const handleDeleteClient = async (clientId, clientName) => {
     }
     const { clientId, fieldName, url: oldUrl } = imageModal;
     if (!clientId || !fieldName) return;
-
     setLoading(true);
     try {
       // Determinar bucket y carpeta según el campo
@@ -1948,7 +1787,6 @@ const handleDeleteClient = async (clientId, clientName) => {
         bucket = 'visits';
         folder = 'visitas';
       }
-
       // Eliminar archivo antiguo si existe
       if (oldUrl) {
         const oldPath = getStoragePathFromUrl(oldUrl, bucket);
@@ -1956,18 +1794,14 @@ const handleDeleteClient = async (clientId, clientName) => {
           await supabase.storage.from(bucket).remove([oldPath]);
         }
       }
-
       // Subir nuevo archivo
       const newUrl = await uploadFile(newFile, bucket, folder);
-
       // Actualizar base de datos
       const { error } = await supabase
         .from('clients')
         .update({ [fieldName]: newUrl })
         .eq('id', clientId);
-
       if (error) throw error;
-
       // Actualizar estado local y cerrar modal
       setImageModal((prev) => ({ ...prev, url: newUrl }));
       // Refrescar listas
@@ -1983,7 +1817,6 @@ const handleDeleteClient = async (clientId, clientName) => {
       setLoading(false);
     }
   };
-
   // Lista de pestañas para el menú
   const menuTabs = [
     { id: 'clientes', label: 'Clientes', icon: Users },
@@ -1991,7 +1824,6 @@ const handleDeleteClient = async (clientId, clientName) => {
     { id: 'nota_entrega', label: 'Nota de Entrega', icon: FileText },
     { id: 'historial_ventas', label: 'Historial de Ventas', icon: History },
   ];
-
   return (
     <div
       style={{
@@ -2008,8 +1840,8 @@ const handleDeleteClient = async (clientId, clientName) => {
           .desktop-tabs { display: none !important; }
           .mobile-menu-container { display: block !important; }
           .desktop-table { display: none !important; }
+          .desktop-cards-grid { display: none !important; }
           .mobile-cards-container { display: flex !important; flex-direction: column; gap: 12px; }
-          
           /* Ajuste de botones internos en móvil */
           .action-buttons-wrapper {
             flex-wrap: wrap !important;
@@ -2024,11 +1856,11 @@ const handleDeleteClient = async (clientId, clientName) => {
         @media (min-width: 769px) {
           .desktop-tabs { display: flex !important; }
           .mobile-menu-container { display: none !important; }
-          .desktop-table { display: table !important; }
+          .desktop-table { display: none !important; } /* Ocultamos tabla tradicional */
+          .desktop-cards-grid { display: grid !important; } /* Mostramos grid de tarjetas */
           .mobile-cards-container { display: none !important; }
         }
       `}</style>
-
       <div
         style={{
           display: 'flex',
@@ -2057,7 +1889,6 @@ const handleDeleteClient = async (clientId, clientName) => {
           </p>
         </div>
       </div>
-
       {/* MENÚ HORIZONTAL (DESKTOP) */}
       <div className="desktop-tabs"
         style={{
@@ -2098,7 +1929,6 @@ const handleDeleteClient = async (clientId, clientName) => {
           );
         })}
       </div>
-
       {/* MENÚ DROPDOWN (MÓVIL) */}
       <div className="mobile-menu-container" ref={mobileMenuRef} style={{ display: 'none', marginBottom: '24px', position: 'relative' }}>
         <button
@@ -2127,7 +1957,6 @@ const handleDeleteClient = async (clientId, clientName) => {
           </span>
           <ChevronDown size={18} color="#6b7280" />
         </button>
-
         {isMobileMenuOpen && (
           <div
             style={{
@@ -2179,7 +2008,6 @@ const handleDeleteClient = async (clientId, clientName) => {
           </div>
         )}
       </div>
-
       {message.text && (
         <div
           style={{
@@ -2210,7 +2038,6 @@ const handleDeleteClient = async (clientId, clientName) => {
           </span>
         </div>
       )}
-
       {activeSubMenu === 'clientes' && (
         <div>
           <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
@@ -2660,7 +2487,110 @@ const handleDeleteClient = async (clientId, clientName) => {
                 </div>
               </div>
               
-              {/* TABLA DESKTOP */}
+              {/* GRID DE TARJETAS ESCRITORIO (NUEVO) */}
+              <div className="desktop-cards-grid" style={{ 
+                display: 'none', 
+                gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', 
+                gap: '16px' 
+              }}>
+                {clients.filter((c) =>
+                  c.name
+                    ?.toLowerCase()
+                    .includes(searchClientQuery.toLowerCase())
+                ).length === 0 ? (
+                  <div style={{ padding: '16px', textAlign: 'center', color: '#6B7280', gridColumn: '1/-1' }}>
+                    No se encontraron clientes registrados por ti.
+                  </div>
+                ) : (
+                  clients
+                    .filter((c) =>
+                      c.name
+                        ?.toLowerCase()
+                        .includes(searchClientQuery.toLowerCase())
+                    )
+                    .map((c) => (
+                      <div
+                        key={c.id}
+                        style={{
+                          backgroundColor: '#FFFFFF',
+                          border: '1px solid #E5E7EB',
+                          borderRadius: '12px',
+                          padding: '16px',
+                          boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '12px',
+                          transition: 'transform 0.2s',
+                        }}
+                      >
+                        {/* Encabezado Tarjeta */}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', borderBottom: '1px solid #F3F4F6', paddingBottom: '8px' }}>
+                          <div>
+                            <span style={{ fontSize: '10px', fontWeight: '700', color: '#6B7280', textTransform: 'uppercase' }}>Cliente</span>
+                            <div style={{ fontSize: '16px', fontWeight: '900', color: '#111827', marginTop: '2px' }}>{c.name}</div>
+                          </div>
+                          <span style={{ padding: '4px 8px', backgroundColor: '#F3F4F6', borderRadius: '6px', fontWeight: '700', color: '#374151', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <UserCheck style={{ width: '12px', height: '12px', color: '#16A34A' }} />
+                            {currentSellerName}
+                          </span>
+                        </div>
+
+                        {/* Datos Principales Grid */}
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '12px' }}>
+                          <div>
+                            <span style={{ fontWeight: '700', color: '#4B5563' }}>C.I.:</span> {c.ci_number || 'N/A'}
+                          </div>
+                          <div>
+                            <span style={{ fontWeight: '700', color: '#4B5563' }}>RIF:</span> {c.rif_number || 'N/A'}
+                          </div>
+                          <div style={{ gridColumn: '1/-1' }}>
+                            <span style={{ fontWeight: '700', color: '#4B5563' }}>Ubicación:</span> {c.city}, {c.state} - {c.address_detail}
+                          </div>
+                          <div style={{ gridColumn: '1/-1' }}>
+                            <span style={{ fontWeight: '700', color: '#4B5563' }}>Teléfono:</span> {c.phone || 'N/A'}
+                          </div>
+                        </div>
+
+                        {/* Documentos Adjuntos */}
+                        <div>
+                          <span style={{ fontWeight: '700', color: '#4B5563', fontSize: '11px', display: 'block', marginBottom: '4px' }}>DATOS ADJUNTOS:</span>
+                          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                            {c.ci_photo_url ? (
+                              <button onClick={() => setImageModal({ open: true, url: c.ci_photo_url, title: `C.I. de ${c.name}`, clientId: c.id, fieldName: 'ci_photo_url' })} style={{ padding: '4px 8px', backgroundColor: '#EFF6FF', color: '#1D4ED8', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: '700', fontSize: '10px', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                                <Eye style={{ width: '12px', height: '12px' }} /> C.I.
+                              </button>
+                            ) : <span style={{ fontSize: '10px', color: '#9CA3AF' }}>Sin C.I.</span>}
+                            {c.rif_photo_url ? (
+                              <button onClick={() => setImageModal({ open: true, url: c.rif_photo_url, title: `RIF de ${c.name}`, clientId: c.id, fieldName: 'rif_photo_url' })} style={{ padding: '4px 8px', backgroundColor: '#EFF6FF', color: '#1D4ED8', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: '700', fontSize: '10px', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                                <Eye style={{ width: '12px', height: '12px' }} /> RIF
+                              </button>
+                            ) : <span style={{ fontSize: '10px', color: '#9CA3AF' }}>Sin RIF</span>}
+                            {c.additional_doc_url && (
+                              <button onClick={() => setImageModal({ open: true, url: c.additional_doc_url, title: `Documento Adicional de ${c.name}`, clientId: c.id, fieldName: 'additional_doc_url' })} style={{ padding: '4px 8px', backgroundColor: '#F0FDF4', color: '#15803D', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: '700', fontSize: '10px', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                                <Eye style={{ width: '12px', height: '12px' }} /> Adicional
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Botones de Acción */}
+                        <div className="action-buttons-wrapper" style={{ display: 'flex', gap: '8px', marginTop: '8px', borderTop: '1px solid #E5E7EB', paddingTop: '12px' }}>
+                          <button onClick={() => handleOpenEditClient(c)} style={{ flex: 1, padding: '8px', backgroundColor: '#F3F4F6', color: '#1F2937', border: '1px solid #D1D5DB', borderRadius: '6px', fontSize: '11px', fontWeight: '700', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '4px' }}>
+                            <Edit style={{ width: '13px', height: '13px', color: '#4F46E5' }} /> Editar
+                          </button>
+                          <button onClick={() => { setSearchHistoryQuery(c.name); setActiveSubMenu('nota_entrega'); setNeTab('historial'); }} style={{ flex: 1, padding: '8px', backgroundColor: '#E0E7FF', color: '#3730A3', border: 'none', borderRadius: '6px', fontSize: '11px', fontWeight: '700', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '4px' }}>
+                            <FileText style={{ width: '13px', height: '13px' }} /> N.E.
+                          </button>
+                          <button onClick={() => handleDeleteClient(c.id, c.name)} style={{ padding: '8px 12px', backgroundColor: '#FEF2F2', color: '#DC2626', border: '1px solid #FECACA', borderRadius: '6px', cursor: 'pointer' }}>
+                            <Trash2 style={{ width: '14px', height: '14px' }} />
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                )}
+              </div>
+
+              {/* TABLA DESKTOP (OCULTA POR CSS AHORA) */}
               <div className="desktop-table"
                 style={{
                   width: '100%',
@@ -2999,7 +2929,6 @@ const handleDeleteClient = async (clientId, clientName) => {
                   </tbody>
                 </table>
               </div>
-
               {/* TARJETAS MÓVIL */}
               <div className="mobile-cards-container">
                 {clients.filter((c) =>
@@ -3313,7 +3242,6 @@ const handleDeleteClient = async (clientId, clientName) => {
           )}
         </div>
       )}
-      
       {/* MODAL IMAGEN (Global) */}
       {imageModal.open && (
         <div
@@ -3464,7 +3392,6 @@ const handleDeleteClient = async (clientId, clientName) => {
           </div>
         </div>
       )}
-
       {/* MODAL EDITAR CLIENTE */}
       {editClientModal.open && (
         <div
@@ -3888,7 +3815,6 @@ const handleDeleteClient = async (clientId, clientName) => {
           </div>
         </div>
       )}
-
       {activeSubMenu === 'visitas' && (
         <div>
           <div
@@ -4188,7 +4114,95 @@ const handleDeleteClient = async (clientId, clientName) => {
                   </div>
                 </div>
                 
-                {/* TABLA DESKTOP */}
+                {/* GRID DE TARJETAS ESCRITORIO (NUEVO) */}
+                <div className="desktop-cards-grid" style={{ 
+                  display: 'none', 
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', 
+                  gap: '16px' 
+                }}>
+                  {potenciales.filter((p) =>
+                    p.name
+                      ?.toLowerCase()
+                      .includes(searchPotencialesQuery.toLowerCase())
+                  ).length === 0 ? (
+                    <div style={{ padding: '16px', textAlign: 'center', color: '#6B7280', gridColumn: '1/-1' }}>
+                      No hay clientes potenciales creados por ti.
+                    </div>
+                  ) : (
+                    potenciales
+                      .filter((p) =>
+                        p.name
+                          ?.toLowerCase()
+                          .includes(searchPotencialesQuery.toLowerCase())
+                      )
+                      .map((p) => (
+                        <div
+                          key={p.id}
+                          style={{
+                            backgroundColor: '#FFFFFF',
+                            border: '1px solid #E5E7EB',
+                            borderRadius: '12px',
+                            padding: '16px',
+                            boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '12px',
+                          }}
+                        >
+                          {/* Encabezado */}
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', borderBottom: '1px solid #F3F4F6', paddingBottom: '8px' }}>
+                            <div>
+                              <span style={{ fontSize: '10px', fontWeight: '700', color: '#6B7280', textTransform: 'uppercase' }}>Cliente Potencial</span>
+                              <div style={{ fontSize: '16px', fontWeight: '900', color: '#111827', marginTop: '2px' }}>{p.name}</div>
+                            </div>
+                            <span style={{ padding: '4px 8px', backgroundColor: '#F3F4F6', borderRadius: '6px', fontWeight: '700', color: '#374151', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <UserCheck style={{ width: '12px', height: '12px', color: '#16A34A' }} />
+                              {currentSellerName}
+                            </span>
+                          </div>
+
+                          {/* Datos Grid */}
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '8px', fontSize: '12px' }}>
+                            <div><span style={{ fontWeight: '700', color: '#4B5563' }}>Dirección:</span> {p.address_detail}</div>
+                            <div><span style={{ fontWeight: '700', color: '#4B5563' }}>Teléfono:</span> {p.phone || 'N/A'}</div>
+                            <div><span style={{ fontWeight: '700', color: '#4B5563' }}>Última Visita:</span> {p.last_visit_at ? new Date(p.last_visit_at).toLocaleString() : 'Sin registro'}</div>
+                          </div>
+
+                          {/* Adjunto */}
+                          <div>
+                            <span style={{ fontWeight: '700', color: '#4B5563', fontSize: '11px', display: 'block', marginBottom: '4px' }}>ADJUNTO:</span>
+                            {p.last_visit_photo_url ? (
+                              <button onClick={() => setImageModal({ open: true, url: p.last_visit_photo_url, title: `Visita ${p.name}`, clientId: p.id, fieldName: 'last_visit_photo_url' })} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#2563EB', fontWeight: '700' }}>
+                                <img src={p.last_visit_photo_url} alt="Miniatura" style={{ width: '28px', height: '28px', objectFit: 'cover', borderRadius: '4px', border: '1px solid #D1D5DB' }} /> Ver Foto
+                              </button>
+                            ) : (
+                              <CustomFileInput id={`desk_file_pot_${p.id}`} onChange={(e) => setVisitasFiles({ ...visitasFiles, [p.id]: e.target.files[0] })} file={visitasFiles[p.id]} labelText="Subir Foto" />
+                            )}
+                          </div>
+
+                          {/* GPS */}
+                          <div>
+                             <button onClick={() => handleCaptureVisitaGps(p.id)} style={{ width: '100%', padding: '6px', backgroundColor: visitasGps[p.id] ? '#16A34A' : '#F59E0B', color: '#FFFFFF', border: 'none', borderRadius: '6px', fontSize: '11px', fontWeight: '700', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '4px' }}>
+                                <MapPin style={{ width: '12px', height: '12px' }} /> {visitasGps[p.id] ? 'GPS Capturado' : 'Extraer GPS'}
+                             </button>
+                          </div>
+
+                          {/* Acciones */}
+                          <div className="action-buttons-wrapper" style={{ display: 'flex', gap: '8px', marginTop: '8px', borderTop: '1px solid #E5E7EB', paddingTop: '12px' }}>
+                            <button onClick={() => handleSaveVisita(p.id, true)} style={{ flex: 1, padding: '6px', backgroundColor: '#111827', color: '#FFFFFF', border: 'none', borderRadius: '6px', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}>Guardar</button>
+                            <button onClick={() => handleOpenConvertModal(p)} style={{ flex: 1, padding: '6px', backgroundColor: '#16A34A', color: '#FFFFFF', border: 'none', borderRadius: '6px', fontSize: '11px', fontWeight: '700', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '4px' }}>
+                              <UserPlus style={{ width: '13px', height: '13px' }} /> Agregar
+                            </button>
+                            <button onClick={() => handleDeleteClient(p.id, p.name)} style={{ padding: '6px 10px', backgroundColor: '#FEF2F2', color: '#DC2626', border: '1px solid #FECACA', borderRadius: '6px', cursor: 'pointer' }}>
+                              <Trash2 style={{ width: '14px', height: '14px' }} />
+                            </button>
+                          </div>
+                        </div>
+                      ))
+                  )}
+                </div>
+
+                {/* TABLA DESKTOP (OCULTA POR CSS) */}
                 <div className="desktop-table"
                   style={{
                     width: '100%',
@@ -4475,7 +4489,6 @@ const handleDeleteClient = async (clientId, clientName) => {
                     </tbody>
                   </table>
                 </div>
-
                 {/* TARJETAS MÓVIL */}
                 <div className="mobile-cards-container">
                   {potenciales.filter((p) =>
@@ -4770,7 +4783,81 @@ const handleDeleteClient = async (clientId, clientName) => {
                 />
               </div>
               
-              {/* TABLA DESKTOP */}
+              {/* GRID DE TARJETAS ESCRITORIO (NUEVO) */}
+              <div className="desktop-cards-grid" style={{ 
+                display: 'none', 
+                gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', 
+                gap: '16px' 
+              }}>
+                 {clients
+                    .filter((c) =>
+                      c.name
+                        ?.toLowerCase()
+                        .includes(searchClientQuery.toLowerCase())
+                    )
+                    .map((c) => (
+                      <div
+                        key={c.id}
+                        style={{
+                          backgroundColor: '#FFFFFF',
+                          border: '1px solid #E5E7EB',
+                          borderRadius: '12px',
+                          padding: '16px',
+                          boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '12px',
+                        }}
+                      >
+                         {/* Encabezado */}
+                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', borderBottom: '1px solid #F3F4F6', paddingBottom: '8px' }}>
+                            <div>
+                              <span style={{ fontSize: '10px', fontWeight: '700', color: '#6B7280', textTransform: 'uppercase' }}>Cliente Oficial</span>
+                              <div style={{ fontSize: '16px', fontWeight: '900', color: '#111827', marginTop: '2px' }}>{c.name}</div>
+                            </div>
+                            <span style={{ padding: '4px 8px', backgroundColor: '#F3F4F6', borderRadius: '6px', fontWeight: '700', color: '#374151', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <UserCheck style={{ width: '12px', height: '12px', color: '#16A34A' }} />
+                              {currentSellerName}
+                            </span>
+                          </div>
+
+                          {/* Datos */}
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '8px', fontSize: '12px' }}>
+                            <div><span style={{ fontWeight: '700', color: '#4B5563' }}>Última Visita:</span> {c.last_visit_at ? new Date(c.last_visit_at).toLocaleString() : 'Sin registro'}</div>
+                            <div><span style={{ fontWeight: '700', color: '#4B5563' }}>Historial N.E.:</span> <button onClick={() => { setSearchHistoryQuery(c.name); setActiveSubMenu('nota_entrega'); setNeTab('historial'); }} style={{ padding: '2px 6px', backgroundColor: '#E0E7FF', color: '#3730A3', border: 'none', borderRadius: '4px', fontSize: '10px', fontWeight: '700', cursor: 'pointer' }}>Ver Historial</button></div>
+                          </div>
+
+                          {/* Adjunto Visita */}
+                          <div>
+                            <span style={{ fontWeight: '700', color: '#4B5563', fontSize: '11px', display: 'block', marginBottom: '4px' }}>FOTO VISITA:</span>
+                            {c.last_visit_photo_url ? (
+                              <button onClick={() => setImageModal({ open: true, url: c.last_visit_photo_url, title: `Visita ${c.name}`, clientId: c.id, fieldName: 'last_visit_photo_url' })} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#2563EB', fontWeight: '700' }}>
+                                <img src={c.last_visit_photo_url} alt="Miniatura" style={{ width: '28px', height: '28px', objectFit: 'cover', borderRadius: '4px', border: '1px solid #D1D5DB' }} /> Ver Foto
+                              </button>
+                            ) : (
+                              <CustomFileInput id={`desk_file_cli_${c.id}`} onChange={(e) => setVisitasFiles({ ...visitasFiles, [c.id]: e.target.files[0] })} file={visitasFiles[c.id]} labelText="Subir Foto" />
+                            )}
+                          </div>
+
+                          {/* GPS */}
+                          <div>
+                             <button onClick={() => handleCaptureVisitaGps(c.id)} style={{ width: '100%', padding: '6px', backgroundColor: visitasGps[c.id] ? '#16A34A' : '#F59E0B', color: '#FFFFFF', border: 'none', borderRadius: '6px', fontSize: '11px', fontWeight: '700', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '4px' }}>
+                                <MapPin style={{ width: '12px', height: '12px' }} /> {visitasGps[c.id] ? 'GPS Capturado' : 'Extraer GPS'}
+                             </button>
+                          </div>
+
+                          {/* Acciones */}
+                          <div className="action-buttons-wrapper" style={{ display: 'flex', gap: '8px', marginTop: '8px', borderTop: '1px solid #E5E7EB', paddingTop: '12px' }}>
+                            <button onClick={() => handleSaveVisita(c.id, false)} style={{ flex: 1, padding: '6px', backgroundColor: '#111827', color: '#FFFFFF', border: 'none', borderRadius: '6px', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}>Guardar</button>
+                            <button onClick={() => handleDeleteClient(c.id, c.name)} style={{ padding: '6px 10px', backgroundColor: '#FEF2F2', color: '#DC2626', border: '1px solid #FECACA', borderRadius: '6px', cursor: 'pointer' }}>
+                              <Trash2 style={{ width: '14px', height: '14px' }} />
+                            </button>
+                          </div>
+                      </div>
+                    ))}
+              </div>
+
+              {/* TABLA DESKTOP (OCULTA POR CSS) */}
               <div className="desktop-table"
                 style={{
                   width: '100%',
@@ -5020,7 +5107,6 @@ const handleDeleteClient = async (clientId, clientName) => {
                   </tbody>
                 </table>
               </div>
-
               {/* TARJETAS MÓVIL */}
               <div className="mobile-cards-container">
                 {clients
@@ -5236,7 +5322,6 @@ const handleDeleteClient = async (clientId, clientName) => {
           )}
         </div>
       )}
-
       {/* MODAL CONVERTIR POTENCIAL */}
       {convertModal.open && (
         <div
@@ -5620,7 +5705,6 @@ const handleDeleteClient = async (clientId, clientName) => {
           </div>
         </div>
       )}
-
       {activeSubMenu === 'nota_entrega' && (
         <div>
           <div
@@ -6653,13 +6737,107 @@ const handleDeleteClient = async (clientId, clientName) => {
                   overflow: 'hidden',
                 }}
               >
-                {/* TABLA DESKTOP */}
+                {/* GRID DE TARJETAS ESCRITORIO (NUEVO) */}
+                <div className="desktop-cards-grid" style={{ 
+                  display: 'none', 
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(400px, 1fr))', 
+                  gap: '16px',
+                  padding: '12px'
+                }}>
+                  {filteredSalesHistory.length === 0 ? (
+                    <div style={{ padding: '16px', textAlign: 'center', color: '#6B7280', gridColumn: '1/-1' }}>
+                      No se encontraron Notas de Entrega creadas por ti.
+                    </div>
+                  ) : (
+                    filteredSalesHistory.map((nota) => {
+                      const isAprobada = nota.status === 'aprobada';
+                      const isCerrada = nota.payment_status === 'cerrada';
+                      const totalAbonado = Number(nota.total_paid_usd) || 0;
+                      const valeAsociado = nota.vales && nota.vales.length > 0 ? nota.vales[0] : null;
+                      const valeEstado = valeAsociado ? valeAsociado.status : null;
+                      const pendingNotif = paymentNotificationsMap[nota.id];
+                      const hasPendingNotif = pendingNotif && pendingNotif.status === 'pending';
+
+                      return (
+                        <div key={nota.id} style={{ backgroundColor: '#FFFFFF', border: '1px solid #E5E7EB', borderRadius: '12px', padding: '16px', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                          {/* Header */}
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', borderBottom: '1px solid #F3F4F6', paddingBottom: '8px' }}>
+                            <div>
+                              <span style={{ fontSize: '10px', fontWeight: '700', color: '#6B7280', textTransform: 'uppercase' }}>Cliente</span>
+                              <div style={{ fontSize: '16px', fontWeight: '900', color: '#111827', marginTop: '2px' }}>{nota.clients?.name || 'Cliente N/A'}</div>
+                            </div>
+                            <div style={{ textAlign: 'right' }}>
+                              <span style={{ fontSize: '10px', fontWeight: '700', color: '#6B7280', display: 'block' }}>Transacción</span>
+                              <span style={{ fontFamily: 'monospace', fontWeight: '700', color: '#111827' }}>#{nota.transaction_number || nota.id.substring(0, 6)}</span>
+                            </div>
+                          </div>
+
+                          {/* Info Grid */}
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '12px' }}>
+                            <div><span style={{ fontWeight: '700', color: '#4B5563' }}>Fecha:</span> {new Date(nota.created_at).toLocaleDateString()}</div>
+                            <div><span style={{ fontWeight: '700', color: '#4B5563' }}>Vendedor:</span> {currentSellerName}</div>
+                            <div>
+                              <span style={{ fontWeight: '700', color: '#4B5563' }}>Estado:</span>{' '}
+                              <span style={{ padding: '2px 6px', borderRadius: '4px', fontSize: '10px', fontWeight: '900', backgroundColor: isAprobada ? '#DCFCE7' : '#FEF3C7', color: isAprobada ? '#15803D' : '#B45309' }}>{nota.status}</span>
+                            </div>
+                            <div>
+                              <span style={{ fontWeight: '700', color: '#4B5563' }}>Pago:</span>{' '}
+                              <span style={{ padding: '2px 6px', borderRadius: '4px', fontSize: '10px', fontWeight: '900', backgroundColor: isCerrada ? '#DCFCE7' : '#FEF3C7', color: isCerrada ? '#15803D' : '#B45309' }}>{isCerrada ? 'Cerrada' : 'Pendiente'}</span>
+                            </div>
+                          </div>
+
+                          {/* Finanzas */}
+                          <div style={{ backgroundColor: '#F9FAFB', padding: '10px', borderRadius: '8px', border: '1px solid #F3F4F6', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                            <div><span style={{ fontWeight: '700', color: '#4B5563', fontSize: '11px' }}>Abonado:</span> <strong style={{ color: '#2563EB' }}>${totalAbonado.toFixed(2)}</strong></div>
+                            <div><span style={{ fontWeight: '700', color: '#4B5563', fontSize: '11px' }}>Deuda:</span> {nota.balance_due_usd > 0 ? `$${Number(nota.balance_due_usd).toFixed(2)}` : <span style={{ color: '#16A34A' }}>Cerrada</span>}</div>
+                          </div>
+
+                          {/* Acciones Intermedias */}
+                          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                            {hasPendingNotif ? (
+                              <button onClick={() => handleOpenAbonoNotifModal(nota.id)} style={{ padding: '4px 8px', backgroundColor: '#FEF3C7', color: '#B45309', border: '1px solid #FDE68A', borderRadius: '4px', fontSize: '10px', cursor: 'pointer', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                <Bell size={11} /> ${Number(pendingNotif.amount_usd).toFixed(2)}
+                              </button>
+                            ) : (
+                              <button onClick={() => handleOpenAbonoNotifModal(nota.id)} style={{ padding: '4px 8px', backgroundColor: '#0284C7', color: '#FFFFFF', border: 'none', borderRadius: '4px', fontSize: '10px', cursor: 'pointer', fontWeight: '700' }}>Notif. Abono</button>
+                            )}
+                            
+                            {valeEstado && valeEstado !== 'rechazada' ? (
+                              <span style={{ padding: '4px 8px', borderRadius: '4px', fontSize: '10px', fontWeight: '900', textTransform: 'capitalize', backgroundColor: valeEstado === 'aprobada' ? '#DCFCE7' : '#FEF3C7', color: valeEstado === 'aprobada' ? '#15803D' : '#B45309' }}>Vale: {valeEstado}</span>
+                            ) : (
+                              <button onClick={() => setValeModal({ open: true, notaId: nota.id, monto: '' })} style={{ padding: '4px 8px', backgroundColor: valeEstado === 'rechazada' ? '#DC2626' : '#F59E0B', color: '#FFFFFF', border: 'none', borderRadius: '4px', fontSize: '10px', cursor: 'pointer', fontWeight: '700' }}>
+                                {valeEstado === 'rechazada' ? 'Reintentar Vale' : 'Solicitar'}
+                              </button>
+                            )}
+                          </div>
+
+                          {/* Botones Principales */}
+                          <div className="action-buttons-wrapper" style={{ display: 'flex', gap: '8px', marginTop: '8px', borderTop: '1px solid #E5E7EB', paddingTop: '12px', justifyContent: 'space-between' }}>
+                            <button onClick={() => handleEditNE(nota)} style={{ padding: '6px', backgroundColor: '#F3F4F6', color: '#4F46E5', border: '1px solid #D1D5DB', borderRadius: '6px', fontSize: '11px', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', flex: 1, justifyContent: 'center' }}>
+                              <Edit style={{ width: '13px', height: '13px' }} /> Editar
+                            </button>
+                            <button disabled={!isAprobada || loading} onClick={() => handleDownloadPDF(nota)} style={{ padding: '6px', backgroundColor: isAprobada ? '#111827' : '#E5E7EB', color: isAprobada ? '#FFFFFF' : '#9CA3AF', border: 'none', borderRadius: '6px', fontSize: '11px', fontWeight: '700', cursor: isAprobada ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', gap: '4px', flex: 1, justifyContent: 'center' }}>
+                              <Download style={{ width: '13px', height: '13px' }} /> PDF
+                            </button>
+                            <button disabled={!isAprobada} onClick={() => handleSendPDF(nota)} style={{ padding: '6px', backgroundColor: isAprobada ? '#16A34A' : '#E5E7EB', color: isAprobada ? '#FFFFFF' : '#9CA3AF', border: 'none', borderRadius: '6px', fontSize: '11px', fontWeight: '700', cursor: isAprobada ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', gap: '4px', flex: 1, justifyContent: 'center' }}>
+                              <Send style={{ width: '13px', height: '13px' }} /> WhatsApp
+                            </button>
+                            <button disabled={totalAbonado > 0} onClick={() => handleDeleteNE(nota)} style={{ padding: '6px 10px', backgroundColor: '#FEF2F2', color: totalAbonado > 0 ? '#9CA3AF' : '#DC2626', border: '1px solid #FECACA', borderRadius: '6px', cursor: totalAbonado > 0 ? 'not-allowed' : 'pointer' }}>
+                              <Trash2 style={{ width: '14px', height: '14px' }} />
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+
+                {/* TABLA DESKTOP (OCULTA POR CSS) */}
                 <div className="desktop-table"
                   style={{
-                        width: '100%', 
-    display: 'block', // <--- AGREGAR ESTO
-    overflowX: 'auto', 
-    WebkitOverflowScrolling: 'touch' ,
+                    width: '100%',
+                    overflowX: 'auto',
+                    WebkitOverflowScrolling: 'touch',
                   }}
                 >
                   <table
@@ -7047,7 +7225,6 @@ const handleDeleteClient = async (clientId, clientName) => {
                     </tbody>
                   </table>
                 </div>
-
                 {/* TARJETAS MÓVIL */}
                 <div className="mobile-cards-container" style={{ padding: '12px' }}>
                   {filteredSalesHistory.length === 0 ? (
@@ -7436,8 +7613,7 @@ const handleDeleteClient = async (clientId, clientName) => {
           )}
         </div>
       )}
-
-{activeSubMenu === 'historial_ventas' && (
+      {activeSubMenu === 'historial_ventas' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           {/* Encabezado y Buscador */}
           <div
@@ -7495,7 +7671,6 @@ const handleDeleteClient = async (clientId, clientName) => {
               />
             </div>
           </div>
-
           {/* Contenedor Principal de Datos */}
           <div
             style={{
@@ -7505,7 +7680,65 @@ const handleDeleteClient = async (clientId, clientName) => {
               overflow: 'hidden', // Importante para los bordes redondeados
             }}
           >
-            {/* --- TABLA DESKTOP --- */}
+            {/* GRID DE TARJETAS ESCRITORIO (NUEVO) */}
+            <div className="desktop-cards-grid" style={{ 
+              display: 'none', 
+              gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', 
+              gap: '16px',
+              padding: '12px'
+            }}>
+              {filteredSettlementHistory.length === 0 ? (
+                <div style={{ padding: '16px', textAlign: 'center', color: '#6B7280', gridColumn: '1/-1' }}>
+                  No hay historial de facturación registrado para ti.
+                </div>
+              ) : (
+                filteredSettlementHistory.map((item) => (
+                  <div key={item.id} style={{ backgroundColor: '#FFFFFF', border: '1px solid #E5E7EB', borderRadius: '12px', padding: '16px', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    {/* Header */}
+                    <div style={{ borderBottom: '1px solid #E5E7EB', paddingBottom: '8px', marginBottom: '4px' }}>
+                      <span style={{ fontSize: '10px', fontWeight: '700', color: '#6B7280', textTransform: 'uppercase', display: 'block' }}>ID Liquidación</span>
+                      <span style={{ fontSize: '16px', fontWeight: '900', color: '#111827' }}>{item.id}</span>
+                    </div>
+                    
+                    {/* Info Grid */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '12px' }}>
+                      <div><span style={{ fontWeight: '700', color: '#4B5563' }}>Fecha Pago:</span> {item.datePaid}</div>
+                      <div><span style={{ fontWeight: '700', color: '#4B5563' }}>Periodo:</span> Ciclo #{item.cycle} ({item.month}/{item.year})</div>
+                      <div><span style={{ fontWeight: '700', color: '#4B5563' }}>Tasa BCV:</span> {Number(item.bcvRate).toFixed(2)}</div>
+                      <div><span style={{ fontWeight: '700', color: '#4B5563' }}>Total N.E.:</span> ${item.totalNeAmount.toFixed(2)}</div>
+                    </div>
+
+                    {/* Montos Destacados */}
+                    <div style={{ backgroundColor: '#F9FAFB', padding: '10px', borderRadius: '8px', border: '1px solid #F3F4F6', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
+                        <span style={{ color: '#059669', fontWeight: '700' }}>Neto 53.38%:</span>
+                        <span style={{ color: '#059669', fontWeight: '900' }}>${item.comm53Net.toFixed(2)}</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
+                        <span style={{ color: '#0369a1', fontWeight: '700' }}>Neto 23.08%:</span>
+                        <span style={{ color: '#0369a1', fontWeight: '900' }}>${item.comm23Net.toFixed(2)}</span>
+                      </div>
+                      <div style={{ borderTop: '1px solid #E5E7EB', paddingTop: '6px', marginTop: '4px', display: 'flex', justifyContent: 'space-between', fontSize: '14px' }}>
+                        <span style={{ fontWeight: '900', color: '#111827' }}>Total Equivalente:</span>
+                        <span style={{ fontWeight: '900', color: '#111827' }}>${item.totalEquivalentUsd.toFixed(2)}</span>
+                      </div>
+                    </div>
+
+                    {/* Acciones */}
+                    <div className="action-buttons-wrapper" style={{ display: 'flex', gap: '8px', marginTop: '8px', borderTop: '1px solid #E5E7EB', paddingTop: '12px', justifyContent: 'space-between' }}>
+                      <button onClick={() => { const modal = document.getElementById('captured-history-modal'); if (modal) { modal.querySelector('#captured-html-content').innerHTML = item.capturedHTML || '<p>Sin contenido.</p>'; modal.style.display = 'flex'; } }} style={{ flex: 1, padding: '6px', backgroundColor: '#1e40af', color: '#ffffff', border: 'none', borderRadius: '6px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '4px' }}>
+                        <Eye size={13} /> Ver Factura
+                      </button>
+                      <button onClick={() => handlePrintCapturedInvoicePDF(item)} style={{ flex: 1, padding: '6px', backgroundColor: '#881337', color: '#ffffff', border: 'none', borderRadius: '6px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '4px' }}>
+                        <Download size={13} /> PDF
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* --- TABLA DESKTOP (OCULTA POR CSS) --- */}
             <div className="desktop-table"
               style={{
                 width: '100%',
@@ -7670,7 +7903,6 @@ const handleDeleteClient = async (clientId, clientName) => {
                 </tbody>
               </table>
             </div>
-
             {/* --- TARJETAS MÓVIL (NUEVO) --- */}
             <div className="mobile-cards-container" style={{ padding: '12px' }}>
               {filteredSettlementHistory.length === 0 ? (
@@ -7721,7 +7953,6 @@ const handleDeleteClient = async (clientId, clientName) => {
                         {item.id}
                       </span>
                     </div>
-
                     {/* Campos Verticales */}
                     <div style={{ fontSize: '12px' }}>
                       <span style={{ fontWeight: '700', color: '#4B5563' }}>
@@ -7729,46 +7960,39 @@ const handleDeleteClient = async (clientId, clientName) => {
                       </span>{' '}
                       {item.datePaid}
                     </div>
-                    
                     <div style={{ fontSize: '12px' }}>
                       <span style={{ fontWeight: '700', color: '#4B5563' }}>
                         Periodo:
                       </span>{' '}
                       Ciclo #{item.cycle} ({item.month}/{item.year})
                     </div>
-
                     <div style={{ fontSize: '12px' }}>
                       <span style={{ fontWeight: '700', color: '#4B5563' }}>
                         Tasa BCV:
                       </span>{' '}
                       {Number(item.bcvRate).toFixed(2)}
                     </div>
-
                     <div style={{ fontSize: '12px' }}>
                       <span style={{ fontWeight: '700', color: '#4B5563' }}>
                         Total N.E.:
                       </span>{' '}
                       ${item.totalNeAmount.toFixed(2)}
                     </div>
-
                     <div style={{ fontSize: '12px', color: '#059669' }}>
                       <span style={{ fontWeight: '700', color: '#059669' }}>
                         Neto 53.38%:
                       </span>{' '}
                       ${item.comm53Net.toFixed(2)}
                     </div>
-
                     <div style={{ fontSize: '12px', color: '#0369a1' }}>
                       <span style={{ fontWeight: '700', color: '#0369a1' }}>
                         Neto 23.08%:
                       </span>{' '}
                       ${item.comm23Net.toFixed(2)}
                     </div>
-
                     <div style={{ fontSize: '14px', fontWeight: '900', color: '#111827', marginTop: '4px' }}>
                       Total Equivalente: ${item.totalEquivalentUsd.toFixed(2)}
                     </div>
-
                     {/* Botones de Acción */}
                     <div
                       className="action-buttons-wrapper"
@@ -7841,7 +8065,6 @@ const handleDeleteClient = async (clientId, clientName) => {
           </div>
         </div>
       )}
-
       {/* MODAL VALE */}
       {valeModal.open && (
         <div
@@ -7943,7 +8166,6 @@ const handleDeleteClient = async (clientId, clientName) => {
           </div>
         </div>
       )}
-
       {/* MODAL ABONO */}
       {abonoNotifModal.open && (
         <div
@@ -8253,7 +8475,6 @@ const handleDeleteClient = async (clientId, clientName) => {
           </div>
         </div>
       )}
-
       {/* MODAL HISTORIAL CAPTURADO */}
       <div
         id="captured-history-modal"
