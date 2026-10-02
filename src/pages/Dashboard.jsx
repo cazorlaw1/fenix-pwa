@@ -205,23 +205,24 @@ export default function Dashboard({ overrideRole }) {
 
     // Generar datos para la gráfica basados en las ventas recuperadas
     const last7Days = Array.from({ length: 7 }, (_, i) => {
-  const d = new Date();
-  d.setDate(d.getDate() - (6 - i));
-  return getLocalDateStr(d);
-});
+      const d = new Date();
+      d.setDate(d.getDate() - (6 - i));
+      return getLocalDateStr(d);
+    });
 
-const dailyData = last7Days.map((dateStr) => {
-  // Filtramos sobre teamSales completo para contar órdenes de cada día
-  const count = (teamSales || []).filter((s) => {
-    if (!s.created_at) return false;
-    const orderDateStr = getLocalDateStr(new Date(s.created_at));
-    return orderDateStr === dateStr;
-  }).length;
-  
-  return { date: dateStr, amount: count };
-});
+    const dailyData = last7Days.map((dateStr) => {
+      // Contar órdenes creadas en este día específico (usando UTC-4)
+      const count =
+        sales?.filter((s) => {
+          if (!s.created_at) return false;
+          const orderDateStr = getLocalDateStr(new Date(s.created_at));
+          return orderDateStr === dateStr;
+        }).length || 0;
+      return { date: dateStr, amount: count };
+    });
 
-setDailySalesData(dailyData);
+    setDailySalesData(dailyData);
+  };
 
   // --- LÓGICA GERENTE/SUPERVISOR (FILTROS IDÉNTICOS A VENDEDORES.JSX) ---
   const fetchManagerData = async () => {
@@ -1661,19 +1662,19 @@ setDailySalesData(dailyData);
                   label="Visitas Equipo"
                   icon={<MapPin size={16} />}
                   color="#2563EB"
-                  onClick={() => (window.location.href = '/vendedores?tab=visitas')}
+                  onClick={() => (window.location.href = '/vendedores')}
                 />
                 <QuickLink
-                  label="Equipo"
+                  label="Reportes"
                   icon={<FileText size={16} />}
                   color="#7c3aed"
-                  onClick={() => (window.location.href = '/vendedores?tab=resumen')}
+                  onClick={() => (window.location.href = '/vendedores')}
                 />
                 <QuickLink
                   label="Comisiones"
                   icon={<DollarSign size={16} />}
                   color="#059669"
-                  onClick={() => (window.location.href = '/vendedores?tab=comisiones')}
+                  onClick={() => (window.location.href = '/vendedores')}
                 />
               </>
             )}
