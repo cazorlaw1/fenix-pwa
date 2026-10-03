@@ -3067,221 +3067,222 @@ ${penaltiesHtml}
       }}
     >
       {/* --- ESTILOS RESPONSIVOS (E) --- */}
+            {/* --- ESTILOS RESPONSIVOS (E) --- */}
       <style>{`
-.admin-tabs-desktop {
-display: flex;
-gap: 8px;
-border-bottom: 2px solid #e5e7eb;
-margin-bottom: 24px;
-overflow-x: auto;
-}
-.admin-tabs-mobile {
-display: none;
-position: relative ;
-margin-bottom: 24px;
-}
-.admin-mobile-trigger {
-width: 100%;
-padding: 12px 16px;
-background: #ffffff;
-border: 1px solid #d1d5db;
-border-radius: 8px;
-display: flex;
-justify-content : space-between;
-align-items: center;
-cursor: pointer;
-font-weight: 700;
-color: #111827;
-font-size: 14px;
-}
-.admin-mobile-dropdown {
-position: absolute;
-top: calc(100% + 4px);
-left : 0;
-right: 0;
-background: #ffffff;
-border: 1px solid #d1d5db;
-border-radius: 8px;
-box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);
-z-index: 1000;
-overflow: hidden;
-}
-.admin-mobile-it em {
-padding: 12px 16px;
-display: flex;
-align-items: center;
-gap: 10px;
-cursor: pointer;
-border-bottom: 1px solid #e5e7eb;
-color: #4b5563;
-font-size: 14px;
-transition: background 0 .15s;
-}
-.admin-mobile-item:last-child {
-border-bottom: none;
-}
-.admin-mobile-item:hover {
-background: #fef2f2;
-}
-.admin-mobile-item.active {
-background: #fef2f2;
-color: #dc2626;
-fo nt-weight: 700;
-}
-.admin-aging-section {
-background: #fffbeb;
-border: 1px solid #fde68a;
-border-radius: 8px;
-padding: 14px 16px;
-margin-bottom: 16px;
-}
-.admin-aging-title {
-font-si ze: 13px;
-font-weight: 800;
-color: #78350f;
-margin-bottom: 10px;
-display: flex;
-align-items: center;
-gap: 8px;
-}
-.admin-aging-item {
-display: flex;
-justify-content: space-between;
- align-items: center;
-padding: 6px 10px;
-background: #ffffff;
-border: 1px solid #fde68a;
-border-radius: 6px;
-margin-bottom: 6px;
-font-size: 12px;
-}
-.admin-aging-item:last-child {
-ma rgin-bottom: 0;
-}
-.admin-days-30 {
-text-decoration: underline;
-text-decoration-color: #eab308;
-text-decoration-thickness: 3px;
-text-underline-offset: 3px;
-}
-.admin-days-45 {
-text-d ecoration: underline;
-text-decoration-color: #f97316;
-text-decoration-thickness: 3px;
-text-underline-offset: 3px;
-}
-.admin-days-60 {
-text-decoration: underline;
-text-decoration-col or: #dc2626;
-text-decoration-thickness: 3px;
-text-underline-offset: 3px;
-}
-    /* --- TABLAS RESPONSIVAS (E) --- */
-     .admin-table-desktop {
-       width: 100%;
-       border-collapse: collapse;
-       text-align: left;
-       font-size: 13px;
-     }
-     .admin-mobile-cards {
-       display: none;
-     }
-     .admin-mobile-card {
-       background: #ffffff;
-       border: 1px solid #e5e7eb;
-       border-radius: 8px;
-       padding: 12px;
-       margin-bottom: 10px;
-       box-shadow: 0 1px 2px rgba(0,0,0,0.05);
-     }
-     .admin-mobile-card-header {
-       font-size: 14px;
-       font-weight: 800;
-       color: #111827;
-       border-bottom: 1px solid #e5e7eb;
-       padding-bottom: 8px;
-       margin-bottom: 8px;
-     }
-     .admin-mobile-card-row {
-       display: flex;
-       justify-content: space-between;
-       align-items: center;
-       padding: 4px 0;
-       font-size: 12px;
-       border-bottom: 1px dashed #f3f4f6;
-     }
-     .admin-mobile-card-row:last-child {
-       border-bottom: none;
-     }
-     .admin-mobile-card-label {
-       color: #6b7280;
-       font-weight: 600;
-       font-size: 11px;
-     }
-     .admin-mobile-card-value {
-       color: #111827;
-       font-weight: 600;
-       text-align: right;
-       max-width: 60%;
-       word-break: break-word;
-     }
-     .admin-mobile-card-actions {
-       display: flex;
-       flex-wrap: wrap;
-       gap: 6px;
-       margin-top: 10px;
-       padding-top: 10px;
-       border-top: 1px solid #e5e7eb;
-     }
-     @media (max-width: 768px) {
-       .admin-tabs-desktop {
-         display: none !important;
-       }
-       .admin-tabs-mobile {
-         display: block !important;
-       }
-       .admin-table-desktop {
-         display: none !important;
-       }
-       .admin-mobile-cards {
-         display: block !important;
-       }
-       .admin-mobile-card-actions button {
-         font-size: 10px !important;
-         padding: 5px 8px !important;
-       }
-       .admin-tab-button-desktop {
-         padding: 10px 12px !important;
-         font-size: 12px !important;
-       }
-       .admin-action-btn-mobile {
-         padding: 5px 8px !important;
-         font-size: 10px !important;
-       }
-     }
-     
-     /* F. NOTIFICACIONES FLOTANTES */
-     .floating-toast-success {
-       position: fixed !important;
-       top: 24px !important;
-       left: 50% !important;
-       transform: translateX(-50%) !important;
-       z-index: 9999 !important;
-       width: 90% !important;
-       max-width: 500px !important;
-       box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
-     }
-     .floating-toast-error {
-       position: fixed !important;
-       top: 24px !important;
-       left: 50% !important;
-       transform: translateX(-50%) !important;
-       z-index: 9999 !important;
-       width: 90% !important;
-       max-width: 500px !important;
-       box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
-     }
-   `}</style>
+        .admin-tabs-desktop {
+          display: flex;
+          gap: 8px;
+          border-bottom: 2px solid #e5e7eb;
+          margin-bottom: 24px;
+          overflow-x: auto;
+        }
+        .admin-tabs-mobile {
+          display: none;
+          position: relative;
+          margin-bottom: 24px;
+        }
+        .admin-mobile-trigger {
+          width: 100%;
+          padding: 12px 16px;
+          background: #ffffff;
+          border: 1px solid #d1d5db;
+          border-radius: 8px;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          cursor: pointer;
+          font-weight: 700;
+          color: #111827;
+          font-size: 14px;
+        }
+        .admin-mobile-dropdown {
+          position: absolute;
+          top: calc(100% + 4px);
+          left: 0;
+          right: 0;
+          background: #ffffff;
+          border: 1px solid #d1d5db;
+          border-radius: 8px;
+          box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); /* Sombra original preferida */
+          z-index: 1000;
+          overflow: hidden;
+        }
+        .admin-mobile-item {
+          padding: 12px 16px;
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          cursor: pointer;
+          border-bottom: 1px solid #e5e7eb;
+          color: #4b5563;
+          font-size: 14px;
+          transition: background 0.15s;
+        }
+        .admin-mobile-item:last-child {
+          border-bottom: none;
+        }
+        .admin-mobile-item:hover {
+          background: #fef2f2; /* Fondo hover preferido */
+        }
+        .admin-mobile-item.active {
+          background: #fef2f2; /* Fondo activo preferido */
+          color: #dc2626;
+          font-weight: 700;
+        }
+        .admin-aging-section {
+          background: #fffbeb;
+          border: 1px solid #fde68a;
+          border-radius: 8px;
+          padding: 14px 16px;
+          margin-bottom: 16px;
+        }
+        .admin-aging-title {
+          font-size: 13px;
+          font-weight: 800;
+          color: #78350f;
+          margin-bottom: 10px;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+        .admin-aging-item {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 6px 10px;
+          background: #ffffff;
+          border: 1px solid #fde68a;
+          border-radius: 6px;
+          margin-bottom: 6px;
+          font-size: 12px;
+        }
+        .admin-aging-item:last-child {
+          margin-bottom: 0;
+        }
+        .admin-days-30 {
+          text-decoration: underline;
+          text-decoration-color: #eab308;
+          text-decoration-thickness: 3px;
+          text-underline-offset: 3px;
+        }
+        .admin-days-45 {
+          text-decoration: underline;
+          text-decoration-color: #f97316;
+          text-decoration-thickness: 3px;
+          text-underline-offset: 3px;
+        }
+        .admin-days-60 {
+          text-decoration: underline;
+          text-decoration-color: #dc2626;
+          text-decoration-thickness: 3px;
+          text-underline-offset: 3px;
+        }
+        /* --- TABLAS RESPONSIVAS (E) --- */
+        .admin-table-desktop {
+          width: 100%;
+          border-collapse: collapse;
+          text-align: left;
+          font-size: 13px;
+        }
+        .admin-mobile-cards {
+          display: none;
+        }
+        .admin-mobile-card {
+          background: #ffffff;
+          border: 1px solid #e5e7eb;
+          border-radius: 8px;
+          padding: 12px;
+          margin-bottom: 10px;
+          box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        }
+        .admin-mobile-card-header {
+          font-size: 14px;
+          font-weight: 800;
+          color: #111827;
+          border-bottom: 1px solid #e5e7eb;
+          padding-bottom: 8px;
+          margin-bottom: 8px;
+        }
+        .admin-mobile-card-row {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 4px 0;
+          font-size: 12px;
+          border-bottom: 1px dashed #f3f4f6;
+        }
+        .admin-mobile-card-row:last-child {
+          border-bottom: none;
+        }
+        .admin-mobile-card-label {
+          color: #6b7280;
+          font-weight: 600;
+          font-size: 11px;
+        }
+        .admin-mobile-card-value {
+          color: #111827;
+          font-weight: 600;
+          text-align: right;
+          max-width: 60%;
+          word-break: break-word;
+        }
+        .admin-mobile-card-actions {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 6px;
+          margin-top: 10px;
+          padding-top: 10px;
+          border-top: 1px solid #e5e7eb;
+        }
+        @media (max-width: 768px) {
+          .admin-tabs-desktop {
+            display: none !important;
+          }
+          .admin-tabs-mobile {
+            display: block !important;
+          }
+          .admin-table-desktop {
+            display: none !important;
+          }
+          .admin-mobile-cards {
+            display: block !important;
+          }
+          .admin-mobile-card-actions button {
+            font-size: 10px !important;
+            padding: 5px 8px !important;
+          }
+          .admin-tab-button-desktop {
+            padding: 10px 12px !important;
+            font-size: 12px !important;
+          }
+          .admin-action-btn-mobile {
+            padding: 5px 8px !important;
+            font-size: 10px !important;
+          }
+        }
+        
+        /* F. NOTIFICACIONES FLOTANTES */
+        .floating-toast-success {
+          position: fixed !important;
+          top: 24px !important;
+          left: 50% !important;
+          transform: translateX(-50%) !important;
+          z-index: 9999 !important;
+          width: 90% !important;
+          max-width: 500px !important;
+          box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
+        }
+        .floating-toast-error {
+          position: fixed !important;
+          top: 24px !important;
+          left: 50% !important;
+          transform: translateX(-50%) !important;
+          z-index: 9999 !important;
+          width: 90% !important;
+          max-width: 500px !important;
+          box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
+        }
+      `}</style>
 
       {/* F. NOTIFICACIONES GLOBALES FLOTANTES */}
       {errorMsg && (
@@ -3351,7 +3352,7 @@ text-underline-offset: 3px;
         </div>
       </div>
 
-      {/* --- MENÚ ESCRITORIO (E) --- */}
+            {/* --- MENÚ ESCRITORIO (E) --- */}
       <div className="admin-tabs-desktop">
         {tabsData.map((tab) => {
           const Icon = tab.icon;
@@ -3383,6 +3384,61 @@ text-underline-offset: 3px;
             </button>
           );
         })}
+      </div>
+      {/* --- MENÚ MÓVIL DROPDOWN (E) --- */}
+      <div className="admin-tabs-mobile" ref={mobileMenuRef}>
+        <div
+          className="admin-mobile-trigger"
+          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+        >
+          <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            {(() => {
+              const current = tabsData.find((t) => t.id === activeTab);
+              const Icon = current?.icon || Plus;
+              return (
+                <>
+                  <Icon size={18} color="#dc2626" />
+                  {current?.label || 'Seleccionar módulo'}
+                </>
+              );
+            })()}
+          </span>
+          <ChevronDown
+            size={18}
+            style={{
+              transform: isMobileMenuOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+              transition: 'transform 0.2s',
+            }}
+          />
+        </div>
+        {isMobileMenuOpen && (
+          <div className="admin-mobile-dropdown">
+            {tabsData.map((tab) => {
+              const Icon = tab.icon;
+              const isActive = activeTab === tab.id;
+              return (
+                <div
+                  key={tab.id}
+                  className={`admin-mobile-item ${isActive ? 'active' : ''}`}
+                  onClick={() => {
+                    handleTabChange(tab.id);
+                    setIsMobileMenuOpen(false);
+                  }}
+                >
+                  <Icon size={18} color={isActive ? '#dc2626' : '#4b5563'} />
+                  <span>{tab.label}</span>
+                  {isActive && (
+                    <Check
+                      size={16}
+                      color="#dc2626"
+                      style={{ marginLeft: 'auto' }}
+                    />
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
       {/* --- MENÚ MÓVIL DROPDOWN (E) --- */}
       <div className="admin-tabs-mobile" ref={mobileMenuRef}>
