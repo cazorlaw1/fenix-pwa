@@ -3067,7 +3067,6 @@ ${penaltiesHtml}
       }}
     >
       {/* --- ESTILOS RESPONSIVOS (E) --- */}
-            {/* --- ESTILOS RESPONSIVOS (E) --- */}
       <style>{`
         .admin-tabs-desktop {
           display: flex;
@@ -3352,7 +3351,7 @@ ${penaltiesHtml}
         </div>
       </div>
 
-            {/* --- MENÚ ESCRITORIO (E) --- */}
+      {/* --- MENÚ ESCRITORIO (E) --- */}
       <div className="admin-tabs-desktop">
         {tabsData.map((tab) => {
           const Icon = tab.icon;
@@ -3384,7 +3383,7 @@ ${penaltiesHtml}
             </button>
           );
         })}
-      </div>      
+      </div>
       {/* --- MENÚ MÓVIL DROPDOWN (E) --- */}
       <div className="admin-tabs-mobile" ref={mobileMenuRef}>
         <div
