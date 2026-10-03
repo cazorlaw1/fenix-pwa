@@ -86,9 +86,9 @@ function SuspendedAccountView() {
   );
 }
 
-// Guardián de Rutas
+// Guardián de Rutas Robusto (detecta rol plano o anidado en profile)
 function RoleProtectedRoute({ allowedRoles, children }) {
-  const { user, loading } = useAuth();
+  const { user, profile, loading } = useAuth();
 
   if (loading) {
     return (
@@ -102,18 +102,22 @@ function RoleProtectedRoute({ allowedRoles, children }) {
     return <Navigate to="/login" replace />;
   }
 
-  // Cuenta suspendida o inactiva (bloqueo total sin botones)
-  if (user.is_active === false || user.role === 'suspendido') {
+  // Extraer el rol y el estado considerando posibles estructuras (user o profile)
+  const userRole = (user?.role || profile?.role || '').toLowerCase().trim();
+  const isActive = user?.is_active ?? profile?.is_active ?? true;
+
+  // 1. Verificación de cuenta suspendida o inactiva (Bloqueo total sin botones)
+  if (isActive === false || userRole === 'suspendido') {
     return <SuspendedAccountView />;
   }
 
-  // Cuenta pendiente de aprobación
-  if (user.role === 'pendiente' || !user.role) {
+  // 2. Verificación de cuenta pendiente
+  if (userRole === 'pendiente' || !userRole) {
     return <Navigate to="/pending" replace />;
   }
 
-  // Validación de roles permitidos por módulo
-  if (allowedRoles && !allowedRoles.includes(user.role)) {
+  // 3. Validación estricta de roles permitidos para el módulo
+  if (allowedRoles && !allowedRoles.includes(userRole)) {
     return <Unauthorized />;
   }
 
@@ -148,7 +152,7 @@ export default function App() {
             } 
           />
           
-          {/* Inventario: Solo Administrador y Stock (Gerente y Supervisor excluidos) */}
+          {/* Inventario: Solo Administrador y Stock */}
           <Route
             path="/inventario"
             element={
@@ -158,7 +162,7 @@ export default function App() {
             }
           />
           
-          {/* Usuarios: Solo Administrador (Gerente y Supervisor excluidos) */}
+          {/* Usuarios: Solo Administrador */}
           <Route
             path="/usuarios"
             element={
@@ -168,7 +172,7 @@ export default function App() {
             }
           />
           
-          {/* Módulo Administrativo: Solo Administrador (Gerente y Supervisor excluidos) */}
+          {/* Módulo Administrativo: Solo Administrador */}
           <Route
             path="/administrativo"
             element={
