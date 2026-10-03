@@ -6,7 +6,7 @@ import {
   Route,
   Navigate,
 } from 'react-router-dom';
-import { AuthProvider, useAuth } from './context/AuthContext';
+import { supabase } from './supabaseClient'; // O './lib/supabase' según tu estructura
 
 // Páginas de tu aplicación
 import Dashboard from './pages/Dashboard';
@@ -86,40 +86,86 @@ function SuspendedAccountView() {
   );
 }
 
-// Guardián de Rutas Robusto (detecta rol plano o anidado en profile)
+// Componente protector que consulta la base de datos igual que el menú principal
 function RoleProtectedRoute({ allowedRoles, children }) {
-  const { user, profile, loading } = useAuth();
+  const [loading, setLoading] = useState(true);
+  const [profile, setProfile] = useState(null);
+  const [isAuthorized, setIsAuthorized] = useState(false);
+  const [statusType, setStatusType] = useState('ok'); // 'ok' | 'unauthorized' | 'suspended' | 'pending' | 'login'
+
+  useEffect(() => {
+    async function checkUserAccess() {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (!session) {
+          setStatusType('login');
+          setLoading(false);
+          return;
+        }
+
+        // Consultar el perfil de la misma manera que lo hace tu app base
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', session.user.id)
+          .single();
+
+        if (error || !data) {
+          setStatusType('pending');
+          setLoading(false);
+          return;
+        }
+
+        setProfile(data);
+
+        const currentRole = data.role ? data.role.toLowerCase().trim() : '';
+        const isMaestro = currentRole === 'maestro';
+
+        // 1. Validar si está inactivo o suspendido
+        if ((data.is_active === false || currentRole === 'suspendido') && !isMaestro) {
+          setStatusType('suspended');
+          setLoading(false);
+          return;
+        }
+
+        // 2. Validar si está pendiente de aprobación
+        if ((!data.is_active || !data.role || currentRole === 'pendiente') && !isMaestro) {
+          setStatusType('pending');
+          setLoading(false);
+          return;
+        }
+
+        // 3. Validar si el rol actual tiene permiso para el módulo (Maestro tiene acceso total)
+        if (isMaestro || allowedRoles.includes(currentRole)) {
+          setIsAuthorized(true);
+        } else {
+          setStatusType('unauthorized');
+        }
+
+      } catch (err) {
+        console.error('Error validando permisos:', err);
+        setStatusType('login');
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    checkUserAccess();
+  }, [allowedRoles]);
 
   if (loading) {
     return (
       <div style={{ backgroundColor: '#000000', color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', fontFamily: 'system-ui' }}>
-        <p>Cargando sistema...</p>
+        <p>Cargando permisos del sistema...</p>
       </div>
     );
   }
 
-  if (!user) {
-    return <Navigate to="/login" replace />;
-  }
-
-  // Extraer el rol y el estado considerando posibles estructuras (user o profile)
-  const userRole = (user?.role || profile?.role || '').toLowerCase().trim();
-  const isActive = user?.is_active ?? profile?.is_active ?? true;
-
-  // 1. Verificación de cuenta suspendida o inactiva (Bloqueo total sin botones)
-  if (isActive === false || userRole === 'suspendido') {
-    return <SuspendedAccountView />;
-  }
-
-  // 2. Verificación de cuenta pendiente
-  if (userRole === 'pendiente' || !userRole) {
-    return <Navigate to="/pending" replace />;
-  }
-
-  // 3. Validación estricta de roles permitidos para el módulo
-  if (allowedRoles && !allowedRoles.includes(userRole)) {
-    return <Unauthorized />;
-  }
+  if (statusType === 'login') return <Navigate to="/login" replace />;
+  if (statusType === 'pending') return <Navigate to="/pending" replace />;
+  if (statusType === 'suspended') return <SuspendedAccountView />;
+  if (statusType === 'unauthorized' || !isAuthorized) return <Unauthorized />;
 
   return children;
 }
@@ -134,88 +180,86 @@ export default function App() {
   }, []);
 
   return (
-    <AuthProvider>
-      <Router>
-        <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route path="/pending" element={<PendingApproval />} />
-          
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
-          
-          {/* Dashboard: Todos los roles activos */}
-          <Route 
-            path="/dashboard" 
-            element={
-              <RoleProtectedRoute allowedRoles={['administrador', 'gerente', 'supervisor', 'vendedor', 'stock']}>
-                <Dashboard />
-              </RoleProtectedRoute>
-            } 
-          />
-          
-          {/* Inventario: Solo Administrador y Stock */}
-          <Route
-            path="/inventario"
-            element={
-              <RoleProtectedRoute allowedRoles={['administrador', 'stock']}>
-                <Inventory />
-              </RoleProtectedRoute>
-            }
-          />
-          
-          {/* Usuarios: Solo Administrador */}
-          <Route
-            path="/usuarios"
-            element={
-              <RoleProtectedRoute allowedRoles={['administrador']}>
-                <Users />
-              </RoleProtectedRoute>
-            }
-          />
-          
-          {/* Módulo Administrativo: Solo Administrador */}
-          <Route
-            path="/administrativo"
-            element={
-              <RoleProtectedRoute allowedRoles={['administrador']}>
-                <AdminModule />
-              </RoleProtectedRoute>
-            }
-          />
-          
-          {/* Vendedores / Comisiones: Admin, Gerente, Supervisor */}
-          <Route 
-            path="/vendedores" 
-            element={
-              <RoleProtectedRoute allowedRoles={['administrador', 'gerente', 'supervisor']}>
-                <Vendedores />
-              </RoleProtectedRoute>
-            } 
-          />
-          
-          {/* Ventas: Admin, Gerente, Supervisor, Vendedor */}
-          <Route
-            path="/ventas"
-            element={
-              <RoleProtectedRoute allowedRoles={['administrador', 'gerente', 'supervisor', 'vendedor']}>
-                <SalesModule />
-              </RoleProtectedRoute>
-            }
-          />
-          
-          {/* Perfil: Todos los roles activos */}
-          <Route
-            path="/profile"
-            element={
-              <RoleProtectedRoute allowedRoles={['administrador', 'gerente', 'supervisor', 'vendedor', 'stock']}>
-                <Profile />
-              </RoleProtectedRoute>
-            }
-          />
+    <Router>
+      <Routes>
+        <Route path="/login" element={<Login />} />
+        <Route path="/pending" element={<PendingApproval />} />
+        
+        <Route path="/" element={<Navigate to="/dashboard" replace />} />
+        
+        {/* Dashboard: Todos los roles activos */}
+        <Route 
+          path="/dashboard" 
+          element={
+            <RoleProtectedRoute allowedRoles={['administrador', 'gerente', 'supervisor', 'vendedor', 'stock']}>
+              <Dashboard />
+            </RoleProtectedRoute>
+          } 
+        />
+        
+        {/* Inventario: Solo Administrador y Stock */}
+        <Route
+          path="/inventario"
+          element={
+            <RoleProtectedRoute allowedRoles={['administrador', 'stock']}>
+              <Inventory />
+            </RoleProtectedRoute>
+          }
+        />
+        
+        {/* Usuarios: Solo Administrador */}
+        <Route
+          path="/usuarios"
+          element={
+            <RoleProtectedRoute allowedRoles={['administrador']}>
+              <Users />
+            </RoleProtectedRoute>
+          }
+        />
+        
+        {/* Módulo Administrativo: Solo Administrador */}
+        <Route
+          path="/administrativo"
+          element={
+            <RoleProtectedRoute allowedRoles={['administrador']}>
+              <AdminModule />
+            </RoleProtectedRoute>
+          }
+        />
+        
+        {/* Vendedores / Comisiones: Admin, Gerente, Supervisor */}
+        <Route 
+          path="/vendedores" 
+          element={
+            <RoleProtectedRoute allowedRoles={['administrador', 'gerente', 'supervisor']}>
+              <Vendedores />
+            </RoleProtectedRoute>
+          } 
+        />
+        
+        {/* Ventas: Admin, Gerente, Supervisor, Vendedor */}
+        <Route
+          path="/ventas"
+          element={
+            <RoleProtectedRoute allowedRoles={['administrador', 'gerente', 'supervisor', 'vendedor']}>
+              <SalesModule />
+            </RoleProtectedRoute>
+          }
+        />
+        
+        {/* Perfil: Todos los roles activos */}
+        <Route
+          path="/profile"
+          element={
+            <RoleProtectedRoute allowedRoles={['administrador', 'gerente', 'supervisor', 'vendedor', 'stock']}>
+              <Profile />
+            </RoleProtectedRoute>
+          }
+        />
 
-          {/* Ruta Comodín */}
-          <Route path="*" element={<Navigate to="/dashboard" replace />} />
-        </Routes>
-      </Router>
-    </AuthProvider>
+        {/* Ruta Comodín */}
+        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+      </Routes>
+    </Router>
   );
 }
