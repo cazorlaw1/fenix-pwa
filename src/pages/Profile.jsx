@@ -8,7 +8,7 @@ export default function Profile() {
   // Estados de datos
   const [fullName, setFullName] = useState('');
   const [ci, setCi] = useState('');
-  const [city, setCity] = useState(''); // Nuevo estado para Ciudad
+  const [city, setCity] = useState('');
   const [avatarUrl, setAvatarUrl] = useState('');
   const [ciUrl, setCiUrl] = useState('');
 
@@ -18,24 +18,15 @@ export default function Profile() {
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [uploadingCi, setUploadingCi] = useState(false);
   const [showCiModal, setShowCiModal] = useState(false);
-  const [imageError, setImageError] = useState(false); // Para manejar error de carga en modal
+  const [imageError, setImageError] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
 
   const avatarInputRef = useRef(null);
   const ciInputRef = useRef(null);
 
   // Constantes de validación
-  const ALLOWED_IMAGE_TYPES = [
-    'image/jpeg',
-    'image/png',
-    'image/webp',
-    'image/gif',
-  ];
-  const ALLOWED_CI_TYPES = [
-    'application/pdf',
-    'image/jpeg',
-    'image/png',
-    'image/webp',
-  ];
+  const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+  const ALLOWED_CI_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
   const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
   const AVATAR_BUCKET = 'avatars';
   const CI_BUCKET = 'documents';
@@ -44,16 +35,14 @@ export default function Profile() {
     if (profile) {
       setFullName(profile.full_name || '');
       setCi(profile.ci || '');
-      setCity(profile.city || ''); // Cargar ciudad
+      setCity(profile.city || '');
       setAvatarUrl(profile.avatar_url || '');
       setCiUrl(profile.ci_url || '');
     }
   }, [profile]);
 
-  // Validación completa: Avatar, CI, Texto CI y CIUDAD
   const isIncomplete = !avatarUrl || !ciUrl || !ci || !city;
 
-  // Extrae el path relativo del archivo a partir de la URL pública de Supabase
   const extractPathFromUrl = (url, bucket) => {
     if (!url) return null;
     const pattern = `/${bucket}/`;
@@ -62,65 +51,41 @@ export default function Profile() {
     return url.substring(idx + pattern.length);
   };
 
-  // Elimina un archivo del storage si existe una URL previa
   const deleteOldFile = async (url, bucket) => {
     if (!url) return;
     const path = extractPathFromUrl(url, bucket);
     if (!path) return;
     try {
-      const { error } = await supabase.storage.from(bucket).remove([path]);
-      if (error)
-        console.warn('No se pudo eliminar archivo anterior:', error.message);
+      await supabase.storage.from(bucket).remove([path]);
     } catch (err) {
       console.warn('Error eliminando archivo anterior:', err);
     }
   };
 
-  // Valida el archivo (tipo y tamaño)
   const validateFile = (file, allowedTypes) => {
     if (!file) return 'No se seleccionó ningún archivo.';
-    if (!allowedTypes.includes(file.type)) {
-      return `Formato no permitido. Aceptados: ${allowedTypes
-        .map((t) => t.split('/')[1])
-        .join(', ')}.`;
-    }
-    if (file.size > MAX_FILE_SIZE) {
-      return 'El archivo supera el tamaño máximo de 5MB.';
-    }
+    if (!allowedTypes.includes(file.type)) return 'Formato no permitido.';
+    if (file.size > MAX_FILE_SIZE) return 'El archivo supera los 5MB.';
     return null;
   };
 
-  // Sube un archivo al bucket indicado
   const uploadFile = async (file, bucket) => {
     const fileExt = file.name.split('.').pop();
-    const fileName = `${Date.now()}-${Math.random()
-      .toString(36)
-      .substring(2, 8)}.${fileExt}`;
+    const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 8)}.${fileExt}`;
     const filePath = `${user.id}/${fileName}`;
-
-    const { error: uploadError } = await supabase.storage
-      .from(bucket)
-      .upload(filePath, file, { upsert: false, cacheControl: '3600' });
-
+    const { error: uploadError } = await supabase.storage.from(bucket).upload(filePath, file, { upsert: false });
     if (uploadError) throw uploadError;
-
     const { data } = supabase.storage.from(bucket).getPublicUrl(filePath);
     return data.publicUrl;
   };
 
-  // Handler para cambiar la foto de perfil
   const handleAvatarChange = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     const validationError = validateFile(file, ALLOWED_IMAGE_TYPES);
-    if (validationError) {
-      setMessage(`Error: ${validationError}`);
-      return;
-    }
+    if (validationError) { setMessage(`Error: ${validationError}`); return; }
 
     setUploadingAvatar(true);
-    setMessage('');
     try {
       await deleteOldFile(avatarUrl, AVATAR_BUCKET);
       const newUrl = await uploadFile(file, AVATAR_BUCKET);
@@ -134,20 +99,14 @@ export default function Profile() {
     }
   };
 
-  // Handler para adjuntar/cambiar la CI
   const handleCiChange = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     const validationError = validateFile(file, ALLOWED_CI_TYPES);
-    if (validationError) {
-      setMessage(`Error: ${validationError}`);
-      return;
-    }
+    if (validationError) { setMessage(`Error: ${validationError}`); return; }
 
     setUploadingCi(true);
-    setMessage('');
-    setImageError(false); // Resetear error de imagen
+    setImageError(false);
     try {
       await deleteOldFile(ciUrl, CI_BUCKET);
       const newUrl = await uploadFile(file, CI_BUCKET);
@@ -168,17 +127,12 @@ export default function Profile() {
     try {
       const { error } = await supabase
         .from('profiles')
-        .update({
-          full_name: fullName,
-          ci,
-          city, // Guardar ciudad
-          avatar_url: avatarUrl,
-          ci_url: ciUrl,
-        })
+        .update({ full_name: fullName, ci, city, avatar_url: avatarUrl, ci_url: ciUrl })
         .eq('id', user.id);
       if (error) throw error;
       await fetchProfile(user.id);
       setMessage('Perfil actualizado correctamente.');
+      setIsEditing(false);
     } catch (err) {
       setMessage(`Error: ${err.message}`);
     } finally {
@@ -186,690 +140,354 @@ export default function Profile() {
     }
   };
 
+  const showFenixCard = !isIncomplete && !isEditing;
+
   return (
     <div
-      className="fixed top-0 right-0 h-full w-full md:w-auto flex flex-col justify-between overflow-y-auto md:overflow-y-visible"
       style={{
-        minHeight: 'calc(100vh - 65px)',
-        backgroundColor: '#ffffff',
-        color: '#111827',
-        padding: '20px 16px',
+        width: '100%',
         display: 'flex',
         justifyContent: 'center',
+        padding: '24px 16px',
         fontFamily: 'system-ui, -apple-system, sans-serif',
-        zIndex: 50,
+        boxSizing: 'border-box',
       }}
     >
       <div
-        className="my-auto md:my-0"
         style={{
-          maxWidth: '600px',
+          maxWidth: '390px',
           width: '100%',
           backgroundColor: '#ffffff',
-          border: '1px solid #e5e7eb',
+          border: '1px solid #d4af37',
           borderRadius: '16px',
-          padding: '20px 24px',
-          boxShadow: '0 10px 25px rgba(0,0,0,0.05)',
-          height: 'fit-content',
-          maxHeight: '100%',
-          overflowY: 'auto',
+          overflow: 'hidden',
+          boxShadow: '0 10px 25px rgba(0, 0, 0, 0.1), 0 0 12px rgba(212, 175, 55, 0.15)',
+          position: 'relative',
         }}
       >
-        <h1
-          style={{
-            fontSize: '20px',
-            fontWeight: 'bold',
-            color: '#000000',
-            borderBottom: '1px solid #f3f4f6',
-            paddingBottom: '12px',
-            marginBottom: '16px',
-          }}
-        >
-          Perfil de Usuario
-        </h1>
-
-        {/* ===== AVATAR REDONDO Y CENTRADO ===== */}
-        <div
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            marginBottom: '18px',
-          }}
-        >
-          <div
-            onClick={() => !uploadingAvatar && avatarInputRef.current?.click()}
-            style={{
-              width: '90px',
-              height: '90px',
-              borderRadius: '50%',
-              overflow: 'hidden',
-              backgroundColor: '#f3f4f6',
-              border: '3px solid #e5e7eb',
-              cursor: uploadingAvatar ? 'wait' : 'pointer',
-              position: 'relative',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              transition: 'border-color 0.2s ease',
-            }}
-            onMouseEnter={(e) =>
-              (e.currentTarget.style.borderColor = '#000000')
-            }
-            onMouseLeave={(e) =>
-              (e.currentTarget.style.borderColor = '#e5e7eb')
-            }
-            title="Cambiar foto de perfil"
-          >
-            {avatarUrl ? (
-              <img
-                src={avatarUrl}
-                alt="Foto de perfil"
-                style={{
-                  width: '100%',
-                  height: '100%',
-                  objectFit: 'cover',
-                  display: 'block',
-                }}
-              />
-            ) : (
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="36"
-                height="36"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="#9ca3af"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                <circle cx="12" cy="7" r="4" />
-              </svg>
-            )}
-
-            {/* Overlay Hover */}
-            <div
-              style={{
-                position: 'absolute',
-                inset: 0,
-                backgroundColor: 'rgba(0,0,0,0.55)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                opacity: uploadingAvatar ? 1 : 0,
-                transition: 'opacity 0.2s ease',
-                pointerEvents: 'none',
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.opacity = '1')}
-              onMouseLeave={(e) =>
-                avatarUrl && (e.currentTarget.style.opacity = '0')
-              }
-            >
-              {uploadingAvatar ? (
-                <div
-                  style={{
-                    width: '24px',
-                    height: '24px',
-                    border: '3px solid #ffffff',
-                    borderTopColor: 'transparent',
-                    borderRadius: '50%',
-                    animation: 'spin 0.8s linear infinite',
-                  }}
-                />
-              ) : (
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="26"
-                  height="26"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="#ffffff"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
-                  <circle cx="12" cy="13" r="4" />
-                </svg>
-              )}
-            </div>
-          </div>
-
-          <input
-            ref={avatarInputRef}
-            type="file"
-            accept={ALLOWED_IMAGE_TYPES.join(',')}
-            onChange={handleAvatarChange}
-            style={{ display: 'none' }}
-          />
-
-          <button
-            type="button"
-            onClick={() => avatarInputRef.current?.click()}
-            disabled={uploadingAvatar}
-            style={{
-              marginTop: '8px',
-              backgroundColor: 'transparent',
-              color: '#000000',
-              border: '1px solid #000000',
-              borderRadius: '8px',
-              padding: '6px 12px',
-              fontSize: '12px',
-              fontWeight: '600',
-              cursor: uploadingAvatar ? 'wait' : 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-            }}
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="13"
-              height="13"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-              <polyline points="17 8 12 3 7 8" />
-              <line x1="12" y1="3" x2="12" y2="15" />
-            </svg>
-            {uploadingAvatar
-              ? 'Subiendo...'
-              : avatarUrl
-              ? 'Cambiar foto'
-              : 'Subir foto de perfil'}
-          </button>
-          <span
-            style={{ fontSize: '10px', color: '#9ca3af', marginTop: '4px' }}
-          >
-            JPG, PNG o WEBP · Máx. 5MB
-          </span>
-        </div>
-
-        {/* ALERTA DE PERFIL INCOMPLETO (Incluye Ciudad) */}
-        {isIncomplete && (
-          <div
-            style={{
-              backgroundColor: '#fef2f2',
-              borderLeft: '4px solid #dc2626',
-              color: '#991b1b',
-              padding: '10px 14px',
-              borderRadius: '0 8px 8px 0',
-              marginBottom: '16px',
-              fontSize: '12px',
-              fontWeight: '500',
-            }}
-          >
-            ⚠️ Tienes el perfil incompleto. Por favor completa tu C.I., Ciudad y
-            adjunta tus documentos.
-          </div>
-        )}
-
-        {message && (
-          <div
-            style={{
-              backgroundColor: '#f3f4f6',
-              border: '1px solid #d1d5db',
-              color: '#1f2937',
-              padding: '10px',
-              borderRadius: '8px',
-              marginBottom: '16px',
-              fontSize: '12px',
-            }}
-          >
-            {message}
-          </div>
-        )}
-
-        <form
-          onSubmit={handleSave}
-          style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}
-        >
-          <div>
-            <label
-              style={{
-                display: 'block',
-                fontSize: '11px',
-                fontWeight: '600',
-                color: '#6b7280',
-                textTransform: 'uppercase',
-                marginBottom: '4px',
-              }}
-            >
-              Nombre Completo
-            </label>
-            <input
-              type="text"
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
-              style={{
-                width: '100%',
-                backgroundColor: '#f9fafb',
-                border: '1px solid #d1d5db',
-                borderRadius: '8px',
-                padding: '8px 12px',
-                fontSize: '13px',
-                color: '#111827',
-                outline: 'none',
-                boxSizing: 'border-box',
-              }}
-            />
-          </div>
-
-          {/* FILA: CI y CIUDAD */}
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: '1fr 1fr',
-              gap: '12px',
-            }}
-          >
-            <div>
-              <label
-                style={{
-                  display: 'block',
-                  fontSize: '11px',
-                  fontWeight: '600',
-                  color: '#6b7280',
-                  textTransform: 'uppercase',
-                  marginBottom: '4px',
-                }}
-              >
-                Cédula de Identidad (C.I.)
-              </label>
-              <input
-                type="text"
-                value={ci}
-                onChange={(e) => setCi(e.target.value)}
-                placeholder="Ej: V-12345678"
-                style={{
-                  width: '100%',
-                  backgroundColor: '#f9fafb',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '8px',
-                  padding: '8px 12px',
-                  fontSize: '13px',
-                  color: '#111827',
-                  outline: 'none',
-                  boxSizing: 'border-box',
-                }}
-              />
-            </div>
-            <div>
-              <label
-                style={{
-                  display: 'block',
-                  fontSize: '11px',
-                  fontWeight: '600',
-                  color: '#6b7280',
-                  textTransform: 'uppercase',
-                  marginBottom: '4px',
-                }}
-              >
-                Ciudad
-              </label>
-              <input
-                type="text"
-                value={city}
-                onChange={(e) => setCity(e.target.value)}
-                placeholder="Ej: Caracas"
-                style={{
-                  width: '100%',
-                  backgroundColor: '#f9fafb',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '8px',
-                  padding: '8px 12px',
-                  fontSize: '13px',
-                  color: '#111827',
-                  outline: 'none',
-                  boxSizing: 'border-box',
-                }}
-              />
-            </div>
-          </div>
-
-          {/* ===== CAMPO PARA ADJUNTAR CI ===== */}
-          <div>
-            <label
-              style={{
-                display: 'block',
-                fontSize: '11px',
-                fontWeight: '600',
-                color: '#6b7280',
-                textTransform: 'uppercase',
-                marginBottom: '4px',
-              }}
-            >
-              Documento de Identidad (CI)
-            </label>
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '10px',
-                backgroundColor: '#f9fafb',
-                border: '1px solid #d1d5db',
-                borderRadius: '8px',
-                padding: '8px 12px',
-                boxSizing: 'border-box',
-              }}
-            >
+        <div style={{ position: 'relative', zIndex: 2 }}>
+          {showFenixCard ? (
+            /* ===== CREDENCIAL FENIX AUTO PART ===== */
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              
+              {/* 1. Cabecera Oscura con Logo y Texto Centrado, Mismo Alto */}
               <div
                 style={{
-                  width: '32px',
-                  height: '32px',
-                  borderRadius: '8px',
-                  backgroundColor: ciUrl ? '#dcfce7' : '#f3f4f6',
+                  backgroundColor: '#0a0a0a',
+                  padding: '12px 16px',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  flexShrink: 0,
+                  gap: '10px',
+                  borderBottom: '3px solid #d4af37',
+                  position: 'relative',
+                  overflow: 'hidden',
                 }}
               >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke={ciUrl ? '#16a34a' : '#9ca3af'}
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                  <polyline points="14 2 14 8 20 8" />
-                  <line x1="16" y1="13" x2="8" y2="13" />
-                  <line x1="16" y1="17" x2="8" y2="17" />
-                </svg>
+                <img 
+                  src="https://hxlwrlzucnpdqofxjelg.supabase.co/storage/v1/object/public/assets/LOGOF.png" 
+                  alt="Fenix auto Part" 
+                  style={{ height: '32px', objectFit: 'contain' }} 
+                />
+                <span style={{ fontSize: '20px', fontWeight: '900', color: '#d4af37', letterSpacing: '0.5px', lineHeight: '32px' }}>
+                  Fenix auto Part
+                </span>
               </div>
 
-              <div style={{ flex: 1, minWidth: 0 }}>
+              {/* 2. Cuerpo Central con Marca de Agua y Datos Más Grandes */}
+              <div
+                style={{
+                  backgroundColor: '#ffffff',
+                  padding: '22px 16px 18px 16px',
+                  position: 'relative',
+                  minHeight: '210px',
+                  display: 'flex',
+                  gap: '16px',
+                  alignItems: 'flex-start',
+                }}
+              >
+                {/* Marca de agua del fénix al fondo */}
+                <div 
+                  style={{
+                    position: 'absolute',
+                    bottom: '5px',
+                    right: '10px',
+                    width: '140px',
+                    height: '140px',
+                    backgroundImage: 'url(https://hxlwrlzucnpdqofxjelg.supabase.co/storage/v1/object/public/assets/LOGOF.png)',
+                    backgroundSize: 'contain',
+                    backgroundRepeat: 'no-repeat',
+                    backgroundPosition: 'center',
+                    opacity: 0.08,
+                    pointerEvents: 'none',
+                  }} 
+                />
+
+                {/* Fotografía de perfil */}
                 <div
                   style={{
-                    fontSize: '12px',
-                    color: ciUrl ? '#111827' : '#9ca3af',
-                    whiteSpace: 'nowrap',
+                    width: '110px',
+                    height: '135px',
+                    borderRadius: '8px',
                     overflow: 'hidden',
-                    textOverflow: 'ellipsis',
+                    border: '2px solid #d4af37',
+                    backgroundColor: '#f3f4f6',
+                    flexShrink: 0,
+                    boxShadow: '0 4px 8px rgba(0,0,0,0.1)',
                   }}
                 >
-                  {ciUrl ? 'Documento cargado ✓' : 'Sin documento adjunto'}
+                  {avatarUrl ? (
+                    <img src={avatarUrl} alt="Avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  ) : (
+                    <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9ca3af', fontSize: '11px' }}>Sin foto</div>
+                  )}
                 </div>
-                {ciUrl && (
+
+                {/* Datos del usuario con fuente considerablemente más grande */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', flex: 1, zIndex: 1 }}>
+                  <div>
+                    <h2 style={{ fontSize: '17px', fontWeight: '900', color: '#111827', margin: 0, lineHeight: '1.15' }}>
+                      {fullName.toUpperCase()}
+                    </h2>
+                    <span style={{ fontSize: '12px', fontWeight: '700', color: '#b45309', textTransform: 'uppercase', letterSpacing: '0.5px', marginTop: '2px', display: 'block' }}>
+                      {profile?.role || 'DIRECTOR DE OPERACIONES'}
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '2px' }}>
+                    <div>
+                      <span style={{ color: '#6b7280', display: 'block', fontSize: '9px', textTransform: 'uppercase', fontWeight: '700' }}>C.I. / Identificación</span>
+                      <span style={{ color: '#111827', fontWeight: '900', fontSize: '14px' }}>{ci}</span>
+                    </div>
+                    <div>
+                      <span style={{ color: '#6b7280', display: 'block', fontSize: '9px', textTransform: 'uppercase', fontWeight: '700' }}>Gestión / Ubicación</span>
+                      <span style={{ color: '#111827', fontWeight: '900', fontSize: '14px' }}>{city}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Correo Electrónico Destacado */}
+              <div style={{ padding: '0 16px 12px 16px', backgroundColor: '#ffffff', zIndex: 1 }}>
+                <div style={{ backgroundColor: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '6px', padding: '8px 12px', textAlign: 'center' }}>
+                  <span style={{ display: 'block', fontSize: '9px', color: '#6b7280', textTransform: 'uppercase', marginBottom: '2px', fontWeight: '700' }}>Correo Electrónico</span>
+                  <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#2563eb', wordBreak: 'break-all' }}>{user?.email}</span>
+                </div>
+              </div>
+
+              {/* Enlace para Ver Documento */}
+              {ciUrl && (
+                <div style={{ textAlign: 'center', paddingBottom: '12px', backgroundColor: '#ffffff', zIndex: 1 }}>
                   <button
                     type="button"
-                    onClick={() => {
-                      setImageError(false);
-                      setShowCiModal(true);
-                    }}
-                    style={{
-                      fontSize: '10px',
-                      color: '#2563eb',
-                      background: 'none',
-                      border: 'none',
-                      padding: 0,
-                      cursor: 'pointer',
-                      textDecoration: 'underline',
-                    }}
+                    onClick={() => { setImageError(false); setShowCiModal(true); }}
+                    style={{ background: 'none', border: 'none', color: '#b45309', fontSize: '11px', cursor: 'pointer', textDecoration: 'underline', fontWeight: '700' }}
                   >
-                    Ver documento
+                    Ver Documento de Identidad adjunto
+                  </button>
+                </div>
+              )}
+
+              {/* 3. Sección Inferior Negra con Botón de Editar */}
+              <div 
+                style={{ 
+                  backgroundColor: '#0a0a0a', 
+                  padding: '14px 16px', 
+                  borderTop: '2px solid #d4af37',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '8px',
+                  alignItems: 'center'
+                }}
+              >
+                <span style={{ fontSize: '10px', color: '#d4af37', fontWeight: '700', letterSpacing: '1px', textTransform: 'uppercase' }}>
+                  FENIXAUTO.COM | {city.toUpperCase()}
+                </span>
+
+                <button
+                  type="button"
+                  onClick={() => setIsEditing(true)}
+                  style={{
+                    width: '100%',
+                    backgroundColor: '#d4af37',
+                    color: '#000000',
+                    fontWeight: 'bold',
+                    padding: '9px',
+                    borderRadius: '6px',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontSize: '12px',
+                    transition: 'background-color 0.2s',
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#e5c158')}
+                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#d4af37')}
+                >
+                  Editar Perfil
+                </button>
+              </div>
+
+            </div>
+          ) : (
+            /* ===== VISTA DE FORMULARIO DE EDICIÓN ===== */
+            <div style={{ padding: '16px', backgroundColor: '#ffffff' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #f3f4f6', paddingBottom: '10px', marginBottom: '12px' }}>
+                <h1 style={{ fontSize: '15px', fontWeight: 'bold', color: '#000000', margin: 0 }}>
+                  Configurar Perfil
+                </h1>
+                {!isIncomplete && (
+                  <button
+                    type="button"
+                    onClick={() => setIsEditing(false)}
+                    style={{ background: 'none', border: '1px solid #d1d5db', borderRadius: '6px', padding: '3px 6px', fontSize: '10px', cursor: 'pointer', color: '#374151' }}
+                  >
+                    Cancelar
                   </button>
                 )}
               </div>
 
-              <button
-                type="button"
-                onClick={() => ciInputRef.current?.click()}
-                disabled={uploadingCi}
-                style={{
-                  backgroundColor: '#000000',
-                  color: '#ffffff',
-                  border: 'none',
-                  borderRadius: '6px',
-                  padding: '5px 10px',
-                  fontSize: '11px',
-                  fontWeight: '600',
-                  cursor: uploadingCi ? 'wait' : 'pointer',
-                  whiteSpace: 'nowrap',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px',
-                }}
-              >
-                {uploadingCi ? 'Subiendo...' : ciUrl ? 'Cambiar' : 'Adjuntar'}
-              </button>
+              {/* Avatar para edición */}
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: '12px' }}>
+                <div
+                  onClick={() => !uploadingAvatar && avatarInputRef.current?.click()}
+                  style={{
+                    width: '75px',
+                    height: '90px',
+                    borderRadius: '8px',
+                    overflow: 'hidden',
+                    backgroundColor: '#f3f4f6',
+                    border: '2px solid #d4af37',
+                    cursor: uploadingAvatar ? 'wait' : 'pointer',
+                    position: 'relative',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  {avatarUrl ? (
+                    <img src={avatarUrl} alt="Avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  ) : (
+                    <span style={{ fontSize: '10px', color: '#9ca3af' }}>Sin foto</span>
+                  )}
+                </div>
+                <input ref={avatarInputRef} type="file" accept={ALLOWED_IMAGE_TYPES.join(',')} onChange={handleAvatarChange} style={{ display: 'none' }} />
+                <button
+                  type="button"
+                  onClick={() => avatarInputRef.current?.click()}
+                  disabled={uploadingAvatar}
+                  style={{ marginTop: '5px', backgroundColor: 'transparent', color: '#b45309', border: '1px solid #d4af37', borderRadius: '6px', padding: '3px 8px', fontSize: '10px', fontWeight: '600', cursor: 'pointer' }}
+                >
+                  {uploadingAvatar ? 'Subiendo...' : 'Cambiar foto'}
+                </button>
+              </div>
 
-              <input
-                ref={ciInputRef}
-                type="file"
-                accept={ALLOWED_CI_TYPES.join(',')}
-                onChange={handleCiChange}
-                style={{ display: 'none' }}
-              />
+              {isIncomplete && (
+                <div style={{ backgroundColor: '#fef2f2', borderLeft: '3px solid #dc2626', color: '#991b1b', padding: '6px 10px', borderRadius: '0 6px 6px 0', marginBottom: '10px', fontSize: '10px', fontWeight: '500' }}>
+                  ⚠️ Completa tu C.I., Ciudad y documentos para activar tu credencial.
+                </div>
+              )}
+
+              {message && (
+                <div style={{ backgroundColor: '#f3f4f6', border: '1px solid #d1d5db', color: '#1f2937', padding: '6px', borderRadius: '6px', marginBottom: '10px', fontSize: '10px' }}>
+                  {message}
+                </div>
+              )}
+
+              <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '9px', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', marginBottom: '2px' }}>Nombre Completo</label>
+                  <input
+                    type="text"
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    style={{ width: '100%', backgroundColor: '#f9fafb', border: '1px solid #d1d5db', borderRadius: '6px', padding: '6px 10px', fontSize: '11px', boxSizing: 'border-box' }}
+                  />
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '9px', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', marginBottom: '2px' }}>Cédula (C.I.)</label>
+                    <input
+                      type="text"
+                      value={ci}
+                      onChange={(e) => setCi(e.target.value)}
+                      placeholder="V-12345678"
+                      style={{ width: '100%', backgroundColor: '#f9fafb', border: '1px solid #d1d5db', borderRadius: '6px', padding: '6px 10px', fontSize: '11px', boxSizing: 'border-box' }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '9px', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', marginBottom: '2px' }}>Ciudad</label>
+                    <input
+                      type="text"
+                      value={city}
+                      onChange={(e) => setCity(e.target.value)}
+                      placeholder="Caracas"
+                      style={{ width: '100%', backgroundColor: '#f9fafb', border: '1px solid #d1d5db', borderRadius: '6px', padding: '6px 10px', fontSize: '11px', boxSizing: 'border-box' }}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '9px', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', marginBottom: '2px' }}>Documento de Identidad (CI)</label>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'between', backgroundColor: '#f9fafb', border: '1px solid #d1d5db', borderRadius: '6px', padding: '5px 8px', gap: '6px' }}>
+                    <span style={{ fontSize: '10px', color: ciUrl ? '#16a34a' : '#9ca3af', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {ciUrl ? 'Documento cargado ✓' : 'Sin documento'}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => ciInputRef.current?.click()}
+                      disabled={uploadingCi}
+                      style={{ backgroundColor: '#0a0a0a', color: '#ffffff', border: 'none', borderRadius: '4px', padding: '3px 6px', fontSize: '9px', fontWeight: '600', cursor: 'pointer' }}
+                    >
+                      {uploadingCi ? 'Subiendo...' : ciUrl ? 'Cambiar' : 'Adjuntar'}
+                    </button>
+                    <input ref={ciInputRef} type="file" accept={ALLOWED_CI_TYPES.join(',')} onChange={handleCiChange} style={{ display: 'none' }} />
+                  </div>
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '9px', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', marginBottom: '2px' }}>Correo Electrónico</label>
+                  <input
+                    type="text"
+                    value={user?.email || ''}
+                    disabled
+                    style={{ width: '100%', backgroundColor: '#f3f4f6', border: '1px solid #e5e7eb', borderRadius: '6px', padding: '6px 10px', fontSize: '11px', color: '#9ca3af', cursor: 'not-allowed', boxSizing: 'border-box' }}
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={saving}
+                  style={{ width: '100%', backgroundColor: '#0a0a0a', color: '#ffffff', fontWeight: '600', padding: '8px', borderRadius: '6px', border: 'none', cursor: 'pointer', marginTop: '4px', fontSize: '11px' }}
+                >
+                  {saving ? 'Guardando...' : 'Guardar Cambios'}
+                </button>
+              </form>
             </div>
-            <span
-              style={{
-                fontSize: '10px',
-                color: '#9ca3af',
-                marginTop: '4px',
-                display: 'block',
-              }}
-            >
-              PDF, JPG o PNG · Máx. 5MB
-            </span>
-          </div>
-
-          <div>
-            <label
-              style={{
-                display: 'block',
-                fontSize: '11px',
-                fontWeight: '600',
-                color: '#6b7280',
-                textTransform: 'uppercase',
-                marginBottom: '4px',
-              }}
-            >
-              Correo Electrónico
-            </label>
-            <input
-              type="text"
-              value={user?.email || ''}
-              disabled
-              style={{
-                width: '100%',
-                backgroundColor: '#f3f4f6',
-                border: '1px solid #e5e7eb',
-                borderRadius: '8px',
-                padding: '8px 12px',
-                fontSize: '13px',
-                color: '#9ca3af',
-                cursor: 'not-allowed',
-                boxSizing: 'border-box',
-              }}
-            />
-          </div>
-
-          <div>
-            <label
-              style={{
-                display: 'block',
-                fontSize: '11px',
-                fontWeight: '600',
-                color: '#6b7280',
-                textTransform: 'uppercase',
-                marginBottom: '4px',
-              }}
-            >
-              Rol Asignado
-            </label>
-            <input
-              type="text"
-              value={profile?.role || 'Pendiente'}
-              disabled
-              style={{
-                width: '100%',
-                backgroundColor: '#f3f4f6',
-                border: '1px solid #e5e7eb',
-                borderRadius: '8px',
-                padding: '8px 12px',
-                fontSize: '13px',
-                color: '#9ca3af',
-                textTransform: 'capitalize',
-                cursor: 'not-allowed',
-                boxSizing: 'border-box',
-              }}
-            />
-          </div>
-
-          <button
-            type="submit"
-            disabled={saving}
-            style={{
-              width: '100%',
-              backgroundColor: '#000000',
-              color: '#ffffff',
-              fontWeight: '600',
-              padding: '10px',
-              borderRadius: '10px',
-              border: 'none',
-              cursor: 'pointer',
-              marginTop: '6px',
-              fontSize: '13px',
-            }}
-          >
-            {saving ? 'Guardando...' : 'Guardar Cambios'}
-          </button>
-        </form>
+          )}
+        </div>
       </div>
 
-      {/* ===== MODAL VISOR DE DOCUMENTO (IMAGEN) ===== */}
+      {/* ===== MODAL VISOR DE DOCUMENTO ===== */}
       {showCiModal && ciUrl && (
         <div
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.85)',
-            zIndex: 1000,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '20px',
-          }}
+          style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.85)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}
           onClick={() => setShowCiModal(false)}
         >
-          <div
-            style={{
-              backgroundColor: '#fff',
-              borderRadius: '12px',
-              maxWidth: '90vw',
-              maxHeight: '90vh',
-              position: 'relative',
-              display: 'flex',
-              flexDirection: 'column',
-              overflow: 'hidden',
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div
-              style={{
-                padding: '12px 16px',
-                borderBottom: '1px solid #e5e7eb',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                backgroundColor: '#fff',
-              }}
-            >
-              <span
-                style={{
-                  fontWeight: '600',
-                  fontSize: '14px',
-                  color: '#111827',
-                }}
-              >
-                Documento de Identidad
-              </span>
-              <button
-                onClick={() => setShowCiModal(false)}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                  fontSize: '20px',
-                  color: '#6b7280',
-                  padding: '0 4px',
-                }}
-              >
-                ✕
-              </button>
+          <div style={{ backgroundColor: '#fff', borderRadius: '10px', maxWidth: '90vw', maxHeight: '90vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ padding: '10px 14px', borderBottom: '1px solid #e5e7eb', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontWeight: '600', fontSize: '13px' }}>Documento de Identidad</span>
+              <button onClick={() => setShowCiModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '16px' }}>✕</button>
             </div>
-            <div
-              style={{
-                padding: '20px',
-                backgroundColor: '#f9fafb',
-                display: 'flex',
-                justifyContent: 'center',
-                alignItems: 'center',
-                overflow: 'auto',
-                minHeight: '200px',
-              }}
-            >
+            <div style={{ padding: '14px', backgroundColor: '#f9fafb', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
               {imageError ? (
-                <div style={{ textAlign: 'center', color: '#dc2626' }}>
-                  <p>No se pudo cargar la imagen.</p>
-                  <p style={{ fontSize: '12px', color: '#6b7280' }}>
-                    Verifica que el bucket 'documents' sea público en Supabase.
-                  </p>
-                  <a
-                    href={ciUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style={{
-                      color: '#2563eb',
-                      fontSize: '12px',
-                      marginTop: '8px',
-                      display: 'inline-block',
-                    }}
-                  >
-                    Abrir enlace directo
-                  </a>
-                </div>
+                <p style={{ color: '#dc2626', fontSize: '12px' }}>No se pudo cargar la imagen.</p>
               ) : (
-                <img
-                  src={ciUrl}
-                  alt="Documento CI"
-                  style={{
-                    maxWidth: '100%',
-                    maxHeight: '70vh',
-                    objectFit: 'contain',
-                    borderRadius: '4px',
-                    boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
-                  }}
-                  onError={() => setImageError(true)}
-                />
+                <img src={ciUrl} alt="Documento CI" style={{ maxWidth: '100%', maxHeight: '70vh', objectFit: 'contain' }} onError={() => setImageError(true)} />
               )}
             </div>
           </div>
         </div>
       )}
-
-      <style>{`
-        @keyframes spin {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
-        }
-      `}</style>
     </div>
   );
 }
