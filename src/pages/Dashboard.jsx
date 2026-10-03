@@ -1684,19 +1684,19 @@ export default function Dashboard({ overrideRole }) {
                   label="Mis Clientes"
                   icon={<Users size={16} />}
                   color="#2563EB"
-                  onClick={() => (window.location.href = '/ventas')}
+                  onClick={() => (window.location.href = '/ventas?tab=clientes')}
                 />
                 <QuickLink
                   label="Mis N.E."
                   icon={<FileText size={16} />}
                   color="#7c3aed"
-                  onClick={() => (window.location.href = '/ventas')}
+                  onClick={() => (window.location.href = '/ventas?tab=nota_entrega')}
                 />
                 <QuickLink
-                  label="Potenciales"
+                  label="Visitas"
                   icon={<UserCheck size={16} />}
                   color="#16A34A"
-                  onClick={() => (window.location.href = '/ventas')}
+                  onClick={() => (window.location.href = '/ventas?tab=visitas')}
                 />
               </>
             )}
