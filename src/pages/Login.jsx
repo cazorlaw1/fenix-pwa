@@ -1,899 +1,493 @@
-// src/pages/Login.jsx
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { supabase } from '../lib/supabase'; // Asegúrate de que esta ruta sea correcta
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { supabase } from '../lib/supabase';
 
-export default function Login() {
-  const navigate = useNavigate();
-  const { fetchProfile } = useAuth();
-  const [isRegistering, setIsRegistering] = useState(false);
-  const [isForgotPassword, setIsForgotPassword] = useState(false);
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
+export default function Profile() {
+  const { user, profile, fetchProfile } = useAuth();
+
+  // Estados de datos
   const [fullName, setFullName] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [ci, setCi] = useState('');
+  const [city, setCity] = useState('');
+  const [avatarUrl, setAvatarUrl] = useState('');
+  const [ciUrl, setCiUrl] = useState('');
+
+  // Estados de UI
+  const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [uploadingCi, setUploadingCi] = useState(false);
+  const [showCiModal, setShowCiModal] = useState(false);
+  const [imageError, setImageError] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
 
-  // ✅ NUEVO: Función para notificar a los administradores
-  const notifyNewUser = async (userProfile) => {
+  const avatarInputRef = useRef(null);
+  const ciInputRef = useRef(null);
+
+  // Constantes de validación
+  const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+  const ALLOWED_CI_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
+  const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+  const AVATAR_BUCKET = 'avatars';
+  const CI_BUCKET = 'documents';
+
+  useEffect(() => {
+    if (profile) {
+      setFullName(profile.full_name || '');
+      setCi(profile.ci || '');
+      setCity(profile.city || '');
+      setAvatarUrl(profile.avatar_url || '');
+      setCiUrl(profile.ci_url || '');
+    }
+  }, [profile]);
+
+  const isIncomplete = !avatarUrl || !ciUrl || !ci || !city;
+
+  const extractPathFromUrl = (url, bucket) => {
+    if (!url) return null;
+    const pattern = `/${bucket}/`;
+    const idx = url.indexOf(pattern);
+    if (idx === -1) return null;
+    return url.substring(idx + pattern.length);
+  };
+
+  const deleteOldFile = async (url, bucket) => {
+    if (!url) return;
+    const path = extractPathFromUrl(url, bucket);
+    if (!path) return;
     try {
-      await supabase.functions.invoke('send-notification', {
-        body: {
-          type: 'new_user',
-          payload: {
-            usuarioNombre: userProfile.full_name || userProfile.email.split('@')[0],
-            usuarioEmail: userProfile.email
-          }
-        }
-      });
+      await supabase.storage.from(bucket).remove([path]);
     } catch (err) {
-      console.error('Error enviando notificación de nuevo usuario:', err);
-      // No lanzamos error aquí para no interrumpir el flujo de registro del usuario
+      console.warn('Error eliminando archivo anterior:', err);
     }
   };
 
-  // LÓGICA DE AUTENTICACIÓN MANUAL (EMAIL/PASSWORD)
-  const handleAuth = async (e) => {
+  const validateFile = (file, allowedTypes) => {
+    if (!file) return 'No se seleccionó ningún archivo.';
+    if (!allowedTypes.includes(file.type)) return 'Formato no permitido.';
+    if (file.size > MAX_FILE_SIZE) return 'El archivo supera los 5MB.';
+    return null;
+  };
+
+  const uploadFile = async (file, bucket) => {
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 8)}.${fileExt}`;
+    const filePath = `${user.id}/${fileName}`;
+    const { error: uploadError } = await supabase.storage.from(bucket).upload(filePath, file, { upsert: false });
+    if (uploadError) throw uploadError;
+    const { data } = supabase.storage.from(bucket).getPublicUrl(filePath);
+    return data.publicUrl;
+  };
+
+  const handleAvatarChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const validationError = validateFile(file, ALLOWED_IMAGE_TYPES);
+    if (validationError) { setMessage(`Error: ${validationError}`); return; }
+
+    setUploadingAvatar(true);
+    try {
+      await deleteOldFile(avatarUrl, AVATAR_BUCKET);
+      const newUrl = await uploadFile(file, AVATAR_BUCKET);
+      setAvatarUrl(newUrl);
+      setMessage('Foto de perfil actualizada. Recuerda guardar los cambios.');
+    } catch (err) {
+      setMessage(`Error al subir la foto: ${err.message}`);
+    } finally {
+      setUploadingAvatar(false);
+      if (avatarInputRef.current) avatarInputRef.current.value = '';
+    }
+  };
+
+  const handleCiChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const validationError = validateFile(file, ALLOWED_CI_TYPES);
+    if (validationError) { setMessage(`Error: ${validationError}`); return; }
+
+    setUploadingCi(true);
+    setImageError(false);
+    try {
+      await deleteOldFile(ciUrl, CI_BUCKET);
+      const newUrl = await uploadFile(file, CI_BUCKET);
+      setCiUrl(newUrl);
+      setMessage('Documento de CI actualizado. Recuerda guardar los cambios.');
+    } catch (err) {
+      setMessage(`Error al subir la CI: ${err.message}`);
+    } finally {
+      setUploadingCi(false);
+      if (ciInputRef.current) ciInputRef.current.value = '';
+    }
+  };
+
+  const handleSave = async (e) => {
     e.preventDefault();
-    setLoading(true);
+    setSaving(true);
     setMessage('');
     try {
-      if (isRegistering) {
-        const { data, error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            data: { full_name: fullName },
-          },
-        });
-        if (error) throw error;
-        
-        if (data?.user) {
-          // ✅ NUEVO: Llamar a la notificación inmediatamente después del registro exitoso
-          await notifyNewUser({
-            email: email,
-            full_name: fullName
-          });
-
-          setMessage(
-            'Su cuenta fue registrada exitosamente. Espere la aprobación del administrador.'
-          );
-          setEmail('');
-          setPassword('');
-          setFullName('');
-        }
-      } else {
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
-        if (error) throw error;
-        if (data?.user) {
-          setEmail('');
-          setPassword('');
-          // REDIRIGIR SEGÚN EL ROL AL INICIAR SESIÓN
-          const userProfile = await fetchProfile(data.user.id);
-          if (userProfile?.role === 'pendiente' || !userProfile?.role) {
-            window.location.href = '/pending';
-            return;
-          }
-          window.location.href = '/';
-        }
-      }
-    } catch (err) {
-      setMessage(err.message || 'Error al procesar la solicitud');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // LÓGICA PARA GOOGLE OAUTH
-  const handleGoogleAuth = async () => {
-    setLoading(true);
-    try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: 'https://hxlwrlzucnpdqofxjelg.supabase.co/auth/v1/callback',
-          queryParams: {
-            access_type: 'offline',
-            prompt: 'consent',
-          },
-        },
-      });
+      const { error } = await supabase
+        .from('profiles')
+        .update({ full_name: fullName, ci, city, avatar_url: avatarUrl, ci_url: ciUrl })
+        .eq('id', user.id);
       if (error) throw error;
+      await fetchProfile(user.id);
+      setMessage('Perfil actualizado correctamente.');
+      setIsEditing(false);
     } catch (err) {
-      setMessage(err.message || 'Error al conectar con Google');
-      setLoading(false);
-    }
-  };
-
-  // LÓGICA DE RECUPERACIÓN DE CONTRASEÑA
-  const handleResetPassword = async (e) => {
-    e.preventDefault();
-    if (!email) {
-      setMessage('Por favor, escribe tu correo electrónico para recuperar la contraseña.');
-      return;
-    }
-
-    setLoading(true);
-    setMessage('');
-
-    try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/update-password`,
-      });
-
-      if (error) throw error;
-
-      setMessage('¡Listo! Revisa tu correo electrónico. Te hemos enviado un enlace para restablecer tu contraseña.');
-    } catch (err) {
-      setMessage(err.message || 'Error al enviar el correo de recuperación.');
+      setMessage(`Error: ${err.message}`);
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   };
+
+  const showFenixCard = !isIncomplete && !isEditing;
 
   return (
-    <>
-      {/* ESTILOS GLOBALES CORREGIDOS PARA MÓVIL Y ESCRITORIO */}
-      <style>{`
-        html, body {
-          margin: 0;
-          padding: 0;
-          width: 100%;
-          min-height: 100%;
-        }
-        
-        @media (max-width: 768px) {
-          .login-main-container {
-            height: 100dvh !important;
-            min-height: 100dvh !important;
-            padding: 0 !important;
-            overflow-y: auto !important; 
-            -webkit-overflow-scrolling: touch !important;
-          }
-          .login-card-wrapper {
-            height: auto !important;
-            min-height: 100% !important;
-            border-radius: 0 !important;
-            border: none !important;
-            box-shadow: none !important;
-            flex-direction: column !important;
-            overflow: visible !important;
-          }
-          .login-left-panel {
-            flex: 0 0 auto !important; 
-            padding: 25px 20px !important;
-            border-right: none !important;
-            border-bottom: 4px solid #D4AF37 !important;
-            display: flex !important;
-            flex-direction: column !important;
-            justify-content: center !important;
-          }
-          .login-left-panel h1 {
-            font-size: 22px !important;
-            margin-bottom: 8px !important;
-            text-align: center !important;
-          }
-          .login-left-panel p {
-            font-size: 12px !important;
-            text-align: center !important;
-          }
-          .login-logo-container {
-            margin: 15px 0 !important;
-          }
-          .login-logo-img {
-            max-width: 110px !important;
-            max-height: 110px !important;
-          }
-          .login-right-panel {
-            flex: 1 1 auto !important;
-            padding: 20px 15px !important;
-            justify-content: center !important;
-            overflow: visible !important;
-          }
-          .login-form-wrapper {
-            max-width: 100% !important;
-          }
-        }
-      `}</style>
-
+    <div
+      style={{
+        width: '100%',
+        display: 'flex',
+        justifyContent: 'center',
+        padding: '24px 16px',
+        fontFamily: 'system-ui, -apple-system, sans-serif',
+        boxSizing: 'border-box',
+      }}
+    >
       <div
-        className="login-main-container"
         style={{
-          minHeight: '100vh',
-          height: '100vh',
-          backgroundColor: '#f3f4f6',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '20px',
-          fontFamily: 'system-ui, -apple-system, sans-serif',
-          boxSizing: 'border-box',
+          maxWidth: '390px',
           width: '100%',
+          backgroundColor: '#ffffff',
+          border: '1px solid #d4af37',
+          borderRadius: '16px',
           overflow: 'hidden',
+          boxShadow: '0 10px 25px rgba(0, 0, 0, 0.1), 0 0 12px rgba(212, 175, 55, 0.15)',
+          position: 'relative',
         }}
       >
-        <div
-          className="login-card-wrapper"
-          style={{
-            width: '100%',
-            maxWidth: '850px',
-            backgroundColor: '#ffffff',
-            borderRadius: '24px',
-            boxShadow: '0 20px 40px rgba(0, 0, 0, 0.08)',
-            overflow: 'hidden',
-            display: 'flex',
-            flexWrap: 'wrap',
-            border: '1px solid rgba(212, 175, 55, 0.4)',
-            minHeight: '520px',
-            height: 'auto',
-          }}
-        >
-          {/* PANEL IZQUIERDO NEGRO Y DORADO */}
-          <div
-            className="login-left-panel"
-            style={{
-              flex: '1 1 320px',
-              backgroundColor: '#000000',
-              color: '#ffffff',
-              padding: '40px 30px',
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'space-between',
-              borderRight: '4px solid #D4AF37',
-              boxSizing: 'border-box',
-            }}
-          >
-            <div>
-              <h1
-                style={{
-                  fontSize: '28px',
-                  fontWeight: '900',
-                  letterSpacing: '1px',
-                  margin: '0 0 10px 0',
-                  color: '#ffffff',
-                  textTransform: 'uppercase',
-                  textAlign: 'left',
-                }}
-              >
-                {isForgotPassword ? 'RECUPERAR' : isRegistering ? 'REGISTRO' : 'INICIAR SESIÓN'}
-              </h1>
-              <p
-                style={{
-                  fontSize: '12px',
-                  color: '#9ca3af',
-                  lineHeight: '1.6',
-                  margin: 0,
-                  textAlign: 'left',
-                }}
-              >
-                Bienvenido a{' '}
-                <span style={{ color: '#D4AF37', fontWeight: 'bold' }}>
-                  FENIX AUTO PART
-                </span>
-                . Gestión de repuestos automotrices.
-              </p>
-            </div>
-            
-            <div
-              className="login-logo-container"
-              style={{
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                margin: '30px 0',
-              }}
-            >
-              <img
-                className="login-logo-img"
-                src="/logo.png"
-                alt="Logo Fenix Auto Part"
-                style={{
-                  maxWidth: '160px',
-                  maxHeight: '160px',
-                  objectFit: 'contain',
-                }}
-                onError={(e) => {
-                  e.target.style.display = 'none';
-                  e.target.nextSibling.style.display = 'flex';
-                }}
-              />
+        <div style={{ position: 'relative', zIndex: 2 }}>
+          {showFenixCard ? (
+            /* ===== CREDENCIAL FENIX AUTO PART ===== */
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              
+              {/* 1. Cabecera Oscura con Logo y Texto Centrado, Mismo Alto */}
               <div
                 style={{
-                  display: 'none',
-                  width: '70px',
-                  height: '70px',
-                  borderRadius: '50%',
-                  backgroundImage:
-                    'linear-gradient(45deg, #AA771C, #D4AF37, #F3E5AB)',
-                  padding: '3px',
+                  backgroundColor: '#0a0a0a',
+                  padding: '12px 16px',
+                  display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  boxSizing: 'border-box',
+                  gap: '10px',
+                  borderBottom: '3px solid #d4af37',
+                  position: 'relative',
+                  overflow: 'hidden',
                 }}
               >
+                <img 
+                  src="https://hxlwrlzucnpdqofxjelg.supabase.co/storage/v1/object/public/assets/LOGOF.png" 
+                  alt="Fenix auto Part" 
+                  style={{ height: '32px', objectFit: 'contain' }} 
+                />
+                <span style={{ fontSize: '20px', fontWeight: '900', color: '#d4af37', letterSpacing: '0.5px', lineHeight: '32px' }}>
+                  Fenix auto Part
+                </span>
+              </div>
+
+              {/* 2. Cuerpo Central con Marca de Agua y Datos Más Grandes */}
+              <div
+                style={{
+                  backgroundColor: '#ffffff',
+                  padding: '22px 16px 18px 16px',
+                  position: 'relative',
+                  minHeight: '210px',
+                  display: 'flex',
+                  gap: '16px',
+                  alignItems: 'flex-start',
+                }}
+              >
+                {/* Marca de agua del fénix al fondo */}
+                <div 
+                  style={{
+                    position: 'absolute',
+                    bottom: '5px',
+                    right: '10px',
+                    width: '140px',
+                    height: '140px',
+                    backgroundImage: 'url(https://hxlwrlzucnpdqofxjelg.supabase.co/storage/v1/object/public/assets/LOGOF.png)',
+                    backgroundSize: 'contain',
+                    backgroundRepeat: 'no-repeat',
+                    backgroundPosition: 'center',
+                    opacity: 0.08,
+                    pointerEvents: 'none',
+                  }} 
+                />
+
+                {/* Fotografía de perfil */}
                 <div
                   style={{
-                    width: '100%',
-                    height: '100%',
-                    backgroundColor: '#000000',
-                    borderRadius: '50%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontWeight: '900',
-                    color: '#dc2626',
-                    fontSize: '24px',
+                    width: '110px',
+                    height: '135px',
+                    borderRadius: '8px',
+                    overflow: 'hidden',
+                    border: '2px solid #d4af37',
+                    backgroundColor: '#f3f4f6',
+                    flexShrink: 0,
+                    boxShadow: '0 4px 8px rgba(0,0,0,0.1)',
                   }}
                 >
-                  F
+                  {avatarUrl ? (
+                    <img src={avatarUrl} alt="Avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  ) : (
+                    <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9ca3af', fontSize: '11px' }}>Sin foto</div>
+                  )}
+                </div>
+
+                {/* Datos del usuario con fuente considerablemente más grande */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', flex: 1, zIndex: 1 }}>
+                  <div>
+                    <h2 style={{ fontSize: '17px', fontWeight: '900', color: '#111827', margin: 0, lineHeight: '1.15' }}>
+                      {fullName.toUpperCase()}
+                    </h2>
+                    <span style={{ fontSize: '12px', fontWeight: '700', color: '#b45309', textTransform: 'uppercase', letterSpacing: '0.5px', marginTop: '2px', display: 'block' }}>
+                      {profile?.role || 'DIRECTOR DE OPERACIONES'}
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '2px' }}>
+                    <div>
+                      <span style={{ color: '#6b7280', display: 'block', fontSize: '9px', textTransform: 'uppercase', fontWeight: '700' }}>C.I. / Identificación</span>
+                      <span style={{ color: '#111827', fontWeight: '900', fontSize: '14px' }}>{ci}</span>
+                    </div>
+                    <div>
+                      <span style={{ color: '#6b7280', display: 'block', fontSize: '9px', textTransform: 'uppercase', fontWeight: '700' }}>Gestión / Ubicación</span>
+                      <span style={{ color: '#111827', fontWeight: '900', fontSize: '14px' }}>{city}</span>
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
-            
-            <div>
-              <p
-                style={{
-                  fontSize: '12px',
-                  fontWeight: 'bold',
-                  color: '#D4AF37',
-                  letterSpacing: '2px',
-                  margin: 0,
-                  textTransform: 'uppercase',
-                  textAlign: 'center',
-                }}
-              >
-                FENIX WEBSITE
-              </p>
-              <p
-                style={{
-                  fontSize: '10px',
-                  color: '#6b7280',
-                  margin: '2px 0 0 0',
-                  textAlign: 'center',
-                }}
-              >
-                Repuestos & Autopartes
-              </p>
-            </div>
-          </div>
 
-          {/* PANEL DERECHO - FORMULARIO */}
-          <div
-            className="login-right-panel"
-            style={{
-              flex: '1 1 380px',
-              backgroundColor: '#ffffff',
-              padding: '40px 30px',
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'center',
-              boxSizing: 'border-box',
-            }}
-          >
-            {!isForgotPassword ? (
-              <>
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '20px',
-                    marginBottom: '30px',
-                  }}
-                >
+              {/* Correo Electrónico Destacado */}
+              <div style={{ padding: '0 16px 12px 16px', backgroundColor: '#ffffff', zIndex: 1 }}>
+                <div style={{ backgroundColor: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '6px', padding: '8px 12px', textAlign: 'center' }}>
+                  <span style={{ display: 'block', fontSize: '9px', color: '#6b7280', textTransform: 'uppercase', marginBottom: '2px', fontWeight: '700' }}>Correo Electrónico</span>
+                  <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#2563eb', wordBreak: 'break-all' }}>{user?.email}</span>
+                </div>
+              </div>
+
+              {/* Enlace para Ver Documento */}
+              {ciUrl && (
+                <div style={{ textAlign: 'center', paddingBottom: '12px', backgroundColor: '#ffffff', zIndex: 1 }}>
                   <button
                     type="button"
-                    onClick={() => setIsRegistering(true)}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      fontSize: '13px',
-                      fontWeight: 'bold',
-                      textTransform: 'uppercase',
-                      cursor: 'pointer',
-                      color: isRegistering ? '#D4AF37' : '#9ca3af',
-                      borderBottom: isRegistering ? '2px solid #D4AF37' : 'none',
-                      paddingBottom: '4px',
-                    }}
+                    onClick={() => { setImageError(false); setShowCiModal(true); }}
+                    style={{ background: 'none', border: 'none', color: '#b45309', fontSize: '11px', cursor: 'pointer', textDecoration: 'underline', fontWeight: '700' }}
                   >
-                    Registrarse
-                  </button>
-                  <div
-                    style={{
-                      width: '22px',
-                      height: '22px',
-                      borderRadius: '50%',
-                      backgroundImage:
-                        'linear-gradient(45deg, #AA771C, #D4AF37, #F3E5AB)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      boxShadow: '0 2px 4px rgba(0,0,0,0.15)',
-                    }}
-                  >
-                    <div
-                      style={{
-                        width: '6px',
-                        height: '6px',
-                        backgroundColor: '#000000',
-                        borderRadius: '50%',
-                      }}
-                    ></div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setIsRegistering(false)}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      fontSize: '13px',
-                      fontWeight: 'bold',
-                      textTransform: 'uppercase',
-                      cursor: 'pointer',
-                      color: !isRegistering ? '#D4AF37' : '#9ca3af',
-                      borderBottom: !isRegistering ? '2px solid #D4AF37' : 'none',
-                      paddingBottom: '4px',
-                    }}
-                  >
-                    Iniciar Sesión
+                    Ver Documento de Identidad adjunto
                   </button>
                 </div>
+              )}
 
-                {message && (
-                  <div
-                    style={{
-                      marginBottom: '16px',
-                      padding: '10px',
-                      fontSize: '12px',
-                      textAlign: 'center',
-                      borderRadius: '10px',
-                      backgroundColor: message.includes('¡Listo!') ? '#f0fdf4' : '#fef2f2',
-                      color: message.includes('¡Listo!') ? '#166534' : '#b91c1c',
-                      border: `1px solid ${message.includes('¡Listo!') ? '#bbf7d0' : '#fecaca'}`,
-                    }}
-                  >
-                    {message}
-                  </div>
-                )}
-
-                <form
-                  onSubmit={handleAuth}
-                  className="login-form-wrapper"
-                  style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '14px',
-                    maxWidth: '320px',
-                    margin: '0 auto',
-                    width: '100%',
-                  }}
-                >
-                  {isRegistering && (
-                    <div
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        border: '2px solid #e5e7eb',
-                        borderRadius: '50px',
-                        overflow: 'hidden',
-                        backgroundColor: '#f9fafb',
-                      }}
-                    >
-                      <span
-                        style={{
-                          padding: '8px 14px',
-                          fontSize: '11px',
-                          fontWeight: 'bold',
-                          color: '#6b7280',
-                          textTransform: 'uppercase',
-                          minWidth: '85px',
-                          borderRight: '1px solid #e5e7eb',
-                          backgroundColor: '#f3f4f6',
-                        }}
-                      >
-                        Nombre
-                      </span>
-                      <input
-                        type="text"
-                        required
-                        placeholder="John Doe"
-                        style={{
-                          width: '100%',
-                          padding: '8px 12px',
-                          fontSize: '12px',
-                          border: 'none',
-                          outline: 'none',
-                          backgroundColor: 'transparent',
-                          color: '#000000',
-                        }}
-                        value={fullName}
-                        onChange={(e) => setFullName(e.target.value)}
-                      />
-                    </div>
-                  )}
-
-                  <div
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      border: '2px solid #e5e7eb',
-                      borderRadius: '50px',
-                      overflow: 'hidden',
-                      backgroundColor: '#f9fafb',
-                    }}
-                  >
-                    <span
-                      style={{
-                        padding: '8px 14px',
-                        fontSize: '11px',
-                        fontWeight: 'bold',
-                        color: '#6b7280',
-                        textTransform: 'uppercase',
-                        minWidth: '85px',
-                        borderRight: '1px solid #e5e7eb',
-                        backgroundColor: '#f3f4f6',
-                      }}
-                    >
-                      Correo
-                    </span>
-                    <input
-                      type="email"
-                      required
-                      placeholder="ejemplo@correo.com"
-                      style={{
-                        width: '100%',
-                        padding: '8px 12px',
-                        fontSize: '12px',
-                        border: 'none',
-                        outline: 'none',
-                        backgroundColor: 'transparent',
-                        color: '#000000',
-                      }}
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                    />
-                  </div>
-
-                  {/* CONTRASEÑA CON OJITO */}
-                  <div
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      border: '2px solid #e5e7eb',
-                      borderRadius: '50px',
-                      overflow: 'hidden',
-                      backgroundColor: '#f9fafb',
-                      position: 'relative',
-                    }}
-                  >
-                    <span
-                      style={{
-                        padding: '8px 14px',
-                        fontSize: '11px',
-                        fontWeight: 'bold',
-                        color: '#6b7280',
-                        textTransform: 'uppercase',
-                        minWidth: '85px',
-                        borderRight: '1px solid #e5e7eb',
-                        backgroundColor: '#f3f4f6',
-                      }}
-                    >
-                      Contraseña
-                    </span>
-                    <input
-                      type={showPassword ? 'text' : 'password'}
-                      required
-                      placeholder="••••••••"
-                      style={{
-                        width: '100%',
-                        padding: '8px 40px 8px 12px',
-                        fontSize: '12px',
-                        border: 'none',
-                        outline: 'none',
-                        backgroundColor: 'transparent',
-                        color: '#000000',
-                      }}
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      style={{
-                        position: 'absolute',
-                        right: '12px',
-                        background: 'none',
-                        border: 'none',
-                        cursor: 'pointer',
-                        padding: 0,
-                        display: 'flex',
-                        alignItems: 'center',
-                        color: '#6b7280',
-                      }}
-                    >
-                      {showPassword ? (
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          width="16"
-                          height="16"
-                          fill="currentColor"
-                          viewBox="0 0 16 16"
-                        >
-                          <path d="M13.359 11.238C15.06 9.72 16 8 16 8s-3-5.5-8-5.5a7 7 0 0 0-2.79.588l.77.771A6 6 0 0 1 8 3.5c2.12 0 3.879 1.168 5.168 2.457A13 13 0 0 1 14.828 8q-.086.13-.195.288c-.335.48-.83 1.12-1.465 1.755-.165.165-.337.328-.517.486z" />
-                          <path d="M11.297 9.176a3.5 3.5 0 0 0-4.474-4.474l.823.823a2.5 2.5 0 0 1 2.829 2.829zm-2.943 1.299.822.822a3.5 3.5 0 0 1-4.474-4.474l.823.823a2.5 2.5 0 0 0 2.829 2.829" />
-                          <path d="M3.35 5.47q-.27.242-.534.509C1.372 7.373 0 8 0 8s3 5.5 8 5.5c1.605 0 3.033-.467 4.237-1.192l.942.942a.5.5 0 0 0 .708-.708l-13-13a.5.5 0 1 0-.708.708z" />
-                        </svg>
-                      ) : (
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          width="16"
-                          height="16"
-                          fill="currentColor"
-                          viewBox="0 0 16 16"
-                        >
-                          <path d="M16 8s-3-5.5-8-5.5S0 8 0 8s3 5.5 8 5.5S16 8 16 8M1.173 8a13 13 0 0 1 1.66-2.043C4.12 4.668 5.88 3.5 8 3.5s3.879 1.168 5.168 2.457A13 13 0 0 1 14.828 8q-.086.13-.195.288c-.335.48-.83 1.12-1.465 1.755C11.879 11.332 10.119 12.5 8 12.5s-3.879-1.168-5.168-2.457A13 13 0 0 1 1.172 8z" />
-                          <path d="M8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5M4.5 8a3.5 3.5 0 1 1 7 0 3.5 3.5 0 0 1-7 0" />
-                        </svg>
-                      )}
-                    </button>
-                  </div>
-
-                  {!isRegistering && (
-                    <div style={{ textAlign: 'right' }}>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setIsForgotPassword(true);
-                          setMessage('');
-                        }}
-                        style={{
-                          background: 'none',
-                          border: 'none',
-                          fontSize: '11px',
-                          color: '#dc2626',
-                          cursor: 'pointer',
-                          fontWeight: '600',
-                          padding: 0,
-                        }}
-                      >
-                        ¿Olvidó su contraseña?
-                      </button>
-                    </div>
-                  )}
-
-                  <button
-                    type="submit"
-                    disabled={loading}
-                    style={{
-                      width: '100%',
-                      padding: '10px 20px',
-                      borderRadius: '50px',
-                      backgroundImage:
-                        'linear-gradient(to right, #AA771C, #D4AF37, #AA771C)',
-                      color: '#ffffff',
-                      fontWeight: 'bold',
-                      fontSize: '12px',
-                      textTransform: 'uppercase',
-                      letterSpacing: '1px',
-                      border: 'none',
-                      cursor: 'pointer',
-                      boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
-                      marginTop: '6px',
-                    }}
-                  >
-                    {loading
-                      ? 'Procesando...'
-                      : isRegistering
-                      ? 'Registrarse'
-                      : 'Iniciar Sesión'}
-                  </button>
-                </form>
-
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    maxWidth: '320px',
-                    margin: '16px auto',
-                    width: '100%',
-                  }}
-                >
-                  <span
-                    style={{ height: '1px', backgroundColor: '#e5e7eb', flex: 1 }}
-                  ></span>
-                  <span
-                    style={{
-                      padding: '0 12px',
-                      fontSize: '10px',
-                      color: '#9ca3af',
-                      fontWeight: 'bold',
-                    }}
-                  >
-                    O
-                  </span>
-                  <span
-                    style={{ height: '1px', backgroundColor: '#e5e7eb', flex: 1 }}
-                  ></span>
-                </div>
-
-                <div
-                  className="login-form-wrapper"
-                  style={{
-                    maxWidth: '320px',
-                    margin: '0 auto',
-                    width: '100%',
-                  }}
-                >
-                  <button
-                    type="button"
-                    onClick={handleGoogleAuth}
-                    disabled={loading}
-                    style={{
-                      width: '100%',
-                      padding: '8px 16px',
-                      border: '2px solid #e5e7eb',
-                      borderRadius: '50px',
-                      fontWeight: '600',
-                      fontSize: '12px',
-                      color: '#374151',
-                      backgroundColor: '#ffffff',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '8px',
-                      cursor: 'pointer',
-                      opacity: loading ? 0.7 : 1,
-                    }}
-                  >
-                    <img
-                      src="https://www.svgrepo.com/show/475656/google-color.svg"
-                      alt="Google"
-                      style={{ width: '18px', height: '18px', display: 'block' }}
-                    />
-                    <span>
-                      {isRegistering
-                        ? 'Registrarse con Google'
-                        : 'Continuar con Google'}
-                    </span>
-                  </button>
-                </div>
-              </>
-            ) : (
-              // SECCIÓN DEDICADA PARA ENVIAR EL CORREO DE RECUPERACIÓN (SIN PEDIR CONTRASEÑA)
-              <div
-                className="login-form-wrapper"
-                style={{
-                  maxWidth: '320px',
-                  margin: '0 auto',
-                  width: '100%',
+              {/* 3. Sección Inferior Negra con Botón de Editar */}
+              <div 
+                style={{ 
+                  backgroundColor: '#0a0a0a', 
+                  padding: '14px 16px', 
+                  borderTop: '2px solid #d4af37',
                   display: 'flex',
                   flexDirection: 'column',
-                  gap: '16px',
+                  gap: '8px',
+                  alignItems: 'center'
                 }}
               >
-                <div style={{ textAlign: 'center' }}>
-                  <h3 style={{ fontSize: '15px', color: '#000000', margin: '0 0 6px 0' }}>
-                    Restablecer acceso
-                  </h3>
-                  <p style={{ fontSize: '12px', color: '#6b7280', margin: 0, lineHeight: '1.4' }}>
-                    Ingresa tu correo y te enviaremos un enlace seguro para crear una nueva contraseña.
-                  </p>
-                </div>
+                <span style={{ fontSize: '10px', color: '#d4af37', fontWeight: '700', letterSpacing: '1px', textTransform: 'uppercase' }}>
+                  FENIXAUTO.COM | {city.toUpperCase()}
+                </span>
 
-                {message && (
-                  <div
-                    style={{
-                      padding: '10px',
-                      fontSize: '12px',
-                      textAlign: 'center',
-                      borderRadius: '10px',
-                      backgroundColor: message.includes('¡Listo!') ? '#f0fdf4' : '#fef2f2',
-                      color: message.includes('¡Listo!') ? '#166534' : '#b91c1c',
-                      border: `1px solid ${message.includes('¡Listo!') ? '#bbf7d0' : '#fecaca'}`,
-                    }}
-                  >
-                    {message}
-                  </div>
-                )}
+                <button
+                  type="button"
+                  onClick={() => setIsEditing(true)}
+                  style={{
+                    width: '100%',
+                    backgroundColor: '#d4af37',
+                    color: '#000000',
+                    fontWeight: 'bold',
+                    padding: '9px',
+                    borderRadius: '6px',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontSize: '12px',
+                    transition: 'background-color 0.2s',
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#e5c158')}
+                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#d4af37')}
+                >
+                  Editar Perfil
+                </button>
+              </div>
 
-                <form onSubmit={handleResetPassword} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                  <div
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      border: '2px solid #e5e7eb',
-                      borderRadius: '50px',
-                      overflow: 'hidden',
-                      backgroundColor: '#f9fafb',
-                    }}
-                  >
-                    <span
-                      style={{
-                        padding: '8px 14px',
-                        fontSize: '11px',
-                        fontWeight: 'bold',
-                        color: '#6b7280',
-                        textTransform: 'uppercase',
-                        minWidth: '85px',
-                        borderRight: '1px solid #e5e7eb',
-                        backgroundColor: '#f3f4f6',
-                      }}
-                    >
-                      Correo
-                    </span>
-                    <input
-                      type="email"
-                      required
-                      placeholder="ejemplo@correo.com"
-                      style={{
-                        width: '100%',
-                        padding: '8px 12px',
-                        fontSize: '12px',
-                        border: 'none',
-                        outline: 'none',
-                        backgroundColor: 'transparent',
-                        color: '#000000',
-                      }}
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                    />
-                  </div>
-
-                  <button
-                    type="submit"
-                    disabled={loading}
-                    style={{
-                      width: '100%',
-                      padding: '11px 20px',
-                      borderRadius: '50px',
-                      backgroundImage:
-                        'linear-gradient(to right, #AA771C, #D4AF37, #AA771C)',
-                      color: '#ffffff',
-                      fontWeight: 'bold',
-                      fontSize: '12px',
-                      textTransform: 'uppercase',
-                      letterSpacing: '1px',
-                      border: 'none',
-                      cursor: 'pointer',
-                      boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
-                    }}
-                  >
-                    {loading ? 'Enviando...' : 'Enviar Solicitud'}
-                  </button>
-                </form>
-
-                <div style={{ textAlign: 'center', marginTop: '4px' }}>
+            </div>
+          ) : (
+            /* ===== VISTA DE FORMULARIO DE EDICIÓN ===== */
+            <div style={{ padding: '16px', backgroundColor: '#ffffff' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #f3f4f6', paddingBottom: '10px', marginBottom: '12px' }}>
+                <h1 style={{ fontSize: '15px', fontWeight: 'bold', color: '#000000', margin: 0 }}>
+                  Configurar Perfil
+                </h1>
+                {!isIncomplete && (
                   <button
                     type="button"
-                    onClick={() => {
-                      setIsForgotPassword(false);
-                      setMessage('');
-                    }}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      fontSize: '12px',
-                      color: '#D4AF37',
-                      cursor: 'pointer',
-                      fontWeight: 'bold',
-                      padding: 0,
-                    }}
+                    onClick={() => setIsEditing(false)}
+                    style={{ background: 'none', border: '1px solid #d1d5db', borderRadius: '6px', padding: '3px 6px', fontSize: '10px', cursor: 'pointer', color: '#374151' }}
                   >
-                    ← Volver a Iniciar Sesión
+                    Cancelar
                   </button>
-                </div>
+                )}
               </div>
-            )}
-          </div>
+
+              {/* Avatar para edición */}
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: '12px' }}>
+                <div
+                  onClick={() => !uploadingAvatar && avatarInputRef.current?.click()}
+                  style={{
+                    width: '75px',
+                    height: '90px',
+                    borderRadius: '8px',
+                    overflow: 'hidden',
+                    backgroundColor: '#f3f4f6',
+                    border: '2px solid #d4af37',
+                    cursor: uploadingAvatar ? 'wait' : 'pointer',
+                    position: 'relative',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  {avatarUrl ? (
+                    <img src={avatarUrl} alt="Avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  ) : (
+                    <span style={{ fontSize: '10px', color: '#9ca3af' }}>Sin foto</span>
+                  )}
+                </div>
+                <input ref={avatarInputRef} type="file" accept={ALLOWED_IMAGE_TYPES.join(',')} onChange={handleAvatarChange} style={{ display: 'none' }} />
+                <button
+                  type="button"
+                  onClick={() => avatarInputRef.current?.click()}
+                  disabled={uploadingAvatar}
+                  style={{ marginTop: '5px', backgroundColor: 'transparent', color: '#b45309', border: '1px solid #d4af37', borderRadius: '6px', padding: '3px 8px', fontSize: '10px', fontWeight: '600', cursor: 'pointer' }}
+                >
+                  {uploadingAvatar ? 'Subiendo...' : 'Cambiar foto'}
+                </button>
+              </div>
+
+              {isIncomplete && (
+                <div style={{ backgroundColor: '#fef2f2', borderLeft: '3px solid #dc2626', color: '#991b1b', padding: '6px 10px', borderRadius: '0 6px 6px 0', marginBottom: '10px', fontSize: '10px', fontWeight: '500' }}>
+                  ⚠️ Completa tu C.I., Ciudad y documentos para activar tu credencial.
+                </div>
+              )}
+
+              {message && (
+                <div style={{ backgroundColor: '#f3f4f6', border: '1px solid #d1d5db', color: '#1f2937', padding: '6px', borderRadius: '6px', marginBottom: '10px', fontSize: '10px' }}>
+                  {message}
+                </div>
+              )}
+
+              <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '9px', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', marginBottom: '2px' }}>Nombre Completo</label>
+                  <input
+                    type="text"
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    style={{ width: '100%', backgroundColor: '#f9fafb', border: '1px solid #d1d5db', borderRadius: '6px', padding: '6px 10px', fontSize: '11px', boxSizing: 'border-box' }}
+                  />
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '9px', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', marginBottom: '2px' }}>Cédula (C.I.)</label>
+                    <input
+                      type="text"
+                      value={ci}
+                      onChange={(e) => setCi(e.target.value)}
+                      placeholder="V-12345678"
+                      style={{ width: '100%', backgroundColor: '#f9fafb', border: '1px solid #d1d5db', borderRadius: '6px', padding: '6px 10px', fontSize: '11px', boxSizing: 'border-box' }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '9px', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', marginBottom: '2px' }}>Ciudad</label>
+                    <input
+                      type="text"
+                      value={city}
+                      onChange={(e) => setCity(e.target.value)}
+                      placeholder="Caracas"
+                      style={{ width: '100%', backgroundColor: '#f9fafb', border: '1px solid #d1d5db', borderRadius: '6px', padding: '6px 10px', fontSize: '11px', boxSizing: 'border-box' }}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '9px', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', marginBottom: '2px' }}>Documento de Identidad (CI)</label>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'between', backgroundColor: '#f9fafb', border: '1px solid #d1d5db', borderRadius: '6px', padding: '5px 8px', gap: '6px' }}>
+                    <span style={{ fontSize: '10px', color: ciUrl ? '#16a34a' : '#9ca3af', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {ciUrl ? 'Documento cargado ✓' : 'Sin documento'}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => ciInputRef.current?.click()}
+                      disabled={uploadingCi}
+                      style={{ backgroundColor: '#0a0a0a', color: '#ffffff', border: 'none', borderRadius: '4px', padding: '3px 6px', fontSize: '9px', fontWeight: '600', cursor: 'pointer' }}
+                    >
+                      {uploadingCi ? 'Subiendo...' : ciUrl ? 'Cambiar' : 'Adjuntar'}
+                    </button>
+                    <input ref={ciInputRef} type="file" accept={ALLOWED_CI_TYPES.join(',')} onChange={handleCiChange} style={{ display: 'none' }} />
+                  </div>
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '9px', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', marginBottom: '2px' }}>Correo Electrónico</label>
+                  <input
+                    type="text"
+                    value={user?.email || ''}
+                    disabled
+                    style={{ width: '100%', backgroundColor: '#f3f4f6', border: '1px solid #e5e7eb', borderRadius: '6px', padding: '6px 10px', fontSize: '11px', color: '#9ca3af', cursor: 'not-allowed', boxSizing: 'border-box' }}
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={saving}
+                  style={{ width: '100%', backgroundColor: '#0a0a0a', color: '#ffffff', fontWeight: '600', padding: '8px', borderRadius: '6px', border: 'none', cursor: 'pointer', marginTop: '4px', fontSize: '11px' }}
+                >
+                  {saving ? 'Guardando...' : 'Guardar Cambios'}
+                </button>
+              </form>
+            </div>
+          )}
         </div>
       </div>
-    </>
+
+      {/* ===== MODAL VISOR DE DOCUMENTO ===== */}
+      {showCiModal && ciUrl && (
+        <div
+          style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.85)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}
+          onClick={() => setShowCiModal(false)}
+        >
+          <div style={{ backgroundColor: '#fff', borderRadius: '10px', maxWidth: '90vw', maxHeight: '90vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ padding: '10px 14px', borderBottom: '1px solid #e5e7eb', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontWeight: '600', fontSize: '13px' }}>Documento de Identidad</span>
+              <button onClick={() => setShowCiModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '16px' }}>✕</button>
+            </div>
+            <div style={{ padding: '14px', backgroundColor: '#f9fafb', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+              {imageError ? (
+                <p style={{ color: '#dc2626', fontSize: '12px' }}>No se pudo cargar la imagen.</p>
+              ) : (
+                <img src={ciUrl} alt="Documento CI" style={{ maxWidth: '100%', maxHeight: '70vh', objectFit: 'contain' }} onError={() => setImageError(true)} />
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
