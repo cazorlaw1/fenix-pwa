@@ -34,9 +34,11 @@ import {
   ShoppingCart,
   Check, // Agregado para el menú responsivo
 } from 'lucide-react';
+
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
 // --- COMPONENTE SEARCHABLE DROPDOWN (CORREGIDO) ---
 function SearchableDropdown({
   options,
@@ -49,6 +51,7 @@ function SearchableDropdown({
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState('');
   const containerRef = useRef(null);
+
   useEffect(() => {
     function handleClickOutside(event) {
       if (
@@ -61,13 +64,16 @@ function SearchableDropdown({
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
   const filtered = options.filter((opt) => {
     const text = String(opt[labelKey] || '').toLowerCase();
     return text.includes(search.toLowerCase());
   });
+
   const selectedOption = options.find(
     (o) => String(o[valueKey]) === String(value)
   );
+
   return (
     <div ref={containerRef} style={{ position: 'relative', width: '100%' }}>
       <div
@@ -183,12 +189,16 @@ function SearchableDropdown({
     </div>
   );
 }
+
 // ---------------------------------------------------------------
+
 export default function SalesModule() {
   const { user, role } = useAuth();
+
   // Referencias para el menú móvil
   const mobileMenuRef = useRef(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
   // --- A. PERSISTENCIA Y NAVEGACIÓN DE PESTAÑAS ---
   // Inicialización con prioridad: URL Param > localStorage > Default
   const getInitialSubMenu = () => {
@@ -199,7 +209,9 @@ export default function SalesModule() {
     if (savedTab) return savedTab;
     return 'clientes';
   };
+
   const [activeSubMenu, setActiveSubMenu] = useState(getInitialSubMenu());
+
   // Efecto para guardar en localStorage y actualizar URL cuando cambia la pestaña
   useEffect(() => {
     localStorage.setItem('salesModule_activeTab', activeSubMenu);
@@ -208,24 +220,31 @@ export default function SalesModule() {
     url.searchParams.set('tab', activeSubMenu);
     window.history.replaceState({}, '', url);
   }, [activeSubMenu]);
+
   // Efecto para cerrar menú móvil al hacer clic fuera
   useEffect(() => {
     function handleClickOutside(event) {
-      if (mobileMenuRef.current && !mobileMenuRef.current.contains(event.target)) {
+      if (
+        mobileMenuRef.current &&
+        !mobileMenuRef.current.contains(event.target)
+      ) {
         setIsMobileMenuOpen(false);
       }
     }
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
   // Pestañas específicas de la sección Clientes (Predeterminada: 'registrar')
   const [clienteTab, setClienteTab] = useState('registrar');
   // Pestañas de Visitas y Nota de Entrega
   const [visitasTab, setVisitasTab] = useState('potenciales');
   const [neTab, setNeTab] = useState('crear_ne');
+
   // Mensajes globales y Loader
   const [message, setMessage] = useState({ type: '', text: '' });
   const [loading, setLoading] = useState(false);
+
   // Data Global
   const [sellersList, setSellersList] = useState([]);
   const [clients, setClients] = useState([]);
@@ -239,6 +258,7 @@ export default function SalesModule() {
     vales: 0.0,
   });
   const [paymentNotificationsMap, setPaymentNotificationsMap] = useState({});
+
   // Estado para el Visor Flotante de Imágenes (Modal)
   const [imageModal, setImageModal] = useState({
     open: false,
@@ -247,15 +267,18 @@ export default function SalesModule() {
     clientId: null,
     fieldName: null,
   });
+
   // --- ESTADOS PARA CONFIGURACIÓN GLOBAL Y FOLIO ---
   const [globalDiscount53, setGlobalDiscount53] = useState(53.38);
   const [globalDiscount23, setGlobalDiscount23] = useState(23.08);
   const [globalTerms, setGlobalTerms] = useState('Cargando términos...');
   const [estimatedNextFolio, setEstimatedNextFolio] = useState('...');
+
   // -------------------------------------------------
   // NUEVO ESTADO PARA HISTORIAL DE FACTURACIÓN DEL USUARIO
   const [userSettlementHistory, setUserSettlementHistory] = useState([]);
   const [historySearch, setHistorySearch] = useState('');
+
   // ---------------------------------------------------------------------------
   // 1. ESTADOS: SECCIÓN CLIENTES (CREAR Y EDITAR)
   // ---------------------------------------------------------------------------
@@ -272,8 +295,10 @@ export default function SalesModule() {
   const [ciFile, setCiFile] = useState(null);
   const [rifFile, setRifFile] = useState(null);
   const [adicionalFile, setAdicionalFile] = useState(null);
+
   // Filtros adicionales para tablas
   const [searchPotencialesQuery, setSearchPotencialesQuery] = useState('');
+
   // Modal para Editar Cliente Oficial de Cartera y sustitución de archivos
   const [editClientModal, setEditClientModal] = useState({
     open: false,
@@ -292,12 +317,14 @@ export default function SalesModule() {
   const [editCiFile, setEditCiFile] = useState(null);
   const [editRifFile, setEditRifFile] = useState(null);
   const [editAdicionalFile, setEditAdicionalFile] = useState(null);
+
   // ---------------------------------------------------------------------------
   // 2. ESTADOS: SECCIÓN VISITAS & POTENCIALES CLIENTES
   // ---------------------------------------------------------------------------
   const [searchClientQuery, setSearchClientQuery] = useState('');
   const [visitasGps, setVisitasGps] = useState({});
   const [visitasFiles, setVisitasFiles] = useState({});
+
   // Formulario en la tabla de potenciales para agregar nuevo
   const [potencialForm, setPotencialForm] = useState({
     nombre: '',
@@ -306,6 +333,7 @@ export default function SalesModule() {
   });
   const [potencialFile, setPotencialFile] = useState(null);
   const [potencialGps, setPotencialGps] = useState(null);
+
   // Modal para convertir de Potencial a Cliente Oficial
   const [convertModal, setConvertModal] = useState({
     open: false,
@@ -324,6 +352,7 @@ export default function SalesModule() {
   const [convertCiFile, setConvertCiFile] = useState(null);
   const [convertRifFile, setConvertRifFile] = useState(null);
   const [convertAdicionalFile, setConvertAdicionalFile] = useState(null);
+
   // ---------------------------------------------------------------------------
   // 3. ESTADOS: SECCIÓN NOTA DE ENTREGA & TARJETA DE VENDEDOR
   // ---------------------------------------------------------------------------
@@ -338,15 +367,19 @@ export default function SalesModule() {
   const [neCart, setNeCart] = useState([]);
   const [neObservacion, setNeObservacion] = useState('');
   const [neGpsLocation, setNeGpsLocation] = useState(null);
+
   // Filtro Buscador para Historial de N.E.
   const [searchHistoryQuery, setSearchHistoryQuery] = useState('');
+
   // Control de expansión de Tarjeta del Vendedor en Historial N.E. (Abierta por defecto)
   const [showFullSellerCard, setShowFullSellerCard] = useState(true);
+
   const [valeModal, setValeModal] = useState({
     open: false,
     notaId: null,
     monto: '',
   });
+
   // Estado para el Modal de Notificación de Abono (con campo de nota del usuario)
   const [abonoNotifModal, setAbonoNotifModal] = useState({
     open: false,
@@ -359,19 +392,22 @@ export default function SalesModule() {
     reference_number: '',
     user_note: '',
   });
+
   // Nuevo estado para manejar archivos de abono por ID de orden
   const [abonoFiles, setAbonoFiles] = useState({});
+
   // ---------------------------------------------------------------------------
-  // EFECTO PARA AUTO-OCULTAR NOTIFICACIONES A LOS 5 SEGUNDOS
+  // EFECTO PARA AUTO-OCULTAR NOTIFICACIONES A LOS 2 SEGUNDOS (MODIFICADO)
   // ---------------------------------------------------------------------------
   useEffect(() => {
     if (message.text) {
       const timer = setTimeout(() => {
         setMessage({ type: '', text: '' });
-      }, 5000);
+      }, 2000); // Cambiado a 2 segundos exactos
       return () => clearTimeout(timer);
     }
   }, [message]);
+
   // ---------------------------------------------------------------------------
   // CARGA DE DATOS INICIALES CON SUPABASE
   // ---------------------------------------------------------------------------
@@ -388,6 +424,7 @@ export default function SalesModule() {
     fetchPaymentNotifications();
     fetchUserSettlementHistory();
   }, [user, role]);
+
   const fetchGlobalSettings = async () => {
     try {
       const { data, error } = await supabase
@@ -399,16 +436,20 @@ export default function SalesModule() {
           settingsMap[item.setting_key] = item.setting_value;
         });
         // Actualizar estados con los valores de la BD
-        if (settingsMap['ne_discount_53']) setGlobalDiscount53(Number(settingsMap['ne_discount_53']));
-        if (settingsMap['ne_discount_23']) setGlobalDiscount23(Number(settingsMap['ne_discount_23']));
-        if (settingsMap['ne_terms_conditions']) setGlobalTerms(settingsMap['ne_terms_conditions']);
+        if (settingsMap['ne_discount_53'])
+          setGlobalDiscount53(Number(settingsMap['ne_discount_53']));
+        if (settingsMap['ne_discount_23'])
+          setGlobalDiscount23(Number(settingsMap['ne_discount_23']));
+        if (settingsMap['ne_terms_conditions'])
+          setGlobalTerms(settingsMap['ne_terms_conditions']);
       } else if (error) {
-        console.error("Error cargando configuración global:", error);
+        console.error('Error cargando configuración global: ', error);
       }
     } catch (err) {
       console.error('Error inesperado cargando configuración:', err);
     }
   };
+
   const fetchEstimatedFolio = async () => {
     try {
       const { data, error } = await supabase
@@ -426,6 +467,7 @@ export default function SalesModule() {
       setEstimatedNextFolio('1001');
     }
   };
+
   const fetchPaymentNotifications = async () => {
     try {
       const { data, error } = await supabase
@@ -449,6 +491,7 @@ export default function SalesModule() {
       console.error('Error cargando seller_payment_notifications:', e);
     }
   };
+
   const fetchSellers = async () => {
     const { data } = await supabase
       .from('profiles')
@@ -457,6 +500,7 @@ export default function SalesModule() {
       );
     if (data) setSellersList(data);
   };
+
   const fetchClients = async () => {
     let query = supabase
       .from('clients')
@@ -466,6 +510,7 @@ export default function SalesModule() {
     const { data } = await query.order('name', { ascending: true });
     if (data) setClients(data);
   };
+
   const fetchPotenciales = async () => {
     let query = supabase
       .from('clients')
@@ -475,6 +520,7 @@ export default function SalesModule() {
     const { data } = await query.order('created_at', { ascending: false });
     if (data) setPotenciales(data);
   };
+
   const fetchProducts = async () => {
     const { data } = await supabase
       .from('products')
@@ -482,6 +528,7 @@ export default function SalesModule() {
       .order('description', { ascending: true });
     if (data) setProducts(data);
   };
+
   const fetchSalesHistory = async () => {
     let query = supabase
       .from('sales_orders')
@@ -492,6 +539,7 @@ export default function SalesModule() {
     const { data } = await query.order('created_at', { ascending: false });
     if (data) setSalesHistory(data);
   };
+
   const fetchUserSettlementHistory = async () => {
     try {
       const { data, error } = await supabase
@@ -537,6 +585,7 @@ export default function SalesModule() {
       console.error('Error obteniendo historial de facturación:', err);
     }
   };
+
   const fetchComisionesYVales = async () => {
     try {
       let valesQuery = supabase
@@ -549,6 +598,7 @@ export default function SalesModule() {
             .filter((v) => v.status === 'aprobada')
             .reduce((acc, v) => acc + (Number(v.requested_amount_usd) || 0), 0)
         : 0;
+
       let salesQuery = supabase
         .from('sales_orders')
         .select(
@@ -556,6 +606,7 @@ export default function SalesModule() {
         )
         .eq('seller_id', user?.id);
       const { data: salesData } = await salesQuery;
+
       let totalCerradas = 0;
       let totalPendientesNe = 0;
       if (salesData) {
@@ -574,15 +625,18 @@ export default function SalesModule() {
           }
         });
       }
+
       const { data: penaltiesData, error: penErr } = await supabase
         .from('penalties')
         .select('amount, status')
         .eq('seller_id', user?.id)
         .in('status', ['pendiente', 'aprobada', 'approved']);
+
       const totalPenalizaciones =
         !penErr && penaltiesData
           ? penaltiesData.reduce((acc, p) => acc + (Number(p.amount) || 0), 0)
           : 0;
+
       setComisionesData({
         pendientes: totalCerradas,
         pendientesNe: totalPendientesNe,
@@ -593,6 +647,7 @@ export default function SalesModule() {
       console.error('Error obteniendo comisiones/vales:', err);
     }
   };
+
   const sellerProfile = sellersList.find((s) => s.id === user?.id);
   const currentSellerName =
     sellerProfile?.full_name ||
@@ -600,9 +655,11 @@ export default function SalesModule() {
     user?.user_metadata?.full_name ||
     'Vendedor Registrado';
   const currentUserRole = sellerProfile?.role || role || 'vendedor';
+
   const now = new Date();
   const currentMonth = now.getMonth() + 1;
   const currentYear = now.getFullYear();
+
   const totalNeFromHistory = salesHistory.reduce(
     (acc, n) => acc + (Number(n.final_price_usd) || 0),
     0
@@ -620,6 +677,7 @@ export default function SalesModule() {
     0
   );
   const fixedSalary = Number(sellerProfile?.sueldo_fijo_usd || 0);
+
   // ---------------------------------------------------------------------------
   // HELPER GPS & STORAGE
   // ---------------------------------------------------------------------------
@@ -639,6 +697,7 @@ export default function SalesModule() {
       (error) => alert('Error GPS: ' + error.message)
     );
   };
+
   const uploadFile = async (file, bucketName, pathFolder) => {
     if (!file) return null;
     const fileExt = file.name.split('.').pop();
@@ -653,6 +712,7 @@ export default function SalesModule() {
     const { data } = supabase.storage.from(bucketName).getPublicUrl(filePath);
     return data.publicUrl;
   };
+
   const getStoragePathFromUrl = (url, bucketName) => {
     if (!url) return null;
     try {
@@ -662,11 +722,13 @@ export default function SalesModule() {
       return null;
     }
   };
+
   // Función auxiliar para validar que sea imagen
   const validateImageFile = (file) => {
     if (!file) return true;
     return file.type.startsWith('image/');
   };
+
   // ---------------------------------------------------------------------------
   // MANEJADORES: CLIENTES OFICIALES Y EDICIÓN/ELIMINACIÓN SEGURA
   // ---------------------------------------------------------------------------
@@ -732,6 +794,7 @@ export default function SalesModule() {
       setLoading(false);
     }
   };
+
   const handleOpenEditClient = (client) => {
     setEditClientForm({
       nombre: client.name || '',
@@ -748,6 +811,7 @@ export default function SalesModule() {
     setEditAdicionalFile(null);
     setEditClientModal({ open: true, clientData: client });
   };
+
   const handleUpdateClient = async (e) => {
     e.preventDefault();
     // Validaciones de formato imagen
@@ -768,6 +832,7 @@ export default function SalesModule() {
       let ciUrl = editClientModal.clientData.ci_photo_url;
       let rifUrl = editClientModal.clientData.rif_photo_url;
       let adicUrl = editClientModal.clientData.additional_doc_url;
+
       // Lógica de eliminación de archivos antiguos antes de subir nuevos
       if (editCiFile) {
         if (ciUrl) {
@@ -793,6 +858,7 @@ export default function SalesModule() {
         }
         adicUrl = await uploadFile(editAdicionalFile, 'documents', 'adicional');
       }
+
       const { error } = await supabase
         .from('clients')
         .update({
@@ -809,6 +875,7 @@ export default function SalesModule() {
           additional_doc_url: adicUrl,
         })
         .eq('id', editClientModal.clientData.id);
+
       if (error) throw error;
       setMessage({
         type: 'success',
@@ -822,7 +889,13 @@ export default function SalesModule() {
       setLoading(false);
     }
   };
+
   const handleDeleteClient = async (clientId, clientName) => {
+    // MODIFICACIÓN D: Confirmación para eliminaciones
+    if (!window.confirm('¿Está seguro que desea eliminar este registro?')) {
+      return;
+    }
+
     setLoading(true);
     try {
       // 1. Verificar si existen Notas de Entrega pendientes o aprobadas para este cliente
@@ -831,11 +904,15 @@ export default function SalesModule() {
         .select('id, status, transaction_number')
         .eq('client_id', clientId)
         .in('status', ['pendiente', 'aprobada']); // Bloqueamos si hay notas en proceso
+
       if (ordersErr) throw ordersErr;
+
       // Si encuentra al menos una nota activa, bloqueamos la eliminación
       if (activeOrders && activeOrders.length > 0) {
         const count = activeOrders.length;
-        const firstTrans = activeOrders[0].transaction_number || activeOrders[0].id.substring(0, 6);
+        const firstTrans =
+          activeOrders[0].transaction_number ||
+          activeOrders[0].id.substring(0, 6);
         setMessage({
           type: 'error',
           text: `No se puede eliminar al cliente "${clientName}" porque tiene ${count} Nota(s) de Entrega activa(s) (Ej: #${firstTrans}). Finalice o elimine las notas primero.`,
@@ -843,13 +920,16 @@ export default function SalesModule() {
         setLoading(false);
         return; // Detenemos la ejecución aquí
       }
+
       // 2. Si no hay notas activas, procedemos a obtener los datos del cliente para borrar sus archivos
       const { data: client, error: fetchErr } = await supabase
         .from('clients')
         .select('*')
         .eq('id', clientId)
         .single();
+
       if (fetchErr) throw fetchErr;
+
       // Recopilar rutas de archivos para eliminar
       const docPaths = [
         getStoragePathFromUrl(client.ci_photo_url, 'documents'),
@@ -860,6 +940,7 @@ export default function SalesModule() {
         client.last_visit_photo_url,
         'visits'
       );
+
       // Eliminar archivos del storage primero
       if (docPaths.length > 0) {
         await supabase.storage.from('documents').remove(docPaths);
@@ -867,11 +948,13 @@ export default function SalesModule() {
       if (visitPath) {
         await supabase.storage.from('visits').remove([visitPath]);
       }
+
       // Finalmente eliminar el registro de la base de datos
       const { error: deleteErr } = await supabase
         .from('clients')
         .delete()
         .eq('id', clientId);
+
       if (deleteErr) throw deleteErr;
       setMessage({
         type: 'success',
@@ -880,8 +963,6 @@ export default function SalesModule() {
       // Refrescar las listas
       fetchClients();
       fetchPotenciales();
-      // No es estrictamente necesario refrescar salesHistory aquí si solo borramos clientes sin notas,
-      // pero lo dejamos por consistencia si hubiera notas cerradas huérfanas (aunque la lógica de negocio usualmente lo evita).
     } catch (err) {
       setMessage({
         type: 'error',
@@ -891,6 +972,7 @@ export default function SalesModule() {
       setLoading(false);
     }
   };
+
   // ---------------------------------------------------------------------------
   // MANEJADORES: POTENCIALES CLIENTES Y VISITAS EXIGIDAS (CON GPS)
   // ---------------------------------------------------------------------------
@@ -933,7 +1015,7 @@ export default function SalesModule() {
       });
       setPotencialForm({ nombre: '', direccion: '', telefono: '' });
       setPotencialFile(null);
-      setPotencialGps(null);
+      setPotencialGps(null); // MODIFICACIÓN A: Reinicio de GPS al guardar
       fetchPotenciales();
     } catch (err) {
       setMessage({ type: 'error', text: err.message });
@@ -941,9 +1023,13 @@ export default function SalesModule() {
       setLoading(false);
     }
   };
+
   const handleCaptureVisitaGps = async (id) => {
+    // MODIFICACIÓN A: Lógica de recaptura y actualización visual
     getDeviceLocation(async (coords) => {
+      // Actualiza inmediatamente el estado visual
       setVisitasGps((prev) => ({ ...prev, [id]: coords }));
+
       // Guardar inmediatamente en la base de datos como solicitado
       try {
         await supabase
@@ -957,6 +1043,7 @@ export default function SalesModule() {
       }
     });
   };
+
   const handleSaveVisita = async (id, isPotencial) => {
     const gps = visitasGps[id];
     if (!gps) {
@@ -977,17 +1064,21 @@ export default function SalesModule() {
       if (file) {
         adjuntoUrl = await uploadFile(file, 'visits', 'visitas');
       }
+
       const updateData = {
         last_visit_at: new Date().toISOString(),
         // Actualizar GPS también por seguridad si cambió
         last_gps_location: { lat: gps.lat, lng: gps.lng },
       };
       if (adjuntoUrl) updateData.last_visit_photo_url = adjuntoUrl;
+
       const { error } = await supabase
         .from('clients')
         .update(updateData)
         .eq('id', id);
+
       if (error) throw error;
+
       // CORRECCIÓN: Usar try/catch en lugar de .catch()
       try {
         await supabase.from('client_visits').insert([
@@ -1005,10 +1096,19 @@ export default function SalesModule() {
           visitErr
         );
       }
+
       setMessage({
         type: 'success',
         text: 'Visita actualizada y coordenadas GPS guardadas con éxito.',
       });
+
+      // MODIFICACIÓN A: Reiniciar estado visual del GPS tras guardar
+      setVisitasGps((prev) => {
+        const newState = { ...prev };
+        delete newState[id];
+        return newState;
+      });
+
       if (isPotencial) fetchPotenciales();
       else fetchClients();
     } catch (err) {
@@ -1017,6 +1117,7 @@ export default function SalesModule() {
       setLoading(false);
     }
   };
+
   const handleOpenConvertModal = (potencial) => {
     setConvertForm({
       nombre: potencial.name || '',
@@ -1033,6 +1134,7 @@ export default function SalesModule() {
     setConvertAdicionalFile(null);
     setConvertModal({ open: true, potencialData: potencial });
   };
+
   const handleSaveConvertion = async (e) => {
     e.preventDefault();
     if (!convertCiFile || !convertRifFile) {
@@ -1059,6 +1161,7 @@ export default function SalesModule() {
       const adicUrl = convertAdicionalFile
         ? await uploadFile(convertAdicionalFile, 'documents', 'adicional')
         : null;
+
       // Nota: Al convertir, asumimos que no hay CI/RIF previos en 'documents' porque era potencial.
       // Pero si hubiera foto de visita en 'visits', esa se mantiene o se limpia según lógica de negocio.
       // Aquí solo actualizamos los campos oficiales.
@@ -1079,6 +1182,7 @@ export default function SalesModule() {
           is_potential: false,
         })
         .eq('id', convertModal.potencialData.id);
+
       if (error) throw error;
       setMessage({
         type: 'success',
@@ -1093,17 +1197,20 @@ export default function SalesModule() {
       setLoading(false);
     }
   };
+
   // ---------------------------------------------------------------------------
   // MANEJADORES: NOTA DE ENTREGA & DESCARGA/ENVÍO PDF DIRECTO (CON GPS)
   // ---------------------------------------------------------------------------
   const porcentajeDescuento =
     neTipoPago === '53.38' ? globalDiscount53 : globalDiscount23;
+
   const filteredProducts = products.filter(
     (p) =>
       (!p.category || p.category.toLowerCase() === neCategoria.toLowerCase()) &&
       (p.description?.toLowerCase().includes(neSearchProduct.toLowerCase()) ||
         p.code?.toLowerCase().includes(neSearchProduct.toLowerCase()))
   );
+
   const handleAddToCart = () => {
     if (!neSelectedProdId) return;
     const prod = products.find((p) => p.id === neSelectedProdId);
@@ -1118,6 +1225,7 @@ export default function SalesModule() {
     }
     const valorUnitario = prod.price_usd;
     const vuConDescuento = valorUnitario * (1 - porcentajeDescuento / 100);
+
     if (inCart) {
       setNeCart(
         neCart.map((item) =>
@@ -1147,20 +1255,24 @@ export default function SalesModule() {
     setNeSelectedProdId('');
     setNeQuantity(1);
   };
+
   const handleRemoveFromCart = (id) => {
     setNeCart(neCart.filter((item) => item.product_id !== id));
   };
+
   const totalSinDescuento = neCart.reduce(
     (acc, i) => acc + i.unit_price_usd * i.quantity,
     0
   );
   const precioFinal = neCart.reduce((acc, i) => acc + i.total_line_usd, 0);
   const montoAhorrado = totalSinDescuento - precioFinal;
+
   const handleSendProposal = async () => {
     if (!neClientId) return alert('Seleccione un cliente.');
     if (neCart.length === 0) return alert('El carrito está vacío.');
     if (!neGpsLocation)
       return alert('Debe extraer la ubicación GPS para enviar la propuesta.');
+
     setLoading(true);
     try {
       const payload = {
@@ -1180,8 +1292,10 @@ export default function SalesModule() {
         longitude: neGpsLocation.lng,
         gps_captured_at: neGpsLocation.timestamp || new Date().toISOString(),
       };
+
       let orderId = editModeId;
       let transactionNumber = null; // Variable clave para guardar el número real
+
       if (editModeId) {
         // --- LÓGICA DE EDICIÓN ---
         // Aquí iría tu lógica existente para restaurar stock si es necesario...
@@ -1205,6 +1319,7 @@ export default function SalesModule() {
         orderId = newNota.id;
         transactionNumber = newNota.transaction_number; // Obtenemos el número de la nueva nota
       }
+
       // Insertar detalles de la orden
       const detalles = neCart.map((item) => ({
         order_id: orderId,
@@ -1215,6 +1330,7 @@ export default function SalesModule() {
         total_line_usd: item.total_line_usd,
       }));
       await supabase.from('order_items').insert(detalles);
+
       // ==========================================
       // 🚀 LLAMADA A LA NUEVA EDGE FUNCTION
       // ==========================================
@@ -1232,17 +1348,20 @@ export default function SalesModule() {
         );
       }
       // ==========================================
+
       setMessage({
         type: 'success',
         text: editModeId
           ? 'Nota de Entrega editada correctamente.'
           : 'Nota de Entrega enviada a revisión con coordenadas GPS guardadas.',
       });
+
       setNeCart([]);
       setNeClientId('');
       setNeObservacion('');
-      setNeGpsLocation(null);
+      setNeGpsLocation(null); // MODIFICACIÓN A: Reinicio de GPS al guardar NE
       setEditModeId(null);
+
       fetchSalesHistory();
       fetchComisionesYVales();
       fetchEstimatedFolio();
@@ -1253,6 +1372,7 @@ export default function SalesModule() {
       setLoading(false);
     }
   };
+
   const handleEditNE = async (nota) => {
     setEditModeId(nota.id);
     setNeClientId(nota.client_id);
@@ -1277,7 +1397,13 @@ export default function SalesModule() {
     }
     setNeTab('crear_ne');
   };
+
   const handleDeleteNE = async (nota) => {
+    // MODIFICACIÓN D: Confirmación para eliminaciones
+    if (!window.confirm('¿Está seguro que desea eliminar este registro?')) {
+      return;
+    }
+
     const totalAbonado = Number(nota.total_paid_usd) || 0;
     if (totalAbonado > 0) {
       alert(
@@ -1289,15 +1415,10 @@ export default function SalesModule() {
       );
       return;
     }
-    if (
-      !window.confirm(
-        `¿Estás seguro de que deseas eliminar la Nota de Entrega N° #${
-          nota.transaction_number || nota.id.substring(0, 6)
-        }?`
-      )
-    ) {
-      return;
-    }
+
+    // La confirmación de window.confirm ya cubre la segunda pregunta, pero mantenemos la estructura original si se desea doble check,
+    // aunque el requerimiento pide una ventana de confirmación general. El window.confirm inicial es suficiente.
+
     setLoading(true);
     try {
       // Restaurar stock si estaba aprobada
@@ -1344,6 +1465,7 @@ export default function SalesModule() {
       setLoading(false);
     }
   };
+
   const handleDownloadPDF = async (nota) => {
     try {
       setLoading(true);
@@ -1352,6 +1474,7 @@ export default function SalesModule() {
         .select('*, products(code, description)')
         .eq('order_id', nota.id);
       if (error) throw error;
+
       if (!window.html2pdf) {
         await new Promise((resolve, reject) => {
           const script = document.createElement('script');
@@ -1362,10 +1485,12 @@ export default function SalesModule() {
           document.head.appendChild(script);
         });
       }
+
       const clientName = nota.clients?.name || 'Cliente';
       const transNo = nota.transaction_number || nota.id.substring(0, 8);
       const fecha = new Date(nota.created_at).toLocaleString();
       const vendedorName = currentSellerName;
+
       let itemsHtml = '';
       let subTotal = 0;
       if (items && items.length > 0) {
@@ -1375,192 +1500,30 @@ export default function SalesModule() {
             item.quantity * item.discounted_unit_price_usd;
           subTotal += totalLine;
           itemsHtml += `
-<tr>
-<td style="padding: 6px 8px; border-bottom: 1px solid #ddd; font-family: monospace;">${
-            item.products?.code || 'S/C'
-          }</td>
-<td style="padding: 6px 8px; border-bottom: 1px solid #ddd;">${
-            item.products?.description || 'Producto'
-          }</td>
-<td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: center;">${
-            item.quantity
-          }</td>
-<td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: right;">$${Number(
-            item.unit_price_usd || 0
-          ).toFixed(2)}</td>
-<td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: right; color: #B45309;">$${Number(
-            item.discounted_unit_price_usd || 0
-          ).toFixed(2)}</td>
-<td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: right; font-weight: bold;">$${Number(
-            totalLine
-          ).toFixed(2)}</td>
-</tr>
-`;
-        });
-      }
-      const container = document.createElement('div');
-      container.innerHTML = `
-<div style="font-family: Arial, sans-serif; color: #111; padding: 25px; background: #fff; width: 700px; height: 1000px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between; margin: 0 auto;">
-<div>
-<div style="display: flex; justify-content: space-between; border-bottom: 2px solid #111; padding-bottom: 15px; margin-bottom: 20px;">
-<div>
-<h2 style="margin: 0; font-size: 20px; text-transform: uppercase;">FENIX AUTO PART C.A</h2>
-<p style="margin: 2px 0; font-size: 12px;"><strong>RIF:</strong> J-50261925-2</p>
-<p style="margin: 8px 0 0 0; font-size: 12px;"><strong>Cliente:</strong> ${clientName}</p>
-</div>
-<div style="text-align: right; font-size: 12px;">
-<p style="margin: 2px 0;"><strong>N° Transacción:</strong> #${transNo}</p>
-<p style="margin: 2px 0;"><strong>Fecha/Hora:</strong> ${fecha}</p>
-<p style="margin: 2px 0;"><strong>Vendedor:</strong> ${vendedorName}</p>
-<p style="margin: 2px 0;"><strong>Categoría:</strong> ${
-        nota.category || 'General'
-      }</p>
-</div>
-</div>
-<table style="width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 20px;">
-<thead>
-<tr style="background-color: #f3f4f6;">
-<th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: left;">Código</th>
-<th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: left;">Descripción</th>
-<th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: center;">Cantidad</th>
-<th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: right;">V. Unitario</th>
-<th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: right;">V. U. con Descuento</th>
-<th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: right;">Total Línea</th>
-</tr>
-</thead>
-<tbody>
-${itemsHtml}
-</tbody>
-</table>
-</div>
-<div>
-<div style="display: flex; justify-content: flex-end; font-size: 12px; margin-bottom: 15px;">
-<div style="width: 280px; background: #f9fafb; padding: 12px; border: 1px solid #ddd; border-radius: 6px;">
-<div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
-<span>Total Base:</span>
-<strong>$${Number(nota.total_base_usd || subTotal).toFixed(2)}</strong>
-</div>
-<div style="display: flex; justify-content: space-between; margin-bottom: 6px; color: #B45309;">
-<span>Descuento Aplicado:</span>
-<strong>-$${Number(nota.discount_amount_usd || 0).toFixed(2)}</strong>
-</div>
-<div style="display: flex; justify-content: space-between; border-top: 1px solid #ccc; padding-top: 6px; font-weight: bold; font-size: 14px; color: #DC2626;">
-<span>Precio Final:</span>
-<span>$${Number(nota.final_price_usd || subTotal).toFixed(2)}</span>
-</div>
-</div>
-</div>
-${
-  nota.observation
-    ? `
-<div style="font-size: 11px; color: #333; background: #fffbeb; border: 1px solid #fde68a; padding: 10px; border-radius: 4px; margin-bottom: 10px; text-align: justify;">
-<strong>Observación:</strong> ${nota.observation}
-</div>
-`
-    : ''
-}
-<div style="font-size: 10px; color: #555; background: #f3f4f6; padding: 10px; border-radius: 4px; line-height: 1.4; text-align: justify;">
-<strong>Términos y condiciones:</strong> ${globalTerms}
-</div>
-</div>
-</div>
-`;
-      const opciones = {
-        margin: 0,
-        filename: `nota-entrega-${transNo}.pdf`,
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-      };
-      await window.html2pdf().from(container).set(opciones).save();
-    } catch (err) {
-      alert('Error al generar PDF: ' + err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-  const handlePrintCapturedInvoicePDF = async (histItem) => {
-    try {
-      setLoading(true);
-      if (!window.html2pdf) {
-        await new Promise((resolve, reject) => {
-          const script = document.createElement('script');
-          script.src =
-            'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
-          script.onload = resolve;
-          script.onerror = reject;
-          document.head.appendChild(script);
-        });
-      }
-      const container = document.createElement('div');
-      container.innerHTML = `
-<div style="font-family: Arial, sans-serif; color: #111; padding: 25px; background: #fff; width: 720px; box-sizing: border-box; margin: 0 auto;">
-${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
-</div>
-`;
-      const opciones = {
-        margin: 0,
-        filename: `factura-liquidacion-${histItem.id}.pdf`,
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-      };
-      await window.html2pdf().from(container).set(opciones).save();
-    } catch (err) {
-      alert('Error al generar PDF de factura histórica: ' + err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-      const handleSendPDF = async (nota) => {
-    try {
-      setLoading(true);
-      
-      // 1. Obtener datos necesarios
-      const { data: items, error } = await supabase
-        .from('order_items')
-        .select('*, products(code, description)')
-        .eq('order_id', nota.id);
-        
-      if (error) throw error;
-
-      // Asegurarnos de tener html2pdf cargado
-      if (!window.html2pdf) {
-        await new Promise((resolve, reject) => {
-          const script = document.createElement('script');
-          script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
-          script.onload = resolve;
-          script.onerror = reject;
-          document.head.appendChild(script);
-        });
-      }
-
-      const clientName = nota.clients?.name || 'Cliente';
-      const transNo = nota.transaction_number || nota.id.substring(0, 8);
-      const fecha = new Date(nota.created_at).toLocaleString();
-      const vendedorName = currentSellerName;
-      
-      let itemsHtml = '';
-      let subTotal = 0;
-      
-      if (items && items.length > 0) {
-        items.forEach((item) => {
-          const totalLine = item.total_line_usd || item.quantity * item.discounted_unit_price_usd;
-          subTotal += totalLine;
-          itemsHtml += `
             <tr>
-              <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; font-family: monospace;">${item.products?.code || 'S/C'}</td>
-              <td style="padding: 6px 8px; border-bottom: 1px solid #ddd;">${item.products?.description || 'Producto'}</td>
-              <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: center;">${item.quantity}</td>
-              <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: right;">$${Number(item.unit_price_usd || 0).toFixed(2)}</td>
-              <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: right; color: #B45309;">$${Number(item.discounted_unit_price_usd || 0).toFixed(2)}</td>
-              <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: right; font-weight: bold;">$${Number(totalLine).toFixed(2)}</td>
+              <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; font-family: monospace;">${
+                item.products?.code || 'S/C'
+              }</td>
+              <td style="padding: 6px 8px; border-bottom: 1px solid #ddd;">${
+                item.products?.description || 'Producto'
+              }</td>
+              <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: center;">${
+                item.quantity
+              }</td>
+              <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: right;">$${Number(
+                item.unit_price_usd || 0
+              ).toFixed(2)}</td>
+              <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: right; color: #B45309;">$${Number(
+                item.discounted_unit_price_usd || 0
+              ).toFixed(2)}</td>
+              <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: right; font-weight: bold;">$${Number(
+                totalLine
+              ).toFixed(2)}</td>
             </tr>
           `;
         });
       }
 
-      // 2. Usar EXACTAMENTE el mismo HTML que handleDownloadPDF para mantener el diseño
       const container = document.createElement('div');
       container.innerHTML = `
         <div style="font-family: Arial, sans-serif; color: #111; padding: 25px; background: #fff; width: 700px; height: 1000px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between; margin: 0 auto;">
@@ -1575,7 +1538,9 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                 <p style="margin: 2px 0;"><strong>N° Transacción:</strong> #${transNo}</p>
                 <p style="margin: 2px 0;"><strong>Fecha/Hora:</strong> ${fecha}</p>
                 <p style="margin: 2px 0;"><strong>Vendedor:</strong> ${vendedorName}</p>
-                <p style="margin: 2px 0;"><strong>Categoría:</strong> ${nota.category || 'General'}</p>
+                <p style="margin: 2px 0;"><strong>Categoría:</strong> ${
+                  nota.category || 'General'
+                }</p>
               </div>
             </div>
             <table style="width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 20px;">
@@ -1599,25 +1564,31 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
               <div style="width: 280px; background: #f9fafb; padding: 12px; border: 1px solid #ddd; border-radius: 6px;">
                 <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
                   <span>Total Base:</span>
-                  <strong>$${Number(nota.total_base_usd || subTotal).toFixed(2)}</strong>
+                  <strong>$${Number(nota.total_base_usd || subTotal).toFixed(
+                    2
+                  )}</strong>
                 </div>
                 <div style="display: flex; justify-content: space-between; margin-bottom: 6px; color: #B45309;">
                   <span>Descuento Aplicado:</span>
-                  <strong>-$${Number(nota.discount_amount_usd || 0).toFixed(2)}</strong>
+                  <strong>-$${Number(nota.discount_amount_usd || 0).toFixed(
+                    2
+                  )}</strong>
                 </div>
                 <div style="display: flex; justify-content: space-between; border-top: 1px solid #ccc; padding-top: 6px; font-weight: bold; font-size: 14px; color: #DC2626;">
                   <span>Precio Final:</span>
-                  <span>$${Number(nota.final_price_usd || subTotal).toFixed(2)}</span>
+                  <span>$${Number(nota.final_price_usd || subTotal).toFixed(
+                    2
+                  )}</span>
                 </div>
               </div>
             </div>
             ${
               nota.observation
                 ? `
-            <div style="font-size: 11px; color: #333; background: #fffbeb; border: 1px solid #fde68a; padding: 10px; border-radius: 4px; margin-bottom: 10px; text-align: justify;">
-              <strong>Observación:</strong> ${nota.observation}
-            </div>
-            `
+              <div style="font-size: 11px; color: #333; background: #fffbeb; border: 1px solid #fde68a; padding: 10px; border-radius: 4px; margin-bottom: 10px; text-align: justify;">
+                <strong>Observación:</strong> ${nota.observation}
+              </div>
+              `
                 : ''
             }
             <div style="font-size: 10px; color: #555; background: #f3f4f6; padding: 10px; border-radius: 4px; line-height: 1.4; text-align: justify;">
@@ -1627,6 +1598,185 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
         </div>
       `;
 
+      const opciones = {
+        margin: 0,
+        filename: `nota-entrega-${transNo}.pdf`,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+      };
+      await window.html2pdf().from(container).set(opciones).save();
+    } catch (err) {
+      alert('Error al generar PDF: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePrintCapturedInvoicePDF = async (histItem) => {
+    try {
+      setLoading(true);
+      if (!window.html2pdf) {
+        await new Promise((resolve, reject) => {
+          const script = document.createElement('script');
+          script.src =
+            'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
+          script.onload = resolve;
+          script.onerror = reject;
+          document.head.appendChild(script);
+        });
+      }
+      const container = document.createElement('div');
+      container.innerHTML = `
+        <div style="font-family: Arial, sans-serif; color: #111; padding: 25px; background: #fff; width: 720px; box-sizing: border-box; margin: 0 auto;">
+          ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
+        </div>
+      `;
+      const opciones = {
+        margin: 0,
+        filename: `factura-liquidacion-${histItem.id}.pdf`,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+      };
+      await window.html2pdf().from(container).set(opciones).save();
+    } catch (err) {
+      alert('Error al generar PDF de factura histórica: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSendPDF = async (nota) => {
+    try {
+      setLoading(true);
+      // 1. Obtener datos necesarios
+      const { data: items, error } = await supabase
+        .from('order_items')
+        .select('*, products(code, description)')
+        .eq('order_id', nota.id);
+      if (error) throw error;
+      // Asegurarnos de tener html2pdf cargado
+      if (!window.html2pdf) {
+        await new Promise((resolve, reject) => {
+          const script = document.createElement('script');
+          script.src =
+            'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
+          script.onload = resolve;
+          script.onerror = reject;
+          document.head.appendChild(script);
+        });
+      }
+      const clientName = nota.clients?.name || 'Cliente';
+      const transNo = nota.transaction_number || nota.id.substring(0, 8);
+      const fecha = new Date(nota.created_at).toLocaleString();
+      const vendedorName = currentSellerName;
+      let itemsHtml = '';
+      let subTotal = 0;
+      if (items && items.length > 0) {
+        items.forEach((item) => {
+          const totalLine =
+            item.total_line_usd ||
+            item.quantity * item.discounted_unit_price_usd;
+          subTotal += totalLine;
+          itemsHtml += `
+             <tr>
+               <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; font-family: monospace;">${
+                 item.products?.code || 'S/C'
+               }</td>
+               <td style="padding: 6px 8px; border-bottom: 1px solid #ddd;">${
+                 item.products?.description || 'Producto'
+               }</td>
+               <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: center;">${
+                 item.quantity
+               }</td>
+               <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: right;">$${Number(
+                 item.unit_price_usd || 0
+               ).toFixed(2)}</td>
+               <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: right; color: #B45309;">$${Number(
+                 item.discounted_unit_price_usd || 0
+               ).toFixed(2)}</td>
+               <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: right; font-weight: bold;">$${Number(
+                 totalLine
+               ).toFixed(2)}</td>
+             </tr>
+           `;
+        });
+      }
+      // 2. Usar EXACTAMENTE el mismo HTML que handleDownloadPDF para mantener el diseño
+      const container = document.createElement('div');
+      container.innerHTML = `
+         <div style="font-family: Arial, sans-serif; color: #111; padding: 25px; background: #fff; width: 700px; height: 1000px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between; margin: 0 auto;">
+           <div>
+             <div style="display: flex; justify-content: space-between; border-bottom: 2px solid #111; padding-bottom: 15px; margin-bottom: 20px;">
+               <div>
+                 <h2 style="margin: 0; font-size: 20px; text-transform: uppercase;">FENIX AUTO PART C.A</h2>
+                 <p style="margin: 2px 0; font-size: 12px;"><strong>RIF:</strong> J-50261925-2</p>
+                 <p style="margin: 8px 0 0 0; font-size: 12px;"><strong>Cliente:</strong> ${clientName}</p>
+               </div>
+               <div style="text-align: right; font-size: 12px;">
+                 <p style="margin: 2px 0;"><strong>N° Transacción:</strong> #${transNo}</p>
+                 <p style="margin: 2px 0;"><strong>Fecha/Hora:</strong> ${fecha}</p>
+                 <p style="margin: 2px 0;"><strong>Vendedor:</strong> ${vendedorName}</p>
+                 <p style="margin: 2px 0;"><strong>Categoría:</strong> ${
+                   nota.category || 'General'
+                 }</p>
+               </div>
+             </div>
+             <table style="width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 20px;">
+               <thead>
+                 <tr style="background-color: #f3f4f6;">
+                   <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: left;">Código</th>
+                   <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: left;">Descripción</th>
+                   <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: center;">Cantidad</th>
+                   <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: right;">V. Unitario</th>
+                   <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: right;">V. U. con Descuento</th>
+                   <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: right;">Total Línea</th>
+                 </tr>
+               </thead>
+               <tbody>
+                 ${itemsHtml}
+               </tbody>
+             </table>
+           </div>
+           <div>
+             <div style="display: flex; justify-content: flex-end; font-size: 12px; margin-bottom: 15px;">
+               <div style="width: 280px; background: #f9fafb; padding: 12px; border: 1px solid #ddd; border-radius: 6px;">
+                 <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+                   <span>Total Base:</span>
+                   <strong>$${Number(nota.total_base_usd || subTotal).toFixed(
+                     2
+                   )}</strong>
+                 </div>
+                 <div style="display: flex; justify-content: space-between; margin-bottom: 6px; color: #B45309;">
+                   <span>Descuento Aplicado:</span>
+                   <strong>-$${Number(nota.discount_amount_usd || 0).toFixed(
+                     2
+                   )}</strong>
+                 </div>
+                 <div style="display: flex; justify-content: space-between; border-top: 1px solid #ccc; padding-top: 6px; font-weight: bold; font-size: 14px; color: #DC2626;">
+                   <span>Precio Final:</span>
+                   <span>$${Number(nota.final_price_usd || subTotal).toFixed(
+                     2
+                   )}</span>
+                 </div>
+               </div>
+             </div>
+             ${
+               nota.observation
+                 ? `
+             <div style="font-size: 11px; color: #333; background: #fffbeb; border: 1px solid #fde68a; padding: 10px; border-radius: 4px; margin-bottom: 10px; text-align: justify;">
+               <strong>Observación:</strong> ${nota.observation}
+             </div>
+             `
+                 : ''
+             }
+             <div style="font-size: 10px; color: #555; background: #f3f4f6; padding: 10px; border-radius: 4px; line-height: 1.4; text-align: justify;">
+               <strong>Términos y condiciones:</strong> ${globalTerms}
+             </div>
+           </div>
+         </div>
+       `;
       // 3. Generar Blob con las mismas opciones de calidad
       const opt = {
         margin: 0,
@@ -1634,29 +1784,47 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
         image: { type: 'jpeg', quality: 0.98 },
         html2canvas: { scale: 2, useCORS: true },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-        output: 'blob' 
+        output: 'blob',
       };
-
-      const pdfBlob = await window.html2pdf().from(container).set(opt).output('blob');
-      
+      const pdfBlob = await window
+        .html2pdf()
+        .from(container)
+        .set(opt)
+        .output('blob');
       // Crear un objeto File desde el Blob
-      const file = new File([pdfBlob], `Nota-Entrega-${transNo}.pdf`, { type: 'application/pdf' });
-
+      const file = new File([pdfBlob], `Nota-Entrega-${transNo}.pdf`, {
+        type: 'application/pdf',
+      });
       // 4. Intentar compartir nativamente
-      if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+      if (
+        navigator.share &&
+        navigator.canShare &&
+        navigator.canShare({ files: [file] })
+      ) {
         await navigator.share({
           title: `Nota de Entrega #${transNo}`,
-          text: `Hola, adjunto la Nota de Entrega #${transNo} para el cliente ${clientName}. Total: $${Number(nota.final_price_usd).toFixed(2)}`,
-          files: [file]
+          text: `Hola, adjunto la Nota de Entrega #${transNo} para el cliente ${clientName}. Total: $${Number(
+            nota.final_price_usd
+          ).toFixed(2)}`,
+          files: [file],
         });
       } else {
         // Fallback: Si no soporta compartir archivos, descarga y abre WhatsApp
-        await window.html2pdf().from(container).set({ ...opt, output: 'save' }).save();
-        
-        const mensaje = `Hola! Adjunto resumen de la Nota de Entrega Aprobada N° ${transNo} para el cliente *${clientName}*. Total Final: *$${Number(nota.final_price_usd).toFixed(2)}*. (El PDF se descargó en tu dispositivo, por favor adjúntalo manualmente).`;
-        window.open(`https://wa.me/?text=${encodeURIComponent(mensaje)}`, '_blank');
+        await window
+          .html2pdf()
+          .from(container)
+          .set({ ...opt, output: 'save' })
+          .save();
+        const mensaje = `Hola! Adjunto resumen de la Nota de Entrega Aprobada N° ${transNo} para el cliente *${clientName}*. Total Final: *$${Number(
+          nota.final_price_usd
+        ).toFixed(
+          2
+        )}*. (El PDF se descargó en tu dispositivo, por favor adjúntalo manualmente).`;
+        window.open(
+          `https://wa.me/?text=${encodeURIComponent(mensaje)}`,
+          '_blank'
+        );
       }
-
     } catch (err) {
       console.error(err);
       alert('Error al generar o compartir el PDF: ' + err.message);
@@ -1664,6 +1832,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
       setLoading(false);
     }
   };
+
   const handleSolicitarVale = async () => {
     if (!valeModal.monto || Number(valeModal.monto) <= 0)
       return alert('Ingrese un monto válido');
@@ -1676,6 +1845,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
         valeModal.notaId?.substring(0, 6) ||
         'N/A';
       const clienteNombre = notaAsociada?.clients?.name || 'Cliente';
+
       const { error } = await supabase.from('vales').insert([
         {
           order_id: valeModal.notaId,
@@ -1686,6 +1856,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
         },
       ]);
       if (error) throw error;
+
       // ✅ ENVIAR CORREO AL ADMINISTRADOR SOBRE LA SOLICITUD DE VALE
       try {
         await supabase.functions.invoke('send-notification', {
@@ -1706,6 +1877,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
           notifErr
         );
       }
+
       setMessage({
         type: 'success',
         text: 'Solicitud de vale enviada y administrador notificado.',
@@ -1719,6 +1891,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
       setLoading(false);
     }
   };
+
   const handleOpenAbonoNotifModal = (notaId) => {
     const existing = paymentNotificationsMap[notaId];
     if (existing && existing.status === 'pending') {
@@ -1743,6 +1916,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
     setAbonoFiles((prev) => ({ ...prev, [notaId]: null }));
     setAbonoNotifModal({ open: true, notaId });
   };
+
   const handleEnviarNotificacionAbono = async (e) => {
     e.preventDefault();
     if (!abonoNotifModal.notaId) return;
@@ -1761,8 +1935,10 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
       if (isNaN(montoNum) || montoNum <= 0) {
         throw new Error('Ingrese un monto válido.');
       }
+
       // Subir archivo primero
       const receiptUrl = await uploadFile(fileToUpload, 'visits', 'abonos');
+
       const { data: newNotif, error: notifErr } = await supabase
         .from('seller_payment_notifications')
         .insert([
@@ -1780,11 +1956,14 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
         ])
         .select()
         .single();
+
       if (notifErr) throw notifErr;
+
       setPaymentNotificationsMap((prev) => ({
         ...prev,
         [abonoNotifModal.notaId]: newNotif,
       }));
+
       // ✅ ENVIAR CORREO AL ADMINISTRADOR Y VENDEDOR SOBRE EL ABONO
       try {
         const notaActual = salesHistory.find(
@@ -1811,6 +1990,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
         console.warn('Error enviando correo de abono:', mailErr);
         // No bloqueamos el flujo si falla el correo
       }
+
       setMessage({
         type: 'success',
         text: 'Notificación de abono registrada y administrador notificado.',
@@ -1834,7 +2014,9 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
       setLoading(false);
     }
   };
+
   const selectedClientData = clients.find((c) => c.id === neClientId);
+
   const CustomFileInput = ({
     id,
     onChange,
@@ -1889,6 +2071,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
       </label>
     </div>
   );
+
   const filteredSalesHistory = salesHistory.filter((nota) => {
     const q = searchHistoryQuery.toLowerCase();
     const clientName = nota.clients?.name?.toLowerCase() || '';
@@ -1897,6 +2080,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
       .toLowerCase();
     return clientName.includes(q) || transNo.includes(q);
   });
+
   const filteredSettlementHistory = userSettlementHistory.filter((item) => {
     if (!historySearch.trim()) return true;
     const q = historySearch.toLowerCase();
@@ -1905,6 +2089,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
       item.user?.full_name?.toLowerCase().includes(q)
     );
   });
+
   // Función para manejar la sustitución de imagen desde el Modal
   const handleReplaceImageFromModal = async (newFile) => {
     if (!newFile) return;
@@ -1914,6 +2099,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
     }
     const { clientId, fieldName, url: oldUrl } = imageModal;
     if (!clientId || !fieldName) return;
+
     setLoading(true);
     try {
       // Determinar bucket y carpeta según el campo
@@ -1925,6 +2111,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
         bucket = 'visits';
         folder = 'visitas';
       }
+
       // Eliminar archivo antiguo si existe
       if (oldUrl) {
         const oldPath = getStoragePathFromUrl(oldUrl, bucket);
@@ -1932,14 +2119,18 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
           await supabase.storage.from(bucket).remove([oldPath]);
         }
       }
+
       // Subir nuevo archivo
       const newUrl = await uploadFile(newFile, bucket, folder);
+
       // Actualizar base de datos
       const { error } = await supabase
         .from('clients')
         .update({ [fieldName]: newUrl })
         .eq('id', clientId);
+
       if (error) throw error;
+
       // Actualizar estado local y cerrar modal
       setImageModal((prev) => ({ ...prev, url: newUrl }));
       // Refrescar listas
@@ -1955,6 +2146,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
       setLoading(false);
     }
   };
+
   // Lista de pestañas para el menú
   const menuTabs = [
     { id: 'clientes', label: 'Clientes', icon: Users },
@@ -1962,6 +2154,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
     { id: 'nota_entrega', label: 'Nota de Entrega', icon: FileText },
     { id: 'historial_ventas', label: 'Historial de Ventas', icon: History },
   ];
+
   return (
     <div
       style={{
@@ -1974,31 +2167,71 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
     >
       {/* BLOQUE DE ESTILOS GLOBALES PARA RESPONSIVIDAD */}
       <style>{`
-        @media (max-width: 768px) {
-          .desktop-tabs { display: none !important; }
-          .mobile-menu-container { display: block !important; }
-          .desktop-table { display: none !important; }
-          .desktop-cards-grid { display: none !important; }
-          .mobile-cards-container { display: flex !important; flex-direction: column; gap: 12px; }
-          /* Ajuste de botones internos en móvil */
-          .action-buttons-wrapper {
-            flex-wrap: wrap !important;
-            justify-content: center !important;
-          }
-          .action-buttons-wrapper button {
-            padding: 4px 6px !important;
-            font-size: 10px !important;
-            min-width: 30% !important;
-          }
-        }
-        @media (min-width: 769px) {
-          .desktop-tabs { display: flex !important; }
-          .mobile-menu-container { display: none !important; }
-          .desktop-table { display: none !important; } /* Ocultamos tabla tradicional */
-          .desktop-cards-grid { display: grid !important; } /* Mostramos grid de tarjetas */
-          .mobile-cards-container { display: none !important; }
-        }
-      `}</style>
+  @media (max-width: 768px) { 
+    .desktop-tabs { display: none !important; } 
+    .mobile-menu-container { display: block !important; } 
+    .desktop-table { display: none !important; } 
+    .desktop-cards-grid { display: none !important; } 
+    .mobile-cards-container { display: flex !important; flex-direction: column; gap: 12px; } 
+    
+    /* CONTENEDOR DE BOTONES */
+    .action-buttons-wrapper { 
+      display: flex !important;
+      flex-wrap: nowrap !important; /* PROHÍBE saltos de línea */
+      justify-content: stretch !important; 
+      align-items: stretch !important; /* CLAVE: Fuerza MISMA ALTURA en todos los hijos */
+      gap: 4px !important; 
+      margin-top: 6px !important;
+      padding-top: 8px !important;
+      border-top: 1px solid #E5E7EB !important;
+    } 
+    
+    /* ESTILO BASE PARA TODOS LOS BOTONES DENTRO DEL WRAPPER */
+    .action-buttons-wrapper button { 
+      display: inline-flex !important; 
+      align-items: center !important; /* Centra íconos/texto verticalmente */
+      justify-content: center !important;
+      padding: 8px 4px !important; 
+      font-size: 9px !important; 
+      white-space: nowrap !important; 
+      overflow: hidden !important;
+      text-overflow: ellipsis !important;
+      border-radius: 6px !important;
+      line-height: 1.2 !important; 
+      height: auto !important; 
+      box-sizing: border-box !important;
+      min-height: 36px !important; /* Altura mínima táctil uniforme */
+      
+      /* RESET DE ESTILOS EN LÍNEA CONFLICTIVOS */
+      width: auto !important; 
+      margin-top: 0 !important; 
+    }
+
+    /* BOTONES PRINCIPALES (Registrar Visita y Reg. Cliente) */
+    .action-buttons-wrapper button:not(:last-child) {
+      flex: 1 !important; /* Se reparten el espacio equitativamente */
+      min-width: 0 !important; 
+    }
+
+    /* BOTÓN DE BORRAR (Último hijo) */
+    .action-buttons-wrapper button:last-child {
+      flex: 0 0 auto !important; 
+      width: 36px !important; 
+      min-width: 36px !important;
+      max-width: 36px !important;
+      padding: 8px 0 !important; 
+    }
+  } 
+
+  @media (min-width: 769px) { 
+    .desktop-tabs { display: flex !important; } 
+    .mobile-menu-container { display: none !important; } 
+    .desktop-table { display: none !important; } 
+    .desktop-cards-grid { display: grid !important; } 
+    .mobile-cards-container { display: none !important; } 
+  }
+`}</style>
+
       <div
         style={{
           display: 'flex',
@@ -2027,8 +2260,10 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
           </p>
         </div>
       </div>
+
       {/* MENÚ HORIZONTAL (DESKTOP) */}
-      <div className="desktop-tabs"
+      <div
+        className="desktop-tabs"
         style={{
           display: 'flex',
           gap: '8px',
@@ -2067,8 +2302,13 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
           );
         })}
       </div>
+
       {/* MENÚ DROPDOWN (MÓVIL) */}
-      <div className="mobile-menu-container" ref={mobileMenuRef} style={{ display: 'none', marginBottom: '24px', position: 'relative' }}>
+      <div
+        className="mobile-menu-container"
+        ref={mobileMenuRef}
+        style={{ display: 'none', marginBottom: '24px', position: 'relative' }}
+      >
         <button
           onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
           style={{
@@ -2088,10 +2328,12 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
         >
           <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             {(() => {
-              const ActiveIcon = menuTabs.find(t => t.id === activeSubMenu)?.icon || Users;
+              const ActiveIcon =
+                menuTabs.find((t) => t.id === activeSubMenu)?.icon || Users;
               return <ActiveIcon size={18} color="#dc2626" />;
             })()}
-            {menuTabs.find((t) => t.id === activeSubMenu)?.label || 'Seleccionar'}
+            {menuTabs.find((t) => t.id === activeSubMenu)?.label ||
+              'Seleccionar'}
           </span>
           <ChevronDown size={18} color="#6b7280" />
         </button>
@@ -2139,27 +2381,40 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                 >
                   <Icon size={18} color={isActive ? '#dc2626' : '#9ca3af'} />
                   <span>{tab.label}</span>
-                  {isActive && <Check size={16} color="#dc2626" style={{ marginLeft: 'auto' }} />}
+                  {isActive && (
+                    <Check
+                      size={16}
+                      color="#dc2626"
+                      style={{ marginLeft: 'auto' }}
+                    />
+                  )}
                 </button>
               );
             })}
           </div>
         )}
       </div>
+
+      {/* MODIFICACIÓN E: Notificaciones Toast (Ventanas emergentes) */}
       {message.text && (
         <div
           style={{
-            padding: '12px',
+            position: 'fixed',
+            top: '20px',
+            right: '20px',
+            zIndex: 9999,
+            padding: '12px 20px',
             borderRadius: '8px',
             display: 'flex',
             alignItems: 'center',
             gap: '12px',
-            marginBottom: '12px',
             backgroundColor: message.type === 'success' ? '#F0FDF4' : '#FEF2F2',
             color: message.type === 'success' ? '#166534' : '#991B1B',
             border: `1px solid ${
               message.type === 'success' ? '#BBF7D0' : '#FECACA'
             }`,
+            boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+            animation: 'fadeIn 0.3s ease-out',
           }}
         >
           {message.type === 'success' ? (
@@ -2176,6 +2431,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
           </span>
         </div>
       )}
+
       {activeSubMenu === 'clientes' && (
         <div>
           <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
@@ -2218,6 +2474,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
               <Users style={{ width: '14px', height: '14px' }} /> Mis Clientes
             </button>
           </div>
+
           {clienteTab === 'registrar' && (
             <div
               style={{
@@ -2563,6 +2820,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
               </form>
             </div>
           )}
+
           {clienteTab === 'cartera' && (
             <div
               style={{
@@ -2624,19 +2882,28 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                   />
                 </div>
               </div>
-              
               {/* GRID DE TARJETAS ESCRITORIO (NUEVO) */}
-              <div className="desktop-cards-grid" style={{ 
-                display: 'none', 
-                gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', 
-                gap: '16px' 
-              }}>
+              <div
+                className="desktop-cards-grid"
+                style={{
+                  display: 'none',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))',
+                  gap: '16px',
+                }}
+              >
                 {clients.filter((c) =>
                   c.name
                     ?.toLowerCase()
                     .includes(searchClientQuery.toLowerCase())
                 ).length === 0 ? (
-                  <div style={{ padding: '16px', textAlign: 'center', color: '#6B7280', gridColumn: '1/-1' }}>
+                  <div
+                    style={{
+                      padding: '16px',
+                      textAlign: 'center',
+                      color: '#6B7280',
+                      gridColumn: '1/-1',
+                    }}
+                  >
                     No se encontraron clientes registrados por ti.
                   </div>
                 ) : (
@@ -2662,64 +2929,305 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                         }}
                       >
                         {/* Encabezado Tarjeta */}
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', borderBottom: '1px solid #F3F4F6', paddingBottom: '8px' }}>
+                        <div
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'start',
+                            borderBottom: '1px solid #F3F4F6',
+                            paddingBottom: '8px',
+                          }}
+                        >
                           <div>
-                            <span style={{ fontSize: '10px', fontWeight: '700', color: '#6B7280', textTransform: 'uppercase' }}>Cliente</span>
-                            <div style={{ fontSize: '16px', fontWeight: '900', color: '#111827', marginTop: '2px' }}>{c.name}</div>
+                            <span
+                              style={{
+                                fontSize: '10px',
+                                fontWeight: '700',
+                                color: '#6B7280',
+                                textTransform: 'uppercase',
+                              }}
+                            >
+                              Cliente
+                            </span>
+                            <div
+                              style={{
+                                fontSize: '16px',
+                                fontWeight: '900',
+                                color: '#111827',
+                                marginTop: '2px',
+                              }}
+                            >
+                              {c.name}
+                            </div>
                           </div>
-                          <span style={{ padding: '4px 8px', backgroundColor: '#F3F4F6', borderRadius: '6px', fontWeight: '700', color: '#374151', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            <UserCheck style={{ width: '12px', height: '12px', color: '#16A34A' }} />
+                          <span
+                            style={{
+                              padding: '4px 8px',
+                              backgroundColor: '#F3F4F6',
+                              borderRadius: '6px',
+                              fontWeight: '700',
+                              color: '#374151',
+                              fontSize: '11px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                            }}
+                          >
+                            <UserCheck
+                              style={{
+                                width: '12px',
+                                height: '12px',
+                                color: '#16A34A',
+                              }}
+                            />
                             {currentSellerName}
                           </span>
                         </div>
-
                         {/* Datos Principales Grid */}
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '12px' }}>
+                        <div
+                          style={{
+                            display: 'grid',
+                            gridTemplateColumns: '1fr 1fr',
+                            gap: '8px',
+                            fontSize: '12px',
+                          }}
+                        >
                           <div>
-                            <span style={{ fontWeight: '700', color: '#4B5563' }}>C.I.:</span> {c.ci_number || 'N/A'}
+                            <span
+                              style={{ fontWeight: '700', color: '#4B5563' }}
+                            >
+                              C.I.:
+                            </span>{' '}
+                            {c.ci_number || 'N/A'}
                           </div>
                           <div>
-                            <span style={{ fontWeight: '700', color: '#4B5563' }}>RIF:</span> {c.rif_number || 'N/A'}
+                            <span
+                              style={{ fontWeight: '700', color: '#4B5563' }}
+                            >
+                              RIF:
+                            </span>{' '}
+                            {c.rif_number || 'N/A'}
                           </div>
                           <div style={{ gridColumn: '1/-1' }}>
-                            <span style={{ fontWeight: '700', color: '#4B5563' }}>Ubicación:</span> {c.city}, {c.state} - {c.address_detail}
+                            <span
+                              style={{ fontWeight: '700', color: '#4B5563' }}
+                            >
+                              Ubicación:
+                            </span>{' '}
+                            {c.city}, {c.state} - {c.address_detail}
                           </div>
                           <div style={{ gridColumn: '1/-1' }}>
-                            <span style={{ fontWeight: '700', color: '#4B5563' }}>Teléfono:</span> {c.phone || 'N/A'}
+                            <span
+                              style={{ fontWeight: '700', color: '#4B5563' }}
+                            >
+                              Teléfono:
+                            </span>{' '}
+                            {c.phone || 'N/A'}
                           </div>
                         </div>
-
                         {/* Documentos Adjuntos */}
                         <div>
-                          <span style={{ fontWeight: '700', color: '#4B5563', fontSize: '11px', display: 'block', marginBottom: '4px' }}>DATOS ADJUNTOS:</span>
-                          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                          <span
+                            style={{
+                              fontWeight: '700',
+                              color: '#4B5563',
+                              fontSize: '11px',
+                              display: 'block',
+                              marginBottom: '4px',
+                            }}
+                          >
+                            DATOS ADJUNTOS:
+                          </span>
+                          <div
+                            style={{
+                              display: 'flex',
+                              gap: '6px',
+                              flexWrap: 'wrap',
+                            }}
+                          >
                             {c.ci_photo_url ? (
-                              <button onClick={() => setImageModal({ open: true, url: c.ci_photo_url, title: `C.I. de ${c.name}`, clientId: c.id, fieldName: 'ci_photo_url' })} style={{ padding: '4px 8px', backgroundColor: '#EFF6FF', color: '#1D4ED8', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: '700', fontSize: '10px', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
-                                <Eye style={{ width: '12px', height: '12px' }} /> C.I.
+                              <button
+                                onClick={() =>
+                                  setImageModal({
+                                    open: true,
+                                    url: c.ci_photo_url,
+                                    title: `C.I. de ${c.name}`,
+                                    clientId: c.id,
+                                    fieldName: 'ci_photo_url',
+                                  })
+                                }
+                                style={{
+                                  padding: '4px 8px',
+                                  backgroundColor: '#EFF6FF',
+                                  color: '#1D4ED8',
+                                  border: 'none',
+                                  borderRadius: '4px',
+                                  cursor: 'pointer',
+                                  fontWeight: '700',
+                                  fontSize: '10px',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '3px',
+                                }}
+                              >
+                                <Eye
+                                  style={{ width: '12px', height: '12px' }}
+                                />{' '}
+                                C.I.
                               </button>
-                            ) : <span style={{ fontSize: '10px', color: '#9CA3AF' }}>Sin C.I.</span>}
+                            ) : (
+                              <span
+                                style={{ fontSize: '10px', color: '#9CA3AF' }}
+                              >
+                                Sin C.I.
+                              </span>
+                            )}
                             {c.rif_photo_url ? (
-                              <button onClick={() => setImageModal({ open: true, url: c.rif_photo_url, title: `RIF de ${c.name}`, clientId: c.id, fieldName: 'rif_photo_url' })} style={{ padding: '4px 8px', backgroundColor: '#EFF6FF', color: '#1D4ED8', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: '700', fontSize: '10px', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
-                                <Eye style={{ width: '12px', height: '12px' }} /> RIF
+                              <button
+                                onClick={() =>
+                                  setImageModal({
+                                    open: true,
+                                    url: c.rif_photo_url,
+                                    title: `RIF de ${c.name}`,
+                                    clientId: c.id,
+                                    fieldName: 'rif_photo_url',
+                                  })
+                                }
+                                style={{
+                                  padding: '4px 8px',
+                                  backgroundColor: '#EFF6FF',
+                                  color: '#1D4ED8',
+                                  border: 'none',
+                                  borderRadius: '4px',
+                                  cursor: 'pointer',
+                                  fontWeight: '700',
+                                  fontSize: '10px',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '3px',
+                                }}
+                              >
+                                <Eye
+                                  style={{ width: '12px', height: '12px' }}
+                                />{' '}
+                                RIF
                               </button>
-                            ) : <span style={{ fontSize: '10px', color: '#9CA3AF' }}>Sin RIF</span>}
+                            ) : (
+                              <span
+                                style={{ fontSize: '10px', color: '#9CA3AF' }}
+                              >
+                                Sin RIF
+                              </span>
+                            )}
                             {c.additional_doc_url && (
-                              <button onClick={() => setImageModal({ open: true, url: c.additional_doc_url, title: `Documento Adicional de ${c.name}`, clientId: c.id, fieldName: 'additional_doc_url' })} style={{ padding: '4px 8px', backgroundColor: '#F0FDF4', color: '#15803D', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: '700', fontSize: '10px', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
-                                <Eye style={{ width: '12px', height: '12px' }} /> Adicional
+                              <button
+                                onClick={() =>
+                                  setImageModal({
+                                    open: true,
+                                    url: c.additional_doc_url,
+                                    title: `Documento Adicional de ${c.name}`,
+                                    clientId: c.id,
+                                    fieldName: 'additional_doc_url',
+                                  })
+                                }
+                                style={{
+                                  padding: '4px 8px',
+                                  backgroundColor: '#F0FDF4',
+                                  color: '#15803D',
+                                  border: 'none',
+                                  borderRadius: '4px',
+                                  cursor: 'pointer',
+                                  fontWeight: '700',
+                                  fontSize: '10px',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '3px',
+                                }}
+                              >
+                                <Eye
+                                  style={{ width: '12px', height: '12px' }}
+                                />{' '}
+                                Adicional
                               </button>
                             )}
                           </div>
                         </div>
-
                         {/* Botones de Acción */}
-                        <div className="action-buttons-wrapper" style={{ display: 'flex', gap: '8px', marginTop: '8px', borderTop: '1px solid #E5E7EB', paddingTop: '12px' }}>
-                          <button onClick={() => handleOpenEditClient(c)} style={{ flex: 1, padding: '8px', backgroundColor: '#F3F4F6', color: '#1F2937', border: '1px solid #D1D5DB', borderRadius: '6px', fontSize: '11px', fontWeight: '700', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '4px' }}>
-                            <Edit style={{ width: '13px', height: '13px', color: '#4F46E5' }} /> Editar
+                        <div
+                          className="action-buttons-wrapper"
+                          style={{
+                            display: 'flex',
+                            gap: '8px',
+                            marginTop: '8px',
+                            borderTop: '1px solid #E5E7EB',
+                            paddingTop: '12px',
+                          }}
+                        >
+                          <button
+                            onClick={() => handleOpenEditClient(c)}
+                            style={{
+                              flex: 1,
+                              padding: '8px',
+                              backgroundColor: '#F3F4F6',
+                              color: '#1F2937',
+                              border: '1px solid #D1D5DB',
+                              borderRadius: '6px',
+                              fontSize: '11px',
+                              fontWeight: '700',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              justifyContent: 'center',
+                              alignItems: 'center',
+                              gap: '4px',
+                            }}
+                          >
+                            <Edit
+                              style={{
+                                width: '13px',
+                                height: '13px',
+                                color: '#4F46E5',
+                              }}
+                            />{' '}
+                            Editar
                           </button>
-                          <button onClick={() => { setSearchHistoryQuery(c.name); setActiveSubMenu('nota_entrega'); setNeTab('historial'); }} style={{ flex: 1, padding: '8px', backgroundColor: '#E0E7FF', color: '#3730A3', border: 'none', borderRadius: '6px', fontSize: '11px', fontWeight: '700', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '4px' }}>
-                            <FileText style={{ width: '13px', height: '13px' }} /> N.E.
+                          <button
+                            onClick={() => {
+                              setSearchHistoryQuery(c.name);
+                              setActiveSubMenu('nota_entrega');
+                              setNeTab('historial');
+                            }}
+                            style={{
+                              flex: 1,
+                              padding: '8px',
+                              backgroundColor: '#E0E7FF',
+                              color: '#3730A3',
+                              border: 'none',
+                              borderRadius: '6px',
+                              fontSize: '11px',
+                              fontWeight: '700',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              justifyContent: 'center',
+                              alignItems: 'center',
+                              gap: '4px',
+                            }}
+                          >
+                            <FileText
+                              style={{ width: '13px', height: '13px' }}
+                            />{' '}
+                            N.E.
                           </button>
-                          <button onClick={() => handleDeleteClient(c.id, c.name)} style={{ padding: '8px 12px', backgroundColor: '#FEF2F2', color: '#DC2626', border: '1px solid #FECACA', borderRadius: '6px', cursor: 'pointer' }}>
+                          <button
+                            onClick={() => handleDeleteClient(c.id, c.name)}
+                            style={{
+                              padding: '8px 12px',
+                              backgroundColor: '#FEF2F2',
+                              color: '#DC2626',
+                              border: '1px solid #FECACA',
+                              borderRadius: '6px',
+                              cursor: 'pointer',
+                            }}
+                          >
                             <Trash2 style={{ width: '14px', height: '14px' }} />
                           </button>
                         </div>
@@ -2727,9 +3235,9 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                     ))
                 )}
               </div>
-
               {/* TABLA DESKTOP (OCULTA POR CSS AHORA) */}
-              <div className="desktop-table"
+              <div
+                className="desktop-table"
                 style={{
                   width: '100%',
                   overflowX: 'auto',
@@ -3103,7 +3611,13 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                           gap: '8px',
                         }}
                       >
-                        <div style={{ borderBottom: '1px solid #E5E7EB', paddingBottom: '8px', marginBottom: '4px' }}>
+                        <div
+                          style={{
+                            borderBottom: '1px solid #E5E7EB',
+                            paddingBottom: '8px',
+                            marginBottom: '4px',
+                          }}
+                        >
                           <span
                             style={{
                               fontSize: '10px',
@@ -3380,6 +3894,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
           )}
         </div>
       )}
+
       {/* MODAL IMAGEN (Global) */}
       {imageModal.open && (
         <div
@@ -3530,6 +4045,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
           </div>
         </div>
       )}
+
       {/* MODAL EDITAR CLIENTE */}
       {editClientModal.open && (
         <div
@@ -3953,6 +4469,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
           </div>
         </div>
       )}
+
       {activeSubMenu === 'visitas' && (
         <div>
           <div
@@ -3996,6 +4513,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
               Mis Clientes Registrados
             </button>
           </div>
+
           {visitasTab === 'potenciales' && (
             <div
               style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}
@@ -4144,6 +4662,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                     >
                       GPS Obligatorio *
                     </label>
+                    {/* MODIFICACIÓN A: Botón GPS Mejorado */}
                     <button
                       type="button"
                       onClick={() =>
@@ -4162,10 +4681,13 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                         justifyContent: 'center',
                         alignItems: 'center',
                         gap: '6px',
+                        transition: 'background-color 0.3s',
                       }}
                     >
                       <MapPin style={{ width: '14px', height: '14px' }} />
-                      {potencialGps ? 'GPS Capturado OK' : 'Capturar GPS *'}
+                      {potencialGps
+                        ? 'GPS Capturado OK (Click para recapturar)'
+                        : 'Capturar GPS *'}
                     </button>
                   </div>
                   <div>
@@ -4189,6 +4711,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                   </div>
                 </form>
               </div>
+
               <div
                 style={{
                   backgroundColor: '#FFFFFF',
@@ -4251,19 +4774,29 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                     />
                   </div>
                 </div>
-                
                 {/* GRID DE TARJETAS ESCRITORIO (NUEVO) */}
-                <div className="desktop-cards-grid" style={{ 
-                  display: 'none', 
-                  gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', 
-                  gap: '16px' 
-                }}>
+                <div
+                  className="desktop-cards-grid"
+                  style={{
+                    display: 'none',
+                    gridTemplateColumns:
+                      'repeat(auto-fill, minmax(350px, 1fr))',
+                    gap: '16px',
+                  }}
+                >
                   {potenciales.filter((p) =>
                     p.name
                       ?.toLowerCase()
                       .includes(searchPotencialesQuery.toLowerCase())
                   ).length === 0 ? (
-                    <div style={{ padding: '16px', textAlign: 'center', color: '#6B7280', gridColumn: '1/-1' }}>
+                    <div
+                      style={{
+                        padding: '16px',
+                        textAlign: 'center',
+                        color: '#6B7280',
+                        gridColumn: '1/-1',
+                      }}
+                    >
                       No hay clientes potenciales creados por ti.
                     </div>
                   ) : (
@@ -4288,60 +4821,267 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                           }}
                         >
                           {/* Encabezado */}
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', borderBottom: '1px solid #F3F4F6', paddingBottom: '8px' }}>
+                          <div
+                            style={{
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'start',
+                              borderBottom: '1px solid #F3F4F6',
+                              paddingBottom: '8px',
+                            }}
+                          >
                             <div>
-                              <span style={{ fontSize: '10px', fontWeight: '700', color: '#6B7280', textTransform: 'uppercase' }}>Cliente Potencial</span>
-                              <div style={{ fontSize: '16px', fontWeight: '900', color: '#111827', marginTop: '2px' }}>{p.name}</div>
+                              <span
+                                style={{
+                                  fontSize: '10px',
+                                  fontWeight: '700',
+                                  color: '#6B7280',
+                                  textTransform: 'uppercase',
+                                }}
+                              >
+                                Cliente Potencial
+                              </span>
+                              <div
+                                style={{
+                                  fontSize: '16px',
+                                  fontWeight: '900',
+                                  color: '#111827',
+                                  marginTop: '2px',
+                                }}
+                              >
+                                {p.name}
+                              </div>
                             </div>
-                            <span style={{ padding: '4px 8px', backgroundColor: '#F3F4F6', borderRadius: '6px', fontWeight: '700', color: '#374151', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                              <UserCheck style={{ width: '12px', height: '12px', color: '#16A34A' }} />
+                            <span
+                              style={{
+                                padding: '4px 8px',
+                                backgroundColor: '#F3F4F6',
+                                borderRadius: '6px',
+                                fontWeight: '700',
+                                color: '#374151',
+                                fontSize: '11px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                              }}
+                            >
+                              <UserCheck
+                                style={{
+                                  width: '12px',
+                                  height: '12px',
+                                  color: '#16A34A',
+                                }}
+                              />
                               {currentSellerName}
                             </span>
                           </div>
-
                           {/* Datos Grid */}
-                          <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '8px', fontSize: '12px' }}>
-                            <div><span style={{ fontWeight: '700', color: '#4B5563' }}>Dirección:</span> {p.address_detail}</div>
-                            <div><span style={{ fontWeight: '700', color: '#4B5563' }}>Teléfono:</span> {p.phone || 'N/A'}</div>
-                            <div><span style={{ fontWeight: '700', color: '#4B5563' }}>Última Visita:</span> {p.last_visit_at ? new Date(p.last_visit_at).toLocaleString() : 'Sin registro'}</div>
+                          <div
+                            style={{
+                              display: 'grid',
+                              gridTemplateColumns: '1fr',
+                              gap: '8px',
+                              fontSize: '12px',
+                            }}
+                          >
+                            <div>
+                              <span
+                                style={{ fontWeight: '700', color: '#4B5563' }}
+                              >
+                                Dirección:
+                              </span>{' '}
+                              {p.address_detail}
+                            </div>
+                            <div>
+                              <span
+                                style={{ fontWeight: '700', color: '#4B5563' }}
+                              >
+                                Teléfono:
+                              </span>{' '}
+                              {p.phone || 'N/A'}
+                            </div>
+                            <div>
+                              <span
+                                style={{ fontWeight: '700', color: '#4B5563' }}
+                              >
+                                Última Visita:
+                              </span>{' '}
+                              {p.last_visit_at
+                                ? new Date(p.last_visit_at).toLocaleString()
+                                : 'Sin registro'}
+                            </div>
                           </div>
-
                           {/* Adjunto */}
                           <div>
-                            <span style={{ fontWeight: '700', color: '#4B5563', fontSize: '11px', display: 'block', marginBottom: '4px' }}>ADJUNTO:</span>
+                            <span
+                              style={{
+                                fontWeight: '700',
+                                color: '#4B5563',
+                                fontSize: '11px',
+                                display: 'block',
+                                marginBottom: '4px',
+                              }}
+                            >
+                              ADJUNTO:
+                            </span>
                             {p.last_visit_photo_url ? (
-                              <button onClick={() => setImageModal({ open: true, url: p.last_visit_photo_url, title: `Visita ${p.name}`, clientId: p.id, fieldName: 'last_visit_photo_url' })} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#2563EB', fontWeight: '700' }}>
-                                <img src={p.last_visit_photo_url} alt="Miniatura" style={{ width: '28px', height: '28px', objectFit: 'cover', borderRadius: '4px', border: '1px solid #D1D5DB' }} /> Ver Foto
+                              <button
+                                onClick={() =>
+                                  setImageModal({
+                                    open: true,
+                                    url: p.last_visit_photo_url,
+                                    title: `Visita ${p.name}`,
+                                    clientId: p.id,
+                                    fieldName: 'last_visit_photo_url',
+                                  })
+                                }
+                                style={{
+                                  background: 'none',
+                                  border: 'none',
+                                  padding: 0,
+                                  cursor: 'pointer',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                  color: '#2563EB',
+                                  fontWeight: '700',
+                                }}
+                              >
+                                <img
+                                  src={p.last_visit_photo_url}
+                                  alt="Miniatura"
+                                  style={{
+                                    width: '28px',
+                                    height: '28px',
+                                    objectFit: 'cover',
+                                    borderRadius: '4px',
+                                    border: '1px solid #D1D5DB',
+                                  }}
+                                />{' '}
+                                Ver Foto
                               </button>
                             ) : (
-                              <CustomFileInput id={`desk_file_pot_${p.id}`} onChange={(e) => setVisitasFiles({ ...visitasFiles, [p.id]: e.target.files[0] })} file={visitasFiles[p.id]} labelText="Subir Foto" />
+                              <CustomFileInput
+                                id={`desk_file_pot_${p.id}`}
+                                onChange={(e) =>
+                                  setVisitasFiles({
+                                    ...visitasFiles,
+                                    [p.id]: e.target.files[0],
+                                  })
+                                }
+                                file={visitasFiles[p.id]}
+                                labelText="Subir Foto"
+                              />
                             )}
                           </div>
-
                           {/* GPS */}
                           <div>
-                             <button onClick={() => handleCaptureVisitaGps(p.id)} style={{ width: '100%', padding: '6px', backgroundColor: visitasGps[p.id] ? '#16A34A' : '#F59E0B', color: '#FFFFFF', border: 'none', borderRadius: '6px', fontSize: '11px', fontWeight: '700', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '4px' }}>
-                                <MapPin style={{ width: '12px', height: '12px' }} /> {visitasGps[p.id] ? 'GPS Capturado' : 'Extraer GPS'}
-                             </button>
-                          </div>
-
-                          {/* Acciones */}
-                          <div className="action-buttons-wrapper" style={{ display: 'flex', gap: '8px', marginTop: '8px', borderTop: '1px solid #E5E7EB', paddingTop: '12px' }}>
-                            <button onClick={() => handleSaveVisita(p.id, true)} style={{ flex: 1, padding: '6px', backgroundColor: '#111827', color: '#FFFFFF', border: 'none', borderRadius: '6px', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}>Guardar</button>
-                            <button onClick={() => handleOpenConvertModal(p)} style={{ flex: 1, padding: '6px', backgroundColor: '#16A34A', color: '#FFFFFF', border: 'none', borderRadius: '6px', fontSize: '11px', fontWeight: '700', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '4px' }}>
-                              <UserPlus style={{ width: '13px', height: '13px' }} /> Agregar
+                            {/* MODIFICACIÓN A: Botón GPS Mejorado */}
+                            <button
+                              onClick={() => handleCaptureVisitaGps(p.id)}
+                              style={{
+                                width: '100%',
+                                padding: '6px',
+                                backgroundColor: visitasGps[p.id]
+                                  ? '#16A34A'
+                                  : '#F59E0B',
+                                color: '#FFFFFF',
+                                border: 'none',
+                                borderRadius: '6px',
+                                fontSize: '11px',
+                                fontWeight: '700',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                justifyContent: 'center',
+                                alignItems: 'center',
+                                gap: '4px',
+                                transition: 'background-color 0.3s',
+                              }}
+                            >
+                              <MapPin
+                                style={{ width: '12px', height: '12px' }}
+                              />{' '}
+                              {visitasGps[p.id]
+                                ? 'GPS Listo (Recapturar)'
+                                : 'Extraer GPS'}
                             </button>
-                            <button onClick={() => handleDeleteClient(p.id, p.name)} style={{ padding: '6px 10px', backgroundColor: '#FEF2F2', color: '#DC2626', border: '1px solid #FECACA', borderRadius: '6px', cursor: 'pointer' }}>
-                              <Trash2 style={{ width: '14px', height: '14px' }} />
+                          </div>
+                          {/* Acciones */}
+                          <div
+                            className="action-buttons-wrapper"
+                            style={{
+                              display: 'flex',
+                              gap: '8px',
+                              marginTop: '8px',
+                              borderTop: '1px solid #E5E7EB',
+                              paddingTop: '12px',
+                            }}
+                          >
+                            {/* MODIFICACIÓN B: Cambio de nombre "Guardar" -> "Registrar Visita" */}
+                            <button
+                              onClick={() => handleSaveVisita(p.id, true)}
+                              style={{
+                                flex: 1,
+                                padding: '6px',
+                                backgroundColor: '#111827',
+                                color: '#FFFFFF',
+                                border: 'none',
+                                borderRadius: '6px',
+                                fontSize: '11px',
+                                fontWeight: '700',
+                                cursor: 'pointer',
+                              }}
+                            >
+                              Registrar Visita
+                            </button>
+                            {/* MODIFICACIÓN B: Cambio de nombre "Agregar" -> "Reg. Cliente" y ancho completo */}
+                            <button
+                              onClick={() => handleOpenConvertModal(p)}
+                              style={{
+                                width: '100%',
+                                padding: '6px',
+                                backgroundColor: '#16A34A',
+                                color: '#FFFFFF',
+                                border: 'none',
+                                borderRadius: '6px',
+                                fontSize: '11px',
+                                fontWeight: '700',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                justifyContent: 'center',
+                                alignItems: 'center',
+                                gap: '4px',
+                                marginTop: '4px',
+                              }}
+                            >
+                              <UserPlus
+                                style={{ width: '13px', height: '13px' }}
+                              />{' '}
+                              Reg. Cliente
+                            </button>
+                            <button
+                              onClick={() => handleDeleteClient(p.id, p.name)}
+                              style={{
+                                padding: '6px 10px',
+                                backgroundColor: '#FEF2F2',
+                                color: '#DC2626',
+                                border: '1px solid #FECACA',
+                                borderRadius: '6px',
+                                cursor: 'pointer',
+                              }}
+                            >
+                              <Trash2
+                                style={{ width: '14px', height: '14px' }}
+                              />
                             </button>
                           </div>
                         </div>
                       ))
                   )}
                 </div>
-
                 {/* TABLA DESKTOP (OCULTA POR CSS) */}
-                <div className="desktop-table"
+                <div
+                  className="desktop-table"
                   style={{
                     width: '100%',
                     overflowX: 'auto',
@@ -4523,6 +5263,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                                   : 'Sin registro'}
                               </td>
                               <td style={{ padding: '8px 12px' }}>
+                                {/* MODIFICACIÓN A: Botón GPS Mejorado */}
                                 <button
                                   onClick={() => handleCaptureVisitaGps(p.id)}
                                   style={{
@@ -4539,13 +5280,14 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                                     display: 'flex',
                                     alignItems: 'center',
                                     gap: '4px',
+                                    transition: 'background-color 0.3s',
                                   }}
                                 >
                                   <MapPin
                                     style={{ width: '12px', height: '12px' }}
                                   />
                                   {visitasGps[p.id]
-                                    ? 'GPS Capturado'
+                                    ? 'GPS Listo (Recapturar)'
                                     : 'Extraer GPS'}
                                 </button>
                               </td>
@@ -4564,6 +5306,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                                     flexWrap: 'wrap',
                                   }}
                                 >
+                                  {/* MODIFICACIÓN B: Cambio de nombre "Guardar" -> "Registrar Visita" */}
                                   <button
                                     onClick={() => handleSaveVisita(p.id, true)}
                                     style={{
@@ -4577,8 +5320,9 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                                       cursor: 'pointer',
                                     }}
                                   >
-                                    Guardar
+                                    Registrar Visita
                                   </button>
+                                  {/* MODIFICACIÓN B: Cambio de nombre "Agregar" -> "Reg. Cliente" */}
                                   <button
                                     onClick={() => handleOpenConvertModal(p)}
                                     style={{
@@ -4599,7 +5343,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                                     <UserPlus
                                       style={{ width: '13px', height: '13px' }}
                                     />
-                                    Agregar
+                                    Reg. Cliente
                                   </button>
                                   <button
                                     onClick={() =>
@@ -4663,7 +5407,13 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                             gap: '8px',
                           }}
                         >
-                          <div style={{ borderBottom: '1px solid #E5E7EB', paddingBottom: '8px', marginBottom: '4px' }}>
+                          <div
+                            style={{
+                              borderBottom: '1px solid #E5E7EB',
+                              paddingBottom: '8px',
+                              marginBottom: '4px',
+                            }}
+                          >
                             <span
                               style={{
                                 fontSize: '10px',
@@ -4787,6 +5537,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                               alignItems: 'center',
                             }}
                           >
+                            {/* MODIFICACIÓN A: Botón GPS Mejorado */}
                             <button
                               onClick={() => handleCaptureVisitaGps(p.id)}
                               style={{
@@ -4805,13 +5556,14 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                                 justifyContent: 'center',
                                 alignItems: 'center',
                                 gap: '4px',
+                                transition: 'background-color 0.3s',
                               }}
                             >
                               <MapPin
                                 style={{ width: '12px', height: '12px' }}
                               />{' '}
                               {visitasGps[p.id]
-                                ? 'GPS Capturado'
+                                ? 'GPS Listo (Recapturar)'
                                 : 'Extraer GPS'}
                             </button>
                           </div>
@@ -4826,6 +5578,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                               paddingTop: '8px',
                             }}
                           >
+                            {/* MODIFICACIÓN B: Cambio de nombre "Guardar" -> "Registrar Visita" */}
                             <button
                               onClick={() => handleSaveVisita(p.id, true)}
                               style={{
@@ -4840,12 +5593,13 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                                 cursor: 'pointer',
                               }}
                             >
-                              Guardar
+                              Registrar Visita
                             </button>
+                            {/* MODIFICACIÓN B: Cambio de nombre "Agregar" -> "Reg. Cliente" y ancho completo */}
                             <button
                               onClick={() => handleOpenConvertModal(p)}
                               style={{
-                                flex: 1,
+                                width: '100%',
                                 padding: '6px',
                                 backgroundColor: '#16A34A',
                                 color: '#FFFFFF',
@@ -4858,12 +5612,13 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                                 justifyContent: 'center',
                                 alignItems: 'center',
                                 gap: '4px',
+                                marginTop: '4px',
                               }}
                             >
                               <UserPlus
                                 style={{ width: '13px', height: '13px' }}
                               />{' '}
-                              Agregar
+                              Reg. Cliente
                             </button>
                             <button
                               onClick={() => handleDeleteClient(p.id, p.name)}
@@ -4888,6 +5643,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
               </div>
             </div>
           )}
+
           {visitasTab === 'clientes' && (
             <div
               style={{
@@ -4920,83 +5676,273 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                   }}
                 />
               </div>
-              
               {/* GRID DE TARJETAS ESCRITORIO (NUEVO) */}
-              <div className="desktop-cards-grid" style={{ 
-                display: 'none', 
-                gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', 
-                gap: '16px' 
-              }}>
-                 {clients
-                    .filter((c) =>
-                      c.name
-                        ?.toLowerCase()
-                        .includes(searchClientQuery.toLowerCase())
-                    )
-                    .map((c) => (
+              <div
+                className="desktop-cards-grid"
+                style={{
+                  display: 'none',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))',
+                  gap: '16px',
+                }}
+              >
+                {clients
+                  .filter((c) =>
+                    c.name
+                      ?.toLowerCase()
+                      .includes(searchClientQuery.toLowerCase())
+                  )
+                  .map((c) => (
+                    <div
+                      key={c.id}
+                      style={{
+                        backgroundColor: '#FFFFFF',
+                        border: '1px solid #E5E7EB',
+                        borderRadius: '12px',
+                        padding: '16px',
+                        boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '12px',
+                      }}
+                    >
+                      {/* Encabezado */}
                       <div
-                        key={c.id}
                         style={{
-                          backgroundColor: '#FFFFFF',
-                          border: '1px solid #E5E7EB',
-                          borderRadius: '12px',
-                          padding: '16px',
-                          boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
                           display: 'flex',
-                          flexDirection: 'column',
-                          gap: '12px',
+                          justifyContent: 'space-between',
+                          alignItems: 'start',
+                          borderBottom: '1px solid #F3F4F6',
+                          paddingBottom: '8px',
                         }}
                       >
-                         {/* Encabezado */}
-                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', borderBottom: '1px solid #F3F4F6', paddingBottom: '8px' }}>
-                            <div>
-                              <span style={{ fontSize: '10px', fontWeight: '700', color: '#6B7280', textTransform: 'uppercase' }}>Cliente Oficial</span>
-                              <div style={{ fontSize: '16px', fontWeight: '900', color: '#111827', marginTop: '2px' }}>{c.name}</div>
-                            </div>
-                            <span style={{ padding: '4px 8px', backgroundColor: '#F3F4F6', borderRadius: '6px', fontWeight: '700', color: '#374151', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                              <UserCheck style={{ width: '12px', height: '12px', color: '#16A34A' }} />
-                              {currentSellerName}
-                            </span>
+                        <div>
+                          <span
+                            style={{
+                              fontSize: '10px',
+                              fontWeight: '700',
+                              color: '#6B7280',
+                              textTransform: 'uppercase',
+                            }}
+                          >
+                            Cliente Oficial
+                          </span>
+                          <div
+                            style={{
+                              fontSize: '16px',
+                              fontWeight: '900',
+                              color: '#111827',
+                              marginTop: '2px',
+                            }}
+                          >
+                            {c.name}
                           </div>
-
-                          {/* Datos */}
-                          <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '8px', fontSize: '12px' }}>
-                            <div><span style={{ fontWeight: '700', color: '#4B5563' }}>Última Visita:</span> {c.last_visit_at ? new Date(c.last_visit_at).toLocaleString() : 'Sin registro'}</div>
-                            <div><span style={{ fontWeight: '700', color: '#4B5563' }}>Historial N.E.:</span> <button onClick={() => { setSearchHistoryQuery(c.name); setActiveSubMenu('nota_entrega'); setNeTab('historial'); }} style={{ padding: '2px 6px', backgroundColor: '#E0E7FF', color: '#3730A3', border: 'none', borderRadius: '4px', fontSize: '10px', fontWeight: '700', cursor: 'pointer' }}>Ver Historial</button></div>
-                          </div>
-
-                          {/* Adjunto Visita */}
-                          <div>
-                            <span style={{ fontWeight: '700', color: '#4B5563', fontSize: '11px', display: 'block', marginBottom: '4px' }}>FOTO VISITA:</span>
-                            {c.last_visit_photo_url ? (
-                              <button onClick={() => setImageModal({ open: true, url: c.last_visit_photo_url, title: `Visita ${c.name}`, clientId: c.id, fieldName: 'last_visit_photo_url' })} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#2563EB', fontWeight: '700' }}>
-                                <img src={c.last_visit_photo_url} alt="Miniatura" style={{ width: '28px', height: '28px', objectFit: 'cover', borderRadius: '4px', border: '1px solid #D1D5DB' }} /> Ver Foto
-                              </button>
-                            ) : (
-                              <CustomFileInput id={`desk_file_cli_${c.id}`} onChange={(e) => setVisitasFiles({ ...visitasFiles, [c.id]: e.target.files[0] })} file={visitasFiles[c.id]} labelText="Subir Foto" />
-                            )}
-                          </div>
-
-                          {/* GPS */}
-                          <div>
-                             <button onClick={() => handleCaptureVisitaGps(c.id)} style={{ width: '100%', padding: '6px', backgroundColor: visitasGps[c.id] ? '#16A34A' : '#F59E0B', color: '#FFFFFF', border: 'none', borderRadius: '6px', fontSize: '11px', fontWeight: '700', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '4px' }}>
-                                <MapPin style={{ width: '12px', height: '12px' }} /> {visitasGps[c.id] ? 'GPS Capturado' : 'Extraer GPS'}
-                             </button>
-                          </div>
-
-                          {/* Acciones */}
-                          <div className="action-buttons-wrapper" style={{ display: 'flex', gap: '8px', marginTop: '8px', borderTop: '1px solid #E5E7EB', paddingTop: '12px' }}>
-                            <button onClick={() => handleSaveVisita(c.id, false)} style={{ flex: 1, padding: '6px', backgroundColor: '#111827', color: '#FFFFFF', border: 'none', borderRadius: '6px', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}>Guardar</button>
-                            <button onClick={() => handleDeleteClient(c.id, c.name)} style={{ padding: '6px 10px', backgroundColor: '#FEF2F2', color: '#DC2626', border: '1px solid #FECACA', borderRadius: '6px', cursor: 'pointer' }}>
-                              <Trash2 style={{ width: '14px', height: '14px' }} />
-                            </button>
-                          </div>
+                        </div>
+                        <span
+                          style={{
+                            padding: '4px 8px',
+                            backgroundColor: '#F3F4F6',
+                            borderRadius: '6px',
+                            fontWeight: '700',
+                            color: '#374151',
+                            fontSize: '11px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                          }}
+                        >
+                          <UserCheck
+                            style={{
+                              width: '12px',
+                              height: '12px',
+                              color: '#16A34A',
+                            }}
+                          />
+                          {currentSellerName}
+                        </span>
                       </div>
-                    ))}
+                      {/* Datos */}
+                      <div
+                        style={{
+                          display: 'grid',
+                          gridTemplateColumns: '1fr',
+                          gap: '8px',
+                          fontSize: '12px',
+                        }}
+                      >
+                        <div>
+                          <span style={{ fontWeight: '700', color: '#4B5563' }}>
+                            Última Visita:
+                          </span>{' '}
+                          {c.last_visit_at
+                            ? new Date(c.last_visit_at).toLocaleString()
+                            : 'Sin registro'}
+                        </div>
+                        <div>
+                          <span style={{ fontWeight: '700', color: '#4B5563' }}>
+                            Historial N.E.:
+                          </span>{' '}
+                          <button
+                            onClick={() => {
+                              setSearchHistoryQuery(c.name);
+                              setActiveSubMenu('nota_entrega');
+                              setNeTab('historial');
+                            }}
+                            style={{
+                              padding: '2px 6px',
+                              backgroundColor: '#E0E7FF',
+                              color: '#3730A3',
+                              border: 'none',
+                              borderRadius: '4px',
+                              fontSize: '10px',
+                              fontWeight: '700',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            Ver Historial
+                          </button>
+                        </div>
+                      </div>
+                      {/* Adjunto Visita */}
+                      <div>
+                        <span
+                          style={{
+                            fontWeight: '700',
+                            color: '#4B5563',
+                            fontSize: '11px',
+                            display: 'block',
+                            marginBottom: '4px',
+                          }}
+                        >
+                          FOTO VISITA:
+                        </span>
+                        {c.last_visit_photo_url ? (
+                          <button
+                            onClick={() =>
+                              setImageModal({
+                                open: true,
+                                url: c.last_visit_photo_url,
+                                title: `Visita ${c.name}`,
+                                clientId: c.id,
+                                fieldName: 'last_visit_photo_url',
+                              })
+                            }
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              padding: 0,
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              color: '#2563EB',
+                              fontWeight: '700',
+                            }}
+                          >
+                            <img
+                              src={c.last_visit_photo_url}
+                              alt="Miniatura"
+                              style={{
+                                width: '28px',
+                                height: '28px',
+                                objectFit: 'cover',
+                                borderRadius: '4px',
+                                border: '1px solid #D1D5DB',
+                              }}
+                            />{' '}
+                            Ver Foto
+                          </button>
+                        ) : (
+                          <CustomFileInput
+                            id={`desk_file_cli_${c.id}`}
+                            onChange={(e) =>
+                              setVisitasFiles({
+                                ...visitasFiles,
+                                [c.id]: e.target.files[0],
+                              })
+                            }
+                            file={visitasFiles[c.id]}
+                            labelText="Subir Foto"
+                          />
+                        )}
+                      </div>
+                      {/* GPS */}
+                      <div>
+                        {/* MODIFICACIÓN A: Botón GPS Mejorado */}
+                        <button
+                          onClick={() => handleCaptureVisitaGps(c.id)}
+                          style={{
+                            width: '100%',
+                            padding: '6px',
+                            backgroundColor: visitasGps[c.id]
+                              ? '#16A34A'
+                              : '#F59E0B',
+                            color: '#FFFFFF',
+                            border: 'none',
+                            borderRadius: '6px',
+                            fontSize: '11px',
+                            fontWeight: '700',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            justifyContent: 'center',
+                            alignItems: 'center',
+                            gap: '4px',
+                            transition: 'background-color 0.3s',
+                          }}
+                        >
+                          <MapPin style={{ width: '12px', height: '12px' }} />{' '}
+                          {visitasGps[c.id]
+                            ? 'GPS Listo (Recapturar)'
+                            : 'Extraer GPS'}
+                        </button>
+                      </div>
+                      {/* Acciones */}
+                      <div
+                        className="action-buttons-wrapper"
+                        style={{
+                          display: 'flex',
+                          gap: '8px',
+                          marginTop: '8px',
+                          borderTop: '1px solid #E5E7EB',
+                          paddingTop: '12px',
+                        }}
+                      >
+                        {/* MODIFICACIÓN B: Cambio de nombre "Guardar" -> "Registrar Visita" */}
+                        <button
+                          onClick={() => handleSaveVisita(c.id, false)}
+                          style={{
+                            flex: 1,
+                            padding: '6px',
+                            backgroundColor: '#111827',
+                            color: '#FFFFFF',
+                            border: 'none',
+                            borderRadius: '6px',
+                            fontSize: '11px',
+                            fontWeight: '700',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          Registrar Visita
+                        </button>
+                        <button
+                          onClick={() => handleDeleteClient(c.id, c.name)}
+                          style={{
+                            padding: '6px 10px',
+                            backgroundColor: '#FEF2F2',
+                            color: '#DC2626',
+                            border: '1px solid #FECACA',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          <Trash2 style={{ width: '14px', height: '14px' }} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
               </div>
-
               {/* TABLA DESKTOP (OCULTA POR CSS) */}
-              <div className="desktop-table"
+              <div
+                className="desktop-table"
                 style={{
                   width: '100%',
                   overflowX: 'auto',
@@ -5169,6 +6115,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                               : 'Sin registro'}
                           </td>
                           <td style={{ padding: '8px 12px' }}>
+                            {/* MODIFICACIÓN A: Botón GPS Mejorado */}
                             <button
                               onClick={() => handleCaptureVisitaGps(c.id)}
                               style={{
@@ -5185,13 +6132,14 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                                 display: 'flex',
                                 alignItems: 'center',
                                 gap: '4px',
+                                transition: 'background-color 0.3s',
                               }}
                             >
                               <MapPin
                                 style={{ width: '12px', height: '12px' }}
                               />
                               {visitasGps[c.id]
-                                ? 'GPS Capturado'
+                                ? 'GPS Listo (Recapturar)'
                                 : 'Extraer GPS'}
                             </button>
                           </td>
@@ -5207,6 +6155,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                                 flexWrap: 'wrap',
                               }}
                             >
+                              {/* MODIFICACIÓN B: Cambio de nombre "Guardar" -> "Registrar Visita" */}
                               <button
                                 onClick={() => handleSaveVisita(c.id, false)}
                                 style={{
@@ -5220,7 +6169,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                                   cursor: 'pointer',
                                 }}
                               >
-                                Guardar
+                                Registrar Visita
                               </button>
                               <button
                                 onClick={() => handleDeleteClient(c.id, c.name)}
@@ -5266,7 +6215,13 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                         gap: '8px',
                       }}
                     >
-                      <div style={{ borderBottom: '1px solid #E5E7EB', paddingBottom: '8px', marginBottom: '4px' }}>
+                      <div
+                        style={{
+                          borderBottom: '1px solid #E5E7EB',
+                          paddingBottom: '8px',
+                          marginBottom: '4px',
+                        }}
+                      >
                         <span
                           style={{
                             fontSize: '10px',
@@ -5388,6 +6343,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                           : 'Sin registro'}
                       </div>
                       <div>
+                        {/* MODIFICACIÓN A: Botón GPS Mejorado */}
                         <button
                           onClick={() => handleCaptureVisitaGps(c.id)}
                           style={{
@@ -5406,10 +6362,13 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                             justifyContent: 'center',
                             alignItems: 'center',
                             gap: '4px',
+                            transition: 'background-color 0.3s',
                           }}
                         >
                           <MapPin style={{ width: '12px', height: '12px' }} />{' '}
-                          {visitasGps[c.id] ? 'GPS Capturado' : 'Extraer GPS'}
+                          {visitasGps[c.id]
+                            ? 'GPS Listo (Recapturar)'
+                            : 'Extraer GPS'}
                         </button>
                       </div>
                       <div
@@ -5423,6 +6382,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                           paddingTop: '8px',
                         }}
                       >
+                        {/* MODIFICACIÓN B: Cambio de nombre "Guardar" -> "Registrar Visita" */}
                         <button
                           onClick={() => handleSaveVisita(c.id, false)}
                           style={{
@@ -5437,7 +6397,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                             cursor: 'pointer',
                           }}
                         >
-                          Guardar
+                          Registrar Visita
                         </button>
                         <button
                           onClick={() => handleDeleteClient(c.id, c.name)}
@@ -5460,6 +6420,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
           )}
         </div>
       )}
+
       {/* MODAL CONVERTIR POTENCIAL */}
       {convertModal.open && (
         <div
@@ -5843,6 +6804,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
           </div>
         </div>
       )}
+
       {activeSubMenu === 'nota_entrega' && (
         <div>
           <div
@@ -5899,6 +6861,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
               Mis Notas de Entrega
             </button>
           </div>
+
           {neTab === 'comisiones' && (
             <div
               style={{
@@ -6037,6 +7000,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
               </div>
             </div>
           )}
+
           {neTab === 'crear_ne' && (
             <div
               style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}
@@ -6075,6 +7039,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                   </div>
                 </div>
               </div>
+
               <div
                 style={{
                   backgroundColor: '#ffffff',
@@ -6173,6 +7138,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                   </select>
                 </div>
               </div>
+
               <div
                 style={{
                   backgroundColor: '#ffffff',
@@ -6261,6 +7227,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                   </button>
                 </div>
               </div>
+
               <div
                 style={{
                   backgroundColor: '#FFFFFF',
@@ -6308,6 +7275,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                     </p>
                   </div>
                 </div>
+
                 <div
                   style={{
                     width: '100%',
@@ -6431,6 +7399,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                     </tbody>
                   </table>
                 </div>
+
                 <div
                   style={{
                     display: 'flex',
@@ -6488,6 +7457,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                     </div>
                   </div>
                 </div>
+
                 <div style={{ marginBottom: '12px' }}>
                   <label
                     style={{
@@ -6514,6 +7484,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                     }}
                   ></textarea>
                 </div>
+
                 <div
                   style={{
                     backgroundColor: '#F3F4F6',
@@ -6528,6 +7499,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                 >
                   <strong>Términos y condiciones:</strong> {globalTerms}
                 </div>
+
                 <div
                   style={{
                     display: 'flex',
@@ -6554,13 +7526,14 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                       display: 'flex',
                       alignItems: 'center',
                       gap: '6px',
+                      transition: 'background-color 0.3s',
                     }}
                   >
                     <MapPin style={{ width: '16px', height: '16px' }} />
                     {neGpsLocation
                       ? `GPS Validado (${neGpsLocation.lat.toFixed(
                           4
-                        )}, ${neGpsLocation.lng.toFixed(4)})`
+                        )}, ${neGpsLocation.lng.toFixed(4)}) (Recapturar)`
                       : 'Extraer GPS Requerido'}
                   </button>
                   <button
@@ -6589,6 +7562,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
               </div>
             </div>
           )}
+
           {neTab === 'historial' && (
             <div
               style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}
@@ -6684,6 +7658,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                     )}
                   </button>
                 </div>
+
                 {showFullSellerCard && (
                   <div
                     style={{
@@ -6833,6 +7808,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                   </div>
                 )}
               </div>
+
               <div
                 style={{
                   backgroundColor: '#FFFFFF',
@@ -6867,6 +7843,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                   }}
                 />
               </div>
+
               <div
                 style={{
                   backgroundColor: '#FFFFFF',
@@ -6876,14 +7853,25 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                 }}
               >
                 {/* GRID DE TARJETAS ESCRITORIO (NUEVO) */}
-                <div className="desktop-cards-grid" style={{ 
-                  display: 'none', 
-                  gridTemplateColumns: 'repeat(auto-fill, minmax(400px, 1fr))', 
-                  gap: '16px',
-                  padding: '12px'
-                }}>
+                <div
+                  className="desktop-cards-grid"
+                  style={{
+                    display: 'none',
+                    gridTemplateColumns:
+                      'repeat(auto-fill, minmax(400px, 1fr))',
+                    gap: '16px',
+                    padding: '12px',
+                  }}
+                >
                   {filteredSalesHistory.length === 0 ? (
-                    <div style={{ padding: '16px', textAlign: 'center', color: '#6B7280', gridColumn: '1/-1' }}>
+                    <div
+                      style={{
+                        padding: '16px',
+                        textAlign: 'center',
+                        color: '#6B7280',
+                        gridColumn: '1/-1',
+                      }}
+                    >
                       No se encontraron Notas de Entrega creadas por ti.
                     </div>
                   ) : (
@@ -6891,77 +7879,396 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                       const isAprobada = nota.status === 'aprobada';
                       const isCerrada = nota.payment_status === 'cerrada';
                       const totalAbonado = Number(nota.total_paid_usd) || 0;
-                      const valeAsociado = nota.vales && nota.vales.length > 0 ? nota.vales[0] : null;
-                      const valeEstado = valeAsociado ? valeAsociado.status : null;
+                      const valeAsociado =
+                        nota.vales && nota.vales.length > 0
+                          ? nota.vales[0]
+                          : null;
+                      const valeEstado = valeAsociado
+                        ? valeAsociado.status
+                        : null;
                       const pendingNotif = paymentNotificationsMap[nota.id];
-                      const hasPendingNotif = pendingNotif && pendingNotif.status === 'pending';
-
+                      const hasPendingNotif =
+                        pendingNotif && pendingNotif.status === 'pending';
                       return (
-                        <div key={nota.id} style={{ backgroundColor: '#FFFFFF', border: '1px solid #E5E7EB', borderRadius: '12px', padding: '16px', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                        <div
+                          key={nota.id}
+                          style={{
+                            backgroundColor: '#FFFFFF',
+                            border: '1px solid #E5E7EB',
+                            borderRadius: '12px',
+                            padding: '16px',
+                            boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '12px',
+                          }}
+                        >
                           {/* Header */}
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', borderBottom: '1px solid #F3F4F6', paddingBottom: '8px' }}>
+                          <div
+                            style={{
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'start',
+                              borderBottom: '1px solid #F3F4F6',
+                              paddingBottom: '8px',
+                            }}
+                          >
                             <div>
-                              <span style={{ fontSize: '10px', fontWeight: '700', color: '#6B7280', textTransform: 'uppercase' }}>Cliente</span>
-                              <div style={{ fontSize: '16px', fontWeight: '900', color: '#111827', marginTop: '2px' }}>{nota.clients?.name || 'Cliente N/A'}</div>
+                              <span
+                                style={{
+                                  fontSize: '10px',
+                                  fontWeight: '700',
+                                  color: '#6B7280',
+                                  textTransform: 'uppercase',
+                                }}
+                              >
+                                Cliente
+                              </span>
+                              <div
+                                style={{
+                                  fontSize: '16px',
+                                  fontWeight: '900',
+                                  color: '#111827',
+                                  marginTop: '2px',
+                                }}
+                              >
+                                {nota.clients?.name || 'Cliente N/A'}
+                              </div>
                             </div>
                             <div style={{ textAlign: 'right' }}>
-                              <span style={{ fontSize: '10px', fontWeight: '700', color: '#6B7280', display: 'block' }}>Transacción</span>
-                              <span style={{ fontFamily: 'monospace', fontWeight: '700', color: '#111827' }}>#{nota.transaction_number || nota.id.substring(0, 6)}</span>
+                              <span
+                                style={{
+                                  fontSize: '10px',
+                                  fontWeight: '700',
+                                  color: '#6B7280',
+                                  display: 'block',
+                                }}
+                              >
+                                Transacción
+                              </span>
+                              <span
+                                style={{
+                                  fontFamily: 'monospace',
+                                  fontWeight: '700',
+                                  color: '#111827',
+                                }}
+                              >
+                                #
+                                {nota.transaction_number ||
+                                  nota.id.substring(0, 6)}
+                              </span>
                             </div>
                           </div>
-
                           {/* Info Grid */}
-                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '12px' }}>
-                            <div><span style={{ fontWeight: '700', color: '#4B5563' }}>Fecha:</span> {new Date(nota.created_at).toLocaleDateString()}</div>
-                            <div><span style={{ fontWeight: '700', color: '#4B5563' }}>Vendedor:</span> {currentSellerName}</div>
+                          <div
+                            style={{
+                              display: 'grid',
+                              gridTemplateColumns: '1fr 1fr',
+                              gap: '8px',
+                              fontSize: '12px',
+                            }}
+                          >
                             <div>
-                              <span style={{ fontWeight: '700', color: '#4B5563' }}>Estado:</span>{' '}
-                              <span style={{ padding: '2px 6px', borderRadius: '4px', fontSize: '10px', fontWeight: '900', backgroundColor: isAprobada ? '#DCFCE7' : '#FEF3C7', color: isAprobada ? '#15803D' : '#B45309' }}>{nota.status}</span>
+                              <span
+                                style={{ fontWeight: '700', color: '#4B5563' }}
+                              >
+                                Fecha:
+                              </span>{' '}
+                              {new Date(nota.created_at).toLocaleDateString()}
                             </div>
                             <div>
-                              <span style={{ fontWeight: '700', color: '#4B5563' }}>Pago:</span>{' '}
-                              <span style={{ padding: '2px 6px', borderRadius: '4px', fontSize: '10px', fontWeight: '900', backgroundColor: isCerrada ? '#DCFCE7' : '#FEF3C7', color: isCerrada ? '#15803D' : '#B45309' }}>{isCerrada ? 'Cerrada' : 'Pendiente'}</span>
+                              <span
+                                style={{ fontWeight: '700', color: '#4B5563' }}
+                              >
+                                Vendedor:
+                              </span>{' '}
+                              {currentSellerName}
+                            </div>
+                            <div>
+                              <span
+                                style={{ fontWeight: '700', color: '#4B5563' }}
+                              >
+                                Estado:
+                              </span>{' '}
+                              <span
+                                style={{
+                                  padding: '2px 6px',
+                                  borderRadius: '4px',
+                                  fontSize: '10px',
+                                  fontWeight: '900',
+                                  backgroundColor: isAprobada
+                                    ? '#DCFCE7'
+                                    : '#FEF3C7',
+                                  color: isAprobada ? '#15803D' : '#B45309',
+                                }}
+                              >
+                                {nota.status}
+                              </span>
+                            </div>
+                            <div>
+                              <span
+                                style={{ fontWeight: '700', color: '#4B5563' }}
+                              >
+                                Pago:
+                              </span>{' '}
+                              <span
+                                style={{
+                                  padding: '2px 6px',
+                                  borderRadius: '4px',
+                                  fontSize: '10px',
+                                  fontWeight: '900',
+                                  backgroundColor: isCerrada
+                                    ? '#DCFCE7'
+                                    : '#FEF3C7',
+                                  color: isCerrada ? '#15803D' : '#B45309',
+                                }}
+                              >
+                                {isCerrada ? 'Cerrada' : 'Pendiente'}
+                              </span>
                             </div>
                           </div>
-
                           {/* Finanzas */}
-                          <div style={{ backgroundColor: '#F9FAFB', padding: '10px', borderRadius: '8px', border: '1px solid #F3F4F6', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                            <div><span style={{ fontWeight: '700', color: '#4B5563', fontSize: '11px' }}>Abonado:</span> <strong style={{ color: '#2563EB' }}>${totalAbonado.toFixed(2)}</strong></div>
-                            <div><span style={{ fontWeight: '700', color: '#4B5563', fontSize: '11px' }}>Deuda:</span> {nota.balance_due_usd > 0 ? `$${Number(nota.balance_due_usd).toFixed(2)}` : <span style={{ color: '#16A34A' }}>Cerrada</span>}</div>
+                          <div
+                            style={{
+                              backgroundColor: '#F9FAFB',
+                              padding: '10px',
+                              borderRadius: '8px',
+                              border: '1px solid #F3F4F6',
+                              display: 'grid',
+                              gridTemplateColumns: '1fr 1fr',
+                              gap: '8px',
+                            }}
+                          >
+                            <div>
+                              <span
+                                style={{
+                                  fontWeight: '700',
+                                  color: '#4B5563',
+                                  fontSize: '11px',
+                                }}
+                              >
+                                Abonado:
+                              </span>{' '}
+                              <strong style={{ color: '#2563EB' }}>
+                                ${totalAbonado.toFixed(2)}
+                              </strong>
+                            </div>
+                            <div>
+                              <span
+                                style={{
+                                  fontWeight: '700',
+                                  color: '#4B5563',
+                                  fontSize: '11px',
+                                }}
+                              >
+                                Deuda:
+                              </span>{' '}
+                              {nota.balance_due_usd > 0 ? (
+                                `$${Number(nota.balance_due_usd).toFixed(2)}`
+                              ) : (
+                                <span style={{ color: '#16A34A' }}>
+                                  Cerrada
+                                </span>
+                              )}
+                            </div>
                           </div>
-
                           {/* Acciones Intermedias */}
-                          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                          <div
+                            style={{
+                              display: 'flex',
+                              gap: '8px',
+                              flexWrap: 'wrap',
+                            }}
+                          >
                             {hasPendingNotif ? (
-                              <button onClick={() => handleOpenAbonoNotifModal(nota.id)} style={{ padding: '4px 8px', backgroundColor: '#FEF3C7', color: '#B45309', border: '1px solid #FDE68A', borderRadius: '4px', fontSize: '10px', cursor: 'pointer', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                <Bell size={11} /> ${Number(pendingNotif.amount_usd).toFixed(2)}
+                              <button
+                                onClick={() =>
+                                  handleOpenAbonoNotifModal(nota.id)
+                                }
+                                style={{
+                                  padding: '4px 8px',
+                                  backgroundColor: '#FEF3C7',
+                                  color: '#B45309',
+                                  border: '1px solid #FDE68A',
+                                  borderRadius: '4px',
+                                  fontSize: '10px',
+                                  cursor: 'pointer',
+                                  fontWeight: '700',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                }}
+                              >
+                                <Bell size={11} /> $
+                                {Number(pendingNotif.amount_usd).toFixed(2)}
                               </button>
                             ) : (
-                              <button onClick={() => handleOpenAbonoNotifModal(nota.id)} style={{ padding: '4px 8px', backgroundColor: '#0284C7', color: '#FFFFFF', border: 'none', borderRadius: '4px', fontSize: '10px', cursor: 'pointer', fontWeight: '700' }}>Notif. Abono</button>
+                              <button
+                                onClick={() =>
+                                  handleOpenAbonoNotifModal(nota.id)
+                                }
+                                style={{
+                                  padding: '4px 8px',
+                                  backgroundColor: '#0284C7',
+                                  color: '#FFFFFF',
+                                  border: 'none',
+                                  borderRadius: '4px',
+                                  fontSize: '10px',
+                                  cursor: 'pointer',
+                                  fontWeight: '700',
+                                }}
+                              >
+                                Notif. Abono
+                              </button>
                             )}
-                            
                             {valeEstado && valeEstado !== 'rechazada' ? (
-                              <span style={{ padding: '4px 8px', borderRadius: '4px', fontSize: '10px', fontWeight: '900', textTransform: 'capitalize', backgroundColor: valeEstado === 'aprobada' ? '#DCFCE7' : '#FEF3C7', color: valeEstado === 'aprobada' ? '#15803D' : '#B45309' }}>Vale: {valeEstado}</span>
+                              <span
+                                style={{
+                                  padding: '4px 8px',
+                                  borderRadius: '4px',
+                                  fontSize: '10px',
+                                  fontWeight: '900',
+                                  textTransform: 'capitalize',
+                                  backgroundColor:
+                                    valeEstado === 'aprobada'
+                                      ? '#DCFCE7'
+                                      : '#FEF3C7',
+                                  color:
+                                    valeEstado === 'aprobada'
+                                      ? '#15803D'
+                                      : '#B45309',
+                                }}
+                              >
+                                Vale: {valeEstado}
+                              </span>
                             ) : (
-                              <button onClick={() => setValeModal({ open: true, notaId: nota.id, monto: '' })} style={{ padding: '4px 8px', backgroundColor: valeEstado === 'rechazada' ? '#DC2626' : '#F59E0B', color: '#FFFFFF', border: 'none', borderRadius: '4px', fontSize: '10px', cursor: 'pointer', fontWeight: '700' }}>
-                                {valeEstado === 'rechazada' ? 'Reintentar Vale' : 'Solicitar'}
+                              <button
+                                onClick={() =>
+                                  setValeModal({
+                                    open: true,
+                                    notaId: nota.id,
+                                    monto: '',
+                                  })
+                                }
+                                style={{
+                                  padding: '4px 8px',
+                                  backgroundColor:
+                                    valeEstado === 'rechazada'
+                                      ? '#DC2626'
+                                      : '#F59E0B',
+                                  color: '#FFFFFF',
+                                  border: 'none',
+                                  borderRadius: '4px',
+                                  fontSize: '10px',
+                                  cursor: 'pointer',
+                                  fontWeight: '700',
+                                }}
+                              >
+                                {valeEstado === 'rechazada'
+                                  ? 'Reintentar Vale'
+                                  : 'Solicitar'}
                               </button>
                             )}
                           </div>
-
                           {/* Botones Principales */}
-                          <div className="action-buttons-wrapper" style={{ display: 'flex', gap: '8px', marginTop: '8px', borderTop: '1px solid #E5E7EB', paddingTop: '12px', justifyContent: 'space-between' }}>
-                            <button onClick={() => handleEditNE(nota)} style={{ padding: '6px', backgroundColor: '#F3F4F6', color: '#4F46E5', border: '1px solid #D1D5DB', borderRadius: '6px', fontSize: '11px', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', flex: 1, justifyContent: 'center' }}>
-                              <Edit style={{ width: '13px', height: '13px' }} /> Editar
+                          <div
+                            className="action-buttons-wrapper"
+                            style={{
+                              display: 'flex',
+                              gap: '8px',
+                              marginTop: '8px',
+                              borderTop: '1px solid #E5E7EB',
+                              paddingTop: '12px',
+                              justifyContent: 'space-between',
+                            }}
+                          >
+                            <button
+                              onClick={() => handleEditNE(nota)}
+                              style={{
+                                padding: '6px',
+                                backgroundColor: '#F3F4F6',
+                                color: '#4F46E5',
+                                border: '1px solid #D1D5DB',
+                                borderRadius: '6px',
+                                fontSize: '11px',
+                                fontWeight: '700',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                flex: 1,
+                                justifyContent: 'center',
+                              }}
+                            >
+                              <Edit style={{ width: '13px', height: '13px' }} />{' '}
+                              Editar
                             </button>
-                            <button disabled={!isAprobada || loading} onClick={() => handleDownloadPDF(nota)} style={{ padding: '6px', backgroundColor: isAprobada ? '#111827' : '#E5E7EB', color: isAprobada ? '#FFFFFF' : '#9CA3AF', border: 'none', borderRadius: '6px', fontSize: '11px', fontWeight: '700', cursor: isAprobada ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', gap: '4px', flex: 1, justifyContent: 'center' }}>
-                              <Download style={{ width: '13px', height: '13px' }} /> PDF
+                            <button
+                              disabled={!isAprobada || loading}
+                              onClick={() => handleDownloadPDF(nota)}
+                              style={{
+                                padding: '6px',
+                                backgroundColor: isAprobada
+                                  ? '#111827'
+                                  : '#E5E7EB',
+                                color: isAprobada ? '#FFFFFF' : '#9CA3AF',
+                                border: 'none',
+                                borderRadius: '6px',
+                                fontSize: '11px',
+                                fontWeight: '700',
+                                cursor: isAprobada ? 'pointer' : 'not-allowed',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                flex: 1,
+                                justifyContent: 'center',
+                              }}
+                            >
+                              <Download
+                                style={{ width: '13px', height: '13px' }}
+                              />{' '}
+                              PDF
                             </button>
-                            <button disabled={!isAprobada} onClick={() => handleSendPDF(nota)} style={{ padding: '6px', backgroundColor: isAprobada ? '#16A34A' : '#E5E7EB', color: isAprobada ? '#FFFFFF' : '#9CA3AF', border: 'none', borderRadius: '6px', fontSize: '11px', fontWeight: '700', cursor: isAprobada ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', gap: '4px', flex: 1, justifyContent: 'center' }}>
-                              <Send style={{ width: '13px', height: '13px' }} /> WhatsApp
+                            <button
+                              disabled={!isAprobada}
+                              onClick={() => handleSendPDF(nota)}
+                              style={{
+                                padding: '6px',
+                                backgroundColor: isAprobada
+                                  ? '#16A34A'
+                                  : '#E5E7EB',
+                                color: isAprobada ? '#FFFFFF' : '#9CA3AF',
+                                border: 'none',
+                                borderRadius: '6px',
+                                fontSize: '11px',
+                                fontWeight: '700',
+                                cursor: isAprobada ? 'pointer' : 'not-allowed',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                flex: 1,
+                                justifyContent: 'center',
+                              }}
+                            >
+                              <Send style={{ width: '13px', height: '13px' }} />{' '}
+                              WhatsApp
                             </button>
-                            <button disabled={totalAbonado > 0} onClick={() => handleDeleteNE(nota)} style={{ padding: '6px 10px', backgroundColor: '#FEF2F2', color: totalAbonado > 0 ? '#9CA3AF' : '#DC2626', border: '1px solid #FECACA', borderRadius: '6px', cursor: totalAbonado > 0 ? 'not-allowed' : 'pointer' }}>
-                              <Trash2 style={{ width: '14px', height: '14px' }} />
+                            <button
+                              disabled={totalAbonado > 0}
+                              onClick={() => handleDeleteNE(nota)}
+                              style={{
+                                padding: '6px 10px',
+                                backgroundColor: '#FEF2F2',
+                                color: totalAbonado > 0 ? '#9CA3AF' : '#DC2626',
+                                border: '1px solid #FECACA',
+                                borderRadius: '6px',
+                                cursor:
+                                  totalAbonado > 0 ? 'not-allowed' : 'pointer',
+                              }}
+                            >
+                              <Trash2
+                                style={{ width: '14px', height: '14px' }}
+                              />
                             </button>
                           </div>
                         </div>
@@ -6969,9 +8276,9 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                     })
                   )}
                 </div>
-
                 {/* TABLA DESKTOP (OCULTA POR CSS) */}
-                <div className="desktop-table"
+                <div
+                  className="desktop-table"
                   style={{
                     width: '100%',
                     overflowX: 'auto',
@@ -7364,7 +8671,10 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                   </table>
                 </div>
                 {/* TARJETAS MÓVIL */}
-                <div className="mobile-cards-container" style={{ padding: '12px' }}>
+                <div
+                  className="mobile-cards-container"
+                  style={{ padding: '12px' }}
+                >
                   {filteredSalesHistory.length === 0 ? (
                     <div
                       style={{
@@ -7404,7 +8714,13 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                             marginBottom: '8px',
                           }}
                         >
-                          <div style={{ borderBottom: '1px solid #E5E7EB', paddingBottom: '8px', marginBottom: '4px' }}>
+                          <div
+                            style={{
+                              borderBottom: '1px solid #E5E7EB',
+                              paddingBottom: '8px',
+                              marginBottom: '4px',
+                            }}
+                          >
                             <span
                               style={{
                                 fontSize: '10px',
@@ -7751,6 +9067,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
           )}
         </div>
       )}
+
       {activeSubMenu === 'historial_ventas' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           {/* Encabezado y Buscador */}
@@ -7809,6 +9126,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
               />
             </div>
           </div>
+
           {/* Contenedor Principal de Datos */}
           <div
             style={{
@@ -7819,55 +9137,223 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
             }}
           >
             {/* GRID DE TARJETAS ESCRITORIO (NUEVO) */}
-            <div className="desktop-cards-grid" style={{ 
-              display: 'none', 
-              gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', 
-              gap: '16px',
-              padding: '12px'
-            }}>
+            <div
+              className="desktop-cards-grid"
+              style={{
+                display: 'none',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))',
+                gap: '16px',
+                padding: '12px',
+              }}
+            >
               {filteredSettlementHistory.length === 0 ? (
-                <div style={{ padding: '16px', textAlign: 'center', color: '#6B7280', gridColumn: '1/-1' }}>
+                <div
+                  style={{
+                    padding: '16px',
+                    textAlign: 'center',
+                    color: '#6B7280',
+                    gridColumn: '1/-1',
+                  }}
+                >
                   No hay historial de facturación registrado para ti.
                 </div>
               ) : (
                 filteredSettlementHistory.map((item) => (
-                  <div key={item.id} style={{ backgroundColor: '#FFFFFF', border: '1px solid #E5E7EB', borderRadius: '12px', padding: '16px', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <div
+                    key={item.id}
+                    style={{
+                      backgroundColor: '#FFFFFF',
+                      border: '1px solid #E5E7EB',
+                      borderRadius: '12px',
+                      padding: '16px',
+                      boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '12px',
+                    }}
+                  >
                     {/* Header */}
-                    <div style={{ borderBottom: '1px solid #E5E7EB', paddingBottom: '8px', marginBottom: '4px' }}>
-                      <span style={{ fontSize: '10px', fontWeight: '700', color: '#6B7280', textTransform: 'uppercase', display: 'block' }}>ID Liquidación</span>
-                      <span style={{ fontSize: '16px', fontWeight: '900', color: '#111827' }}>{item.id}</span>
+                    <div
+                      style={{
+                        borderBottom: '1px solid #E5E7EB',
+                        paddingBottom: '8px',
+                        marginBottom: '4px',
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontSize: '10px',
+                          fontWeight: '700',
+                          color: '#6B7280',
+                          textTransform: 'uppercase',
+                          display: 'block',
+                        }}
+                      >
+                        ID Liquidación
+                      </span>
+                      <span
+                        style={{
+                          fontSize: '16px',
+                          fontWeight: '900',
+                          color: '#111827',
+                        }}
+                      >
+                        {item.id}
+                      </span>
                     </div>
-                    
                     {/* Info Grid */}
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '12px' }}>
-                      <div><span style={{ fontWeight: '700', color: '#4B5563' }}>Fecha Pago:</span> {item.datePaid}</div>
-                      <div><span style={{ fontWeight: '700', color: '#4B5563' }}>Periodo:</span> Ciclo #{item.cycle} ({item.month}/{item.year})</div>
-                      <div><span style={{ fontWeight: '700', color: '#4B5563' }}>Tasa BCV:</span> {Number(item.bcvRate).toFixed(2)}</div>
-                      <div><span style={{ fontWeight: '700', color: '#4B5563' }}>Total N.E.:</span> ${item.totalNeAmount.toFixed(2)}</div>
+                    <div
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: '1fr 1fr',
+                        gap: '8px',
+                        fontSize: '12px',
+                      }}
+                    >
+                      <div>
+                        <span style={{ fontWeight: '700', color: '#4B5563' }}>
+                          Fecha Pago:
+                        </span>{' '}
+                        {item.datePaid}
+                      </div>
+                      <div>
+                        <span style={{ fontWeight: '700', color: '#4B5563' }}>
+                          Periodo:
+                        </span>{' '}
+                        Ciclo #{item.cycle} ({item.month}/{item.year})
+                      </div>
+                      <div>
+                        <span style={{ fontWeight: '700', color: '#4B5563' }}>
+                          Tasa BCV:
+                        </span>{' '}
+                        {Number(item.bcvRate).toFixed(2)}
+                      </div>
+                      <div>
+                        <span style={{ fontWeight: '700', color: '#4B5563' }}>
+                          Total N.E.:
+                        </span>{' '}
+                        ${item.totalNeAmount.toFixed(2)}
+                      </div>
                     </div>
-
                     {/* Montos Destacados */}
-                    <div style={{ backgroundColor: '#F9FAFB', padding: '10px', borderRadius: '8px', border: '1px solid #F3F4F6', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
-                        <span style={{ color: '#059669', fontWeight: '700' }}>Neto 53.38%:</span>
-                        <span style={{ color: '#059669', fontWeight: '900' }}>${item.comm53Net.toFixed(2)}</span>
+                    <div
+                      style={{
+                        backgroundColor: '#F9FAFB',
+                        padding: '10px',
+                        borderRadius: '8px',
+                        border: '1px solid #F3F4F6',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '6px',
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          fontSize: '12px',
+                        }}
+                      >
+                        <span style={{ color: '#059669', fontWeight: '700' }}>
+                          Neto 53.38%:
+                        </span>
+                        <span style={{ color: '#059669', fontWeight: '900' }}>
+                          ${item.comm53Net.toFixed(2)}
+                        </span>
                       </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
-                        <span style={{ color: '#0369a1', fontWeight: '700' }}>Neto 23.08%:</span>
-                        <span style={{ color: '#0369a1', fontWeight: '900' }}>${item.comm23Net.toFixed(2)}</span>
+                      <div
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          fontSize: '12px',
+                        }}
+                      >
+                        <span style={{ color: '#0369a1', fontWeight: '700' }}>
+                          Neto 23.08%:
+                        </span>
+                        <span style={{ color: '#0369a1', fontWeight: '900' }}>
+                          ${item.comm23Net.toFixed(2)}
+                        </span>
                       </div>
-                      <div style={{ borderTop: '1px solid #E5E7EB', paddingTop: '6px', marginTop: '4px', display: 'flex', justifyContent: 'space-between', fontSize: '14px' }}>
-                        <span style={{ fontWeight: '900', color: '#111827' }}>Total Equivalente:</span>
-                        <span style={{ fontWeight: '900', color: '#111827' }}>${item.totalEquivalentUsd.toFixed(2)}</span>
+                      <div
+                        style={{
+                          borderTop: '1px solid #E5E7EB',
+                          paddingTop: '6px',
+                          marginTop: '4px',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          fontSize: '14px',
+                        }}
+                      >
+                        <span style={{ fontWeight: '900', color: '#111827' }}>
+                          Total Equivalente:
+                        </span>
+                        <span style={{ fontWeight: '900', color: '#111827' }}>
+                          ${item.totalEquivalentUsd.toFixed(2)}
+                        </span>
                       </div>
                     </div>
-
                     {/* Acciones */}
-                    <div className="action-buttons-wrapper" style={{ display: 'flex', gap: '8px', marginTop: '8px', borderTop: '1px solid #E5E7EB', paddingTop: '12px', justifyContent: 'space-between' }}>
-                      <button onClick={() => { const modal = document.getElementById('captured-history-modal'); if (modal) { modal.querySelector('#captured-html-content').innerHTML = item.capturedHTML || '<p>Sin contenido.</p>'; modal.style.display = 'flex'; } }} style={{ flex: 1, padding: '6px', backgroundColor: '#1e40af', color: '#ffffff', border: 'none', borderRadius: '6px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '4px' }}>
+                    <div
+                      className="action-buttons-wrapper"
+                      style={{
+                        display: 'flex',
+                        gap: '8px',
+                        marginTop: '8px',
+                        borderTop: '1px solid #E5E7EB',
+                        paddingTop: '12px',
+                        justifyContent: 'space-between',
+                      }}
+                    >
+                      <button
+                        onClick={() => {
+                          const modal = document.getElementById(
+                            'captured-history-modal'
+                          );
+                          if (modal) {
+                            modal.querySelector(
+                              '#captured-html-content'
+                            ).innerHTML =
+                              item.capturedHTML || '<p>Sin contenido.</p>';
+                            modal.style.display = 'flex';
+                          }
+                        }}
+                        style={{
+                          flex: 1,
+                          padding: '6px',
+                          backgroundColor: '#1e40af',
+                          color: '#ffffff',
+                          border: 'none',
+                          borderRadius: '6px',
+                          fontSize: '11px',
+                          fontWeight: 'bold',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          justifyContent: 'center',
+                          alignItems: 'center',
+                          gap: '4px',
+                        }}
+                      >
                         <Eye size={13} /> Ver Factura
                       </button>
-                      <button onClick={() => handlePrintCapturedInvoicePDF(item)} style={{ flex: 1, padding: '6px', backgroundColor: '#881337', color: '#ffffff', border: 'none', borderRadius: '6px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '4px' }}>
+                      <button
+                        onClick={() => handlePrintCapturedInvoicePDF(item)}
+                        style={{
+                          flex: 1,
+                          padding: '6px',
+                          backgroundColor: '#881337',
+                          color: '#ffffff',
+                          border: 'none',
+                          borderRadius: '6px',
+                          fontSize: '11px',
+                          fontWeight: 'bold',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          justifyContent: 'center',
+                          alignItems: 'center',
+                          gap: '4px',
+                        }}
+                      >
                         <Download size={13} /> PDF
                       </button>
                     </div>
@@ -7875,9 +9361,9 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                 ))
               )}
             </div>
-
             {/* --- TABLA DESKTOP (OCULTA POR CSS) --- */}
-            <div className="desktop-table"
+            <div
+              className="desktop-table"
               style={{
                 width: '100%',
                 overflowX: 'auto',
@@ -7906,8 +9392,12 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                     <th style={{ padding: '12px 14px' }}>Periodo</th>
                     <th style={{ padding: '12px 14px' }}>Tasa BCV</th>
                     <th style={{ padding: '12px 14px' }}>Total N.E. ($)</th>
-                    <th style={{ padding: '12px 14px' }}>Neto 53.38% Net ($)</th>
-                    <th style={{ padding: '12px 14px' }}>Neto 23.08% Net ($)</th>
+                    <th style={{ padding: '12px 14px' }}>
+                      Neto 53.38% Net ($)
+                    </th>
+                    <th style={{ padding: '12px 14px' }}>
+                      Neto 23.08% Net ($)
+                    </th>
                     <th style={{ padding: '12px 14px' }}>
                       Total Equivalente ($)
                     </th>
@@ -7936,10 +9426,14 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                         key={item.id}
                         style={{ borderBottom: '1px solid #e5e7eb' }}
                       >
-                        <td style={{ padding: '12px 14px', fontWeight: 'bold' }}>
+                        <td
+                          style={{ padding: '12px 14px', fontWeight: 'bold' }}
+                        >
                           {item.id}
                         </td>
-                        <td style={{ padding: '12px 14px' }}>{item.datePaid}</td>
+                        <td style={{ padding: '12px 14px' }}>
+                          {item.datePaid}
+                        </td>
                         <td style={{ padding: '12px 14px' }}>
                           Ciclo #{item.cycle} ({item.month}/{item.year})
                         </td>
@@ -7976,7 +9470,9 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                         >
                           ${item.totalEquivalentUsd.toFixed(2)}
                         </td>
-                        <td style={{ padding: '12px 14px', textAlign: 'center' }}>
+                        <td
+                          style={{ padding: '12px 14px', textAlign: 'center' }}
+                        >
                           <div
                             className="action-buttons-wrapper"
                             style={{
@@ -7995,7 +9491,8 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                                   modal.querySelector(
                                     '#captured-html-content'
                                   ).innerHTML =
-                                    item.capturedHTML || '<p>Sin contenido.</p>';
+                                    item.capturedHTML ||
+                                    '<p>Sin contenido.</p>';
                                   modal.style.display = 'flex';
                                 }
                               }}
@@ -8016,7 +9513,9 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                               <Eye size={13} /> Ver Factura
                             </button>
                             <button
-                              onClick={() => handlePrintCapturedInvoicePDF(item)}
+                              onClick={() =>
+                                handlePrintCapturedInvoicePDF(item)
+                              }
                               style={{
                                 padding: '6px 10px',
                                 backgroundColor: '#881337',
@@ -8069,7 +9568,13 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                     }}
                   >
                     {/* Encabezado de la Tarjeta */}
-                    <div style={{ borderBottom: '1px solid #E5E7EB', paddingBottom: '8px', marginBottom: '4px' }}>
+                    <div
+                      style={{
+                        borderBottom: '1px solid #E5E7EB',
+                        paddingBottom: '8px',
+                        marginBottom: '4px',
+                      }}
+                    >
                       <span
                         style={{
                           fontSize: '10px',
@@ -8128,7 +9633,14 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                       </span>{' '}
                       ${item.comm23Net.toFixed(2)}
                     </div>
-                    <div style={{ fontSize: '14px', fontWeight: '900', color: '#111827', marginTop: '4px' }}>
+                    <div
+                      style={{
+                        fontSize: '14px',
+                        fontWeight: '900',
+                        color: '#111827',
+                        marginTop: '4px',
+                      }}
+                    >
                       Total Equivalente: ${item.totalEquivalentUsd.toFixed(2)}
                     </div>
                     {/* Botones de Acción */}
@@ -8203,6 +9715,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
           </div>
         </div>
       )}
+
       {/* MODAL VALE */}
       {valeModal.open && (
         <div
@@ -8304,6 +9817,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
           </div>
         </div>
       )}
+
       {/* MODAL ABONO */}
       {abonoNotifModal.open && (
         <div
@@ -8355,6 +9869,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                 <X size={18} />
               </button>
             </div>
+
             {/* Mostrar Nombre del Cliente (No editable) */}
             {(() => {
               const nota = salesHistory.find(
@@ -8393,6 +9908,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                 </div>
               );
             })()}
+
             <form
               onSubmit={handleEnviarNotificacionAbono}
               style={{
@@ -8613,6 +10129,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
           </div>
         </div>
       )}
+
       {/* MODAL HISTORIAL CAPTURADO */}
       <div
         id="captured-history-modal"
