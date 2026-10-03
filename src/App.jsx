@@ -138,34 +138,80 @@ function AuthCallback() {
   );
 }
 
-// Componente protector de rutas
+// Componente protector de rutas con validación estricta de existencia y roles
 function RoleProtectedRoute({ allowedRoles }) {
-  const { user, profile, loading } = useAuth();
+  const { user, loading: authLoading } = useAuth();
+  const [checking, setChecking] = useState(true);
+  const [profileStatus, setProfileStatus] = useState({ isValid: false, role: '', isActive: true });
 
-  if (loading) {
+  useEffect(() => {
+    async function verifyUserInDatabase() {
+      if (!user) {
+        setChecking(false);
+        return;
+      }
+
+      try {
+        // Consultar directamente a la base de datos para verificar si el usuario aún existe
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('role, is_active')
+          .eq('id', user.id)
+          .maybeSingle();
+
+        // Si el usuario fue borrado de la tabla profiles o da error
+        if (error || !data) {
+          await supabase.auth.signOut();
+          setProfileStatus({ isValid: false, role: '', isActive: false });
+          setChecking(false);
+          return;
+        }
+
+        const role = (data.role || '').toLowerCase().trim();
+        const isActive = data.is_active ?? true;
+
+        setProfileStatus({
+          isValid: true,
+          role,
+          isActive,
+        });
+      } catch (err) {
+        console.error('Error verificando perfil:', err);
+        await supabase.auth.signOut();
+      } finally {
+        setChecking(false);
+      }
+    }
+
+    if (!authLoading) {
+      verifyUserInDatabase();
+    }
+  }, [user, authLoading]);
+
+  if (authLoading || checking) {
     return (
       <div style={{ backgroundColor: '#000000', color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', fontFamily: 'system-ui' }}>
-        <p>Cargando sistema...</p>
+        <p>Verificando acceso en tiempo real...</p>
       </div>
     );
   }
 
-  if (!user) {
+  if (!user || !profileStatus.isValid) {
     return <Navigate to="/login" replace />;
   }
 
-  const currentRole = (profile?.role || user?.role || '').toLowerCase().trim();
-  const isActive = profile?.is_active ?? user?.is_active ?? true;
-
-  if (isActive === false || currentRole === 'suspendido') {
+  // Cuenta suspendida o inactiva (Bloqueo total sin botones)
+  if (profileStatus.isActive === false || profileStatus.role === 'suspendido') {
     return <SuspendedAccountView />;
   }
 
-  if (currentRole === 'pendiente' || !currentRole) {
+  // Cuenta pendiente
+  if (profileStatus.role === 'pendiente' || !profileStatus.role) {
     return <Navigate to="/pending" replace />;
   }
 
-  if (allowedRoles && !allowedRoles.includes(currentRole)) {
+  // Validación de roles permitidos para este módulo
+  if (allowedRoles && !allowedRoles.includes(profileStatus.role)) {
     return <Unauthorized />;
   }
 
@@ -297,7 +343,7 @@ export default function App() {
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/pending" element={<PendingApproval />} />
-          <Route path="/auth/callback" element={<AuthCallback />} />
+          <Route path="/auth/callback" element={(<AuthCallback />)} />
           
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           
