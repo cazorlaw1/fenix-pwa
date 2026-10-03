@@ -28,49 +28,49 @@ export default function MobileNavigation({ isOpen, onClose }) {
 
   if (!isOpen) return null;
 
-  // Todos los ítems del menú con sus roles permitidos (en minúsculas para comparación segura)
+  // Todos los ítems del menú con el rol 'tecnico' incluido en todos ellos
   const allNavItems = [
     {
       to: '/dashboard',
       label: 'Dashboard',
       icon: LayoutDashboard,
-      roles: ['administrador', 'gerente', 'supervisor', 'vendedor'],
+      roles: ['administrador', 'gerente', 'supervisor', 'vendedor', 'tecnico'],
     },
     {
       to: '/inventario',
       label: 'Inventario',
       icon: Package,
-      roles: ['administrador', 'stock'],
+      roles: ['administrador', 'stock', 'tecnico'],
     },
     {
       to: '/usuarios',
       label: 'Usuarios',
       icon: UsersIcon,
-      roles: ['administrador', 'gerente'],
+      roles: ['administrador', 'gerente', 'tecnico'],
     },
     {
       to: '/administrativo',
       label: 'Administrativo',
       icon: FileText,
-      roles: ['administrador', 'gerente'],
+      roles: ['administrador', 'gerente', 'tecnico'],
     },
     {
       to: '/vendedores',
       label: 'Vendedores',
       icon: TrendingUp,
-      roles: ['administrador', 'gerente', 'supervisor'],
+      roles: ['administrador', 'gerente', 'supervisor', 'tecnico'],
     },
     {
       to: '/ventas',
       label: 'Ventas',
       icon: ShoppingCart,
-      roles: ['administrador', 'gerente', 'supervisor', 'vendedor'],
+      roles: ['administrador', 'gerente', 'supervisor', 'vendedor', 'tecnico'],
     },
     {
       to: '/profile',
       label: 'Mi Perfil',
       icon: User,
-      roles: ['administrador', 'gerente', 'supervisor', 'vendedor', 'stock'],
+      roles: ['administrador', 'gerente', 'supervisor', 'vendedor', 'stock', 'tecnico'],
     },
   ];
 
