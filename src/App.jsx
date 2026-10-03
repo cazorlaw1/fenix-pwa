@@ -348,7 +348,7 @@ export default function App() {
             path="/dashboard" 
             element={
               <>
-                <RoleProtectedRoute allowedRoles={['administrador', 'gerente', 'supervisor', 'vendedor', 'stock']} />
+                <RoleProtectedRoute allowedRoles={['administrador', 'tecnico', 'gerente', 'supervisor', 'vendedor', 'stock']} />
                 <DashboardWrapper />
               </>
             } 
@@ -358,7 +358,7 @@ export default function App() {
             path="/inventario"
             element={
               <>
-                <RoleProtectedRoute allowedRoles={['administrador', 'stock']} />
+                <RoleProtectedRoute allowedRoles={['administrador', 'tecnico', 'stock']} />
                 <Layout><Inventory /></Layout>
               </>
             }
@@ -368,7 +368,7 @@ export default function App() {
             path="/usuarios"
             element={
               <>
-                <RoleProtectedRoute allowedRoles={['administrador']} />
+                <RoleProtectedRoute allowedRoles={['administrador', 'tecnico']} />
                 <Layout><Users /></Layout>
               </>
             }
@@ -378,7 +378,7 @@ export default function App() {
             path="/administrativo"
             element={
               <>
-                <RoleProtectedRoute allowedRoles={['administrador']} />
+                <RoleProtectedRoute allowedRoles={['administrador', 'tecnico']} />
                 <Layout><AdminModule /></Layout>
               </>
             }
@@ -388,7 +388,7 @@ export default function App() {
             path="/vendedores" 
             element={
               <>
-                <RoleProtectedRoute allowedRoles={['administrador', 'gerente', 'supervisor']} />
+                <RoleProtectedRoute allowedRoles={['administrador', 'tecnico', 'gerente', 'supervisor']} />
                 <VendedoresWrapper />
               </>
             } 
@@ -398,7 +398,7 @@ export default function App() {
             path="/ventas"
             element={
               <>
-                <RoleProtectedRoute allowedRoles={['administrador', 'gerente', 'supervisor', 'vendedor']} />
+                <RoleProtectedRoute allowedRoles={['administrador', 'tecnico', 'gerente', 'supervisor', 'vendedor']} />
                 <Layout><SalesModule /></Layout>
               </>
             }
@@ -408,7 +408,7 @@ export default function App() {
             path="/profile"
             element={
               <>
-                <RoleProtectedRoute allowedRoles={['administrador', 'gerente', 'supervisor', 'vendedor', 'stock']} />
+                <RoleProtectedRoute allowedRoles={['administrador', 'tecnico', 'gerente', 'supervisor', 'vendedor', 'stock']} />
                 <Layout><Profile /></Layout>
               </>
             }
