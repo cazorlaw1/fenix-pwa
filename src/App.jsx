@@ -6,18 +6,18 @@ import {
   Route,
   Navigate,
 } from 'react-router-dom';
-import { supabase } from './supabaseClient'; // O './lib/supabase' según tu estructura
+import { supabase } from './supabaseClient';
 
-// Páginas de tu aplicación
-import Dashboard from './pages/Dashboard';
-import Login from './pages/Login';
-import PendingApproval from './pages/PendingApproval';
-import Profile from './pages/Profile';
-import Users from './pages/Users';
-import Inventory from './pages/Inventory';
-import AdminModule from './pages/AdminModule';
-import Vendedores from './pages/Vendedores';
-import SalesModule from './pages/SalesModule';
+// Importación de componentes desde la carpeta correcta
+import Dashboard from './components/Dashboard';
+import Login from './components/Login'; // O tu vista de login correspondiente
+import PendingApproval from './components/PendingApproval';
+import Profile from './components/Profile';
+import Users from './components/Users';
+import Inventory from './components/Inventory';
+import AdminPanel from './components/AdminPanel';
+import Vendedores from './components/Vendedores';
+import SalesModule from './components/SalesModule';
 
 // Pantalla en negro para Acceso No Autorizado (Con botón de redirección)
 function Unauthorized() {
@@ -86,12 +86,12 @@ function SuspendedAccountView() {
   );
 }
 
-// Componente protector que consulta la base de datos igual que el menú principal
+// Componente protector de rutas
 function RoleProtectedRoute({ allowedRoles, children }) {
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState(null);
   const [isAuthorized, setIsAuthorized] = useState(false);
-  const [statusType, setStatusType] = useState('ok'); // 'ok' | 'unauthorized' | 'suspended' | 'pending' | 'login'
+  const [statusType, setStatusType] = useState('ok');
 
   useEffect(() => {
     async function checkUserAccess() {
@@ -104,7 +104,6 @@ function RoleProtectedRoute({ allowedRoles, children }) {
           return;
         }
 
-        // Consultar el perfil de la misma manera que lo hace tu app base
         const { data, error } = await supabase
           .from('profiles')
           .select('*')
@@ -122,21 +121,18 @@ function RoleProtectedRoute({ allowedRoles, children }) {
         const currentRole = data.role ? data.role.toLowerCase().trim() : '';
         const isMaestro = currentRole === 'maestro';
 
-        // 1. Validar si está inactivo o suspendido
         if ((data.is_active === false || currentRole === 'suspendido') && !isMaestro) {
           setStatusType('suspended');
           setLoading(false);
           return;
         }
 
-        // 2. Validar si está pendiente de aprobación
         if ((!data.is_active || !data.role || currentRole === 'pendiente') && !isMaestro) {
           setStatusType('pending');
           setLoading(false);
           return;
         }
 
-        // 3. Validar si el rol actual tiene permiso para el módulo (Maestro tiene acceso total)
         if (isMaestro || allowedRoles.includes(currentRole)) {
           setIsAuthorized(true);
         } else {
@@ -187,7 +183,6 @@ export default function App() {
         
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
         
-        {/* Dashboard: Todos los roles activos */}
         <Route 
           path="/dashboard" 
           element={
@@ -197,7 +192,6 @@ export default function App() {
           } 
         />
         
-        {/* Inventario: Solo Administrador y Stock */}
         <Route
           path="/inventario"
           element={
@@ -207,7 +201,6 @@ export default function App() {
           }
         />
         
-        {/* Usuarios: Solo Administrador */}
         <Route
           path="/usuarios"
           element={
@@ -217,17 +210,15 @@ export default function App() {
           }
         />
         
-        {/* Módulo Administrativo: Solo Administrador */}
         <Route
           path="/administrativo"
           element={
             <RoleProtectedRoute allowedRoles={['administrador']}>
-              <AdminModule />
+              <AdminPanel />
             </RoleProtectedRoute>
           }
         />
         
-        {/* Vendedores / Comisiones: Admin, Gerente, Supervisor */}
         <Route 
           path="/vendedores" 
           element={
@@ -237,7 +228,6 @@ export default function App() {
           } 
         />
         
-        {/* Ventas: Admin, Gerente, Supervisor, Vendedor */}
         <Route
           path="/ventas"
           element={
@@ -247,7 +237,6 @@ export default function App() {
           }
         />
         
-        {/* Perfil: Todos los roles activos */}
         <Route
           path="/profile"
           element={
@@ -257,7 +246,6 @@ export default function App() {
           }
         />
 
-        {/* Ruta Comodín */}
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
     </Router>
