@@ -3384,62 +3384,7 @@ ${penaltiesHtml}
             </button>
           );
         })}
-      </div>
-      {/* --- MENÚ MÓVIL DROPDOWN (E) --- */}
-      <div className="admin-tabs-mobile" ref={mobileMenuRef}>
-        <div
-          className="admin-mobile-trigger"
-          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-        >
-          <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            {(() => {
-              const current = tabsData.find((t) => t.id === activeTab);
-              const Icon = current?.icon || Plus;
-              return (
-                <>
-                  <Icon size={18} color="#dc2626" />
-                  {current?.label || 'Seleccionar módulo'}
-                </>
-              );
-            })()}
-          </span>
-          <ChevronDown
-            size={18}
-            style={{
-              transform: isMobileMenuOpen ? 'rotate(180deg)' : 'rotate(0deg)',
-              transition: 'transform 0.2s',
-            }}
-          />
-        </div>
-        {isMobileMenuOpen && (
-          <div className="admin-mobile-dropdown">
-            {tabsData.map((tab) => {
-              const Icon = tab.icon;
-              const isActive = activeTab === tab.id;
-              return (
-                <div
-                  key={tab.id}
-                  className={`admin-mobile-item ${isActive ? 'active' : ''}`}
-                  onClick={() => {
-                    handleTabChange(tab.id);
-                    setIsMobileMenuOpen(false);
-                  }}
-                >
-                  <Icon size={18} color={isActive ? '#dc2626' : '#4b5563'} />
-                  <span>{tab.label}</span>
-                  {isActive && (
-                    <Check
-                      size={16}
-                      color="#dc2626"
-                      style={{ marginLeft: 'auto' }}
-                    />
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
+      </div>      
       {/* --- MENÚ MÓVIL DROPDOWN (E) --- */}
       <div className="admin-tabs-mobile" ref={mobileMenuRef}>
         <div
