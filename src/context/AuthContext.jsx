@@ -20,12 +20,19 @@ export function AuthProvider({ children }) {
         console.error('Error al obtener perfil:', error);
       }
 
-      const activeProfile = profileData
-        ? {
-            ...profileData,
-            role: profileData.role || 'vendedor',
-          }
-        : { id: userId, role: 'vendedor' };
+      // FILTRO DE SEGURIDAD: Si el perfil fue borrado de la tabla profiles, cerramos sesión de inmediato
+      if (!profileData) {
+        await supabase.auth.signOut();
+        setUser(null);
+        setProfile(null);
+        window.location.href = '/login';
+        return null;
+      }
+
+      const activeProfile = {
+        ...profileData,
+        role: profileData.role || 'vendedor',
+      };
 
       setProfile(activeProfile);
 
@@ -60,6 +67,11 @@ export function AuthProvider({ children }) {
       return activeProfile;
     } catch (err) {
       console.error('Error en fetchProfile:', err);
+      // Si hay un error crítico de conexión o perfil ausente, forzamos salida por seguridad
+      await supabase.auth.signOut();
+      setUser(null);
+      setProfile(null);
+      window.location.href = '/login';
       return null;
     }
   };
