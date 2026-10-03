@@ -33,7 +33,7 @@ export default function Sidebar() {
       <nav style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
         {/* 3.1 Dashboards */}
         <NavLink to="/dashboard" style={linkStyle}>
-          Inicio / Dashboard
+          Dashboard
         </NavLink>
 
         {/* 3.2 Inventario */}
