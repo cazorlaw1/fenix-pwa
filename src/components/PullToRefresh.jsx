@@ -89,7 +89,7 @@ export default function PullToRefresh({ children }) {
             transition: 'opacity 0.2s',
           }}
         >
-          {/* Icono de engranaje de lucide-react */}
+          {/* Único icono: Engranaje girando con el gesto */}
           <Settings
             size={20}
             className={refreshing ? 'animate-spin' : ''}
