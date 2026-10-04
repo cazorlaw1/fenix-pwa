@@ -212,6 +212,8 @@ export default function AdminModule() {
   const [historySearch, setHistorySearch] = useState('');
   const [valesSubTab, setValesSubTab] = useState('vales_lista');
   const [cobranzaSortField, setCobranzaSortField] = useState('created_at');
+  const [quincenaSortField, setQuincenaSortField] = useState('full_name');
+  const [quincenaSortAsc, setQuincenaSortAsc] = useState(true);
   const [cobranzaSortAsc, setCobranzaSortAsc] = useState(false);
   const [neTargetUserId, setNeTargetUserId] = useState('');
   const [neClientId, setNeClientId] = useState('');
@@ -700,6 +702,14 @@ export default function AdminModule() {
     } else {
       setCobranzaSortField(field);
       setCobranzaSortAsc(true);
+    }
+  };
+  const handleSortQuincena = (field) => {
+    if (quincenaSortField === field) {
+      setQuincenaSortAsc(!quincenaSortAsc);
+    } else {
+      setQuincenaSortField(field);
+      setQuincenaSortAsc(true);
     }
   };
 
@@ -8786,17 +8796,136 @@ box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
                         borderBottom: '1px solid #e5e7eb',
                       }}
                     >
-                      <th style={{ padding: '12px 14px' }}>Usuario</th>
-                      <th style={{ padding: '12px 14px' }}>Rol</th>
-                      <th style={{ padding: '12px 14px' }}>
-                        Vendedores Asignados
+                      <th
+                        onClick={() => handleSortQuincena('full_name')}
+                        style={{
+                          padding: '12px 14px',
+                          cursor: 'pointer',
+                          userSelect: 'none',
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                          }}
+                        >
+                          Usuario <ArrowUpDown size={12} color="#6B7280" />
+                        </div>
                       </th>
-                      <th style={{ padding: '12px 14px' }}>Sueldo Fijo Base</th>
-                      <th style={{ padding: '12px 14px', textAlign: 'center' }}>
-                        N.E Cerradas
+                      <th
+                        onClick={() => handleSortQuincena('role')}
+                        style={{
+                          padding: '12px 14px',
+                          cursor: 'pointer',
+                          userSelect: 'none',
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                          }}
+                        >
+                          Rol <ArrowUpDown size={12} color="#6B7280" />
+                        </div>
                       </th>
-                      <th style={{ padding: '12px 14px' }}>% Bombillos</th>
-                      <th style={{ padding: '12px 14px' }}>% Fluidos</th>
+                      <th
+                        onClick={() => handleSortQuincena('assigned')}
+                        style={{
+                          padding: '12px 14px',
+                          cursor: 'pointer',
+                          userSelect: 'none',
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                          }}
+                        >
+                          Vendedores Asignados{' '}
+                          <ArrowUpDown size={12} color="#6B7280" />
+                        </div>
+                      </th>
+                      <th
+                        onClick={() => handleSortQuincena('sueldo')}
+                        style={{
+                          padding: '12px 14px',
+                          cursor: 'pointer',
+                          userSelect: 'none',
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                          }}
+                        >
+                          Sueldo Fijo Base{' '}
+                          <ArrowUpDown size={12} color="#6B7280" />
+                        </div>
+                      </th>
+                      <th
+                        onClick={() => handleSortQuincena('closed_count')}
+                        style={{
+                          padding: '12px 14px',
+                          textAlign: 'center',
+                          cursor: 'pointer',
+                          userSelect: 'none',
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '4px',
+                          }}
+                        >
+                          N.E Cerradas <ArrowUpDown size={12} color="#6B7280" />
+                        </div>
+                      </th>
+                      <th
+                        onClick={() => handleSortQuincena('bombillos')}
+                        style={{
+                          padding: '12px 14px',
+                          cursor: 'pointer',
+                          userSelect: 'none',
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                          }}
+                        >
+                          % Bombillos <ArrowUpDown size={12} color="#6B7280" />
+                        </div>
+                      </th>
+                      <th
+                        onClick={() => handleSortQuincena('fluidos')}
+                        style={{
+                          padding: '12px 14px',
+                          cursor: 'pointer',
+                          userSelect: 'none',
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                          }}
+                        >
+                          % Fluidos <ArrowUpDown size={12} color="#6B7280" />
+                        </div>
+                      </th>
                       <th style={{ padding: '12px 14px' }}>Neto 53.38% ($)</th>
                       <th style={{ padding: '12px 14px' }}>Neto 23.08% ($)</th>
                       <th style={{ padding: '12px 14px', textAlign: 'center' }}>
@@ -8828,119 +8957,179 @@ box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
                         </td>
                       </tr>
                     ) : (
-                      liquidaciones.map((usr) => {
-                        const userClosedNotes = getClosedNotesForUserAndCycle(
-                          usr.id
-                        );
-                        const userVales = getApprovedValesForUserAndCycle(
-                          usr.id
-                        );
-                        const userPenalties =
-                          getApprovedPenaltiesForUserAndCycle(usr.id);
-                        const details = calculateUserSettlementDetails(
-                          usr,
-                          userClosedNotes,
-                          userVales,
-                          userPenalties,
-                          sueldoFijoCurrency,
-                          bcvRateUsd,
-                          penaltyChargeMethod
-                        );
-                        const assignedLabel =
-                          details.hierarchyData.assignedLabelText;
-                        return (
-                          <tr
-                            key={usr.id}
-                            style={{ borderBottom: '1px solid #e5e7eb' }}
-                          >
-                            <td
-                              style={{
-                                padding: '12px 14px',
-                                fontWeight: 'bold',
-                              }}
+                      [...liquidaciones]
+                        .sort((a, b) => {
+                          const notesA = getClosedNotesForUserAndCycle(
+                            a.id
+                          ).length;
+                          const notesB = getClosedNotesForUserAndCycle(
+                            b.id
+                          ).length;
+                          const detailsA = calculateUserSettlementDetails(
+                            a,
+                            getClosedNotesForUserAndCycle(a.id),
+                            getApprovedValesForUserAndCycle(a.id),
+                            getApprovedPenaltiesForUserAndCycle(a.id),
+                            sueldoFijoCurrency,
+                            bcvRateUsd,
+                            penaltyChargeMethod
+                          );
+                          const detailsB = calculateUserSettlementDetails(
+                            b,
+                            getClosedNotesForUserAndCycle(b.id),
+                            getApprovedValesForUserAndCycle(b.id),
+                            getApprovedPenaltiesForUserAndCycle(b.id),
+                            sueldoFijoCurrency,
+                            bcvRateUsd,
+                            penaltyChargeMethod
+                          );
+
+                          let valA, valB;
+                          if (quincenaSortField === 'full_name') {
+                            valA = a.full_name || '';
+                            valB = b.full_name || '';
+                          } else if (quincenaSortField === 'role') {
+                            valA = a.role || '';
+                            valB = b.role || '';
+                          } else if (quincenaSortField === 'assigned') {
+                            valA =
+                              detailsA.hierarchyData.assignedLabelText || '';
+                            valB =
+                              detailsB.hierarchyData.assignedLabelText || '';
+                          } else if (quincenaSortField === 'sueldo') {
+                            valA = Number(a.sueldo_fijo_usd || 0);
+                            valB = Number(b.sueldo_fijo_usd || 0);
+                          } else if (quincenaSortField === 'closed_count') {
+                            valA = notesA;
+                            valB = notesB;
+                          } else if (quincenaSortField === 'bombillos') {
+                            valA = Number(a.pct_bombillos ?? 3);
+                            valB = Number(b.pct_bombillos ?? 3);
+                          } else if (quincenaSortField === 'fluidos') {
+                            valA = Number(a.pct_fluidos ?? 2);
+                            valB = Number(b.pct_fluidos ?? 2);
+                          }
+
+                          if (valA < valB) return quincenaSortAsc ? -1 : 1;
+                          if (valA > valB) return quincenaSortAsc ? 1 : -1;
+                          return 0;
+                        })
+                        .map((usr) => {
+                          const userClosedNotes = getClosedNotesForUserAndCycle(
+                            usr.id
+                          );
+                          const userVales = getApprovedValesForUserAndCycle(
+                            usr.id
+                          );
+                          const userPenalties =
+                            getApprovedPenaltiesForUserAndCycle(usr.id);
+                          const details = calculateUserSettlementDetails(
+                            usr,
+                            userClosedNotes,
+                            userVales,
+                            userPenalties,
+                            sueldoFijoCurrency,
+                            bcvRateUsd,
+                            penaltyChargeMethod
+                          );
+                          const assignedLabel =
+                            details.hierarchyData.assignedLabelText;
+                          return (
+                            <tr
+                              key={usr.id}
+                              style={{ borderBottom: '1px solid #e5e7eb' }}
                             >
-                              {usr.full_name}
-                            </td>
-                            <td
-                              style={{
-                                padding: '12px 14px',
-                                textTransform: 'capitalize',
-                              }}
-                            >
-                              {usr.role}
-                            </td>
-                            <td style={{ padding: '12px 14px' }}>
-                              <span
-                                style={{ fontWeight: '700', color: '#1e40af' }}
-                              >
-                                {assignedLabel}
-                              </span>
-                            </td>
-                            <td style={{ padding: '12px 14px' }}>
-                              ${Number(usr.sueldo_fijo_usd || 0).toFixed(2)}
-                            </td>
-                            <td
-                              style={{
-                                padding: '12px 14px',
-                                textAlign: 'center',
-                                fontWeight: 'bold',
-                                color:
-                                  userClosedNotes.length > 0
-                                    ? '#059669'
-                                    : '#6b7280',
-                              }}
-                            >
-                              {userClosedNotes.length}
-                            </td>
-                            <td style={{ padding: '12px 14px' }}>
-                              {usr.pct_bombillos ?? 3}%
-                            </td>
-                            <td style={{ padding: '12px 14px' }}>
-                              {usr.pct_fluidos ?? 2}%
-                            </td>
-                            <td
-                              style={{
-                                padding: '12px 14px',
-                                fontWeight: '700',
-                                color: '#059669',
-                              }}
-                            >
-                              ${details.comm53NetUsd.toFixed(2)}
-                            </td>
-                            <td
-                              style={{
-                                padding: '12px 14px',
-                                fontWeight: '700',
-                                color: '#0369a1',
-                              }}
-                            >
-                              ${details.comm23NetUsd.toFixed(2)}
-                            </td>
-                            <td
-                              style={{
-                                padding: '12px 14px',
-                                textAlign: 'center',
-                              }}
-                            >
-                              <button
-                                onClick={() => handleOpenSettlementModal(usr)}
+                              <td
                                 style={{
-                                  padding: '6px 12px',
-                                  backgroundColor: '#111827',
-                                  color: '#ffffff',
-                                  border: 'none',
-                                  borderRadius: '4px',
-                                  cursor: 'pointer',
-                                  fontSize: '12px',
+                                  padding: '12px 14px',
                                   fontWeight: 'bold',
                                 }}
                               >
-                                Ver Detalle / Factura
-                              </button>
-                            </td>
-                          </tr>
-                        );
-                      })
+                                {usr.full_name}
+                              </td>
+                              <td
+                                style={{
+                                  padding: '12px 14px',
+                                  textTransform: 'capitalize',
+                                }}
+                              >
+                                {usr.role}
+                              </td>
+                              <td style={{ padding: '12px 14px' }}>
+                                <span
+                                  style={{
+                                    fontWeight: '700',
+                                    color: '#1e40af',
+                                  }}
+                                >
+                                  {assignedLabel}
+                                </span>
+                              </td>
+                              <td style={{ padding: '12px 14px' }}>
+                                ${Number(usr.sueldo_fijo_usd || 0).toFixed(2)}
+                              </td>
+                              <td
+                                style={{
+                                  padding: '12px 14px',
+                                  textAlign: 'center',
+                                  fontWeight: 'bold',
+                                  color:
+                                    userClosedNotes.length > 0
+                                      ? '#059669'
+                                      : '#6b7280',
+                                }}
+                              >
+                                {userClosedNotes.length}
+                              </td>
+                              <td style={{ padding: '12px 14px' }}>
+                                {usr.pct_bombillos ?? 3}%
+                              </td>
+                              <td style={{ padding: '12px 14px' }}>
+                                {usr.pct_fluidos ?? 2}%
+                              </td>
+                              <td
+                                style={{
+                                  padding: '12px 14px',
+                                  fontWeight: '700',
+                                  color: '#059669',
+                                }}
+                              >
+                                ${details.comm53NetUsd.toFixed(2)}
+                              </td>
+                              <td
+                                style={{
+                                  padding: '12px 14px',
+                                  fontWeight: '700',
+                                  color: '#0369a1',
+                                }}
+                              >
+                                ${details.comm23NetUsd.toFixed(2)}
+                              </td>
+                              <td
+                                style={{
+                                  padding: '12px 14px',
+                                  textAlign: 'center',
+                                }}
+                              >
+                                <button
+                                  onClick={() => handleOpenSettlementModal(usr)}
+                                  style={{
+                                    padding: '6px 12px',
+                                    backgroundColor: '#111827',
+                                    color: '#ffffff',
+                                    border: 'none',
+                                    borderRadius: '4px',
+                                    cursor: 'pointer',
+                                    fontSize: '12px',
+                                    fontWeight: 'bold',
+                                  }}
+                                >
+                                  Ver Detalle / Factura
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })
                     )}
                   </tbody>
                 </table>
