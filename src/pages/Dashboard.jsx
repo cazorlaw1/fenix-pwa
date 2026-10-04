@@ -89,15 +89,15 @@ export default function Dashboard({ overrideRole }) {
   useEffect(() => {
     fetchDashboardData();
   }, [effectiveRole, profile?.id]);
-
-  // --- SINCRONIZACIÓN EN TIEMPO REAL PARA EL DASHBOARD ---
+// --- SINCRONIZACIÓN EN TIEMPO REAL PARA EL DASHBOARD ---
   useEffect(() => {
     const channel = supabase
       .channel('dashboard_module_realtime')
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'sales_orders' },
-        () => {
+        (payload) => {
+          console.log('Cambio detectado en sales_orders:', payload);
           fetchDashboardData();
         }
       )
@@ -115,13 +115,28 @@ export default function Dashboard({ overrideRole }) {
           fetchDashboardData();
         }
       )
-      .subscribe();
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'products' },
+        () => {
+          fetchDashboardData();
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'seller_payment_notifications' },
+        () => {
+          fetchDashboardData();
+        }
+      )
+      .subscribe((status) => {
+        console.log('Estado de conexión Realtime Dashboard:', status);
+      });
 
     return () => {
       supabase.removeChannel(channel);
     };
   }, [effectiveRole, profile?.id]);
-
   // --- FUNCIÓN AUXILIAR PARA FECHAS EN UTC-4 (AMERICA/CARACAS) ---
   // Evita discrepancias por zona horaria del navegador/servidor
   const getLocalDateStr = (dateObj) => {
