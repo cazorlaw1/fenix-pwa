@@ -477,16 +477,26 @@ export default function AdminModule() {
   // --- E. GESTIÓN DE FOLIOS CORREGIDA ---
   const fetchEstimatedFolio = async () => {
     try {
-      const { data, error } = await supabase
-        .from('sales_orders')
-        .select('transaction_number')
-        .order('transaction_number', { ascending: false })
-        .limit(1);
-      if (!error && data && data.length > 0) {
-        const maxNum = Number(data[0].transaction_number || 1000);
-        setEstimatedNextFolio(String(maxNum + 1));
+      // Intentamos consultar directamente el siguiente valor de la secuencia de PostgreSQL
+      const { data, error } = await supabase.rpc('get_next_sales_order_folio');
+
+      if (!error && data) {
+        setEstimatedNextFolio(String(data));
       } else {
-        setEstimatedNextFolio('1001');
+        // Fallback si la función RPC no existe aún: buscar el máximo pero sumándole 1 limpio
+        const { data: ordData } = await supabase
+          .from('sales_orders')
+          .select('transaction_number');
+
+        if (ordData && ordData.length > 0) {
+          const numbers = ordData
+            .map((item) => Number(item.transaction_number))
+            .filter((n) => !isNaN(n));
+          const maxNum = numbers.length > 0 ? Math.max(...numbers) : 1000;
+          setEstimatedNextFolio(String(maxNum + 1));
+        } else {
+          setEstimatedNextFolio('1001');
+        }
       }
     } catch {
       setEstimatedNextFolio('1001');
