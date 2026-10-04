@@ -32,14 +32,14 @@ import {
   Target,
   Banknote,
   ShoppingCart,
-  Check, // Agregado para el menú responsivo
+  Check,
 } from 'lucide-react';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-// --- COMPONENTE SEARCHABLE DROPDOWN (CORREGIDO) ---
+// --- COMPONENTE SEARCHABLE DROPDOWN (ESTILO ADMINMODULE - GRANDE) ---
 function SearchableDropdown({
   options,
   value,
@@ -80,8 +80,8 @@ function SearchableDropdown({
         onClick={() => setIsOpen(!isOpen)}
         style={{
           width: '100%',
-          padding: '7px 8px',
-          fontSize: '12px',
+          padding: '10px 12px', // Tamaño grande como AdminModule
+          fontSize: '14px',
           border: '1px solid #D1D5DB',
           borderRadius: '6px',
           backgroundColor: '#FFFFFF',
@@ -90,6 +90,7 @@ function SearchableDropdown({
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
+          minHeight: '42px',
         }}
       >
         <span
@@ -101,7 +102,7 @@ function SearchableDropdown({
         >
           {selectedOption ? selectedOption[labelKey] : placeholder}
         </span>
-        <span style={{ fontSize: '10px', color: '#6b7280' }}>▼</span>
+        <span style={{ fontSize: '12px', color: '#6b7280' }}>▼</span>
       </div>
       {isOpen && (
         <div
@@ -116,12 +117,12 @@ function SearchableDropdown({
             borderRadius: '6px',
             boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
             marginTop: '4px',
-            maxHeight: '220px',
+            maxHeight: '260px',
             display: 'flex',
             flexDirection: 'column',
           }}
         >
-          <div style={{ padding: '6px', borderBottom: '1px solid #e5e7eb' }}>
+          <div style={{ padding: '8px', borderBottom: '1px solid #e5e7eb' }}>
             <input
               type="text"
               placeholder="🔍 Filtrar en tiempo real..."
@@ -131,8 +132,8 @@ function SearchableDropdown({
               autoFocus
               style={{
                 width: '100%',
-                padding: '5px 8px',
-                fontSize: '11px',
+                padding: '8px 10px',
+                fontSize: '14px',
                 border: '1px solid #9ca3af',
                 borderRadius: '4px',
                 boxSizing: 'border-box',
@@ -143,8 +144,8 @@ function SearchableDropdown({
             {filtered.length === 0 ? (
               <div
                 style={{
-                  padding: '8px',
-                  fontSize: '11px',
+                  padding: '12px',
+                  fontSize: '13px',
                   color: '#9ca3af',
                   textAlign: 'center',
                 }}
@@ -170,8 +171,8 @@ function SearchableDropdown({
                         : 'transparent')
                   }
                   style={{
-                    padding: '6px 8px',
-                    fontSize: '11px',
+                    padding: '10px 12px',
+                    fontSize: '14px',
                     cursor: 'pointer',
                     backgroundColor:
                       String(value) === String(opt[valueKey])
@@ -191,16 +192,13 @@ function SearchableDropdown({
 }
 
 // ---------------------------------------------------------------
-
 export default function SalesModule() {
   const { user, role } = useAuth();
-
   // Referencias para el menú móvil
   const mobileMenuRef = useRef(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   // --- A. PERSISTENCIA Y NAVEGACIÓN DE PESTAÑAS ---
-  // Inicialización con prioridad: URL Param > localStorage > Default
   const getInitialSubMenu = () => {
     const params = new URLSearchParams(window.location.search);
     const urlTab = params.get('tab');
@@ -212,16 +210,13 @@ export default function SalesModule() {
 
   const [activeSubMenu, setActiveSubMenu] = useState(getInitialSubMenu());
 
-  // Efecto para guardar en localStorage y actualizar URL cuando cambia la pestaña
   useEffect(() => {
     localStorage.setItem('salesModule_activeTab', activeSubMenu);
-    // Opcional: Actualizar URL sin recargar
     const url = new URL(window.location);
     url.searchParams.set('tab', activeSubMenu);
     window.history.replaceState({}, '', url);
   }, [activeSubMenu]);
 
-  // Efecto para cerrar menú móvil al hacer clic fuera
   useEffect(() => {
     function handleClickOutside(event) {
       if (
@@ -235,13 +230,10 @@ export default function SalesModule() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Pestañas específicas de la sección Clientes (Predeterminada: 'registrar')
   const [clienteTab, setClienteTab] = useState('registrar');
-  // Pestañas de Visitas y Nota de Entrega
   const [visitasTab, setVisitasTab] = useState('potenciales');
   const [neTab, setNeTab] = useState('crear_ne');
 
-  // Mensajes globales y Loader
   const [message, setMessage] = useState({ type: '', text: '' });
   const [loading, setLoading] = useState(false);
 
@@ -259,7 +251,6 @@ export default function SalesModule() {
   });
   const [paymentNotificationsMap, setPaymentNotificationsMap] = useState({});
 
-  // Estado para el Visor Flotante de Imágenes (Modal)
   const [imageModal, setImageModal] = useState({
     open: false,
     url: '',
@@ -268,19 +259,19 @@ export default function SalesModule() {
     fieldName: null,
   });
 
-  // --- ESTADOS PARA CONFIGURACIÓN GLOBAL Y FOLIO ---
+  // --- ESTADOS PARA CONFIGURACIÓN GLOBAL Y FOLIO (ACTUALIZADO PARA 4 MODALIDADES) ---
   const [globalDiscount53, setGlobalDiscount53] = useState(53.38);
   const [globalDiscount23, setGlobalDiscount23] = useState(23.08);
+  const [globalDiscount10, setGlobalDiscount10] = useState(10); // Nueva modalidad
+  const [globalDiscount0, setGlobalDiscount0] = useState(0);   // Nueva modalidad
   const [globalTerms, setGlobalTerms] = useState('Cargando términos...');
   const [estimatedNextFolio, setEstimatedNextFolio] = useState('...');
 
-  // -------------------------------------------------
-  // NUEVO ESTADO PARA HISTORIAL DE FACTURACIÓN DEL USUARIO
   const [userSettlementHistory, setUserSettlementHistory] = useState([]);
   const [historySearch, setHistorySearch] = useState('');
 
   // ---------------------------------------------------------------------------
-  // 1. ESTADOS: SECCIÓN CLIENTES (CREAR Y EDITAR)
+  // 1. ESTADOS: SECCIÓN CLIENTES
   // ---------------------------------------------------------------------------
   const [clientForm, setClientForm] = useState({
     nombre: '',
@@ -296,10 +287,8 @@ export default function SalesModule() {
   const [rifFile, setRifFile] = useState(null);
   const [adicionalFile, setAdicionalFile] = useState(null);
 
-  // Filtros adicionales para tablas
   const [searchPotencialesQuery, setSearchPotencialesQuery] = useState('');
 
-  // Modal para Editar Cliente Oficial de Cartera y sustitución de archivos
   const [editClientModal, setEditClientModal] = useState({
     open: false,
     clientData: null,
@@ -319,13 +308,12 @@ export default function SalesModule() {
   const [editAdicionalFile, setEditAdicionalFile] = useState(null);
 
   // ---------------------------------------------------------------------------
-  // 2. ESTADOS: SECCIÓN VISITAS & POTENCIALES CLIENTES
+  // 2. ESTADOS: SECCIÓN VISITAS & POTENCIALES
   // ---------------------------------------------------------------------------
   const [searchClientQuery, setSearchClientQuery] = useState('');
   const [visitasGps, setVisitasGps] = useState({});
   const [visitasFiles, setVisitasFiles] = useState({});
 
-  // Formulario en la tabla de potenciales para agregar nuevo
   const [potencialForm, setPotencialForm] = useState({
     nombre: '',
     direccion: '',
@@ -334,7 +322,6 @@ export default function SalesModule() {
   const [potencialFile, setPotencialFile] = useState(null);
   const [potencialGps, setPotencialGps] = useState(null);
 
-  // Modal para convertir de Potencial a Cliente Oficial
   const [convertModal, setConvertModal] = useState({
     open: false,
     potencialData: null,
@@ -354,33 +341,33 @@ export default function SalesModule() {
   const [convertAdicionalFile, setConvertAdicionalFile] = useState(null);
 
   // ---------------------------------------------------------------------------
-  // 3. ESTADOS: SECCIÓN NOTA DE ENTREGA & TARJETA DE VENDEDOR
+  // 3. ESTADOS: SECCIÓN NOTA DE ENTREGA
   // ---------------------------------------------------------------------------
   const [editModeId, setEditModeId] = useState(null);
+  
   // Estados para SearchableDropdowns en Crear N.E.
   const [neClientId, setNeClientId] = useState('');
   const [neSearchProduct, setNeSearchProduct] = useState('');
   const [neSelectedProdId, setNeSelectedProdId] = useState('');
   const [neCategoria, setNeCategoria] = useState('bombillos');
-  const [neTipoPago, setNeTipoPago] = useState('53.38');
+  
+  // B. ACTUALIZACIÓN: Modalidad ahora soporta 4 valores
+  const [neTipoPago, setNeTipoPago] = useState('53.38'); 
+  
   const [neQuantity, setNeQuantity] = useState(1);
   const [neCart, setNeCart] = useState([]);
   const [neObservacion, setNeObservacion] = useState('');
   const [neGpsLocation, setNeGpsLocation] = useState(null);
 
-  // Filtro Buscador para Historial de N.E.
   const [searchHistoryQuery, setSearchHistoryQuery] = useState('');
-
-  // Control de expansión de Tarjeta del Vendedor en Historial N.E. (Abierta por defecto)
   const [showFullSellerCard, setShowFullSellerCard] = useState(true);
-
+  
   const [valeModal, setValeModal] = useState({
     open: false,
     notaId: null,
     monto: '',
   });
 
-  // Estado para el Modal de Notificación de Abono (con campo de nota del usuario)
   const [abonoNotifModal, setAbonoNotifModal] = useState({
     open: false,
     notaId: null,
@@ -392,24 +379,22 @@ export default function SalesModule() {
     reference_number: '',
     user_note: '',
   });
-
-  // Nuevo estado para manejar archivos de abono por ID de orden
   const [abonoFiles, setAbonoFiles] = useState({});
 
   // ---------------------------------------------------------------------------
-  // EFECTO PARA AUTO-OCULTAR NOTIFICACIONES A LOS 2 SEGUNDOS (MODIFICADO)
+  // EFECTO PARA AUTO-OCULTAR NOTIFICACIONES
   // ---------------------------------------------------------------------------
   useEffect(() => {
     if (message.text) {
       const timer = setTimeout(() => {
         setMessage({ type: '', text: '' });
-      }, 2000); // Cambiado a 2 segundos exactos
+      }, 2000);
       return () => clearTimeout(timer);
     }
   }, [message]);
 
   // ---------------------------------------------------------------------------
-  // CARGA DE DATOS INICIALES CON SUPABASE
+  // CARGA DE DATOS INICIALES
   // ---------------------------------------------------------------------------
   useEffect(() => {
     if (!user) return;
@@ -435,11 +420,14 @@ export default function SalesModule() {
         data.forEach((item) => {
           settingsMap[item.setting_key] = item.setting_value;
         });
-        // Actualizar estados con los valores de la BD
         if (settingsMap['ne_discount_53'])
           setGlobalDiscount53(Number(settingsMap['ne_discount_53']));
         if (settingsMap['ne_discount_23'])
           setGlobalDiscount23(Number(settingsMap['ne_discount_23']));
+        if (settingsMap['ne_discount_10'])
+          setGlobalDiscount10(Number(settingsMap['ne_discount_10']));
+        if (settingsMap['ne_discount_0'])
+          setGlobalDiscount0(Number(settingsMap['ne_discount_0']));
         if (settingsMap['ne_terms_conditions'])
           setGlobalTerms(settingsMap['ne_terms_conditions']);
       } else if (error) {
@@ -452,16 +440,24 @@ export default function SalesModule() {
 
   const fetchEstimatedFolio = async () => {
     try {
-      const { data, error } = await supabase
-        .from('sales_orders')
-        .select('transaction_number')
-        .order('transaction_number', { ascending: false })
-        .limit(1);
-      if (!error && data && data.length > 0) {
-        const maxNum = Number(data[0].transaction_number || 1000);
-        setEstimatedNextFolio(String(maxNum + 1));
+      // Intentamos consultar directamente el siguiente valor de la secuencia de PostgreSQL
+      const { data, error } = await supabase.rpc('get_next_sales_order_folio');
+      if (!error && data) {
+        setEstimatedNextFolio(String(data));
       } else {
-        setEstimatedNextFolio('1001');
+        // Fallback si la función RPC no existe aún
+        const { data: ordData } = await supabase
+          .from('sales_orders')
+          .select('transaction_number');
+        if (ordData && ordData.length > 0) {
+          const numbers = ordData
+            .map((item) => Number(item.transaction_number))
+            .filter((n) => !isNaN(n));
+          const maxNum = numbers.length > 0 ? Math.max(...numbers) : 1000;
+          setEstimatedNextFolio(String(maxNum + 1));
+        } else {
+          setEstimatedNextFolio('1001');
+        }
       }
     } catch {
       setEstimatedNextFolio('1001');
@@ -606,7 +602,6 @@ export default function SalesModule() {
         )
         .eq('seller_id', user?.id);
       const { data: salesData } = await salesQuery;
-
       let totalCerradas = 0;
       let totalPendientesNe = 0;
       if (salesData) {
@@ -625,18 +620,15 @@ export default function SalesModule() {
           }
         });
       }
-
       const { data: penaltiesData, error: penErr } = await supabase
         .from('penalties')
         .select('amount, status')
         .eq('seller_id', user?.id)
         .in('status', ['pendiente', 'aprobada', 'approved']);
-
       const totalPenalizaciones =
         !penErr && penaltiesData
           ? penaltiesData.reduce((acc, p) => acc + (Number(p.amount) || 0), 0)
           : 0;
-
       setComisionesData({
         pendientes: totalCerradas,
         pendientesNe: totalPendientesNe,
@@ -655,11 +647,9 @@ export default function SalesModule() {
     user?.user_metadata?.full_name ||
     'Vendedor Registrado';
   const currentUserRole = sellerProfile?.role || role || 'vendedor';
-
   const now = new Date();
   const currentMonth = now.getMonth() + 1;
   const currentYear = now.getFullYear();
-
   const totalNeFromHistory = salesHistory.reduce(
     (acc, n) => acc + (Number(n.final_price_usd) || 0),
     0
@@ -723,14 +713,13 @@ export default function SalesModule() {
     }
   };
 
-  // Función auxiliar para validar que sea imagen
   const validateImageFile = (file) => {
     if (!file) return true;
     return file.type.startsWith('image/');
   };
 
   // ---------------------------------------------------------------------------
-  // MANEJADORES: CLIENTES OFICIALES Y EDICIÓN/ELIMINACIÓN SEGURA
+  // MANEJADORES: CLIENTES OFICIALES
   // ---------------------------------------------------------------------------
   const handleSaveClient = async (e) => {
     e.preventDefault();
@@ -814,7 +803,6 @@ export default function SalesModule() {
 
   const handleUpdateClient = async (e) => {
     e.preventDefault();
-    // Validaciones de formato imagen
     if (editCiFile && !validateImageFile(editCiFile)) {
       alert('La nueva foto de C.I. debe ser una imagen.');
       return;
@@ -833,7 +821,6 @@ export default function SalesModule() {
       let rifUrl = editClientModal.clientData.rif_photo_url;
       let adicUrl = editClientModal.clientData.additional_doc_url;
 
-      // Lógica de eliminación de archivos antiguos antes de subir nuevos
       if (editCiFile) {
         if (ciUrl) {
           const oldPath = getStoragePathFromUrl(ciUrl, 'documents');
@@ -858,7 +845,6 @@ export default function SalesModule() {
         }
         adicUrl = await uploadFile(editAdicionalFile, 'documents', 'adicional');
       }
-
       const { error } = await supabase
         .from('clients')
         .update({
@@ -875,7 +861,6 @@ export default function SalesModule() {
           additional_doc_url: adicUrl,
         })
         .eq('id', editClientModal.clientData.id);
-
       if (error) throw error;
       setMessage({
         type: 'success',
@@ -891,23 +876,17 @@ export default function SalesModule() {
   };
 
   const handleDeleteClient = async (clientId, clientName) => {
-    // MODIFICACIÓN D: Confirmación para eliminaciones
     if (!window.confirm('¿Está seguro que desea eliminar este registro?')) {
       return;
     }
-
     setLoading(true);
     try {
-      // 1. Verificar si existen Notas de Entrega pendientes o aprobadas para este cliente
       const { data: activeOrders, error: ordersErr } = await supabase
         .from('sales_orders')
         .select('id, status, transaction_number')
         .eq('client_id', clientId)
-        .in('status', ['pendiente', 'aprobada']); // Bloqueamos si hay notas en proceso
-
+        .in('status', ['pendiente', 'aprobada']);
       if (ordersErr) throw ordersErr;
-
-      // Si encuentra al menos una nota activa, bloqueamos la eliminación
       if (activeOrders && activeOrders.length > 0) {
         const count = activeOrders.length;
         const firstTrans =
@@ -918,19 +897,14 @@ export default function SalesModule() {
           text: `No se puede eliminar al cliente "${clientName}" porque tiene ${count} Nota(s) de Entrega activa(s) (Ej: #${firstTrans}). Finalice o elimine las notas primero.`,
         });
         setLoading(false);
-        return; // Detenemos la ejecución aquí
+        return;
       }
-
-      // 2. Si no hay notas activas, procedemos a obtener los datos del cliente para borrar sus archivos
       const { data: client, error: fetchErr } = await supabase
         .from('clients')
         .select('*')
         .eq('id', clientId)
         .single();
-
       if (fetchErr) throw fetchErr;
-
-      // Recopilar rutas de archivos para eliminar
       const docPaths = [
         getStoragePathFromUrl(client.ci_photo_url, 'documents'),
         getStoragePathFromUrl(client.rif_photo_url, 'documents'),
@@ -940,27 +914,21 @@ export default function SalesModule() {
         client.last_visit_photo_url,
         'visits'
       );
-
-      // Eliminar archivos del storage primero
       if (docPaths.length > 0) {
         await supabase.storage.from('documents').remove(docPaths);
       }
       if (visitPath) {
         await supabase.storage.from('visits').remove([visitPath]);
       }
-
-      // Finalmente eliminar el registro de la base de datos
       const { error: deleteErr } = await supabase
         .from('clients')
         .delete()
         .eq('id', clientId);
-
       if (deleteErr) throw deleteErr;
       setMessage({
         type: 'success',
         text: `El cliente "${clientName}" fue eliminado exitosamente.`,
       });
-      // Refrescar las listas
       fetchClients();
       fetchPotenciales();
     } catch (err) {
@@ -974,7 +942,7 @@ export default function SalesModule() {
   };
 
   // ---------------------------------------------------------------------------
-  // MANEJADORES: POTENCIALES CLIENTES Y VISITAS EXIGIDAS (CON GPS)
+  // MANEJADORES: POTENCIALES CLIENTES
   // ---------------------------------------------------------------------------
   const handleSaveNuevoPotencial = async (e) => {
     e.preventDefault();
@@ -1015,7 +983,7 @@ export default function SalesModule() {
       });
       setPotencialForm({ nombre: '', direccion: '', telefono: '' });
       setPotencialFile(null);
-      setPotencialGps(null); // MODIFICACIÓN A: Reinicio de GPS al guardar
+      setPotencialGps(null);
       fetchPotenciales();
     } catch (err) {
       setMessage({ type: 'error', text: err.message });
@@ -1025,12 +993,8 @@ export default function SalesModule() {
   };
 
   const handleCaptureVisitaGps = async (id) => {
-    // MODIFICACIÓN A: Lógica de recaptura y actualización visual
     getDeviceLocation(async (coords) => {
-      // Actualiza inmediatamente el estado visual
       setVisitasGps((prev) => ({ ...prev, [id]: coords }));
-
-      // Guardar inmediatamente en la base de datos como solicitado
       try {
         await supabase
           .from('clients')
@@ -1060,26 +1024,19 @@ export default function SalesModule() {
     setLoading(true);
     try {
       let adjuntoUrl = null;
-      // Si hay nuevo archivo, subirlo. Si ya había uno, la lógica simple aquí sobrescribe la URL.
       if (file) {
         adjuntoUrl = await uploadFile(file, 'visits', 'visitas');
       }
-
       const updateData = {
         last_visit_at: new Date().toISOString(),
-        // Actualizar GPS también por seguridad si cambió
         last_gps_location: { lat: gps.lat, lng: gps.lng },
       };
       if (adjuntoUrl) updateData.last_visit_photo_url = adjuntoUrl;
-
       const { error } = await supabase
         .from('clients')
         .update(updateData)
         .eq('id', id);
-
       if (error) throw error;
-
-      // CORRECCIÓN: Usar try/catch en lugar de .catch()
       try {
         await supabase.from('client_visits').insert([
           {
@@ -1096,19 +1053,15 @@ export default function SalesModule() {
           visitErr
         );
       }
-
       setMessage({
         type: 'success',
         text: 'Visita actualizada y coordenadas GPS guardadas con éxito.',
       });
-
-      // MODIFICACIÓN A: Reiniciar estado visual del GPS tras guardar
       setVisitasGps((prev) => {
         const newState = { ...prev };
         delete newState[id];
         return newState;
       });
-
       if (isPotencial) fetchPotenciales();
       else fetchClients();
     } catch (err) {
@@ -1161,10 +1114,6 @@ export default function SalesModule() {
       const adicUrl = convertAdicionalFile
         ? await uploadFile(convertAdicionalFile, 'documents', 'adicional')
         : null;
-
-      // Nota: Al convertir, asumimos que no hay CI/RIF previos en 'documents' porque era potencial.
-      // Pero si hubiera foto de visita en 'visits', esa se mantiene o se limpia según lógica de negocio.
-      // Aquí solo actualizamos los campos oficiales.
       const { error } = await supabase
         .from('clients')
         .update({
@@ -1182,7 +1131,6 @@ export default function SalesModule() {
           is_potential: false,
         })
         .eq('id', convertModal.potencialData.id);
-
       if (error) throw error;
       setMessage({
         type: 'success',
@@ -1199,10 +1147,26 @@ export default function SalesModule() {
   };
 
   // ---------------------------------------------------------------------------
-  // MANEJADORES: NOTA DE ENTREGA & DESCARGA/ENVÍO PDF DIRECTO (CON GPS)
+  // MANEJADORES: NOTA DE ENTREGA & DESCARGA/ENVÍO PDF
   // ---------------------------------------------------------------------------
-  const porcentajeDescuento =
-    neTipoPago === '53.38' ? globalDiscount53 : globalDiscount23;
+  
+  // B. FUNCIÓN AUXILIAR PARA OBTENER PORCENTAJE DINÁMICO
+  const getDiscountPercent = (type) => {
+    switch (String(type)) {
+      case '53.38':
+        return globalDiscount53;
+      case '23.08':
+        return globalDiscount23;
+      case '10':
+        return globalDiscount10;
+      case '0':
+        return globalDiscount0;
+      default:
+        return globalDiscount53;
+    }
+  };
+
+  const porcentajeDescuento = getDiscountPercent(neTipoPago);
 
   const filteredProducts = products.filter(
     (p) =>
@@ -1217,12 +1181,15 @@ export default function SalesModule() {
     if (!prod) return;
     const qty = Number(neQuantity);
     if (qty <= 0) return alert('Cantidad debe ser mayor a 0');
+    
+    // B. RECÁLCULO DINÁMICO AL AGREGAR
     const inCart = neCart.find((item) => item.product_id === prod.id);
     const currentQty = inCart ? inCart.quantity : 0;
     if (currentQty + qty > prod.stock_current) {
       alert(`Stock insuficiente. Disponible: ${prod.stock_current}`);
       return;
     }
+
     const valorUnitario = prod.price_usd;
     const vuConDescuento = valorUnitario * (1 - porcentajeDescuento / 100);
 
@@ -1272,7 +1239,6 @@ export default function SalesModule() {
     if (neCart.length === 0) return alert('El carrito está vacío.');
     if (!neGpsLocation)
       return alert('Debe extraer la ubicación GPS para enviar la propuesta.');
-
     setLoading(true);
     try {
       const payload = {
@@ -1292,24 +1258,19 @@ export default function SalesModule() {
         longitude: neGpsLocation.lng,
         gps_captured_at: neGpsLocation.timestamp || new Date().toISOString(),
       };
-
       let orderId = editModeId;
-      let transactionNumber = null; // Variable clave para guardar el número real
-
+      let transactionNumber = null;
       if (editModeId) {
-        // --- LÓGICA DE EDICIÓN ---
-        // Aquí iría tu lógica existente para restaurar stock si es necesario...
         const { data: updatedData, error } = await supabase
           .from('sales_orders')
           .update(payload)
           .eq('id', editModeId)
-          .select() // Agregamos select para obtener los datos actualizados
+          .select()
           .single();
         if (error) throw error;
-        transactionNumber = updatedData?.transaction_number; // Obtenemos el número de la nota editada
+        transactionNumber = updatedData?.transaction_number;
         await supabase.from('order_items').delete().eq('order_id', editModeId);
       } else {
-        // --- LÓGICA DE CREACIÓN ---
         const { data: newNota, error } = await supabase
           .from('sales_orders')
           .insert([payload])
@@ -1317,10 +1278,8 @@ export default function SalesModule() {
           .single();
         if (error) throw error;
         orderId = newNota.id;
-        transactionNumber = newNota.transaction_number; // Obtenemos el número de la nueva nota
+        transactionNumber = newNota.transaction_number;
       }
-
-      // Insertar detalles de la orden
       const detalles = neCart.map((item) => ({
         order_id: orderId,
         product_id: item.product_id,
@@ -1331,12 +1290,9 @@ export default function SalesModule() {
       }));
       await supabase.from('order_items').insert(detalles);
 
-      // ==========================================
-      // 🚀 LLAMADA A LA NUEVA EDGE FUNCTION
-      // ==========================================
       try {
         await notificarAdminNuevaNota({
-          transactionNumber: transactionNumber, // Pasamos el número real (ej: #102)
+          transactionNumber: transactionNumber,
           sellerName: currentSellerName,
           clientName: selectedClientData?.name || 'Cliente',
           totalUsd: precioFinal,
@@ -1347,21 +1303,17 @@ export default function SalesModule() {
           notifErr
         );
       }
-      // ==========================================
-
       setMessage({
         type: 'success',
         text: editModeId
           ? 'Nota de Entrega editada correctamente.'
           : 'Nota de Entrega enviada a revisión con coordenadas GPS guardadas.',
       });
-
       setNeCart([]);
       setNeClientId('');
       setNeObservacion('');
-      setNeGpsLocation(null); // MODIFICACIÓN A: Reinicio de GPS al guardar NE
+      setNeGpsLocation(null);
       setEditModeId(null);
-
       fetchSalesHistory();
       fetchComisionesYVales();
       fetchEstimatedFolio();
@@ -1399,11 +1351,9 @@ export default function SalesModule() {
   };
 
   const handleDeleteNE = async (nota) => {
-    // MODIFICACIÓN D: Confirmación para eliminaciones
     if (!window.confirm('¿Está seguro que desea eliminar este registro?')) {
       return;
     }
-
     const totalAbonado = Number(nota.total_paid_usd) || 0;
     if (totalAbonado > 0) {
       alert(
@@ -1415,13 +1365,8 @@ export default function SalesModule() {
       );
       return;
     }
-
-    // La confirmación de window.confirm ya cubre la segunda pregunta, pero mantenemos la estructura original si se desea doble check,
-    // aunque el requerimiento pide una ventana de confirmación general. El window.confirm inicial es suficiente.
-
     setLoading(true);
     try {
-      // Restaurar stock si estaba aprobada
       if (nota.status === 'aprobada') {
         const { data: items, error: itemsErr } = await supabase
           .from('order_items')
@@ -1474,7 +1419,6 @@ export default function SalesModule() {
         .select('*, products(code, description)')
         .eq('order_id', nota.id);
       if (error) throw error;
-
       if (!window.html2pdf) {
         await new Promise((resolve, reject) => {
           const script = document.createElement('script');
@@ -1485,12 +1429,10 @@ export default function SalesModule() {
           document.head.appendChild(script);
         });
       }
-
       const clientName = nota.clients?.name || 'Cliente';
       const transNo = nota.transaction_number || nota.id.substring(0, 8);
       const fecha = new Date(nota.created_at).toLocaleString();
       const vendedorName = currentSellerName;
-
       let itemsHtml = '';
       let subTotal = 0;
       if (items && items.length > 0) {
@@ -1500,104 +1442,102 @@ export default function SalesModule() {
             item.quantity * item.discounted_unit_price_usd;
           subTotal += totalLine;
           itemsHtml += `
-            <tr>
-              <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; font-family: monospace;">${
-                item.products?.code || 'S/C'
-              }</td>
-              <td style="padding: 6px 8px; border-bottom: 1px solid #ddd;">${
-                item.products?.description || 'Producto'
-              }</td>
-              <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: center;">${
-                item.quantity
-              }</td>
-              <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: right;">$${Number(
-                item.unit_price_usd || 0
-              ).toFixed(2)}</td>
-              <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: right; color: #B45309;">$${Number(
-                item.discounted_unit_price_usd || 0
-              ).toFixed(2)}</td>
-              <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: right; font-weight: bold;">$${Number(
-                totalLine
-              ).toFixed(2)}</td>
-            </tr>
-          `;
+         <tr>
+           <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; font-family: monospace;">${
+             item.products?.code || 'S/C'
+           }</td>
+           <td style="padding: 6px 8px; border-bottom: 1px solid #ddd;">${
+             item.products?.description || 'Producto'
+           }</td>
+           <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: center;">${
+             item.quantity
+           }</td>
+           <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: right;">$${Number(
+             item.unit_price_usd || 0
+           ).toFixed(2)}</td>
+           <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: right; color: #B45309;">$${Number(
+             item.discounted_unit_price_usd || 0
+           ).toFixed(2)}</td>
+           <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: right; font-weight: bold;">$${Number(
+             totalLine
+           ).toFixed(2)}</td>
+         </tr>
+       `;
         });
       }
-
       const container = document.createElement('div');
       container.innerHTML = `
-        <div style="font-family: Arial, sans-serif; color: #111; padding: 25px; background: #fff; width: 700px; height: 1000px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between; margin: 0 auto;">
-          <div>
-            <div style="display: flex; justify-content: space-between; border-bottom: 2px solid #111; padding-bottom: 15px; margin-bottom: 20px;">
-              <div>
-                <h2 style="margin: 0; font-size: 20px; text-transform: uppercase;">FENIX AUTO PART C.A</h2>
-                <p style="margin: 2px 0; font-size: 12px;"><strong>RIF:</strong> J-50261925-2</p>
-                <p style="margin: 8px 0 0 0; font-size: 12px;"><strong>Cliente:</strong> ${clientName}</p>
-              </div>
-              <div style="text-align: right; font-size: 12px;">
-                <p style="margin: 2px 0;"><strong>N° Transacción:</strong> #${transNo}</p>
-                <p style="margin: 2px 0;"><strong>Fecha/Hora:</strong> ${fecha}</p>
-                <p style="margin: 2px 0;"><strong>Vendedor:</strong> ${vendedorName}</p>
-                <p style="margin: 2px 0;"><strong>Categoría:</strong> ${
-                  nota.category || 'General'
-                }</p>
-              </div>
-            </div>
-            <table style="width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 20px;">
-              <thead>
-                <tr style="background-color: #f3f4f6;">
-                  <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: left;">Código</th>
-                  <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: left;">Descripción</th>
-                  <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: center;">Cantidad</th>
-                  <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: right;">V. Unitario</th>
-                  <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: right;">V. U. con Descuento</th>
-                  <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: right;">Total Línea</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${itemsHtml}
-              </tbody>
-            </table>
-          </div>
-          <div>
-            <div style="display: flex; justify-content: flex-end; font-size: 12px; margin-bottom: 15px;">
-              <div style="width: 280px; background: #f9fafb; padding: 12px; border: 1px solid #ddd; border-radius: 6px;">
-                <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
-                  <span>Total Base:</span>
-                  <strong>$${Number(nota.total_base_usd || subTotal).toFixed(
-                    2
-                  )}</strong>
-                </div>
-                <div style="display: flex; justify-content: space-between; margin-bottom: 6px; color: #B45309;">
-                  <span>Descuento Aplicado:</span>
-                  <strong>-$${Number(nota.discount_amount_usd || 0).toFixed(
-                    2
-                  )}</strong>
-                </div>
-                <div style="display: flex; justify-content: space-between; border-top: 1px solid #ccc; padding-top: 6px; font-weight: bold; font-size: 14px; color: #DC2626;">
-                  <span>Precio Final:</span>
-                  <span>$${Number(nota.final_price_usd || subTotal).toFixed(
-                    2
-                  )}</span>
-                </div>
-              </div>
-            </div>
-            ${
-              nota.observation
-                ? `
-              <div style="font-size: 11px; color: #333; background: #fffbeb; border: 1px solid #fde68a; padding: 10px; border-radius: 4px; margin-bottom: 10px; text-align: justify;">
-                <strong>Observación:</strong> ${nota.observation}
-              </div>
-              `
-                : ''
-            }
-            <div style="font-size: 10px; color: #555; background: #f3f4f6; padding: 10px; border-radius: 4px; line-height: 1.4; text-align: justify;">
-              <strong>Términos y condiciones:</strong> ${globalTerms}
-            </div>
-          </div>
-        </div>
-      `;
-
+     <div style="font-family: Arial, sans-serif; color: #111; padding: 25px; background: #fff; width: 700px; height: 1000px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between; margin: 0 auto;">
+       <div>
+         <div style="display: flex; justify-content: space-between; border-bottom: 2px solid #111; padding-bottom: 15px; margin-bottom: 20px;">
+           <div>
+             <h2 style="margin: 0; font-size: 20px; text-transform: uppercase;">FENIX AUTO PART C.A</h2>
+             <p style="margin: 2px 0; font-size: 12px;"><strong>RIF:</strong> J-50261925-2</p>
+             <p style="margin: 8px 0 0 0; font-size: 12px;"><strong>Cliente:</strong> ${clientName}</p>
+           </div>
+           <div style="text-align: right; font-size: 12px;">
+             <p style="margin: 2px 0;"><strong>N° Transacción:</strong> #${transNo}</p>
+             <p style="margin: 2px 0;"><strong>Fecha/Hora:</strong> ${fecha}</p>
+             <p style="margin: 2px 0;"><strong>Vendedor:</strong> ${vendedorName}</p>
+             <p style="margin: 2px 0;"><strong>Categoría:</strong> ${
+               nota.category || 'General'
+             }</p>
+           </div>
+         </div>
+         <table style="width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 20px;">
+           <thead>
+             <tr style="background-color: #f3f4f6;">
+               <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: left;">Código</th>
+               <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: left;">Descripción</th>
+               <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: center;">Cantidad</th>
+               <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: right;">V. Unitario</th>
+               <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: right;">V. U. con Descuento</th>
+               <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: right;">Total Línea</th>
+             </tr>
+           </thead>
+           <tbody>
+             ${itemsHtml}
+           </tbody>
+         </table>
+       </div>
+       <div>
+         <div style="display: flex; justify-content: flex-end; font-size: 12px; margin-bottom: 15px;">
+           <div style="width: 280px; background: #f9fafb; padding: 12px; border: 1px solid #ddd; border-radius: 6px;">
+             <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+               <span>Total Base:</span>
+               <strong>$${Number(nota.total_base_usd || subTotal).toFixed(
+                 2
+               )}</strong>
+             </div>
+             <div style="display: flex; justify-content: space-between; margin-bottom: 6px; color: #B45309;">
+               <span>Descuento Aplicado:</span>
+               <strong>-$${Number(nota.discount_amount_usd || 0).toFixed(
+                 2
+               )}</strong>
+             </div>
+             <div style="display: flex; justify-content: space-between; border-top: 1px solid #ccc; padding-top: 6px; font-weight: bold; font-size: 14px; color: #DC2626;">
+               <span>Precio Final:</span>
+               <span>$${Number(nota.final_price_usd || subTotal).toFixed(
+                 2
+               )}</span>
+             </div>
+           </div>
+         </div>
+         ${
+           nota.observation
+             ? `
+           <div style="font-size: 11px; color: #333; background: #fffbeb; border: 1px solid #fde68a; padding: 10px; border-radius: 4px; margin-bottom: 10px; text-align: justify;">
+             <strong>Observación:</strong> ${nota.observation}
+           </div>
+           `
+             : ''
+         }
+         <div style="font-size: 10px; color: #555; background: #f3f4f6; padding: 10px; border-radius: 4px; line-height: 1.4; text-align: justify;">
+           <strong>Términos y condiciones:</strong> ${globalTerms}
+         </div>
+       </div>
+     </div>
+   `;
       const opciones = {
         margin: 0,
         filename: `nota-entrega-${transNo}.pdf`,
@@ -1627,11 +1567,7 @@ export default function SalesModule() {
         });
       }
       const container = document.createElement('div');
-      container.innerHTML = `
-        <div style="font-family: Arial, sans-serif; color: #111; padding: 25px; background: #fff; width: 720px; box-sizing: border-box; margin: 0 auto;">
-          ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
-        </div>
-      `;
+      container.innerHTML = `<div style="font-family: Arial, sans-serif; color: #111; padding: 25px; background: #fff; width: 720px; box-sizing: border-box; margin: 0 auto;"> ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'} </div>`;
       const opciones = {
         margin: 0,
         filename: `factura-liquidacion-${histItem.id}.pdf`,
@@ -1650,13 +1586,11 @@ export default function SalesModule() {
   const handleSendPDF = async (nota) => {
     try {
       setLoading(true);
-      // 1. Obtener datos necesarios
       const { data: items, error } = await supabase
         .from('order_items')
         .select('*, products(code, description)')
         .eq('order_id', nota.id);
       if (error) throw error;
-      // Asegurarnos de tener html2pdf cargado
       if (!window.html2pdf) {
         await new Promise((resolve, reject) => {
           const script = document.createElement('script');
@@ -1668,7 +1602,7 @@ export default function SalesModule() {
         });
       }
       const clientName = nota.clients?.name || 'Cliente';
-      const transNo = nota.transaction_number || nota.id.substring(0, 8);
+      const transNo = nota.transaction_number || nota.id.substring(0, 8); 
       const fecha = new Date(nota.created_at).toLocaleString();
       const vendedorName = currentSellerName;
       let itemsHtml = '';
@@ -1679,105 +1613,14 @@ export default function SalesModule() {
             item.total_line_usd ||
             item.quantity * item.discounted_unit_price_usd;
           subTotal += totalLine;
-          itemsHtml += `
-             <tr>
-               <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; font-family: monospace;">${
-                 item.products?.code || 'S/C'
-               }</td>
-               <td style="padding: 6px 8px; border-bottom: 1px solid #ddd;">${
-                 item.products?.description || 'Producto'
-               }</td>
-               <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: center;">${
-                 item.quantity
-               }</td>
-               <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: right;">$${Number(
-                 item.unit_price_usd || 0
-               ).toFixed(2)}</td>
-               <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: right; color: #B45309;">$${Number(
-                 item.discounted_unit_price_usd || 0
-               ).toFixed(2)}</td>
-               <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: right; font-weight: bold;">$${Number(
-                 totalLine
-               ).toFixed(2)}</td>
-             </tr>
-           `;
+          itemsHtml += `<tr> <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; font-family: monospace;">${ item.products?.code || 'S/C' }</td> <td style="padding: 6px 8px; border-bottom: 1px solid #ddd;">${ item.products?.description || 'Producto' }</td> <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: center;">${ item.quantity }</td> <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: right;">$${Number( item.unit_price_usd || 0 ).toFixed(2)}</td> <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: right; color: #B45309;">$${Number( item.discounted_unit_price_usd || 0 ).toFixed(2)}</td> <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: right; font-weight: bold;">$${Number( totalLine ).toFixed(2)}</td> </tr>` ;
         });
       }
-      // 2. Usar EXACTAMENTE el mismo HTML que handleDownloadPDF para mantener el diseño
       const container = document.createElement('div');
-      container.innerHTML = `
-         <div style="font-family: Arial, sans-serif; color: #111; padding: 25px; background: #fff; width: 700px; height: 1000px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between; margin: 0 auto;">
-           <div>
-             <div style="display: flex; justify-content: space-between; border-bottom: 2px solid #111; padding-bottom: 15px; margin-bottom: 20px;">
-               <div>
-                 <h2 style="margin: 0; font-size: 20px; text-transform: uppercase;">FENIX AUTO PART C.A</h2>
-                 <p style="margin: 2px 0; font-size: 12px;"><strong>RIF:</strong> J-50261925-2</p>
-                 <p style="margin: 8px 0 0 0; font-size: 12px;"><strong>Cliente:</strong> ${clientName}</p>
-               </div>
-               <div style="text-align: right; font-size: 12px;">
-                 <p style="margin: 2px 0;"><strong>N° Transacción:</strong> #${transNo}</p>
-                 <p style="margin: 2px 0;"><strong>Fecha/Hora:</strong> ${fecha}</p>
-                 <p style="margin: 2px 0;"><strong>Vendedor:</strong> ${vendedorName}</p>
-                 <p style="margin: 2px 0;"><strong>Categoría:</strong> ${
-                   nota.category || 'General'
-                 }</p>
-               </div>
-             </div>
-             <table style="width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 20px;">
-               <thead>
-                 <tr style="background-color: #f3f4f6;">
-                   <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: left;">Código</th>
-                   <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: left;">Descripción</th>
-                   <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: center;">Cantidad</th>
-                   <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: right;">V. Unitario</th>
-                   <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: right;">V. U. con Descuento</th>
-                   <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: right;">Total Línea</th>
-                 </tr>
-               </thead>
-               <tbody>
-                 ${itemsHtml}
-               </tbody>
-             </table>
-           </div>
-           <div>
-             <div style="display: flex; justify-content: flex-end; font-size: 12px; margin-bottom: 15px;">
-               <div style="width: 280px; background: #f9fafb; padding: 12px; border: 1px solid #ddd; border-radius: 6px;">
-                 <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
-                   <span>Total Base:</span>
-                   <strong>$${Number(nota.total_base_usd || subTotal).toFixed(
-                     2
-                   )}</strong>
-                 </div>
-                 <div style="display: flex; justify-content: space-between; margin-bottom: 6px; color: #B45309;">
-                   <span>Descuento Aplicado:</span>
-                   <strong>-$${Number(nota.discount_amount_usd || 0).toFixed(
-                     2
-                   )}</strong>
-                 </div>
-                 <div style="display: flex; justify-content: space-between; border-top: 1px solid #ccc; padding-top: 6px; font-weight: bold; font-size: 14px; color: #DC2626;">
-                   <span>Precio Final:</span>
-                   <span>$${Number(nota.final_price_usd || subTotal).toFixed(
-                     2
-                   )}</span>
-                 </div>
-               </div>
-             </div>
-             ${
-               nota.observation
-                 ? `
-             <div style="font-size: 11px; color: #333; background: #fffbeb; border: 1px solid #fde68a; padding: 10px; border-radius: 4px; margin-bottom: 10px; text-align: justify;">
-               <strong>Observación:</strong> ${nota.observation}
-             </div>
-             `
-                 : ''
-             }
-             <div style="font-size: 10px; color: #555; background: #f3f4f6; padding: 10px; border-radius: 4px; line-height: 1.4; text-align: justify;">
-               <strong>Términos y condiciones:</strong> ${globalTerms}
-             </div>
-           </div>
-         </div>
-       `;
-      // 3. Generar Blob con las mismas opciones de calidad
+      container.innerHTML = `<div style="font-family: Arial, sans-serif; color: #111; padding: 25px; background: #fff; width: 700px; height: 1000px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between; margin: 0 auto;"> <div> <div style="display: flex; justify-content: space-between; border-bottom: 2px solid #111; padding-bottom: 15px; margin-bottom: 20px;"> <div> <h2 style="margin: 0; font-size: 20px; text-transform: uppercase;">FENIX AUTO PART C.A</h2> <p style="margin: 2px 0; font-size: 12px;"><strong>RIF:</strong> J-50261925-2</p> <p style="margin: 8px 0 0 0; font-size: 12px;"><strong>Cliente:</strong> ${clientName}</p> </div> <div style="text-align: right; font-size: 12px;"> <p style="margin: 2px 0;"><strong>N° Transacción:</strong> #${transNo}</p> <p style="margin: 2px 0;"><strong>Fecha/Hora:</strong> ${fecha}</p> <p style="margin: 2px 0;"><strong>Vendedor:</strong> ${vendedorName}</p> <p style="margin: 2px 0;"><strong>Categoría:</strong> ${ nota.category || 'General' }</p> </div> </div> <table style="width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 20px;"> <thead> <tr style="background-color: #f3f4f6;"> <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: left;">Código</th> <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: left;">Descripción</th> <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: center;">Cantidad</th> <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: right;">V. Unitario</th> <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: right;">V. U. con Descuento</th> <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: right;">Total Línea</th> </tr> </thead> <tbody> ${itemsHtml} </tbody> </table> </div> <div> <div style="display: flex; justify-content: flex-end; font-size: 12px; margin-bottom: 15px;"> <div style="width: 280px; background: #f9fafb; padding: 12px; border: 1px solid #ddd; border-radius: 6px;"> <div style="display: flex; justify-content: space-between; margin-bottom: 6px;"> <span>Total Base:</span> <strong>$${Number(nota.total_base_usd || subTotal).toFixed( 2 )}</strong> </div> <div style="display: flex; justify-content: space-between; margin-bottom: 6px; color: #B45309;"> <span>Descuento Aplicado:</span> <strong>-$${Number(nota.discount_amount_usd || 0).toFixed( 2 )}</strong> </div> <div style="display: flex; justify-content: space-between; border-top: 1px solid #ccc; padding-top: 6px; font-weight: bold; font-size: 14px; color: #DC2626;"> <span>Precio Final:</span> <span>$${Number(nota.final_price_usd || subTotal).toFixed( 2 )}</span> </div> </div> </div> ${ nota.observation ?` <div style= "font-size: 11px; color: #333; background: #fffbeb; border: 1px solid #fde68a; padding: 10px; border-radius: 4px; margin-bottom: 10px; text-align: justify; " >
+ <strong >Observación: </strong > ${nota.observation}
+ </div >
+ `: '' } <div style="font-size: 10px; color: #555; background: #f3f4f6; padding: 10px; border-radius: 4px; line-height: 1.4; text-align: justify;"> <strong>Términos y condiciones:</strong> ${globalTerms} </div> </div> </div>` ;
       const opt = {
         margin: 0,
         filename: `Nota-${transNo}.pdf`,
@@ -1791,11 +1634,9 @@ export default function SalesModule() {
         .from(container)
         .set(opt)
         .output('blob');
-      // Crear un objeto File desde el Blob
       const file = new File([pdfBlob], `Nota-Entrega-${transNo}.pdf`, {
         type: 'application/pdf',
       });
-      // 4. Intentar compartir nativamente
       if (
         navigator.share &&
         navigator.canShare &&
@@ -1809,7 +1650,6 @@ export default function SalesModule() {
           files: [file],
         });
       } else {
-        // Fallback: Si no soporta compartir archivos, descarga y abre WhatsApp
         await window
           .html2pdf()
           .from(container)
@@ -1838,14 +1678,12 @@ export default function SalesModule() {
       return alert('Ingrese un monto válido');
     setLoading(true);
     try {
-      // Obtener datos de la nota para el correo
       const notaAsociada = salesHistory.find((n) => n.id === valeModal.notaId);
       const nroTransaccion =
         notaAsociada?.transaction_number ||
         valeModal.notaId?.substring(0, 6) ||
         'N/A';
       const clienteNombre = notaAsociada?.clients?.name || 'Cliente';
-
       const { error } = await supabase.from('vales').insert([
         {
           order_id: valeModal.notaId,
@@ -1856,8 +1694,6 @@ export default function SalesModule() {
         },
       ]);
       if (error) throw error;
-
-      // ✅ ENVIAR CORREO AL ADMINISTRADOR SOBRE LA SOLICITUD DE VALE
       try {
         await supabase.functions.invoke('send-notification', {
           body: {
@@ -1877,7 +1713,6 @@ export default function SalesModule() {
           notifErr
         );
       }
-
       setMessage({
         type: 'success',
         text: 'Solicitud de vale enviada y administrador notificado.',
@@ -1912,7 +1747,6 @@ export default function SalesModule() {
         user_note: '',
       });
     }
-    // Resetear archivo al abrir modal
     setAbonoFiles((prev) => ({ ...prev, [notaId]: null }));
     setAbonoNotifModal({ open: true, notaId });
   };
@@ -1935,10 +1769,7 @@ export default function SalesModule() {
       if (isNaN(montoNum) || montoNum <= 0) {
         throw new Error('Ingrese un monto válido.');
       }
-
-      // Subir archivo primero
       const receiptUrl = await uploadFile(fileToUpload, 'visits', 'abonos');
-
       const { data: newNotif, error: notifErr } = await supabase
         .from('seller_payment_notifications')
         .insert([
@@ -1956,15 +1787,11 @@ export default function SalesModule() {
         ])
         .select()
         .single();
-
       if (notifErr) throw notifErr;
-
       setPaymentNotificationsMap((prev) => ({
         ...prev,
         [abonoNotifModal.notaId]: newNotif,
       }));
-
-      // ✅ ENVIAR CORREO AL ADMINISTRADOR Y VENDEDOR SOBRE EL ABONO
       try {
         const notaActual = salesHistory.find(
           (n) => n.id === abonoNotifModal.notaId
@@ -1978,7 +1805,7 @@ export default function SalesModule() {
               nroTransaccion:
                 notaActual?.transaction_number ||
                 abonoNotifModal.notaId.substring(0, 6),
-              vendedorEmail: user?.email, // Email del vendedor logueado
+              vendedorEmail: user?.email,
               vendedorNombre: currentSellerName,
               clienteNombre: notaActual?.clients?.name || 'Cliente',
               montoAbonado: montoNum.toFixed(2),
@@ -1988,9 +1815,7 @@ export default function SalesModule() {
         });
       } catch (mailErr) {
         console.warn('Error enviando correo de abono:', mailErr);
-        // No bloqueamos el flujo si falla el correo
       }
-
       setMessage({
         type: 'success',
         text: 'Notificación de abono registrada y administrador notificado.',
@@ -2090,7 +1915,6 @@ export default function SalesModule() {
     );
   });
 
-  // Función para manejar la sustitución de imagen desde el Modal
   const handleReplaceImageFromModal = async (newFile) => {
     if (!newFile) return;
     if (!validateImageFile(newFile)) {
@@ -2099,41 +1923,29 @@ export default function SalesModule() {
     }
     const { clientId, fieldName, url: oldUrl } = imageModal;
     if (!clientId || !fieldName) return;
-
     setLoading(true);
     try {
-      // Determinar bucket y carpeta según el campo
       let bucket = 'documents';
-      let folder = 'adicional'; // default
+      let folder = 'adicional';
       if (fieldName === 'ci_photo_url') folder = 'ci';
       if (fieldName === 'rif_photo_url') folder = 'rif';
       if (fieldName === 'last_visit_photo_url') {
         bucket = 'visits';
         folder = 'visitas';
       }
-
-      // Eliminar archivo antiguo si existe
       if (oldUrl) {
         const oldPath = getStoragePathFromUrl(oldUrl, bucket);
         if (oldPath) {
           await supabase.storage.from(bucket).remove([oldPath]);
         }
       }
-
-      // Subir nuevo archivo
       const newUrl = await uploadFile(newFile, bucket, folder);
-
-      // Actualizar base de datos
       const { error } = await supabase
         .from('clients')
         .update({ [fieldName]: newUrl })
         .eq('id', clientId);
-
       if (error) throw error;
-
-      // Actualizar estado local y cerrar modal
       setImageModal((prev) => ({ ...prev, url: newUrl }));
-      // Refrescar listas
       fetchClients();
       fetchPotenciales();
       setMessage({ type: 'success', text: 'Imagen sustituida correctamente.' });
@@ -2147,13 +1959,97 @@ export default function SalesModule() {
     }
   };
 
-  // Lista de pestañas para el menú
   const menuTabs = [
     { id: 'clientes', label: 'Clientes', icon: Users },
     { id: 'visitas', label: 'Visitas', icon: MapPin },
     { id: 'nota_entrega', label: 'Nota de Entrega', icon: FileText },
     { id: 'historial_ventas', label: 'Historial de Ventas', icon: History },
   ];
+
+  // E. FUNCIÓN AUXILIAR PARA RENDERIZAR TARJETAS DE PRODUCTOS EN MÓVIL
+  const renderProductCards = (items, isEditable, onRemove) => {
+    return items.map((item, idx) => (
+      <div
+        key={item.product_id || idx}
+        style={{
+          background: '#fff',
+          border: '1px solid #e5e7eb',
+          borderRadius: '8px',
+          padding: '12px',
+          marginBottom: '10px',
+          boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+        }}
+      >
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'flex-start',
+            marginBottom: '8px',
+          }}
+        >
+          <div style={{ fontWeight: '700', fontSize: '14px', color: '#111827' }}>
+            {item.description}
+          </div>
+          {isEditable && (
+            <button
+              onClick={() => onRemove(item.product_id)}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: '#dc2626',
+                cursor: 'pointer',
+                padding: '4px',
+              }}
+            >
+              <Trash2 size={16} />
+            </button>
+          )}
+        </div>
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
+            gap: '8px',
+            fontSize: '12px',
+          }}
+        >
+          <div>
+            <span style={{ color: '#6b7280' }}>Código: </span>{' '}
+            <strong>{item.code}</strong>
+          </div>
+          <div style={{ textAlign: 'right' }}>
+            <span style={{ color: '#6b7280' }}>Cant: </span>{' '}
+            <strong>{item.quantity}</strong>
+          </div>
+          <div>
+            <span style={{ color: '#6b7280' }}>P. Unit: </span>{' '}
+            <strong>${Number(item.unit_price_usd).toFixed(2)}</strong>
+          </div>
+          <div style={{ textAlign: 'right' }}>
+            <span style={{ color: '#b45309' }}>Desc: </span>{' '}
+            <strong>
+              ${Number(item.discounted_unit_price_usd).toFixed(2)}
+            </strong>
+          </div>
+          <div
+            style={{
+              gridColumn: '1 / -1',
+              borderTop: '1px dashed #e5e7eb',
+              paddingTop: '6px',
+              marginTop: '4px',
+              textAlign: 'right',
+              fontWeight: '800',
+              fontSize: '14px',
+              color: '#059669',
+            }}
+          >
+            Total: ${Number(item.total_line_usd).toFixed(2)}
+          </div>
+        </div>
+      </div>
+    ));
+  };
 
   return (
     <div
@@ -2165,73 +2061,60 @@ export default function SalesModule() {
         boxSizing: 'border-box',
       }}
     >
-      {/* BLOQUE DE ESTILOS GLOBALES PARA RESPONSIVIDAD */}
       <style>{`
-  @media (max-width: 768px) { 
-    .desktop-tabs { display: none !important; } 
-    .mobile-menu-container { display: block !important; } 
-    .desktop-table { display: none !important; } 
-    .desktop-cards-grid { display: none !important; } 
-    .mobile-cards-container { display: flex !important; flex-direction: column; gap: 12px; } 
-    
-    /* CONTENEDOR DE BOTONES */
-    .action-buttons-wrapper { 
-      display: flex !important;
-      flex-wrap: nowrap !important; /* PROHÍBE saltos de línea */
-      justify-content: stretch !important; 
-      align-items: stretch !important; /* CLAVE: Fuerza MISMA ALTURA en todos los hijos */
-      gap: 4px !important; 
-      margin-top: 6px !important;
-      padding-top: 8px !important;
-      border-top: 1px solid #E5E7EB !important;
-    } 
-    
-    /* ESTILO BASE PARA TODOS LOS BOTONES DENTRO DEL WRAPPER */
-    .action-buttons-wrapper button { 
-      display: inline-flex !important; 
-      align-items: center !important; /* Centra íconos/texto verticalmente */
-      justify-content: center !important;
-      padding: 8px 4px !important; 
-      font-size: 9px !important; 
-      white-space: nowrap !important; 
-      overflow: hidden !important;
-      text-overflow: ellipsis !important;
-      border-radius: 6px !important;
-      line-height: 1.2 !important; 
-      height: auto !important; 
-      box-sizing: border-box !important;
-      min-height: 36px !important; /* Altura mínima táctil uniforme */
-      
-      /* RESET DE ESTILOS EN LÍNEA CONFLICTIVOS */
-      width: auto !important; 
-      margin-top: 0 !important; 
-    }
-
-    /* BOTONES PRINCIPALES (Registrar Visita y Reg. Cliente) */
-    .action-buttons-wrapper button:not(:last-child) {
-      flex: 1 !important; /* Se reparten el espacio equitativamente */
-      min-width: 0 !important; 
-    }
-
-    /* BOTÓN DE BORRAR (Último hijo) */
-    .action-buttons-wrapper button:last-child {
-      flex: 0 0 auto !important; 
-      width: 36px !important; 
-      min-width: 36px !important;
-      max-width: 36px !important;
-      padding: 8px 0 !important; 
-    }
-  } 
-
-  @media (min-width: 769px) { 
-    .desktop-tabs { display: flex !important; } 
-    .mobile-menu-container { display: none !important; } 
-    .desktop-table { display: none !important; } 
-    .desktop-cards-grid { display: grid !important; } 
-    .mobile-cards-container { display: none !important; } 
-  }
+@media (max-width: 768px) {
+.desktop-tabs { display: none !important; }
+.mobile-menu-container { display: block !important; }
+.desktop-table { display: none !important; }
+.desktop-cards-grid { display: none !important; }
+.mobile-cards-container { display: flex !important; flex-direction: column; gap: 12px; }
+.action-buttons-wrapper { 
+   display: flex !important;
+   flex-wrap: nowrap !important;
+   justify-content: stretch !important; 
+   align-items: stretch !important;
+   gap: 4px !important; 
+   margin-top: 6px !important;
+   padding-top: 8px !important;
+   border-top: 1px solid #E5E7EB !important;
+ } 
+ .action-buttons-wrapper button { 
+   display: inline-flex !important; 
+   align-items: center !important;
+   justify-content: center !important;
+   padding: 8px 4px !important; 
+   font-size: 9px !important; 
+   white-space: nowrap !important; 
+   overflow: hidden !important;
+   text-overflow: ellipsis !important;
+   border-radius: 6px !important;
+   line-height: 1.2 !important; 
+   height: auto !important; 
+   box-sizing: border-box !important;
+   min-height: 36px !important;
+   width: auto !important; 
+   margin-top: 0 !important; 
+ }
+ .action-buttons-wrapper button:not(:last-child) {
+   flex: 1 !important;
+   min-width: 0 !important; 
+ }
+ .action-buttons-wrapper button:last-child {
+   flex: 0 0 auto !important; 
+   width: 36px !important; 
+   min-width: 36px !important;
+   max-width: 36px !important;
+   padding: 8px 0 !important; 
+ }
+}
+@media (min-width: 769px) {
+.desktop-tabs { display: flex !important; }
+.mobile-menu-container { display: none !important; }
+.desktop-table { display: none !important; }
+.desktop-cards-grid { display: grid !important; }
+.mobile-cards-container { display: none !important; }
+}
 `}</style>
-
       <div
         style={{
           display: 'flex',
@@ -2260,7 +2143,6 @@ export default function SalesModule() {
           </p>
         </div>
       </div>
-
       {/* MENÚ HORIZONTAL (DESKTOP) */}
       <div
         className="desktop-tabs"
@@ -2302,7 +2184,6 @@ export default function SalesModule() {
           );
         })}
       </div>
-
       {/* MENÚ DROPDOWN (MÓVIL) */}
       <div
         className="mobile-menu-container"
@@ -2394,8 +2275,6 @@ export default function SalesModule() {
           </div>
         )}
       </div>
-
-      {/* MODIFICACIÓN E: Notificaciones Toast (Ventanas emergentes) */}
       {message.text && (
         <div
           style={{
@@ -2431,7 +2310,6 @@ export default function SalesModule() {
           </span>
         </div>
       )}
-
       {activeSubMenu === 'clientes' && (
         <div>
           <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
@@ -2474,7 +2352,6 @@ export default function SalesModule() {
               <Users style={{ width: '14px', height: '14px' }} /> Mis Clientes
             </button>
           </div>
-
           {clienteTab === 'registrar' && (
             <div
               style={{
@@ -2820,7 +2697,6 @@ export default function SalesModule() {
               </form>
             </div>
           )}
-
           {clienteTab === 'cartera' && (
             <div
               style={{
@@ -2882,7 +2758,7 @@ export default function SalesModule() {
                   />
                 </div>
               </div>
-              {/* GRID DE TARJETAS ESCRITORIO (NUEVO) */}
+              {/* GRID DE TARJETAS ESCRITORIO */}
               <div
                 className="desktop-cards-grid"
                 style={{
@@ -2928,7 +2804,6 @@ export default function SalesModule() {
                           transition: 'transform 0.2s',
                         }}
                       >
-                        {/* Encabezado Tarjeta */}
                         <div
                           style={{
                             display: 'flex',
@@ -2983,7 +2858,6 @@ export default function SalesModule() {
                             {currentSellerName}
                           </span>
                         </div>
-                        {/* Datos Principales Grid */}
                         <div
                           style={{
                             display: 'grid',
@@ -3025,7 +2899,6 @@ export default function SalesModule() {
                             {c.phone || 'N/A'}
                           </div>
                         </div>
-                        {/* Documentos Adjuntos */}
                         <div>
                           <span
                             style={{
@@ -3152,7 +3025,6 @@ export default function SalesModule() {
                             )}
                           </div>
                         </div>
-                        {/* Botones de Acción */}
                         <div
                           className="action-buttons-wrapper"
                           style={{
@@ -3235,7 +3107,7 @@ export default function SalesModule() {
                     ))
                 )}
               </div>
-              {/* TABLA DESKTOP (OCULTA POR CSS AHORA) */}
+              {/* TABLA DESKTOP */}
               <div
                 className="desktop-table"
                 style={{
@@ -3894,7 +3766,6 @@ export default function SalesModule() {
           )}
         </div>
       )}
-
       {/* MODAL IMAGEN (Global) */}
       {imageModal.open && (
         <div
@@ -3966,7 +3837,6 @@ export default function SalesModule() {
                   <Download style={{ width: '14px', height: '14px' }} />{' '}
                   Descargar
                 </a>
-                {/* Botón Sustituir */}
                 <label
                   style={{
                     fontSize: '11px',
@@ -4045,7 +3915,6 @@ export default function SalesModule() {
           </div>
         </div>
       )}
-
       {/* MODAL EDITAR CLIENTE */}
       {editClientModal.open && (
         <div
@@ -4469,7 +4338,6 @@ export default function SalesModule() {
           </div>
         </div>
       )}
-
       {activeSubMenu === 'visitas' && (
         <div>
           <div
@@ -4513,7 +4381,6 @@ export default function SalesModule() {
               Mis Clientes Registrados
             </button>
           </div>
-
           {visitasTab === 'potenciales' && (
             <div
               style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}
@@ -4662,7 +4529,6 @@ export default function SalesModule() {
                     >
                       GPS Obligatorio *
                     </label>
-                    {/* MODIFICACIÓN A: Botón GPS Mejorado */}
                     <button
                       type="button"
                       onClick={() =>
@@ -4711,7 +4577,6 @@ export default function SalesModule() {
                   </div>
                 </form>
               </div>
-
               <div
                 style={{
                   backgroundColor: '#FFFFFF',
@@ -4774,7 +4639,7 @@ export default function SalesModule() {
                     />
                   </div>
                 </div>
-                {/* GRID DE TARJETAS ESCRITORIO (NUEVO) */}
+                {/* GRID DE TARJETAS ESCRITORIO */}
                 <div
                   className="desktop-cards-grid"
                   style={{
@@ -4820,7 +4685,6 @@ export default function SalesModule() {
                             gap: '12px',
                           }}
                         >
-                          {/* Encabezado */}
                           <div
                             style={{
                               display: 'flex',
@@ -4875,7 +4739,6 @@ export default function SalesModule() {
                               {currentSellerName}
                             </span>
                           </div>
-                          {/* Datos Grid */}
                           <div
                             style={{
                               display: 'grid',
@@ -4911,7 +4774,6 @@ export default function SalesModule() {
                                 : 'Sin registro'}
                             </div>
                           </div>
-                          {/* Adjunto */}
                           <div>
                             <span
                               style={{
@@ -4974,9 +4836,7 @@ export default function SalesModule() {
                               />
                             )}
                           </div>
-                          {/* GPS */}
                           <div>
-                            {/* MODIFICACIÓN A: Botón GPS Mejorado */}
                             <button
                               onClick={() => handleCaptureVisitaGps(p.id)}
                               style={{
@@ -5006,7 +4866,6 @@ export default function SalesModule() {
                                 : 'Extraer GPS'}
                             </button>
                           </div>
-                          {/* Acciones */}
                           <div
                             className="action-buttons-wrapper"
                             style={{
@@ -5017,7 +4876,6 @@ export default function SalesModule() {
                               paddingTop: '12px',
                             }}
                           >
-                            {/* MODIFICACIÓN B: Cambio de nombre "Guardar" -> "Registrar Visita" */}
                             <button
                               onClick={() => handleSaveVisita(p.id, true)}
                               style={{
@@ -5034,7 +4892,6 @@ export default function SalesModule() {
                             >
                               Registrar Visita
                             </button>
-                            {/* MODIFICACIÓN B: Cambio de nombre "Agregar" -> "Reg. Cliente" y ancho completo */}
                             <button
                               onClick={() => handleOpenConvertModal(p)}
                               style={{
@@ -5079,7 +4936,7 @@ export default function SalesModule() {
                       ))
                   )}
                 </div>
-                {/* TABLA DESKTOP (OCULTA POR CSS) */}
+                {/* TABLA DESKTOP */}
                 <div
                   className="desktop-table"
                   style={{
@@ -5263,7 +5120,6 @@ export default function SalesModule() {
                                   : 'Sin registro'}
                               </td>
                               <td style={{ padding: '8px 12px' }}>
-                                {/* MODIFICACIÓN A: Botón GPS Mejorado */}
                                 <button
                                   onClick={() => handleCaptureVisitaGps(p.id)}
                                   style={{
@@ -5306,7 +5162,6 @@ export default function SalesModule() {
                                     flexWrap: 'wrap',
                                   }}
                                 >
-                                  {/* MODIFICACIÓN B: Cambio de nombre "Guardar" -> "Registrar Visita" */}
                                   <button
                                     onClick={() => handleSaveVisita(p.id, true)}
                                     style={{
@@ -5322,7 +5177,6 @@ export default function SalesModule() {
                                   >
                                     Registrar Visita
                                   </button>
-                                  {/* MODIFICACIÓN B: Cambio de nombre "Agregar" -> "Reg. Cliente" */}
                                   <button
                                     onClick={() => handleOpenConvertModal(p)}
                                     style={{
@@ -5537,7 +5391,6 @@ export default function SalesModule() {
                               alignItems: 'center',
                             }}
                           >
-                            {/* MODIFICACIÓN A: Botón GPS Mejorado */}
                             <button
                               onClick={() => handleCaptureVisitaGps(p.id)}
                               style={{
@@ -5578,7 +5431,6 @@ export default function SalesModule() {
                               paddingTop: '8px',
                             }}
                           >
-                            {/* MODIFICACIÓN B: Cambio de nombre "Guardar" -> "Registrar Visita" */}
                             <button
                               onClick={() => handleSaveVisita(p.id, true)}
                               style={{
@@ -5595,7 +5447,6 @@ export default function SalesModule() {
                             >
                               Registrar Visita
                             </button>
-                            {/* MODIFICACIÓN B: Cambio de nombre "Agregar" -> "Reg. Cliente" y ancho completo */}
                             <button
                               onClick={() => handleOpenConvertModal(p)}
                               style={{
@@ -5643,7 +5494,6 @@ export default function SalesModule() {
               </div>
             </div>
           )}
-
           {visitasTab === 'clientes' && (
             <div
               style={{
@@ -5676,7 +5526,7 @@ export default function SalesModule() {
                   }}
                 />
               </div>
-              {/* GRID DE TARJETAS ESCRITORIO (NUEVO) */}
+              {/* GRID DE TARJETAS ESCRITORIO */}
               <div
                 className="desktop-cards-grid"
                 style={{
@@ -5705,7 +5555,6 @@ export default function SalesModule() {
                         gap: '12px',
                       }}
                     >
-                      {/* Encabezado */}
                       <div
                         style={{
                           display: 'flex',
@@ -5760,7 +5609,6 @@ export default function SalesModule() {
                           {currentSellerName}
                         </span>
                       </div>
-                      {/* Datos */}
                       <div
                         style={{
                           display: 'grid',
@@ -5802,7 +5650,6 @@ export default function SalesModule() {
                           </button>
                         </div>
                       </div>
-                      {/* Adjunto Visita */}
                       <div>
                         <span
                           style={{
@@ -5865,9 +5712,7 @@ export default function SalesModule() {
                           />
                         )}
                       </div>
-                      {/* GPS */}
                       <div>
-                        {/* MODIFICACIÓN A: Botón GPS Mejorado */}
                         <button
                           onClick={() => handleCaptureVisitaGps(c.id)}
                           style={{
@@ -5895,7 +5740,6 @@ export default function SalesModule() {
                             : 'Extraer GPS'}
                         </button>
                       </div>
-                      {/* Acciones */}
                       <div
                         className="action-buttons-wrapper"
                         style={{
@@ -5906,7 +5750,6 @@ export default function SalesModule() {
                           paddingTop: '12px',
                         }}
                       >
-                        {/* MODIFICACIÓN B: Cambio de nombre "Guardar" -> "Registrar Visita" */}
                         <button
                           onClick={() => handleSaveVisita(c.id, false)}
                           style={{
@@ -5940,7 +5783,7 @@ export default function SalesModule() {
                     </div>
                   ))}
               </div>
-              {/* TABLA DESKTOP (OCULTA POR CSS) */}
+              {/* TABLA DESKTOP */}
               <div
                 className="desktop-table"
                 style={{
@@ -6115,7 +5958,6 @@ export default function SalesModule() {
                               : 'Sin registro'}
                           </td>
                           <td style={{ padding: '8px 12px' }}>
-                            {/* MODIFICACIÓN A: Botón GPS Mejorado */}
                             <button
                               onClick={() => handleCaptureVisitaGps(c.id)}
                               style={{
@@ -6155,7 +5997,6 @@ export default function SalesModule() {
                                 flexWrap: 'wrap',
                               }}
                             >
-                              {/* MODIFICACIÓN B: Cambio de nombre "Guardar" -> "Registrar Visita" */}
                               <button
                                 onClick={() => handleSaveVisita(c.id, false)}
                                 style={{
@@ -6343,7 +6184,6 @@ export default function SalesModule() {
                           : 'Sin registro'}
                       </div>
                       <div>
-                        {/* MODIFICACIÓN A: Botón GPS Mejorado */}
                         <button
                           onClick={() => handleCaptureVisitaGps(c.id)}
                           style={{
@@ -6382,7 +6222,6 @@ export default function SalesModule() {
                           paddingTop: '8px',
                         }}
                       >
-                        {/* MODIFICACIÓN B: Cambio de nombre "Guardar" -> "Registrar Visita" */}
                         <button
                           onClick={() => handleSaveVisita(c.id, false)}
                           style={{
@@ -6420,7 +6259,6 @@ export default function SalesModule() {
           )}
         </div>
       )}
-
       {/* MODAL CONVERTIR POTENCIAL */}
       {convertModal.open && (
         <div
@@ -6804,7 +6642,6 @@ export default function SalesModule() {
           </div>
         </div>
       )}
-
       {activeSubMenu === 'nota_entrega' && (
         <div>
           <div
@@ -6861,7 +6698,6 @@ export default function SalesModule() {
               Mis Notas de Entrega
             </button>
           </div>
-
           {neTab === 'comisiones' && (
             <div
               style={{
@@ -7000,7 +6836,6 @@ export default function SalesModule() {
               </div>
             </div>
           )}
-
           {neTab === 'crear_ne' && (
             <div
               style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}
@@ -7039,7 +6874,6 @@ export default function SalesModule() {
                   </div>
                 </div>
               </div>
-
               <div
                 style={{
                   backgroundColor: '#ffffff',
@@ -7091,8 +6925,8 @@ export default function SalesModule() {
                     }}
                     style={{
                       width: '100%',
-                      padding: '7px 8px',
-                      fontSize: '12px',
+                      padding: '10px 12px',
+                      fontSize: '14px',
                       border: '1px solid #D1D5DB',
                       borderRadius: '6px',
                       backgroundColor: '#FFFFFF',
@@ -7119,8 +6953,8 @@ export default function SalesModule() {
                     onChange={(e) => setNeTipoPago(e.target.value)}
                     style={{
                       width: '100%',
-                      padding: '7px 8px',
-                      fontSize: '12px',
+                      padding: '10px 12px',
+                      fontSize: '14px',
                       border: '1px solid #F59E0B',
                       borderRadius: '6px',
                       backgroundColor: '#FEF3C7',
@@ -7135,10 +6969,15 @@ export default function SalesModule() {
                     <option value="23.08">
                       {globalDiscount23}% Pagará en Bs BCV
                     </option>
+                    <option value="10">
+                      {globalDiscount10}% Descuento Especial
+                    </option>
+                    <option value="0">
+                      {globalDiscount0}% Sin Descuento
+                    </option>
                   </select>
                 </div>
               </div>
-
               <div
                 style={{
                   backgroundColor: '#ffffff',
@@ -7184,7 +7023,7 @@ export default function SalesModule() {
                       placeholder="-- Seleccionar producto --"
                     />
                   </div>
-                  <div style={{ width: '90px' }}>
+                  <div style={{ width: '100px' }}>
                     <label
                       style={{
                         display: 'block',
@@ -7202,32 +7041,33 @@ export default function SalesModule() {
                       onChange={(e) => setNeQuantity(e.target.value)}
                       style={{
                         width: '100%',
-                        padding: '6px 8px',
-                        fontSize: '12px',
+                        padding: '10px 12px',
+                        fontSize: '14px',
                         border: '1px solid #D1D5DB',
                         borderRadius: '6px',
                         boxSizing: 'border-box',
+                        height: '42px',
                       }}
                     />
                   </div>
                   <button
                     onClick={handleAddToCart}
                     style={{
-                      padding: '8px 14px',
+                      padding: '10px 20px',
                       backgroundColor: '#DC2626',
                       color: '#FFFFFF',
                       border: 'none',
                       borderRadius: '6px',
-                      fontSize: '12px',
+                      fontSize: '14px',
                       fontWeight: '700',
                       cursor: 'pointer',
+                      height: '42px',
                     }}
                   >
                     Agregar
                   </button>
                 </div>
               </div>
-
               <div
                 style={{
                   backgroundColor: '#FFFFFF',
@@ -7275,129 +7115,146 @@ export default function SalesModule() {
                     </p>
                   </div>
                 </div>
-
-                <div
-                  style={{
-                    width: '100%',
-                    overflowX: 'auto',
-                    WebkitOverflowScrolling: 'touch',
-                  }}
-                >
-                  <table
-                    style={{
-                      width: '100%',
-                      minWidth: '700px',
-                      borderCollapse: 'collapse',
-                      textAlign: 'left',
-                      fontSize: '12px',
-                      marginBottom: '12px',
-                    }}
+                
+                {/* E. VISTA RESPONSIVA: TABLA EN DESKTOP, TARJETAS EN MÓVIL */}
+                <div className="admin-table-desktop-wrapper">
+                  <div
+                    style={{ width: '100%', overflowX: 'auto' }}
+                    className="desktop-table"
                   >
-                    <thead>
-                      <tr
-                        style={{
-                          backgroundColor: '#F3F4F6',
-                          borderBottom: '1px solid #D1D5DB',
-                          fontWeight: '700',
-                        }}
-                      >
-                        <th style={{ padding: '8px' }}>Código</th>
-                        <th style={{ padding: '8px' }}>Descripción</th>
-                        <th style={{ padding: '8px', textAlign: 'center' }}>
-                          Cantidad
-                        </th>
-                        <th style={{ padding: '8px', textAlign: 'right' }}>
-                          Valor Unitario
-                        </th>
-                        <th style={{ padding: '8px', textAlign: 'right' }}>
-                          V. U. con descuento
-                        </th>
-                        <th style={{ padding: '8px', textAlign: 'right' }}>
-                          Valor Total
-                        </th>
-                        <th style={{ padding: '8px', textAlign: 'center' }}>
-                          Eliminar
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {neCart.length === 0 ? (
-                        <tr>
-                          <td
-                            colSpan="7"
-                            style={{
-                              padding: '16px',
-                              textAlign: 'center',
-                              color: '#9CA3AF',
-                              fontStyle: 'italic',
-                            }}
-                          >
-                            No hay productos añadidos a la nota de entrega.
-                          </td>
+                    <table
+                      style={{
+                        width: '100%',
+                        minWidth: '700px',
+                        borderCollapse: 'collapse',
+                        textAlign: 'left',
+                        fontSize: '12px',
+                        marginBottom: '12px',
+                      }}
+                    >
+                      <thead>
+                        <tr
+                          style={{
+                            backgroundColor: '#F3F4F6',
+                            borderBottom: '1px solid #D1D5DB',
+                            fontWeight: '700',
+                          }}
+                        >
+                          <th style={{ padding: '8px' }}>Código</th>
+                          <th style={{ padding: '8px' }}>Descripción</th>
+                          <th style={{ padding: '8px', textAlign: 'center' }}>
+                            Cantidad
+                          </th>
+                          <th style={{ padding: '8px', textAlign: 'right' }}>
+                            Valor Unitario
+                          </th>
+                          <th style={{ padding: '8px', textAlign: 'right' }}>
+                            V. U. con descuento
+                          </th>
+                          <th style={{ padding: '8px', textAlign: 'right' }}>
+                            Valor Total
+                          </th>
+                          <th style={{ padding: '8px', textAlign: 'center' }}>
+                            Eliminar
+                          </th>
                         </tr>
-                      ) : (
-                        neCart.map((item) => (
-                          <tr
-                            key={item.product_id}
-                            style={{ borderBottom: '1px solid #E5E7EB' }}
-                          >
+                      </thead>
+                      <tbody>
+                        {neCart.length === 0 ? (
+                          <tr>
                             <td
+                              colSpan="7"
                               style={{
-                                padding: '8px',
-                                fontFamily: 'monospace',
+                                padding: '16px',
+                                textAlign: 'center',
+                                color: '#9CA3AF',
+                                fontStyle: 'italic',
                               }}
                             >
-                              {item.code}
-                            </td>
-                            <td style={{ padding: '8px', fontWeight: '600' }}>
-                              {item.description}
-                            </td>
-                            <td style={{ padding: '8px', textAlign: 'center' }}>
-                              {item.quantity}
-                            </td>
-                            <td style={{ padding: '8px', textAlign: 'right' }}>
-                              ${item.unit_price_usd.toFixed(2)}
-                            </td>
-                            <td
-                              style={{
-                                padding: '8px',
-                                textAlign: 'right',
-                                color: '#B45309',
-                              }}
-                            >
-                              ${item.discounted_unit_price_usd.toFixed(2)}
-                            </td>
-                            <td
-                              style={{
-                                padding: '8px',
-                                textAlign: 'right',
-                                fontWeight: '700',
-                              }}
-                            >
-                              ${item.total_line_usd.toFixed(2)}
-                            </td>
-                            <td style={{ padding: '8px', textAlign: 'center' }}>
-                              <button
-                                onClick={() =>
-                                  handleRemoveFromCart(item.product_id)
-                                }
-                                style={{
-                                  border: 'none',
-                                  background: 'none',
-                                  cursor: 'pointer',
-                                  color: '#DC2626',
-                                }}
-                              >
-                                <Trash2
-                                  style={{ width: '16px', height: '16px' }}
-                                />
-                              </button>
+                              No hay productos añadidos a la nota de entrega.
                             </td>
                           </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
+                        ) : (
+                          neCart.map((item) => (
+                            <tr
+                              key={item.product_id}
+                              style={{ borderBottom: '1px solid #E5E7EB' }}
+                            >
+                              <td
+                                style={{
+                                  padding: '8px',
+                                  fontFamily: 'monospace',
+                                }}
+                              >
+                                {item.code}
+                              </td>
+                              <td style={{ padding: '8px', fontWeight: '600' }}>
+                                {item.description}
+                              </td>
+                              <td style={{ padding: '8px', textAlign: 'center' }}>
+                                {item.quantity}
+                              </td>
+                              <td style={{ padding: '8px', textAlign: 'right' }}>
+                                ${item.unit_price_usd.toFixed(2)}
+                              </td>
+                              <td
+                                style={{
+                                  padding: '8px',
+                                  textAlign: 'right',
+                                  color: '#B45309',
+                                }}
+                              >
+                                ${item.discounted_unit_price_usd.toFixed(2)}
+                              </td>
+                              <td
+                                style={{
+                                  padding: '8px',
+                                  textAlign: 'right',
+                                  fontWeight: '700',
+                                }}
+                              >
+                                ${item.total_line_usd.toFixed(2)}
+                              </td>
+                              <td style={{ padding: '8px', textAlign: 'center' }}>
+                                <button
+                                  onClick={() =>
+                                    handleRemoveFromCart(item.product_id)
+                                  }
+                                  style={{
+                                    border: 'none',
+                                    background: 'none',
+                                    cursor: 'pointer',
+                                    color: '#DC2626',
+                                  }}
+                                >
+                                  <Trash2
+                                    style={{ width: '16px', height: '16px' }}
+                                  />
+                                </button>
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Mobile Cards for Cart */}
+                <div className="mobile-cards-container">
+                  {neCart.length === 0 ? (
+                    <div
+                      style={{
+                        padding: '16px',
+                        textAlign: 'center',
+                        color: '#9CA3AF',
+                      }}
+                    >
+                      No hay productos añadidos.
+                    </div>
+                  ) : (
+                    renderProductCards(neCart, true, handleRemoveFromCart)
+                  )}
                 </div>
 
                 <div
@@ -7457,7 +7314,6 @@ export default function SalesModule() {
                     </div>
                   </div>
                 </div>
-
                 <div style={{ marginBottom: '12px' }}>
                   <label
                     style={{
@@ -7484,7 +7340,6 @@ export default function SalesModule() {
                     }}
                   ></textarea>
                 </div>
-
                 <div
                   style={{
                     backgroundColor: '#F3F4F6',
@@ -7499,7 +7354,6 @@ export default function SalesModule() {
                 >
                   <strong>Términos y condiciones:</strong> {globalTerms}
                 </div>
-
                 <div
                   style={{
                     display: 'flex',
@@ -7562,7 +7416,6 @@ export default function SalesModule() {
               </div>
             </div>
           )}
-
           {neTab === 'historial' && (
             <div
               style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}
@@ -7658,7 +7511,6 @@ export default function SalesModule() {
                     )}
                   </button>
                 </div>
-
                 {showFullSellerCard && (
                   <div
                     style={{
@@ -7808,7 +7660,6 @@ export default function SalesModule() {
                   </div>
                 )}
               </div>
-
               <div
                 style={{
                   backgroundColor: '#FFFFFF',
@@ -7843,7 +7694,6 @@ export default function SalesModule() {
                   }}
                 />
               </div>
-
               <div
                 style={{
                   backgroundColor: '#FFFFFF',
@@ -7852,7 +7702,7 @@ export default function SalesModule() {
                   overflow: 'hidden',
                 }}
               >
-                {/* GRID DE TARJETAS ESCRITORIO (NUEVO) */}
+                {/* GRID DE TARJETAS ESCRITORIO */}
                 <div
                   className="desktop-cards-grid"
                   style={{
@@ -8276,7 +8126,7 @@ export default function SalesModule() {
                     })
                   )}
                 </div>
-                {/* TABLA DESKTOP (OCULTA POR CSS) */}
+                {/* TABLA DESKTOP */}
                 <div
                   className="desktop-table"
                   style={{
@@ -9067,7 +8917,6 @@ export default function SalesModule() {
           )}
         </div>
       )}
-
       {activeSubMenu === 'historial_ventas' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           {/* Encabezado y Buscador */}
@@ -9126,17 +8975,16 @@ export default function SalesModule() {
               />
             </div>
           </div>
-
           {/* Contenedor Principal de Datos */}
           <div
             style={{
               backgroundColor: '#ffffff',
               borderRadius: '8px',
               boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-              overflow: 'hidden', // Importante para los bordes redondeados
+              overflow: 'hidden',
             }}
           >
-            {/* GRID DE TARJETAS ESCRITORIO (NUEVO) */}
+            {/* GRID DE TARJETAS ESCRITORIO */}
             <div
               className="desktop-cards-grid"
               style={{
@@ -9361,7 +9209,7 @@ export default function SalesModule() {
                 ))
               )}
             </div>
-            {/* --- TABLA DESKTOP (OCULTA POR CSS) --- */}
+            {/* --- TABLA DESKTOP --- */}
             <div
               className="desktop-table"
               style={{
@@ -9373,7 +9221,7 @@ export default function SalesModule() {
               <table
                 style={{
                   width: '100%',
-                  minWidth: '900px', // Ancho mínimo para que no se rompa en desktop pequeño
+                  minWidth: '900px',
                   borderCollapse: 'collapse',
                   textAlign: 'left',
                   fontSize: '13px',
@@ -9540,7 +9388,7 @@ export default function SalesModule() {
                 </tbody>
               </table>
             </div>
-            {/* --- TARJETAS MÓVIL (NUEVO) --- */}
+            {/* --- TARJETAS MÓVIL --- */}
             <div className="mobile-cards-container" style={{ padding: '12px' }}>
               {filteredSettlementHistory.length === 0 ? (
                 <div
@@ -9715,7 +9563,6 @@ export default function SalesModule() {
           </div>
         </div>
       )}
-
       {/* MODAL VALE */}
       {valeModal.open && (
         <div
@@ -9817,7 +9664,6 @@ export default function SalesModule() {
           </div>
         </div>
       )}
-
       {/* MODAL ABONO */}
       {abonoNotifModal.open && (
         <div
@@ -9869,8 +9715,6 @@ export default function SalesModule() {
                 <X size={18} />
               </button>
             </div>
-
-            {/* Mostrar Nombre del Cliente (No editable) */}
             {(() => {
               const nota = salesHistory.find(
                 (n) => n.id === abonoNotifModal.notaId
@@ -9908,7 +9752,6 @@ export default function SalesModule() {
                 </div>
               );
             })()}
-
             <form
               onSubmit={handleEnviarNotificacionAbono}
               style={{
@@ -10035,7 +9878,6 @@ export default function SalesModule() {
                   }}
                 />
               </div>
-              {/* Campo de Archivo Obligatorio */}
               <div>
                 <label
                   style={{
@@ -10129,7 +9971,6 @@ export default function SalesModule() {
           </div>
         </div>
       )}
-
       {/* MODAL HISTORIAL CAPTURADO */}
       <div
         id="captured-history-modal"
