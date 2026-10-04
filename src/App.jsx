@@ -12,6 +12,7 @@ import Header from './components/Header';
 import Sidebar from './components/Sidebar';
 import MobileNavigation from './components/MobileNavigation';
 import { supabase } from './lib/supabase';
+import { RefreshCw } from 'lucide-react';
 
 // Páginas
 import Dashboard from './pages/Dashboard';
@@ -23,6 +24,120 @@ import Inventory from './pages/Inventory';
 import AdminModule from './pages/AdminModule';
 import Vendedores from './pages/Vendedores';
 import SalesModule from './pages/SalesModule';
+
+// Componente Pull-to-Refresh para móviles
+function PullToRefreshContainer({ children }) {
+  const [startY, setStartY] = useState(0);
+  const [pullDistance, setPullDistance] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
+  const threshold = 80;
+
+  useEffect(() => {
+    const handleTouchStart = (e) => {
+      if (window.scrollY === 0) {
+        setStartY(e.touches[0].clientY);
+      }
+    };
+
+    const handleTouchMove = (e) => {
+      if (!startY) return;
+      const currentY = e.touches[0].clientY;
+      const distance = currentY - startY;
+
+      if (distance > 0 && window.scrollY === 0) {
+        setPullDistance(Math.min(distance * 0.4, 120));
+      } else {
+        setPullDistance(0);
+      }
+    };
+
+    const handleTouchEnd = () => {
+      if (!startY) return;
+
+      if (pullDistance >= threshold && !refreshing) {
+        setRefreshing(true);
+        setTimeout(() => {
+          window.location.reload();
+        }, 600);
+      } else {
+        setPullDistance(0);
+      }
+      setStartY(0);
+    };
+
+    window.addEventListener('touchstart', handleTouchStart);
+    window.addEventListener('touchmove', handleTouchMove);
+    window.addEventListener('touchend', handleTouchEnd);
+
+    return () => {
+      window.removeEventListener('touchstart', handleTouchStart);
+      window.removeEventListener('touchmove', handleTouchMove);
+      window.removeEventListener('touchend', handleTouchEnd);
+    };
+  }, [startY, pullDistance, refreshing]);
+
+  return (
+    <div style={{ position: 'relative', minHeight: '100vh', width: '100%' }}>
+      <div
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          height: `${pullDistance}px`,
+          maxHeight: '100px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: '#1c1917',
+          color: '#D4AF37',
+          overflow: 'hidden',
+          transition: pullDistance === 0 ? 'height 0.3s ease' : 'none',
+          zIndex: 99999,
+          boxShadow: pullDistance > 0 ? '0 4px 6px rgba(0,0,0,0.1)' : 'none',
+        }}
+      >
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            fontSize: '13px',
+            fontWeight: 'bold',
+            opacity: pullDistance > 30 ? 1 : 0,
+            transition: 'opacity 0.2s',
+          }}
+        >
+          <RefreshCw
+            size={18}
+            style={{
+              transform: `rotate(${pullDistance * 3}deg)`,
+              transition: pullDistance === 0 ? 'transform 0.3s' : 'none',
+            }}
+          />
+          <span>
+            {refreshing
+              ? 'Actualizando Fenix...'
+              : pullDistance >= threshold
+              ? 'Suelta para actualizar'
+              : 'Desliza hacia abajo'}
+          </span>
+        </div>
+      </div>
+
+      <div
+        style={{
+          transform: `translateY(${pullDistance}px)`,
+          transition: pullDistance === 0 ? 'transform 0.3s ease' : 'none',
+          width: '100%',
+          minHeight: '100vh',
+        }}
+      >
+        {children}
+      </div>
+    </div>
+  );
+}
 
 // Pantalla en negro para Acceso No Autorizado (Con botón)
 function Unauthorized() {
@@ -151,14 +266,12 @@ function RoleProtectedRoute({ allowedRoles }) {
         return;
       }
 
-      // Si ya tenemos perfil cargado en el context y tiene rol, no necesitamos revalidar cada vez
       if (profile && profile.role) {
         setChecking(false);
         return;
       }
 
       try {
-        // Verificar si el usuario fue borrado de la tabla profiles
         const { data, error } = await supabase
           .from('profiles')
           .select('id')
@@ -166,7 +279,6 @@ function RoleProtectedRoute({ allowedRoles }) {
           .maybeSingle();
 
         if (error || !data) {
-          // El perfil fue borrado pero la sesión sigue activa: forzar cierre de sesión
           await supabase.auth.signOut();
           setProfileMissing(true);
         }
@@ -197,17 +309,14 @@ function RoleProtectedRoute({ allowedRoles }) {
   const currentRole = (profile?.role || user?.role || '').toLowerCase().trim();
   const isActive = profile?.is_active ?? user?.is_active ?? true;
 
-  // Cuenta suspendida o inactiva (Bloqueo total sin botones)
   if (isActive === false || currentRole === 'suspendido') {
     return <SuspendedAccountView />;
   }
 
-  // Cuenta pendiente
   if (currentRole === 'pendiente' || !currentRole) {
     return <Navigate to="/pending" replace />;
   }
 
-  // Validación de roles permitidos para este módulo
   if (allowedRoles && !allowedRoles.includes(currentRole)) {
     return <Unauthorized />;
   }
@@ -336,87 +445,89 @@ export default function App() {
 
   return (
     <AuthProvider>
-      <Router>
-        <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route path="/pending" element={<PendingApproval />} />
-          <Route path="/auth/callback" element={<AuthCallback />} />
-          
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
-          
-          <Route 
-            path="/dashboard" 
-            element={
-              <>
-                <RoleProtectedRoute allowedRoles={['administrador', 'tecnico', 'gerente', 'supervisor', 'vendedor', 'stock']} />
-                <DashboardWrapper />
-              </>
-            } 
-          />
+      <PullToRefreshContainer>
+        <Router>
+          <Routes>
+            <Route path="/login" element={<Login />} />
+            <Route path="/pending" element={<PendingApproval />} />
+            <Route path="/auth/callback" element={<AuthCallback />} />
+            
+            <Route path="/" element={<Navigate to="/dashboard" replace />} />
+            
+            <Route 
+              path="/dashboard" 
+              element={
+                <>
+                  <RoleProtectedRoute allowedRoles={['administrador', 'tecnico', 'gerente', 'supervisor', 'vendedor', 'stock']} />
+                  <DashboardWrapper />
+                </>
+              } 
+            />
 
-          <Route
-            path="/inventario"
-            element={
-              <>
-                <RoleProtectedRoute allowedRoles={['administrador', 'tecnico', 'stock']} />
-                <Layout><Inventory /></Layout>
-              </>
-            }
-          />
+            <Route
+              path="/inventario"
+              element={
+                <>
+                  <RoleProtectedRoute allowedRoles={['administrador', 'tecnico', 'stock']} />
+                  <Layout><Inventory /></Layout>
+                </>
+              }
+            />
 
-          <Route
-            path="/usuarios"
-            element={
-              <>
-                <RoleProtectedRoute allowedRoles={['administrador', 'tecnico']} />
-                <Layout><Users /></Layout>
-              </>
-            }
-          />
+            <Route
+              path="/usuarios"
+              element={
+                <>
+                  <RoleProtectedRoute allowedRoles={['administrador', 'tecnico']} />
+                  <Layout><Users /></Layout>
+                </>
+              }
+            />
 
-          <Route
-            path="/administrativo"
-            element={
-              <>
-                <RoleProtectedRoute allowedRoles={['administrador', 'tecnico']} />
-                <Layout><AdminModule /></Layout>
-              </>
-            }
-          />
+            <Route
+              path="/administrativo"
+              element={
+                <>
+                  <RoleProtectedRoute allowedRoles={['administrador', 'tecnico']} />
+                  <Layout><AdminModule /></Layout>
+                </>
+              }
+            />
 
-          <Route 
-            path="/vendedores" 
-            element={
-              <>
-                <RoleProtectedRoute allowedRoles={['administrador', 'tecnico', 'gerente', 'supervisor']} />
-                <VendedoresWrapper />
-              </>
-            } 
-          />
+            <Route 
+              path="/vendedores" 
+              element={
+                <>
+                  <RoleProtectedRoute allowedRoles={['administrador', 'tecnico', 'gerente', 'supervisor']} />
+                  <VendedoresWrapper />
+                </>
+              } 
+            />
 
-          <Route
-            path="/ventas"
-            element={
-              <>
-                <RoleProtectedRoute allowedRoles={['administrador', 'tecnico', 'gerente', 'supervisor', 'vendedor']} />
-                <Layout><SalesModule /></Layout>
-              </>
-            }
-          />
+            <Route
+              path="/ventas"
+              element={
+                <>
+                  <RoleProtectedRoute allowedRoles={['administrador', 'tecnico', 'gerente', 'supervisor', 'vendedor']} />
+                  <Layout><SalesModule /></Layout>
+                </>
+              }
+            />
 
-          <Route
-            path="/profile"
-            element={
-              <>
-                <RoleProtectedRoute allowedRoles={['administrador', 'tecnico', 'gerente', 'supervisor', 'vendedor', 'stock']} />
-                <Layout><Profile /></Layout>
-              </>
-            }
-          />
+            <Route
+              path="/profile"
+              element={
+                <>
+                  <RoleProtectedRoute allowedRoles={['administrador', 'tecnico', 'gerente', 'supervisor', 'vendedor', 'stock']} />
+                  <Layout><Profile /></Layout>
+                </>
+              }
+            />
 
-          <Route path="*" element={<Navigate to="/dashboard" replace />} />
-        </Routes>
-      </Router>
+            <Route path="*" element={<Navigate to="/dashboard" replace />} />
+          </Routes>
+        </Router>
+      </PullToRefreshContainer>
     </AuthProvider>
   );
 }
