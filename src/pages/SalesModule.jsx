@@ -263,7 +263,7 @@ export default function SalesModule() {
   const [globalDiscount53, setGlobalDiscount53] = useState(53.38);
   const [globalDiscount23, setGlobalDiscount23] = useState(23.08);
   const [globalDiscount10, setGlobalDiscount10] = useState(10); // Nueva modalidad
-  const [globalDiscount0, setGlobalDiscount0] = useState(0);   // Nueva modalidad
+  const [globalDiscount0, setGlobalDiscount0] = useState(0); // Nueva modalidad
   const [globalTerms, setGlobalTerms] = useState('Cargando términos...');
   const [estimatedNextFolio, setEstimatedNextFolio] = useState('...');
 
@@ -344,24 +344,39 @@ export default function SalesModule() {
   // 3. ESTADOS: SECCIÓN NOTA DE ENTREGA
   // ---------------------------------------------------------------------------
   const [editModeId, setEditModeId] = useState(null);
-  
+
   // Estados para SearchableDropdowns en Crear N.E.
   const [neClientId, setNeClientId] = useState('');
   const [neSearchProduct, setNeSearchProduct] = useState('');
   const [neSelectedProdId, setNeSelectedProdId] = useState('');
   const [neCategoria, setNeCategoria] = useState('bombillos');
-  
+
   // B. ACTUALIZACIÓN: Modalidad ahora soporta 4 valores
-  const [neTipoPago, setNeTipoPago] = useState('53.38'); 
-  
+  const [neTipoPago, setNeTipoPago] = useState('53.38');
+
   const [neQuantity, setNeQuantity] = useState(1);
   const [neCart, setNeCart] = useState([]);
+  // NUEVO: Efecto para recalcular precios del carrito al cambiar el tipo de pago/descuento
+  useEffect(() => {
+    if (neCart.length > 0) {
+      const nuevoPct = getDiscountPercent(neTipoPago);
+      const carritoActualizado = neCart.map((item) => {
+        const vuConDescuento = item.unit_price_usd * (1 - nuevoPct / 100);
+        return {
+          ...item,
+          discounted_unit_price_usd: vuConDescuento,
+          total_line_usd: item.quantity * vuConDescuento,
+        };
+      });
+      setNeCart(carritoActualizado);
+    }
+  }, [neTipoPago]);
   const [neObservacion, setNeObservacion] = useState('');
   const [neGpsLocation, setNeGpsLocation] = useState(null);
 
   const [searchHistoryQuery, setSearchHistoryQuery] = useState('');
   const [showFullSellerCard, setShowFullSellerCard] = useState(true);
-  
+
   const [valeModal, setValeModal] = useState({
     open: false,
     notaId: null,
@@ -1149,7 +1164,7 @@ export default function SalesModule() {
   // ---------------------------------------------------------------------------
   // MANEJADORES: NOTA DE ENTREGA & DESCARGA/ENVÍO PDF
   // ---------------------------------------------------------------------------
-  
+
   // B. FUNCIÓN AUXILIAR PARA OBTENER PORCENTAJE DINÁMICO
   const getDiscountPercent = (type) => {
     switch (String(type)) {
@@ -1181,7 +1196,7 @@ export default function SalesModule() {
     if (!prod) return;
     const qty = Number(neQuantity);
     if (qty <= 0) return alert('Cantidad debe ser mayor a 0');
-    
+
     // B. RECÁLCULO DINÁMICO AL AGREGAR
     const inCart = neCart.find((item) => item.product_id === prod.id);
     const currentQty = inCart ? inCart.quantity : 0;
@@ -1331,23 +1346,55 @@ export default function SalesModule() {
     setNeCategoria(nota.category || 'bombillos');
     setNeTipoPago(nota.payment_discount || '53.38');
     setNeObservacion(nota.observation || '');
-    const { data: detalles } = await supabase
+
+    // Consulta a Supabase trayendo la relación de productos
+    const { data: detalles, error } = await supabase
       .from('order_items')
-      .select('*, products()')
+      .select(
+        `
+        *,
+        products (
+          code,
+          description
+        )
+      `
+      )
       .eq('order_id', nota.id);
+
+    if (error) {
+      console.error('Error cargando detalles para editar:', error);
+      alert('Error al cargar los productos de la nota.');
+      return;
+    }
+
     if (detalles) {
       const loadedCart = detalles.map((d) => ({
         product_id: d.product_id,
-        code: d.products?.code || 'S/C',
-        description: d.products?.description,
+        // Tomamos el código y descripción de la relación de la BD o respaldos
+        code: d.products?.code || d.code || 'S/C',
+        description:
+          d.products?.description ||
+          d.description ||
+          'Producto sin descripción',
         quantity: d.quantity,
         unit_price_usd: d.unit_price_usd,
         discounted_unit_price_usd: d.discounted_unit_price_usd,
         total_line_usd: d.total_line_usd,
       }));
+
+      // 1. Cargamos el carrito con los productos de la nota
       setNeCart(loadedCart);
     }
+
+    // 2. Nos movemos a la pestaña de creación/edición de la Nota de Entrega
     setNeTab('crear_ne');
+
+    // 3. ADICIONAL PARA ESCRITORIO:
+    // Si tu tabla de escritorio depende de que neSelectedProdId tenga un valor o
+    // que se limpie la búsqueda para renderizar el contenedor del carrito,
+    // puedes resetear estos estados auxiliares aquí:
+    setNeSearchProduct('');
+    setNeSelectedProdId('');
   };
 
   const handleDeleteNE = async (nota) => {
@@ -1567,7 +1614,9 @@ export default function SalesModule() {
         });
       }
       const container = document.createElement('div');
-      container.innerHTML = `<div style="font-family: Arial, sans-serif; color: #111; padding: 25px; background: #fff; width: 720px; box-sizing: border-box; margin: 0 auto;"> ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'} </div>`;
+      container.innerHTML = `<div style="font-family: Arial, sans-serif; color: #111; padding: 25px; background: #fff; width: 720px; box-sizing: border-box; margin: 0 auto;"> ${
+        histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'
+      } </div>`;
       const opciones = {
         margin: 0,
         filename: `factura-liquidacion-${histItem.id}.pdf`,
@@ -1602,7 +1651,7 @@ export default function SalesModule() {
         });
       }
       const clientName = nota.clients?.name || 'Cliente';
-      const transNo = nota.transaction_number || nota.id.substring(0, 8); 
+      const transNo = nota.transaction_number || nota.id.substring(0, 8);
       const fecha = new Date(nota.created_at).toLocaleString();
       const vendedorName = currentSellerName;
       let itemsHtml = '';
@@ -1613,14 +1662,46 @@ export default function SalesModule() {
             item.total_line_usd ||
             item.quantity * item.discounted_unit_price_usd;
           subTotal += totalLine;
-          itemsHtml += `<tr> <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; font-family: monospace;">${ item.products?.code || 'S/C' }</td> <td style="padding: 6px 8px; border-bottom: 1px solid #ddd;">${ item.products?.description || 'Producto' }</td> <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: center;">${ item.quantity }</td> <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: right;">$${Number( item.unit_price_usd || 0 ).toFixed(2)}</td> <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: right; color: #B45309;">$${Number( item.discounted_unit_price_usd || 0 ).toFixed(2)}</td> <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: right; font-weight: bold;">$${Number( totalLine ).toFixed(2)}</td> </tr>` ;
+          itemsHtml += `<tr> <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; font-family: monospace;">${
+            item.products?.code || 'S/C'
+          }</td> <td style="padding: 6px 8px; border-bottom: 1px solid #ddd;">${
+            item.products?.description || 'Producto'
+          }</td> <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: center;">${
+            item.quantity
+          }</td> <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: right;">$${Number(
+            item.unit_price_usd || 0
+          ).toFixed(
+            2
+          )}</td> <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: right; color: #B45309;">$${Number(
+            item.discounted_unit_price_usd || 0
+          ).toFixed(
+            2
+          )}</td> <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: right; font-weight: bold;">$${Number(
+            totalLine
+          ).toFixed(2)}</td> </tr>`;
         });
       }
       const container = document.createElement('div');
-      container.innerHTML = `<div style="font-family: Arial, sans-serif; color: #111; padding: 25px; background: #fff; width: 700px; height: 1000px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between; margin: 0 auto;"> <div> <div style="display: flex; justify-content: space-between; border-bottom: 2px solid #111; padding-bottom: 15px; margin-bottom: 20px;"> <div> <h2 style="margin: 0; font-size: 20px; text-transform: uppercase;">FENIX AUTO PART C.A</h2> <p style="margin: 2px 0; font-size: 12px;"><strong>RIF:</strong> J-50261925-2</p> <p style="margin: 8px 0 0 0; font-size: 12px;"><strong>Cliente:</strong> ${clientName}</p> </div> <div style="text-align: right; font-size: 12px;"> <p style="margin: 2px 0;"><strong>N° Transacción:</strong> #${transNo}</p> <p style="margin: 2px 0;"><strong>Fecha/Hora:</strong> ${fecha}</p> <p style="margin: 2px 0;"><strong>Vendedor:</strong> ${vendedorName}</p> <p style="margin: 2px 0;"><strong>Categoría:</strong> ${ nota.category || 'General' }</p> </div> </div> <table style="width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 20px;"> <thead> <tr style="background-color: #f3f4f6;"> <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: left;">Código</th> <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: left;">Descripción</th> <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: center;">Cantidad</th> <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: right;">V. Unitario</th> <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: right;">V. U. con Descuento</th> <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: right;">Total Línea</th> </tr> </thead> <tbody> ${itemsHtml} </tbody> </table> </div> <div> <div style="display: flex; justify-content: flex-end; font-size: 12px; margin-bottom: 15px;"> <div style="width: 280px; background: #f9fafb; padding: 12px; border: 1px solid #ddd; border-radius: 6px;"> <div style="display: flex; justify-content: space-between; margin-bottom: 6px;"> <span>Total Base:</span> <strong>$${Number(nota.total_base_usd || subTotal).toFixed( 2 )}</strong> </div> <div style="display: flex; justify-content: space-between; margin-bottom: 6px; color: #B45309;"> <span>Descuento Aplicado:</span> <strong>-$${Number(nota.discount_amount_usd || 0).toFixed( 2 )}</strong> </div> <div style="display: flex; justify-content: space-between; border-top: 1px solid #ccc; padding-top: 6px; font-weight: bold; font-size: 14px; color: #DC2626;"> <span>Precio Final:</span> <span>$${Number(nota.final_price_usd || subTotal).toFixed( 2 )}</span> </div> </div> </div> ${ nota.observation ?` <div style= "font-size: 11px; color: #333; background: #fffbeb; border: 1px solid #fde68a; padding: 10px; border-radius: 4px; margin-bottom: 10px; text-align: justify; " >
+      container.innerHTML = `<div style="font-family: Arial, sans-serif; color: #111; padding: 25px; background: #fff; width: 700px; height: 1000px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between; margin: 0 auto;"> <div> <div style="display: flex; justify-content: space-between; border-bottom: 2px solid #111; padding-bottom: 15px; margin-bottom: 20px;"> <div> <h2 style="margin: 0; font-size: 20px; text-transform: uppercase;">FENIX AUTO PART C.A</h2> <p style="margin: 2px 0; font-size: 12px;"><strong>RIF:</strong> J-50261925-2</p> <p style="margin: 8px 0 0 0; font-size: 12px;"><strong>Cliente:</strong> ${clientName}</p> </div> <div style="text-align: right; font-size: 12px;"> <p style="margin: 2px 0;"><strong>N° Transacción:</strong> #${transNo}</p> <p style="margin: 2px 0;"><strong>Fecha/Hora:</strong> ${fecha}</p> <p style="margin: 2px 0;"><strong>Vendedor:</strong> ${vendedorName}</p> <p style="margin: 2px 0;"><strong>Categoría:</strong> ${
+        nota.category || 'General'
+      }</p> </div> </div> <table style="width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 20px;"> <thead> <tr style="background-color: #f3f4f6;"> <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: left;">Código</th> <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: left;">Descripción</th> <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: center;">Cantidad</th> <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: right;">V. Unitario</th> <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: right;">V. U. con Descuento</th> <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: right;">Total Línea</th> </tr> </thead> <tbody> ${itemsHtml} </tbody> </table> </div> <div> <div style="display: flex; justify-content: flex-end; font-size: 12px; margin-bottom: 15px;"> <div style="width: 280px; background: #f9fafb; padding: 12px; border: 1px solid #ddd; border-radius: 6px;"> <div style="display: flex; justify-content: space-between; margin-bottom: 6px;"> <span>Total Base:</span> <strong>$${Number(
+        nota.total_base_usd || subTotal
+      ).toFixed(
+        2
+      )}</strong> </div> <div style="display: flex; justify-content: space-between; margin-bottom: 6px; color: #B45309;"> <span>Descuento Aplicado:</span> <strong>-$${Number(
+        nota.discount_amount_usd || 0
+      ).toFixed(
+        2
+      )}</strong> </div> <div style="display: flex; justify-content: space-between; border-top: 1px solid #ccc; padding-top: 6px; font-weight: bold; font-size: 14px; color: #DC2626;"> <span>Precio Final:</span> <span>$${Number(
+        nota.final_price_usd || subTotal
+      ).toFixed(2)}</span> </div> </div> </div> ${
+        nota.observation
+          ? ` <div style= "font-size: 11px; color: #333; background: #fffbeb; border: 1px solid #fde68a; padding: 10px; border-radius: 4px; margin-bottom: 10px; text-align: justify; " >
  <strong >Observación: </strong > ${nota.observation}
  </div >
- `: '' } <div style="font-size: 10px; color: #555; background: #f3f4f6; padding: 10px; border-radius: 4px; line-height: 1.4; text-align: justify;"> <strong>Términos y condiciones:</strong> ${globalTerms} </div> </div> </div>` ;
+ `
+          : ''
+      } <div style="font-size: 10px; color: #555; background: #f3f4f6; padding: 10px; border-radius: 4px; line-height: 1.4; text-align: justify;"> <strong>Términos y condiciones:</strong> ${globalTerms} </div> </div> </div>`;
       const opt = {
         margin: 0,
         filename: `Nota-${transNo}.pdf`,
@@ -1988,7 +2069,9 @@ export default function SalesModule() {
             marginBottom: '8px',
           }}
         >
-          <div style={{ fontWeight: '700', fontSize: '14px', color: '#111827' }}>
+          <div
+            style={{ fontWeight: '700', fontSize: '14px', color: '#111827' }}
+          >
             {item.description}
           </div>
           {isEditable && (
@@ -6972,9 +7055,7 @@ export default function SalesModule() {
                     <option value="10">
                       {globalDiscount10}% Descuento Especial
                     </option>
-                    <option value="0">
-                      {globalDiscount0}% Sin Descuento
-                    </option>
+                    <option value="0">{globalDiscount0}% Sin Descuento</option>
                   </select>
                 </div>
               </div>
@@ -7115,129 +7196,138 @@ export default function SalesModule() {
                     </p>
                   </div>
                 </div>
-                
-                {/* E. VISTA RESPONSIVA: TABLA EN DESKTOP, TARJETAS EN MÓVIL */}
-                <div className="admin-table-desktop-wrapper">
-                  <div
-                    style={{ width: '100%', overflowX: 'auto' }}
-                    className="desktop-table"
+
+                {/* Tabla de Productos para Escritorio (Oculta en Móvil) */}
+                <div
+                  className="desktop-table-container"
+                  style={{
+                    width: '100%',
+                    overflowX: 'auto',
+                    marginBottom: '12px',
+                    display: 'block',
+                  }}
+                >
+                  <style>{`
+                    @media (max-width: 768px) {
+                      .desktop-table-container {
+                        display: none !important;
+                      }
+                    }
+                  `}</style>
+                  <table
+                    style={{
+                      width: '100%',
+                      minWidth: '700px',
+                      borderCollapse: 'collapse',
+                      textAlign: 'left',
+                      fontSize: '12px',
+                    }}
                   >
-                    <table
-                      style={{
-                        width: '100%',
-                        minWidth: '700px',
-                        borderCollapse: 'collapse',
-                        textAlign: 'left',
-                        fontSize: '12px',
-                        marginBottom: '12px',
-                      }}
-                    >
-                      <thead>
-                        <tr
-                          style={{
-                            backgroundColor: '#F3F4F6',
-                            borderBottom: '1px solid #D1D5DB',
-                            fontWeight: '700',
-                          }}
-                        >
-                          <th style={{ padding: '8px' }}>Código</th>
-                          <th style={{ padding: '8px' }}>Descripción</th>
-                          <th style={{ padding: '8px', textAlign: 'center' }}>
-                            Cantidad
-                          </th>
-                          <th style={{ padding: '8px', textAlign: 'right' }}>
-                            Valor Unitario
-                          </th>
-                          <th style={{ padding: '8px', textAlign: 'right' }}>
-                            V. U. con descuento
-                          </th>
-                          <th style={{ padding: '8px', textAlign: 'right' }}>
-                            Valor Total
-                          </th>
-                          <th style={{ padding: '8px', textAlign: 'center' }}>
-                            Eliminar
-                          </th>
+                    <thead>
+                      <tr
+                        style={{
+                          backgroundColor: '#F3F4F6',
+                          borderBottom: '1px solid #D1D5DB',
+                          fontWeight: '700',
+                        }}
+                      >
+                        <th style={{ padding: '8px' }}>Código</th>
+                        <th style={{ padding: '8px' }}>Descripción</th>
+                        <th style={{ padding: '8px', textAlign: 'center' }}>
+                          Cantidad
+                        </th>
+                        <th style={{ padding: '8px', textAlign: 'right' }}>
+                          Valor Unitario
+                        </th>
+                        <th style={{ padding: '8px', textAlign: 'right' }}>
+                          V. U. con descuento
+                        </th>
+                        <th style={{ padding: '8px', textAlign: 'right' }}>
+                          Valor Total
+                        </th>
+                        <th style={{ padding: '8px', textAlign: 'center' }}>
+                          Eliminar
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {neCart.length === 0 ? (
+                        <tr>
+                          <td
+                            colSpan="7"
+                            style={{
+                              padding: '16px',
+                              textAlign: 'center',
+                              color: '#9CA3AF',
+                              fontStyle: 'italic',
+                            }}
+                          >
+                            No hay productos añadidos a la nota de entrega.
+                          </td>
                         </tr>
-                      </thead>
-                      <tbody>
-                        {neCart.length === 0 ? (
-                          <tr>
+                      ) : (
+                        neCart.map((item) => (
+                          <tr
+                            key={item.product_id}
+                            style={{ borderBottom: '1px solid #E5E7EB' }}
+                          >
                             <td
-                              colSpan="7"
                               style={{
-                                padding: '16px',
-                                textAlign: 'center',
-                                color: '#9CA3AF',
-                                fontStyle: 'italic',
+                                padding: '8px',
+                                fontFamily: 'monospace',
                               }}
                             >
-                              No hay productos añadidos a la nota de entrega.
+                              {item.code}
+                            </td>
+                            <td style={{ padding: '8px', fontWeight: '600' }}>
+                              {item.description}
+                            </td>
+                            <td style={{ padding: '8px', textAlign: 'center' }}>
+                              {item.quantity}
+                            </td>
+                            <td style={{ padding: '8px', textAlign: 'right' }}>
+                              ${item.unit_price_usd.toFixed(2)}
+                            </td>
+                            <td
+                              style={{
+                                padding: '8px',
+                                textAlign: 'right',
+                                color: '#B45309',
+                              }}
+                            >
+                              ${item.discounted_unit_price_usd.toFixed(2)}
+                            </td>
+                            <td
+                              style={{
+                                padding: '8px',
+                                textAlign: 'right',
+                                fontWeight: '700',
+                              }}
+                            >
+                              ${item.total_line_usd.toFixed(2)}
+                            </td>
+                            <td style={{ padding: '8px', textAlign: 'center' }}>
+                              <button
+                                onClick={() =>
+                                  handleRemoveFromCart(item.product_id)
+                                }
+                                style={{
+                                  border: 'none',
+                                  background: 'none',
+                                  cursor: 'pointer',
+                                  color: '#DC2626',
+                                }}
+                              >
+                                <Trash2
+                                  style={{ width: '16px', height: '16px' }}
+                                />
+                              </button>
                             </td>
                           </tr>
-                        ) : (
-                          neCart.map((item) => (
-                            <tr
-                              key={item.product_id}
-                              style={{ borderBottom: '1px solid #E5E7EB' }}
-                            >
-                              <td
-                                style={{
-                                  padding: '8px',
-                                  fontFamily: 'monospace',
-                                }}
-                              >
-                                {item.code}
-                              </td>
-                              <td style={{ padding: '8px', fontWeight: '600' }}>
-                                {item.description}
-                              </td>
-                              <td style={{ padding: '8px', textAlign: 'center' }}>
-                                {item.quantity}
-                              </td>
-                              <td style={{ padding: '8px', textAlign: 'right' }}>
-                                ${item.unit_price_usd.toFixed(2)}
-                              </td>
-                              <td
-                                style={{
-                                  padding: '8px',
-                                  textAlign: 'right',
-                                  color: '#B45309',
-                                }}
-                              >
-                                ${item.discounted_unit_price_usd.toFixed(2)}
-                              </td>
-                              <td
-                                style={{
-                                  padding: '8px',
-                                  textAlign: 'right',
-                                  fontWeight: '700',
-                                }}
-                              >
-                                ${item.total_line_usd.toFixed(2)}
-                              </td>
-                              <td style={{ padding: '8px', textAlign: 'center' }}>
-                                <button
-                                  onClick={() =>
-                                    handleRemoveFromCart(item.product_id)
-                                  }
-                                  style={{
-                                    border: 'none',
-                                    background: 'none',
-                                    cursor: 'pointer',
-                                    color: '#DC2626',
-                                  }}
-                                >
-                                  <Trash2
-                                    style={{ width: '16px', height: '16px' }}
-                                  />
-                                </button>
-                              </td>
-                            </tr>
-                          ))
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
                 </div>
 
                 {/* Mobile Cards for Cart */}
