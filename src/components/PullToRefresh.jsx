@@ -80,20 +80,19 @@ export default function PullToRefresh({ children }) {
         <div
           style={{
             display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            gap: '6px',
+            alignItems: 'center', // Alinea el engranaje y el texto en la misma línea horizontal
+            gap: '10px',
             fontSize: '13px',
             fontWeight: 'bold',
             opacity: pullDistance > 30 ? 1 : 0,
             transition: 'opacity 0.2s',
           }}
         >
-          {/* Tu SVG de engranaje integrado */}
+          {/* Tu engranaje SVG con gradiente de fuego */}
           <svg
             id="gearSvg"
-            width="36"
-            height="36"
+            width="32"
+            height="32"
             viewBox="0 0 300 300"
             xmlns="http://www.w3.org/2000/svg"
             className={refreshing ? 'animate-spin' : ''}
@@ -123,6 +122,7 @@ export default function PullToRefresh({ children }) {
               filter="url(#glow)"
             />
           </svg>
+          
           <span>
             {refreshing
               ? 'Actualizando Fenix...'
