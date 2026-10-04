@@ -277,7 +277,6 @@ export default function AdminModule() {
   const [bcvRateUsd, setBcvRateUsd] = useState(849.56);
   const [bcvLastUpdated, setBcvLastUpdated] = useState('Sin sincronizar');
   const [bcvLoading, setBcvLoading] = useState(false);
-
   // --- A. CONFIGURACIÓN DINÁMICA DE DESCUENTOS ---
   const [globalDiscount53, setGlobalDiscount53] = useState(53.38);
   const [globalDiscount23, setGlobalDiscount23] = useState(23.08);
@@ -288,7 +287,6 @@ export default function AdminModule() {
   );
   const [isConfigOpen, setIsConfigOpen] = useState(false);
   const [configLoading, setConfigLoading] = useState(false);
-
   const [cobranzaInternalTab, setCobranzaInternalTab] = useState('control_ne');
   const [paymentsHistoricalList, setPaymentsHistoricalList] = useState([]);
   const [paymentsHistorySearch, setPaymentsHistorySearch] = useState('');
@@ -453,16 +451,19 @@ export default function AdminModule() {
           'id, full_name, email, role, pct_bombillos, pct_fluidos, sueldo_fijo_usd'
         );
       if (sellers) setSellersList(sellers);
+
       const { data: allClients } = await supabase
         .from('clients')
         .select('*, profiles:assigned_seller_id(full_name)')
         .order('name', { ascending: true });
       if (allClients) setAllClientsList(allClients);
+
       const { data: prods } = await supabase
         .from('products')
         .select('*')
         .order('description', { ascending: true });
       if (prods) setAllProductsList(prods);
+
       const { data: ords } = await supabase
         .from('sales_orders')
         .select('*, client:client_id(name), seller:seller_id(full_name)')
@@ -632,6 +633,7 @@ export default function AdminModule() {
         .select()
         .single();
       if (orderErr) throw orderErr;
+
       const detalles = neCart.map((item) => ({
         order_id: newNota.id,
         product_id: item.product_id,
@@ -644,6 +646,7 @@ export default function AdminModule() {
         .from('order_items')
         .insert(detalles);
       if (itemsErr) throw itemsErr;
+
       for (const item of neCart) {
         const { data: prodData } = await supabase
           .from('products')
@@ -658,6 +661,7 @@ export default function AdminModule() {
             .eq('id', item.product_id);
         }
       }
+
       showToastSuccess(
         `Nota de entrega #${newNota.transaction_number} creada, aprobada y asignada con éxito.`
       );
@@ -921,22 +925,24 @@ export default function AdminModule() {
     try {
       const { data: hConfig } = await supabase
         .from('hierarchy_config')
-        .select('');
+        .select('*');
       const { data: hAssign } = await supabase
         .from('hierarchy_assignments')
-        .select('');
+        .select('*');
       const configMap = {};
       (hConfig || []).forEach((c) => {
         configMap[c.parent_user_id] = c;
       });
       setHierarchyConfigsMap(configMap);
       setHierarchyAssignmentsList(hAssign || []);
+
       const subMap = {};
       (hAssign || []).forEach((row) => {
         if (!subMap[row.parent_user_id]) subMap[row.parent_user_id] = [];
         subMap[row.parent_user_id].push(row.target_seller_id);
       });
       setUserAssignedSubordinatesMap(subMap);
+
       if (activeTab === 'aprobaciones') {
         const { data, error } = await supabase
           .from('sales_orders')
@@ -979,6 +985,7 @@ export default function AdminModule() {
           .order('created_at', { ascending: false });
         if (error) throw error;
         setVales(data || []);
+
         const { data: penData, error: penErr } = await supabase
           .from('penalties')
           .select(
@@ -994,6 +1001,7 @@ export default function AdminModule() {
         } else {
           setPenalties(penData || []);
         }
+
         const { data: ords } = await supabase
           .from('sales_orders')
           .select('*, client:client_id(name)')
@@ -1006,6 +1014,7 @@ export default function AdminModule() {
           .in('role', ['vendedor', 'supervisor', 'gerente', 'administrador']);
         if (profErr) throw profErr;
         setLiquidaciones(profs || []);
+
         const { data: closedOrd, error: closedErr } = await supabase
           .from('sales_orders')
           .select(
@@ -1016,6 +1025,7 @@ export default function AdminModule() {
         if (!closedErr) {
           setClosedOrdersList(closedOrd || []);
         }
+
         const { data: appVales, error: valErr } = await supabase
           .from('vales')
           .select(
@@ -1025,6 +1035,7 @@ export default function AdminModule() {
         if (!valErr) {
           setApprovedValesList(appVales || []);
         }
+
         const { data: appPen, error: penAppErr } = await supabase
           .from('penalties')
           .select(
@@ -1040,10 +1051,12 @@ export default function AdminModule() {
             .in('status', ['aprobada', 'approved', 'pendiente']);
           setApprovedPenaltiesList(plainPen || []);
         }
+
         const { data: ords } = await supabase
           .from('sales_orders')
           .select('id, transaction_number, final_price_usd, balance_due_usd');
         if (ords) setAllOrdersList(ords);
+
         await fetchPaymentHistoryFromDB();
       }
     } catch (err) {
@@ -1308,7 +1321,6 @@ export default function AdminModule() {
     let comm23GrossUsd = 0;
     let comm10GrossUsd = 0;
     let comm0GrossUsd = 0;
-
     let valesDeduction53Usd = 0;
     let valesDeduction23Usd = 0;
     let valesDeduction10Usd = 0;
@@ -1336,7 +1348,6 @@ export default function AdminModule() {
       (acc, p) => acc + Number(p.amount || 0),
       0
     );
-
     const hierarchyData = calculateHierarchyCommissionsForUser(user);
 
     let penDeduction53 = penChargeMethod === '53.38' ? totalPenaltiesUsd : 0;
@@ -1375,7 +1386,6 @@ export default function AdminModule() {
     // Para efectos de total en BS, sumamos todos los netos equivalentes + sueldo si aplica
     const totalNetoAllUsd =
       comm53NetUsd + comm23NetUsd + comm10NetUsd + comm0NetUsd;
-
     const comm23NetUsdWithSueldo =
       sfCurr === 'BS' ? comm23NetUsd + rawSueldoFijo : comm23NetUsd;
 
@@ -1396,7 +1406,6 @@ export default function AdminModule() {
       (sfCurr === 'BS' ? rawSueldoFijo : 0);
 
     const total23NetBs = Math.max(0, baseToMultiplyByRateBs) * currentRate;
-
     const totalEquivalentUsd =
       sfCurr === 'USD' ? rawSueldoFijo + totalNetoAllUsd : totalNetoAllUsd;
 
@@ -1500,6 +1509,7 @@ export default function AdminModule() {
         interactiveEls.forEach((el) => el.remove());
         capturedHTMLContent = clonedNode.innerHTML;
       }
+
       for (const pen of settlementModalData.penalties) {
         const penAmt = Number(pen.amount || 0);
         if (pen.order_id && penAmt > 0) {
@@ -1542,6 +1552,7 @@ export default function AdminModule() {
           .update({ status: 'cobrada' })
           .eq('id', pen.id);
       }
+
       const { data: insertedInv, error: invErr } = await supabase
         .from('settlement_invoices')
         .insert([
@@ -1570,6 +1581,7 @@ export default function AdminModule() {
         .select()
         .single();
       if (invErr) throw invErr;
+
       const noteIdsToDelete = settlementModalData.notes.map((n) => n.id);
       if (noteIdsToDelete.length > 0) {
         await supabase
@@ -1586,20 +1598,24 @@ export default function AdminModule() {
           .in('order_id', noteIdsToDelete);
         await supabase.from('sales_orders').delete().in('id', noteIdsToDelete);
       }
+
       const valeIdsToDelete = settlementModalData.vales.map((v) => v.id);
       if (valeIdsToDelete.length > 0) {
         await supabase.from('vales').delete().in('id', valeIdsToDelete);
       }
+
       const penIdsToDelete = settlementModalData.penalties.map((p) => p.id);
       if (penIdsToDelete.length > 0) {
         await supabase.from('penalties').delete().in('id', penIdsToDelete);
       }
+
       if (noteIdsToDelete.length > 0) {
         await supabase
           .from('penalties')
           .delete()
           .in('order_id', noteIdsToDelete);
       }
+
       try {
         await supabase.functions.invoke('send-notification', {
           body: {
@@ -1617,6 +1633,7 @@ export default function AdminModule() {
       } catch (e) {
         console.warn('Error enviando notif de liquidación:', e);
       }
+
       showToastSuccess(
         `Factura ${invCode} generada, penalizaciones aplicadas como abonos, y ciclos liquidados.`
       );
@@ -1716,9 +1733,9 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
         associatedPenalties.forEach((p) => {
           penaltiesHtml += `
 <div style="display: flex; justify-content: space-between; margin-bottom: 4px; color: #DC2626;">
- <span>Penalización (${p.status || 'pendiente'}): </span>
- <strong>$${Number(p.amount || 0).toFixed(2)} </strong>
- </div>
+<span>Penalización (${p.status || 'pendiente'}): </span>
+<strong>$${Number(p.amount || 0).toFixed(2)} </strong>
+</div>
 `;
         });
       }
@@ -1731,97 +1748,97 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
             item.quantity * item.discounted_unit_price_usd;
           subTotal += totalLine;
           itemsHtml += `
- <tr>
- <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; font-family: monospace;">${
-   item.products?.code || 'S/C'
- } </td>
- <td style="padding: 6px 8px; border-bottom: 1px solid #ddd;">${
-   item.products?.description || 'Producto'
- } </td>
- <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: center;">${
-   item.quantity
- } </td>
- <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: right;">$${Number(
-   item.unit_price_usd || 0
- ).toFixed(2)} </td>
- <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: right; color: #B45309;">$${Number(
-   item.discounted_unit_price_usd || 0
- ).toFixed(2)} </td>
- <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: right; font-weight: bold;">$${Number(
-   totalLine
- ).toFixed(2)} </td>
- </tr>
+<tr>
+<td style="padding: 6px 8px; border-bottom: 1px solid #ddd; font-family: monospace;">${
+            item.products?.code || 'S/C'
+          } </td>
+<td style="padding: 6px 8px; border-bottom: 1px solid #ddd;">${
+            item.products?.description || 'Producto'
+          } </td>
+<td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: center;">${
+            item.quantity
+          } </td>
+<td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: right;">$${Number(
+            item.unit_price_usd || 0
+          ).toFixed(2)} </td>
+<td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: right; color: #B45309;">$${Number(
+            item.discounted_unit_price_usd || 0
+          ).toFixed(2)} </td>
+<td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: right; font-weight: bold;">$${Number(
+            totalLine
+          ).toFixed(2)} </td>
+</tr>
 `;
         });
       }
       const container = document.createElement('div');
       container.innerHTML = `
- <div style="font-family: Arial, sans-serif; color: #111; padding: 25px; background: #fff; width: 700px; height: 1000px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between; margin: 0 auto;">
- <div>
- <div style="display: flex; justify-content: space-between; border-bottom: 2px solid #111; padding-bottom: 15px; margin-bottom: 20px;">
- <div>
- <h2 style="margin: 0; font-size: 20px; text-transform: uppercase;">FENIX AUTO PART C.A </h2>
- <p style="margin: 2px 0; font-size: 12px;"> <strong>RIF: </strong> J-50261925-2 </p>
- <p style="margin: 8px 0 0 0; font-size: 12px;"> <strong>Cliente: </strong> ${clientName} </p>
- </div>
- <div style="text-align: right; font-size: 12px;">
- <p style="margin: 2px 0;"> <strong>N° Transacción: </strong> #${transNo} </p>
- <p style="margin: 2px 0;"> <strong>Fecha/Hora: </strong> ${fecha} </p>
- <p style="margin: 2px 0;"> <strong>Vendedor: </strong> ${vendedorName} </p>
- <p style="margin: 2px 0;"> <strong>Categoría: </strong> ${
-   nota.category || 'General'
- } </p>
- </div>
- </div>
- <table style="width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 20px;">
- <thead>
- <tr style="background-color: #f3f4f6;">
- <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: left;">Código </th>
- <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: left;">Descripción </th>
- <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: center;">Cantidad </th>
- <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: right;">V. Unitario </th>
- <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: right;">V. U. con Descuento </th>
- <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: right;">Total Línea </th>
- </tr>
- </thead>
- <tbody>
+<div style="font-family: Arial, sans-serif; color: #111; padding: 25px; background: #fff; width: 700px; height: 1000px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between; margin: 0 auto;">
+<div>
+<div style="display: flex; justify-content: space-between; border-bottom: 2px solid #111; padding-bottom: 15px; margin-bottom: 20px;">
+<div>
+<h2 style="margin: 0; font-size: 20px; text-transform: uppercase;">FENIX AUTO PART C.A </h2>
+<p style="margin: 2px 0; font-size: 12px;"> <strong>RIF: </strong> J-50261925-2 </p>
+<p style="margin: 8px 0 0 0; font-size: 12px;"> <strong>Cliente: </strong> ${clientName} </p>
+</div>
+<div style="text-align: right; font-size: 12px;">
+<p style="margin: 2px 0;"> <strong>N° Transacción: </strong> #${transNo} </p>
+<p style="margin: 2px 0;"> <strong>Fecha/Hora: </strong> ${fecha} </p>
+<p style="margin: 2px 0;"> <strong>Vendedor: </strong> ${vendedorName} </p>
+<p style="margin: 2px 0;"> <strong>Categoría: </strong> ${
+        nota.category || 'General'
+      } </p>
+</div>
+</div>
+<table style="width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 20px;">
+<thead>
+<tr style="background-color: #f3f4f6;">
+<th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: left;">Código </th>
+<th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: left;">Descripción </th>
+<th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: center;">Cantidad </th>
+<th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: right;">V. Unitario </th>
+<th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: right;">V. U. con Descuento </th>
+<th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: right;">Total Línea </th>
+</tr>
+</thead>
+<tbody>
 ${itemsHtml}
- </tbody>
- </table>
- </div>
- <div>
- <div style="display: flex; justify-content: flex-end; font-size: 12px; margin-bottom: 15px;">
- <div style="width: 300px; background: #f9fafb; padding: 12px; border: 1px solid #ddd; border-radius: 6px;">
- <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
- <span>Total Base: </span>
- <strong>$${Number(nota.total_base_usd || subTotal).toFixed(2)} </strong>
- </div>
- <div style="display: flex; justify-content: space-between; margin-bottom: 6px; color: #B45309;">
- <span>Descuento Aplicado: </span>
- <strong>-$${Number(nota.discount_amount_usd || 0).toFixed(2)} </strong>
- </div>
+</tbody>
+</table>
+</div>
+<div>
+<div style="display: flex; justify-content: flex-end; font-size: 12px; margin-bottom: 15px;">
+<div style="width: 300px; background: #f9fafb; padding: 12px; border: 1px solid #ddd; border-radius: 6px;">
+<div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+<span>Total Base: </span>
+<strong>$${Number(nota.total_base_usd || subTotal).toFixed(2)} </strong>
+</div>
+<div style="display: flex; justify-content: space-between; margin-bottom: 6px; color: #B45309;">
+<span>Descuento Aplicado: </span>
+<strong>-$${Number(nota.discount_amount_usd || 0).toFixed(2)} </strong>
+</div>
 ${penaltiesHtml}
- <div style="display: flex; justify-content: space-between; border-top: 1px solid #ccc; padding-top: 6px; font-weight: bold; font-size: 14px; color: #DC2626;">
- <span>Precio Final: </span>
- <span>$${Number(nota.final_price_usd || subTotal).toFixed(2)} </span>
- </div>
- <div style="display: flex; justify-content: space-between; margin-top: 4px; font-size: 12px;">
- <span>Abonado Total: </span>
- <span>$${Number(nota.total_paid_usd || 0).toFixed(2)} </span>
- </div>
- <div style="display: flex; justify-content: space-between; margin-top: 4px; font-size: 12px; color: ${
-   Number(nota.balance_due_usd || 0) > 0 ? '#DC2626' : '#16A34A'
- }; font-weight: bold;">
- <span>Saldo Pendiente: </span>
- <span>$${Number(nota.balance_due_usd || 0).toFixed(2)} </span>
- </div>
- </div>
- </div>
- <div style="font-size: 10px; color: #555; background: #f3f4f6; padding: 10px; border-radius: 4px; line-height: 1.4; text-align: justify;">
- <strong>Términos y condiciones: </strong> ${globalTerms}
- </div>
- </div>
- </div>
+<div style="display: flex; justify-content: space-between; border-top: 1px solid #ccc; padding-top: 6px; font-weight: bold; font-size: 14px; color: #DC2626;">
+<span>Precio Final: </span>
+<span>$${Number(nota.final_price_usd || subTotal).toFixed(2)} </span>
+</div>
+<div style="display: flex; justify-content: space-between; margin-top: 4px; font-size: 12px;">
+<span>Abonado Total: </span>
+<span>$${Number(nota.total_paid_usd || 0).toFixed(2)} </span>
+</div>
+<div style="display: flex; justify-content: space-between; margin-top: 4px; font-size: 12px; color: ${
+        Number(nota.balance_due_usd || 0) > 0 ? '#DC2626' : '#16A34A'
+      }; font-weight: bold;">
+<span>Saldo Pendiente: </span>
+<span>$${Number(nota.balance_due_usd || 0).toFixed(2)} </span>
+</div>
+</div>
+</div>
+<div style="font-size: 10px; color: #555; background: #f3f4f6; padding: 10px; border-radius: 4px; line-height: 1.4; text-align: justify;">
+<strong>Términos y condiciones: </strong> ${globalTerms}
+</div>
+</div>
+</div>
 `;
       const opciones = {
         margin: 0,
@@ -1938,11 +1955,13 @@ ${penaltiesHtml}
       );
       if (duplicate) {
         const confirmDup = window.confirm(
-          `⚠️ PAGO DUPLICADO DETECTADO\n\nYa existe un pago con Monto: $${montoNum.toFixed(
+          `⚠️ PAGO DUPLICADO DETECTADO
+Ya existe un pago con Monto: $${montoNum.toFixed(
             2
           )} y Referencia: "${refNum}" registrado el ${new Date(
             duplicate.payment_date
-          ).toLocaleDateString()}.\n\n¿Desea continuar aprobando este pago duplicado de todas formas?`
+          ).toLocaleDateString()}.
+¿Desea continuar aprobando este pago duplicado de todas formas?`
         );
         if (!confirmDup) {
           setLoading(false);
@@ -1985,12 +2004,14 @@ ${penaltiesHtml}
         },
       ]);
       if (payErr) throw payErr;
+
       const { data: orderData, error: orderFetchErr } = await supabase
         .from('sales_orders')
         .select('*')
         .eq('id', notif.order_id)
         .single();
       if (orderFetchErr) throw orderFetchErr;
+
       const nuevoAbonado = Number(orderData.total_paid_usd || 0) + montoNum;
       const nuevoSaldo = Math.max(
         0,
@@ -2008,11 +2029,13 @@ ${penaltiesHtml}
         })
         .eq('id', notif.order_id);
       if (orderUpdateErr) throw orderUpdateErr;
+
       const { error: notifUpdateErr } = await supabase
         .from('seller_payment_notifications')
         .update({ status: 'approved' })
         .eq('id', notif.id);
       if (notifUpdateErr) throw notifUpdateErr;
+
       try {
         const vendedorEmail = notif.seller?.email;
         const vendedorNombre = notif.seller?.full_name;
@@ -2047,6 +2070,7 @@ ${penaltiesHtml}
           notifErr
         );
       }
+
       showToastSuccess(
         `Notificación de abono de $${montoNum.toFixed(
           2
@@ -2176,9 +2200,11 @@ ${penaltiesHtml}
           duplicates[0].payment_date
         ).toLocaleDateString();
         const continueAnyway = window.confirm(
-          `⚠️ ATENCIÓN: Este pago parece estar duplicado.\n\nYa existe un registro con Monto: $${montoNum.toFixed(
+          `⚠️ ATENCIÓN: Este pago parece estar duplicado.
+Ya existe un registro con Monto: $${montoNum.toFixed(
             2
-          )} y Referencia: "${refNum}" fechado el ${dupDate}.\n\n¿Desea continuar guardando este abono de todas formas?`
+          )} y Referencia: "${refNum}" fechado el ${dupDate}.
+¿Desea continuar guardando este abono de todas formas?`
         );
         if (!continueAnyway) return;
       }
@@ -2395,15 +2421,17 @@ ${penaltiesHtml}
       setIsCobranzaNEModal(isCobranza);
       const { data: prods, error: prodErr } = await supabase
         .from('products')
-        .select('')
+        .select('*')
         .order('description', { ascending: true });
       if (prodErr) throw prodErr;
       setEditNoteProductsList(prods || []);
+
       const { data: items, error: itemsErr } = await supabase
         .from('order_items')
         .select('*, products(code, description)')
         .eq('order_id', note.id);
       if (itemsErr) throw itemsErr;
+
       const mappedItems = (items || []).map((item) => ({
         product_id: item.product_id,
         code: item.products?.code || 'S/C',
@@ -2416,6 +2444,7 @@ ${penaltiesHtml}
             item.quantity * Number(item.discounted_unit_price_usd || 0)
         ),
       }));
+
       setEditingNoteId(note.id);
       setEditNoteClientName(note.client?.name || 'Cliente');
       setEditNoteCategory(note.category || 'bombillos');
@@ -2430,7 +2459,20 @@ ${penaltiesHtml}
     }
   };
 
-  // --- C. LÓGICA DINÁMICA DE EDICIÓN ---
+  // --- C. LÓGICA DINÁMICA DE EDICIÓN Y CREACIÓN ---
+  const handleEditNoteRecalculatePrices = (newDiscountType) => {
+    const newPct = getDiscountPercent(newDiscountType);
+    const recalculated = editNoteItems.map((item) => {
+      const newDiscPrice = item.unit_price_usd * (1 - newPct / 100);
+      return {
+        ...item,
+        discounted_unit_price_usd: newDiscPrice,
+        total_line_usd: item.quantity * newDiscPrice,
+      };
+    });
+    setEditNoteItems(recalculated);
+  };
+
   const handleEditNoteAddProduct = () => {
     if (!editNoteSelectedProdId) return;
     const prod = editNoteProductsList.find(
@@ -2526,11 +2568,13 @@ ${penaltiesHtml}
         })
         .eq('id', note.id);
       if (updateErr) throw updateErr;
+
       const { error: delErr } = await supabase
         .from('order_items')
         .delete()
         .eq('order_id', note.id);
       if (delErr) throw delErr;
+
       if (editNoteItems.length > 0) {
         const rowsToInsert = editNoteItems.map((item) => ({
           order_id: note.id,
@@ -3068,220 +3112,219 @@ ${penaltiesHtml}
     >
       {/* --- ESTILOS RESPONSIVOS (E) --- */}
       <style>{`
-        .admin-tabs-desktop {
-          display: flex;
-          gap: 8px;
-          border-bottom: 2px solid #e5e7eb;
-          margin-bottom: 24px;
-          overflow-x: auto;
-        }
-        .admin-tabs-mobile {
-          display: none;
-          position: relative;
-          margin-bottom: 24px;
-        }
-        .admin-mobile-trigger {
-          width: 100%;
-          padding: 12px 16px;
-          background: #ffffff;
-          border: 1px solid #d1d5db;
-          border-radius: 8px;
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          cursor: pointer;
-          font-weight: 700;
-          color: #111827;
-          font-size: 14px;
-        }
-        .admin-mobile-dropdown {
-          position: absolute;
-          top: calc(100% + 4px);
-          left: 0;
-          right: 0;
-          background: #ffffff;
-          border: 1px solid #d1d5db;
-          border-radius: 8px;
-          box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); /* Sombra original preferida */
-          z-index: 1000;
-          overflow: hidden;
-        }
-        .admin-mobile-item {
-          padding: 12px 16px;
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          cursor: pointer;
-          border-bottom: 1px solid #e5e7eb;
-          color: #4b5563;
-          font-size: 14px;
-          transition: background 0.15s;
-        }
-        .admin-mobile-item:last-child {
-          border-bottom: none;
-        }
-        .admin-mobile-item:hover {
-          background: #fef2f2; /* Fondo hover preferido */
-        }
-        .admin-mobile-item.active {
-          background: #fef2f2; /* Fondo activo preferido */
-          color: #dc2626;
-          font-weight: 700;
-        }
-        .admin-aging-section {
-          background: #fffbeb;
-          border: 1px solid #fde68a;
-          border-radius: 8px;
-          padding: 14px 16px;
-          margin-bottom: 16px;
-        }
-        .admin-aging-title {
-          font-size: 13px;
-          font-weight: 800;
-          color: #78350f;
-          margin-bottom: 10px;
-          display: flex;
-          align-items: center;
-          gap: 8px;
-        }
-        .admin-aging-item {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          padding: 6px 10px;
-          background: #ffffff;
-          border: 1px solid #fde68a;
-          border-radius: 6px;
-          margin-bottom: 6px;
-          font-size: 12px;
-        }
-        .admin-aging-item:last-child {
-          margin-bottom: 0;
-        }
-        .admin-days-30 {
-          text-decoration: underline;
-          text-decoration-color: #eab308;
-          text-decoration-thickness: 3px;
-          text-underline-offset: 3px;
-        }
-        .admin-days-45 {
-          text-decoration: underline;
-          text-decoration-color: #f97316;
-          text-decoration-thickness: 3px;
-          text-underline-offset: 3px;
-        }
-        .admin-days-60 {
-          text-decoration: underline;
-          text-decoration-color: #dc2626;
-          text-decoration-thickness: 3px;
-          text-underline-offset: 3px;
-        }
-        /* --- TABLAS RESPONSIVAS (E) --- */
-        .admin-table-desktop {
-          width: 100%;
-          border-collapse: collapse;
-          text-align: left;
-          font-size: 13px;
-        }
-        .admin-mobile-cards {
-          display: none;
-        }
-        .admin-mobile-card {
-          background: #ffffff;
-          border: 1px solid #e5e7eb;
-          border-radius: 8px;
-          padding: 12px;
-          margin-bottom: 10px;
-          box-shadow: 0 1px 2px rgba(0,0,0,0.05);
-        }
-        .admin-mobile-card-header {
-          font-size: 14px;
-          font-weight: 800;
-          color: #111827;
-          border-bottom: 1px solid #e5e7eb;
-          padding-bottom: 8px;
-          margin-bottom: 8px;
-        }
-        .admin-mobile-card-row {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          padding: 4px 0;
-          font-size: 12px;
-          border-bottom: 1px dashed #f3f4f6;
-        }
-        .admin-mobile-card-row:last-child {
-          border-bottom: none;
-        }
-        .admin-mobile-card-label {
-          color: #6b7280;
-          font-weight: 600;
-          font-size: 11px;
-        }
-        .admin-mobile-card-value {
-          color: #111827;
-          font-weight: 600;
-          text-align: right;
-          max-width: 60%;
-          word-break: break-word;
-        }
-        .admin-mobile-card-actions {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 6px;
-          margin-top: 10px;
-          padding-top: 10px;
-          border-top: 1px solid #e5e7eb;
-        }
-        @media (max-width: 768px) {
-          .admin-tabs-desktop {
-            display: none !important;
-          }
-          .admin-tabs-mobile {
-            display: block !important;
-          }
-          .admin-table-desktop {
-            display: none !important;
-          }
-          .admin-mobile-cards {
-            display: block !important;
-          }
-          .admin-mobile-card-actions button {
-            font-size: 10px !important;
-            padding: 5px 8px !important;
-          }
-          .admin-tab-button-desktop {
-            padding: 10px 12px !important;
-            font-size: 12px !important;
-          }
-          .admin-action-btn-mobile {
-            padding: 5px 8px !important;
-            font-size: 10px !important;
-          }
-        }
-        
-        /* F. NOTIFICACIONES FLOTANTES */
-        .floating-toast-success {
-          position: fixed !important;
-          top: 24px !important;
-          left: 50% !important;
-          transform: translateX(-50%) !important;
-          z-index: 9999 !important;
-          width: 90% !important;
-          max-width: 500px !important;
-          box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
-        }
-        .floating-toast-error {
-          position: fixed !important;
-          top: 24px !important;
-          left: 50% !important;
-          transform: translateX(-50%) !important;
-          z-index: 9999 !important;
-          width: 90% !important;
-          max-width: 500px !important;
-          box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
-        }
-      `}</style>
+.admin-tabs-desktop {
+display: flex;
+gap: 8px;
+border-bottom: 2px solid #e5e7eb;
+margin-bottom: 24px;
+overflow-x: auto;
+}
+.admin-tabs-mobile {
+display: none;
+position: relative;
+margin-bottom: 24px;
+}
+.admin-mobile-trigger {
+width: 100%;
+padding: 12px 16px;
+background: #ffffff;
+border: 1px solid #d1d5db;
+border-radius: 8px;
+display: flex;
+justify-content: space-between;
+align-items: center;
+cursor: pointer;
+font-weight: 700;
+color: #111827;
+font-size: 14px;
+}
+.admin-mobile-dropdown {
+position: absolute;
+top: calc(100% + 4px);
+left: 0;
+right: 0;
+background: #ffffff;
+border: 1px solid #d1d5db;
+border-radius: 8px;
+box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); /* Sombra original preferida */
+z-index: 1000;
+overflow: hidden;
+}
+.admin-mobile-item {
+padding: 12px 16px;
+display: flex;
+alignItems: center;
+gap: 10px;
+cursor: pointer;
+border-bottom: 1px solid #e5e7eb;
+color: #4b5563;
+font-size: 14px;
+transition: background 0.15s;
+}
+.admin-mobile-item:last-child {
+border-bottom: none;
+}
+.admin-mobile-item:hover {
+background: #fef2f2; /* Fondo hover preferido */
+}
+.admin-mobile-item.active {
+background: #fef2f2; /* Fondo activo preferido */
+color: #dc2626;
+font-weight: 700;
+}
+.admin-aging-section {
+background: #fffbeb;
+border: 1px solid #fde68a;
+border-radius: 8px;
+padding: 14px 16px;
+margin-bottom: 16px;
+}
+.admin-aging-title {
+font-size: 13px;
+font-weight: 800;
+color: #78350f;
+margin-bottom: 10px;
+display: flex;
+alignItems: center;
+gap: 8px;
+}
+.admin-aging-item {
+display: flex;
+justify-content: space-between;
+align-items: center;
+padding: 6px 10px;
+background: #ffffff;
+border: 1px solid #fde68a;
+border-radius: 6px;
+margin-bottom: 6px;
+font-size: 12px;
+}
+.admin-aging-item:last-child {
+margin-bottom: 0;
+}
+.admin-days-30 {
+text-decoration: underline;
+text-decoration-color: #eab308;
+text-decoration-thickness: 3px;
+text-underline-offset: 3px;
+}
+.admin-days-45 {
+text-decoration: underline;
+text-decoration-color: #f97316;
+text-decoration-thickness: 3px;
+text-underline-offset: 3px;
+}
+.admin-days-60 {
+text-decoration: underline;
+text-decoration-color: #dc2626;
+text-decoration-thickness: 3px;
+text-underline-offset: 3px;
+}
+/* --- TABLAS RESPONSIVAS (E) --- */
+.admin-table-desktop {
+width: 100%;
+border-collapse: collapse;
+text-align: left;
+font-size: 13px;
+}
+.admin-mobile-cards {
+display: none;
+}
+.admin-mobile-card {
+background: #ffffff;
+border: 1px solid #e5e7eb;
+border-radius: 8px;
+padding: 12px;
+marginBottom: 10px;
+boxShadow: 0 1px 2px rgba(0,0,0,0.05);
+}
+.admin-mobile-card-header {
+font-size: 14px;
+font-weight: 800;
+color: #111827;
+border-bottom: 1px solid #e5e7eb;
+padding-bottom: 8px;
+margin-bottom: 8px;
+}
+.admin-mobile-card-row {
+display: flex;
+justify-content: space-between;
+align-items: center;
+padding: 4px 0;
+font-size: 12px;
+border-bottom: 1px dashed #f3f4f6;
+}
+.admin-mobile-card-row:last-child {
+border-bottom: none;
+}
+.admin-mobile-card-label {
+color: #6b7280;
+font-weight: 600;
+font-size: 11px;
+}
+.admin-mobile-card-value {
+color: #111827;
+font-weight: 600;
+text-align: right;
+max-width: 60%;
+word-break: break-word;
+}
+.admin-mobile-card-actions {
+display: flex;
+flex-wrap: wrap;
+gap: 6px;
+margin-top: 10px;
+padding-top: 10px;
+border-top: 1px solid #e5e7eb;
+}
+@media (max-width: 768px) {
+.admin-tabs-desktop {
+display: none !important;
+}
+.admin-tabs-mobile {
+display: block !important;
+}
+.admin-table-desktop {
+display: none !important;
+}
+.admin-mobile-cards {
+display: block !important;
+}
+.admin-mobile-card-actions button {
+font-size: 10px !important;
+padding: 5px 8px !important;
+}
+.admin-tab-button-desktop {
+padding: 10px 12px !important;
+font-size: 12px !important;
+}
+.admin-action-btn-mobile {
+padding: 5px 8px !important;
+font-size: 10px !important;
+}
+}
+/* F. NOTIFICACIONES FLOTANTES */
+.floating-toast-success {
+position: fixed !important;
+top: 24px !important;
+left: 50% !important;
+transform: translateX(-50%) !important;
+z-index: 9999 !important;
+width: 90% !important;
+max-width: 500px !important;
+box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
+}
+.floating-toast-error {
+position: fixed !important;
+top: 24px !important;
+left: 50% !important;
+transform: translateX(-50%) !important;
+z-index: 9999 !important;
+width: 90% !important;
+max-width: 500px !important;
+box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
+}
+`}</style>
 
       {/* F. NOTIFICACIONES GLOBALES FLOTANTES */}
       {errorMsg && (
@@ -3384,6 +3427,7 @@ ${penaltiesHtml}
           );
         })}
       </div>
+
       {/* --- MENÚ MÓVIL DROPDOWN (E) --- */}
       <div className="admin-tabs-mobile" ref={mobileMenuRef}>
         <div
@@ -3439,6 +3483,7 @@ ${penaltiesHtml}
           </div>
         )}
       </div>
+
       {/* PESTAÑA 1: CREAR N.E. */}
       {activeTab === 'crear_ne' && (
         <div style={tabContentWrapperStyle}>
@@ -3649,6 +3694,7 @@ ${penaltiesHtml}
               </div>
             )}
           </div>
+
           <div
             style={{
               backgroundColor: '#f8fafc',
@@ -3764,6 +3810,7 @@ ${penaltiesHtml}
               </div>
             </div>
           </div>
+
           <div
             style={{
               backgroundColor: '#ffffff',
@@ -3932,6 +3979,7 @@ ${penaltiesHtml}
               </select>
             </div>
           </div>
+
           <div
             style={{
               backgroundColor: '#ffffff',
@@ -4022,6 +4070,7 @@ ${penaltiesHtml}
               </button>
             </div>
           </div>
+
           <div
             style={{
               backgroundColor: '#ffffff',
@@ -4069,7 +4118,6 @@ ${penaltiesHtml}
                 </p>
               </div>
             </div>
-
             {/* B. TABLA ESCRITORIO / TARJETAS MÓVIL PRODUCTOS */}
             <div className="admin-table-desktop-wrapper">
               <div
@@ -4188,7 +4236,6 @@ ${penaltiesHtml}
                 </table>
               </div>
             </div>
-
             {/* Mobile Cards for Cart */}
             <div className="admin-mobile-cards">
               {neCart.length === 0 ? (
@@ -4261,6 +4308,7 @@ ${penaltiesHtml}
                 </div>
               </div>
             </div>
+
             <div style={{ marginBottom: '12px' }}>
               <label
                 style={{
@@ -4286,6 +4334,7 @@ ${penaltiesHtml}
                 }}
               ></textarea>
             </div>
+
             <div
               style={{
                 backgroundColor: '#F3F4F6',
@@ -4300,6 +4349,7 @@ ${penaltiesHtml}
             >
               <strong>Términos y condiciones: </strong> {globalTerms}
             </div>
+
             <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
               <button
                 onClick={handleCreateDirectNE}
@@ -4326,6 +4376,7 @@ ${penaltiesHtml}
           </div>
         </div>
       )}
+
       {/* PESTAÑA APROBACIONES */}
       {activeTab === 'aprobaciones' && (
         <div style={tabContentWrapperStyle}>
@@ -4446,16 +4497,28 @@ ${penaltiesHtml}
                               backgroundColor:
                                 String(note.payment_discount) === '53.38'
                                   ? '#fef3c7'
-                                  : '#e0f2fe',
+                                  : String(note.payment_discount) === '23.08'
+                                  ? '#e0f2fe'
+                                  : String(note.payment_discount) === '10'
+                                  ? '#fff7ed'
+                                  : '#f3f4f6',
                               color:
                                 String(note.payment_discount) === '53.38'
                                   ? '#d97706'
-                                  : '#0369a1',
+                                  : String(note.payment_discount) === '23.08'
+                                  ? '#0369a1'
+                                  : String(note.payment_discount) === '10'
+                                  ? '#c2410c'
+                                  : '#374151',
                             }}
                           >
                             {String(note.payment_discount) === '53.38'
                               ? `${globalDiscount53}% ($)`
-                              : `${globalDiscount23}% (Bs)`}
+                              : String(note.payment_discount) === '23.08'
+                              ? `${globalDiscount23}% (Bs)`
+                              : String(note.payment_discount) === '10'
+                              ? `${globalDiscount10}% (Esp)`
+                              : `${globalDiscount0}% (0)`}
                           </span>
                         </td>
                         <td
@@ -4640,7 +4703,11 @@ ${penaltiesHtml}
                         <span className="admin-mobile-card-value">
                           {String(note.payment_discount) === '53.38'
                             ? `${globalDiscount53}% ($)`
-                            : `${globalDiscount23}% (Bs)`}
+                            : String(note.payment_discount) === '23.08'
+                            ? `${globalDiscount23}% (Bs)`
+                            : String(note.payment_discount) === '10'
+                            ? `${globalDiscount10}% (Esp)`
+                            : `${globalDiscount0}% (0)`}
                         </span>
                       </div>
                       <div className="admin-mobile-card-row">
@@ -4728,637 +4795,655 @@ ${penaltiesHtml}
               )}
             </div>
           </div>
+
+          {/* MODAL EDITABLE PARA APROBACIONES (D) */}
           {editingNote && !isCobranzaNEModal && (
             <div
               style={{
-                backgroundColor: '#ffffff',
-                border: '2px solid #111827',
-                borderRadius: '12px',
-                padding: '24px',
-                boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)',
+                position: 'fixed',
+                inset: 0,
+                backgroundColor: 'rgba(0,0,0,0.6)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                zIndex: 1250,
+                padding: '16px',
               }}
             >
               <div
                 style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  marginBottom: '16px',
-                  borderBottom: '2px solid #111827',
-                  paddingBottom: '12px',
-                }}
-              >
-                <div>
-                  <h2
-                    style={{ fontSize: '18px', fontWeight: '900', margin: 0 }}
-                  >
-                    Panel Editable - Nota de Entrega #
-                    {editingNote.transaction_number}
-                  </h2>
-                </div>
-                <button
-                  onClick={() => setEditingNoteId(null)}
-                  style={{
-                    background: '#111827',
-                    color: '#fff',
-                    border: 'none',
-                    padding: '6px 12px',
-                    borderRadius: '6px',
-                    cursor: 'pointer',
-                    fontSize: '12px',
-                    fontWeight: 'bold',
-                  }}
-                >
-                  Cerrar Panel
-                </button>
-              </div>
-              <div
-                style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '16px',
+                  backgroundColor: '#ffffff',
+                  border: '2px solid #111827',
+                  borderRadius: '12px',
+                  width: '100%',
+                  maxWidth: '850px',
+                  maxHeight: '90vh',
+                  overflowY: 'auto',
+                  padding: '24px',
+                  boxShadow: '0 10px 40px rgba(0,0,0,0.3)',
+                  boxSizing: 'border-box',
                 }}
               >
                 <div
                   style={{
-                    backgroundColor: '#ffffff',
-                    padding: '16px',
-                    borderRadius: '12px',
-                    border: '1px solid #E5E7EB',
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-                    gap: '12px',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    marginBottom: '16px',
+                    borderBottom: '2px solid #111827',
+                    paddingBottom: '12px',
                   }}
                 >
                   <div>
-                    <label
-                      style={{
-                        display: 'block',
-                        fontSize: '12px',
-                        fontWeight: '700',
-                        marginBottom: '4px',
-                      }}
+                    <h2
+                      style={{ fontSize: '18px', fontWeight: '900', margin: 0 }}
                     >
-                      Cliente
-                    </label>
-                    <input
-                      type="text"
-                      disabled
-                      value={editNoteClientName}
-                      style={{
-                        width: '100%',
-                        padding: '6px 8px',
-                        fontSize: '12px',
-                        border: '1px solid #D1D5DB',
-                        borderRadius: '6px',
-                        backgroundColor: '#F3F4F6',
-                        boxSizing: 'border-box',
-                      }}
-                    />
+                      Panel Editable - Nota de Entrega #
+                      {editingNote.transaction_number}
+                    </h2>
                   </div>
-                  <div>
-                    <label
-                      style={{
-                        display: 'block',
-                        fontSize: '12px',
-                        fontWeight: '700',
-                        marginBottom: '4px',
-                      }}
-                    >
-                      Categoría *
-                    </label>
-                    <select
-                      value={editNoteCategory}
-                      onChange={(e) => setEditNoteCategory(e.target.value)}
-                      style={{
-                        width: '100%',
-                        padding: '10px 12px',
-                        fontSize: '14px',
-                        border: '1px solid #D1D5DB',
-                        borderRadius: '6px',
-                        backgroundColor: '#FFFFFF',
-                        boxSizing: 'border-box',
-                      }}
-                    >
-                      <option value="bombillos">Bombillos</option>
-                      <option value="fluidos">Fluidos</option>
-                    </select>
-                  </div>
-                  {/* C. SELECT DINÁMICO EN EDICIÓN */}
-                  <div>
-                    <label
-                      style={{
-                        display: 'block',
-                        fontSize: '12px',
-                        fontWeight: '700',
-                        marginBottom: '4px',
-                      }}
-                    >
-                      % Descuento (Pago Bs) *
-                    </label>
-                    <select
-                      value={editNotePaymentDiscount}
-                      onChange={(e) => {
-                        setEditNotePaymentDiscount(e.target.value);
-                        // Recalcular items existentes en tiempo real
-                        const newPct = getDiscountPercent(e.target.value);
-                        const recalculated = editNoteItems.map((item) => {
-                          const newDiscPrice =
-                            item.unit_price_usd * (1 - newPct / 100);
-                          return {
-                            ...item,
-                            discounted_unit_price_usd: newDiscPrice,
-                            total_line_usd: item.quantity * newDiscPrice,
-                          };
-                        });
-                        setEditNoteItems(recalculated);
-                      }}
-                      style={{
-                        width: '100%',
-                        padding: '10px 12px',
-                        fontSize: '14px',
-                        border: '1px solid #F59E0B',
-                        borderRadius: '6px',
-                        backgroundColor: '#FEF3C7',
-                        color: '#78350F',
-                        fontWeight: '700',
-                        boxSizing: 'border-box',
-                      }}
-                    >
-                      <option value="53.38">
-                        {globalDiscount53}% Pagará en $
-                      </option>
-                      <option value="23.08">
-                        {globalDiscount23}% Pagará en Bs BCV
-                      </option>
-                      <option value="10">
-                        {globalDiscount10}% Descuento Especial
-                      </option>
-                      <option value="0">
-                        {globalDiscount0}% Sin Descuento
-                      </option>
-                    </select>
-                  </div>
-                </div>
-                <div
-                  style={{
-                    backgroundColor: '#ffffff',
-                    padding: '16px',
-                    borderRadius: '12px',
-                    border: '1px solid #E5E7EB',
-                  }}
-                >
-                  <h3
+                  <button
+                    onClick={() => setEditingNoteId(null)}
                     style={{
-                      fontSize: '13px',
-                      fontWeight: '900',
-                      textTransform: 'uppercase',
-                      marginBottom: '8px',
+                      background: '#111827',
+                      color: '#fff',
+                      border: 'none',
+                      padding: '6px 12px',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      fontSize: '12px',
+                      fontWeight: 'bold',
                     }}
                   >
-                    Agregar Productos
-                  </h3>
+                    Cerrar Panel
+                  </button>
+                </div>
+                <div
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '16px',
+                  }}
+                >
                   <div
                     style={{
-                      display: 'flex',
-                      flexWrap: 'wrap',
-                      gap: '10px',
-                      alignItems: 'flex-end',
+                      backgroundColor: '#ffffff',
+                      padding: '16px',
+                      borderRadius: '12px',
+                      border: '1px solid #E5E7EB',
+                      display: 'grid',
+                      gridTemplateColumns:
+                        'repeat(auto-fit, minmax(240px, 1fr))',
+                      gap: '12px',
                     }}
                   >
-                    <div style={{ flex: '1 1 300px' }}>
-                      <SearchableDropdown
-                        options={filteredProducts.map((p) => {
-                          const descPct = getDiscountPercent(
-                            editNotePaymentDiscount
-                          );
-                          const desc =
-                            Number(p.price_usd) * (1 - descPct / 100);
-                          return {
-                            value: p.id,
-                            label: `${p.description} | Stock: ${
-                              p.stock_current
-                            } | Base: $${Number(p.price_usd).toFixed(
-                              2
-                            )} | Desc: $${desc.toFixed(2)}`,
-                          };
-                        })}
-                        value={editNoteSelectedProdId}
-                        onChange={setEditNoteSelectedProdId}
-                        placeholder="Seleccionar del catálogo..."
-                      />
-                    </div>
-                    <div style={{ width: '100px' }}>
+                    <div>
                       <label
                         style={{
                           display: 'block',
-                          fontSize: '11px',
-                          fontWeight: '600',
+                          fontSize: '12px',
+                          fontWeight: '700',
                           marginBottom: '4px',
                         }}
                       >
-                        Cantidad
+                        Cliente
                       </label>
                       <input
-                        type="number"
-                        min="1"
-                        value={editNoteQuantity}
-                        onChange={(e) => setEditNoteQuantity(e.target.value)}
+                        type="text"
+                        disabled
+                        value={editNoteClientName}
+                        style={{
+                          width: '100%',
+                          padding: '6px 8px',
+                          fontSize: '12px',
+                          border: '1px solid #D1D5DB',
+                          borderRadius: '6px',
+                          backgroundColor: '#F3F4F6',
+                          boxSizing: 'border-box',
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label
+                        style={{
+                          display: 'block',
+                          fontSize: '12px',
+                          fontWeight: '700',
+                          marginBottom: '4px',
+                        }}
+                      >
+                        Categoría *
+                      </label>
+                      <select
+                        value={editNoteCategory}
+                        onChange={(e) => setEditNoteCategory(e.target.value)}
                         style={{
                           width: '100%',
                           padding: '10px 12px',
                           fontSize: '14px',
                           border: '1px solid #D1D5DB',
                           borderRadius: '6px',
+                          backgroundColor: '#FFFFFF',
                           boxSizing: 'border-box',
-                          height: '42px',
                         }}
-                      />
+                      >
+                        <option value="bombillos">Bombillos</option>
+                        <option value="fluidos">Fluidos</option>
+                      </select>
                     </div>
-                    <button
-                      type="button"
-                      onClick={handleEditNoteAddProduct}
-                      style={{
-                        padding: '10px 20px',
-                        backgroundColor: '#059669',
-                        color: '#FFFFFF',
-                        border: 'none',
-                        borderRadius: '6px',
-                        fontSize: '14px',
-                        fontWeight: '700',
-                        cursor: 'pointer',
-                        height: '42px',
-                      }}
-                    >
-                      Agregar
-                    </button>
+                    {/* C. SELECT DINÁMICO EN EDICIÓN */}
+                    <div>
+                      <label
+                        style={{
+                          display: 'block',
+                          fontSize: '12px',
+                          fontWeight: '700',
+                          marginBottom: '4px',
+                        }}
+                      >
+                        % Descuento (Pago Bs) *
+                      </label>
+                      <select
+                        value={editNotePaymentDiscount}
+                        onChange={(e) => {
+                          setEditNotePaymentDiscount(e.target.value);
+                          handleEditNoteRecalculatePrices(e.target.value);
+                        }}
+                        style={{
+                          width: '100%',
+                          padding: '10px 12px',
+                          fontSize: '14px',
+                          border: '1px solid #F59E0B',
+                          borderRadius: '6px',
+                          backgroundColor: '#FEF3C7',
+                          color: '#78350F',
+                          fontWeight: '700',
+                          boxSizing: 'border-box',
+                        }}
+                      >
+                        <option value="53.38">
+                          {globalDiscount53}% Pagará en $
+                        </option>
+                        <option value="23.08">
+                          {globalDiscount23}% Pagará en Bs BCV
+                        </option>
+                        <option value="10">
+                          {globalDiscount10}% Descuento Especial
+                        </option>
+                        <option value="0">
+                          {globalDiscount0}% Sin Descuento
+                        </option>
+                      </select>
+                    </div>
                   </div>
-                </div>
-                <div
-                  style={{
-                    backgroundColor: '#ffffff',
-                    border: '2px solid #111827',
-                    borderRadius: '12px',
-                    padding: '16px',
-                  }}
-                >
+
                   <div
                     style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      borderBottom: '1px solid #E5E7EB',
-                      paddingBottom: '12px',
-                      marginBottom: '12px',
-                      fontSize: '12px',
-                      flexWrap: 'wrap',
-                      gap: '12px',
+                      backgroundColor: '#ffffff',
+                      padding: '16px',
+                      borderRadius: '12px',
+                      border: '1px solid #E5E7EB',
                     }}
                   >
-                    <div>
-                      <h2
-                        style={{
-                          fontSize: '15px',
-                          fontWeight: '900',
-                          margin: 0,
-                        }}
-                      >
-                        FENIX AUTO PART C.A
-                      </h2>
-                      <p style={{ fontWeight: '700', margin: '2px 0' }}>
-                        RIF: J-50261925-2
-                      </p>
-                      <p style={{ margin: '6px 0 0 0' }}>
-                        <strong>Cliente: </strong> {editNoteClientName}
-                      </p>
-                    </div>
-                    <div style={{ textAlign: 'right' }}>
-                      <p style={{ margin: 0 }}>
-                        <strong>Fecha/Hora: </strong>{' '}
-                        {new Date(editingNote.created_at).toLocaleString()}
-                      </p>
-                      <p style={{ margin: '2px 0' }}>
-                        <strong>N° Transacción: </strong> #
-                        {editingNote.transaction_number}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Desktop Table Edit */}
-                  <div
-                    style={{ width: '100%', overflowX: 'auto' }}
-                    className="admin-table-desktop"
-                  >
-                    <table
+                    <h3
                       style={{
-                        width: '100%',
-                        minWidth: '700px',
-                        borderCollapse: 'collapse',
-                        textAlign: 'left',
-                        fontSize: '12px',
-                        marginBottom: '12px',
+                        fontSize: '13px',
+                        fontWeight: '900',
+                        textTransform: 'uppercase',
+                        marginBottom: '8px',
                       }}
                     >
-                      <thead>
-                        <tr
+                      Agregar Productos
+                    </h3>
+                    <div
+                      style={{
+                        display: 'flex',
+                        flexWrap: 'wrap',
+                        gap: '10px',
+                        alignItems: 'flex-end',
+                      }}
+                    >
+                      <div style={{ flex: '1 1 300px' }}>
+                        <SearchableDropdown
+                          options={filteredProducts.map((p) => {
+                            const descPct = getDiscountPercent(
+                              editNotePaymentDiscount
+                            );
+                            const desc =
+                              Number(p.price_usd) * (1 - descPct / 100);
+                            return {
+                              value: p.id,
+                              label: `${p.description} | Stock: ${
+                                p.stock_current
+                              } | Base: $${Number(p.price_usd).toFixed(
+                                2
+                              )} | Desc: $${desc.toFixed(2)}`,
+                            };
+                          })}
+                          value={editNoteSelectedProdId}
+                          onChange={setEditNoteSelectedProdId}
+                          placeholder="Seleccionar del catálogo..."
+                        />
+                      </div>
+                      <div style={{ width: '100px' }}>
+                        <label
                           style={{
-                            backgroundColor: '#F3F4F6',
-                            borderBottom: '1px solid #D1D5DB',
-                            fontWeight: '700',
+                            display: 'block',
+                            fontSize: '11px',
+                            fontWeight: '600',
+                            marginBottom: '4px',
                           }}
                         >
-                          <th style={{ padding: '8px' }}>Código</th>
-                          <th style={{ padding: '8px' }}>Descripción</th>
-                          <th style={{ padding: '8px', textAlign: 'center' }}>
-                            Cantidad
-                          </th>
-                          <th style={{ padding: '8px', textAlign: 'right' }}>
-                            Valor Unitario
-                          </th>
-                          <th style={{ padding: '8px', textAlign: 'right' }}>
-                            V. U. con descuento
-                          </th>
-                          <th style={{ padding: '8px', textAlign: 'right' }}>
-                            Valor Total
-                          </th>
-                          <th style={{ padding: '8px', textAlign: 'center' }}>
-                            Eliminar
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {editNoteItems.length === 0 ? (
-                          <tr>
-                            <td
-                              colSpan="7"
-                              style={{
-                                padding: '16px',
-                                textAlign: 'center',
-                                color: '#9CA3AF',
-                                fontStyle: 'italic',
-                              }}
-                            >
-                              No hay productos añadidos a la nota de entrega.
-                            </td>
-                          </tr>
-                        ) : (
-                          editNoteItems.map((item) => (
-                            <tr
-                              key={item.product_id}
-                              style={{ borderBottom: '1px solid #E5E7EB' }}
-                            >
-                              <td
-                                style={{
-                                  padding: '8px',
-                                  fontFamily: 'monospace',
-                                }}
-                              >
-                                {item.code}
-                              </td>
-                              <td style={{ padding: '8px', fontWeight: '600' }}>
-                                {item.description}
-                              </td>
-                              <td
-                                style={{ padding: '8px', textAlign: 'center' }}
-                              >
-                                {item.quantity}
-                              </td>
-                              <td
-                                style={{ padding: '8px', textAlign: 'right' }}
-                              >
-                                ${Number(item.unit_price_usd).toFixed(2)}
-                              </td>
-                              <td
-                                style={{
-                                  padding: '8px',
-                                  textAlign: 'right',
-                                  color: '#B45309',
-                                }}
-                              >
-                                $
-                                {Number(item.discounted_unit_price_usd).toFixed(
-                                  2
-                                )}
-                              </td>
-                              <td
-                                style={{
-                                  padding: '8px',
-                                  textAlign: 'right',
-                                  fontWeight: '700',
-                                }}
-                              >
-                                ${Number(item.total_line_usd).toFixed(2)}
-                              </td>
-                              <td
-                                style={{
-                                  padding: '8px',
-                                  textAlign: 'center',
-                                }}
-                              >
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    handleEditNoteRemoveItem(item.product_id)
-                                  }
-                                  style={{
-                                    border: 'none',
-                                    background: 'none',
-                                    cursor: 'pointer',
-                                    color: '#dc2626',
-                                  }}
-                                >
-                                  <Trash2 size={16} />
-                                </button>
-                              </td>
-                            </tr>
-                          ))
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-
-                  {/* Mobile Cards Edit */}
-                  <div className="admin-mobile-cards">
-                    {editNoteItems.length === 0 ? (
-                      <div
+                          Cantidad
+                        </label>
+                        <input
+                          type="number"
+                          min="1"
+                          value={editNoteQuantity}
+                          onChange={(e) => setEditNoteQuantity(e.target.value)}
+                          style={{
+                            width: '100%',
+                            padding: '10px 12px',
+                            fontSize: '14px',
+                            border: '1px solid #D1D5DB',
+                            borderRadius: '6px',
+                            boxSizing: 'border-box',
+                            height: '42px',
+                          }}
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleEditNoteAddProduct}
                         style={{
-                          padding: '16px',
-                          textAlign: 'center',
-                          color: '#9CA3AF',
+                          padding: '10px 20px',
+                          backgroundColor: '#059669',
+                          color: '#FFFFFF',
+                          border: 'none',
+                          borderRadius: '6px',
+                          fontSize: '14px',
+                          fontWeight: '700',
+                          cursor: 'pointer',
+                          height: '42px',
                         }}
                       >
-                        No hay productos.
-                      </div>
-                    ) : (
-                      renderProductCards(
-                        editNoteItems,
-                        true,
-                        handleEditNoteRemoveItem
-                      )
-                    )}
+                        Agregar
+                      </button>
+                    </div>
                   </div>
 
                   <div
                     style={{
-                      display: 'flex',
-                      justifyContent: 'flex-end',
-                      marginBottom: '12px',
-                      fontSize: '12px',
+                      backgroundColor: '#ffffff',
+                      border: '2px solid #111827',
+                      borderRadius: '12px',
+                      padding: '16px',
                     }}
                   >
                     <div
                       style={{
-                        width: '300px',
-                        backgroundColor: '#F9FAFB',
-                        padding: '10px',
-                        borderRadius: '8px',
-                        border: '1px solid #E5E7EB',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        borderBottom: '1px solid #E5E7EB',
+                        paddingBottom: '12px',
+                        marginBottom: '12px',
+                        fontSize: '12px',
+                        flexWrap: 'wrap',
+                        gap: '12px',
                       }}
                     >
-                      <div
-                        style={{
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          marginBottom: '4px',
-                        }}
-                      >
-                        <span>Total sin Descuento: </span>
-                        <strong>${editTotalSinDesc.toFixed(2)}</strong>
+                      <div>
+                        <h2
+                          style={{
+                            fontSize: '15px',
+                            fontWeight: '900',
+                            margin: 0,
+                          }}
+                        >
+                          FENIX AUTO PART C.A
+                        </h2>
+                        <p style={{ fontWeight: '700', margin: '2px 0' }}>
+                          RIF: J-50261925-2
+                        </p>
+                        <p style={{ margin: '6px 0 0 0' }}>
+                          <strong>Cliente: </strong> {editNoteClientName}
+                        </p>
                       </div>
-                      <div
-                        style={{
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          marginBottom: '4px',
-                          color: '#B45309',
-                        }}
-                      >
-                        <span>% de descuento aplicado: </span>
-                        <strong>-${editMontoAhorrado.toFixed(2)}</strong>
-                      </div>
-                      <div
-                        style={{
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          borderTop: '1px solid #D1D5DB',
-                          paddingTop: '4px',
-                          fontSize: '13px',
-                          fontWeight: '900',
-                        }}
-                      >
-                        <span>Precio Final: </span>
-                        <span style={{ color: '#059669' }}>
-                          ${editPrecioFinal.toFixed(2)}
-                        </span>
+                      <div style={{ textAlign: 'right' }}>
+                        <p style={{ margin: 0 }}>
+                          <strong>Fecha/Hora: </strong>{' '}
+                          {new Date(editingNote.created_at).toLocaleString()}
+                        </p>
+                        <p style={{ margin: '2px 0' }}>
+                          <strong>N° Transacción: </strong> #
+                          {editingNote.transaction_number}
+                        </p>
                       </div>
                     </div>
-                  </div>
-                  <div style={{ marginBottom: '12px' }}>
-                    <label
+                    {/* Desktop Table Edit */}
+                    <div
+                      style={{ width: '100%', overflowX: 'auto' }}
+                      className="admin-table-desktop"
+                    >
+                      <table
+                        style={{
+                          width: '100%',
+                          minWidth: '700px',
+                          borderCollapse: 'collapse',
+                          textAlign: 'left',
+                          fontSize: '12px',
+                          marginBottom: '12px',
+                        }}
+                      >
+                        <thead>
+                          <tr
+                            style={{
+                              backgroundColor: '#F3F4F6',
+                              borderBottom: '1px solid #D1D5DB',
+                              fontWeight: '700',
+                            }}
+                          >
+                            <th style={{ padding: '8px' }}>Código</th>
+                            <th style={{ padding: '8px' }}>Descripción</th>
+                            <th style={{ padding: '8px', textAlign: 'center' }}>
+                              Cantidad
+                            </th>
+                            <th style={{ padding: '8px', textAlign: 'right' }}>
+                              Valor Unitario
+                            </th>
+                            <th style={{ padding: '8px', textAlign: 'right' }}>
+                              V. U. con descuento
+                            </th>
+                            <th style={{ padding: '8px', textAlign: 'right' }}>
+                              Valor Total
+                            </th>
+                            <th style={{ padding: '8px', textAlign: 'center' }}>
+                              Eliminar
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {editNoteItems.length === 0 ? (
+                            <tr>
+                              <td
+                                colSpan="7"
+                                style={{
+                                  padding: '16px',
+                                  textAlign: 'center',
+                                  color: '#9CA3AF',
+                                  fontStyle: 'italic',
+                                }}
+                              >
+                                No hay productos añadidos a la nota de entrega.
+                              </td>
+                            </tr>
+                          ) : (
+                            editNoteItems.map((item) => (
+                              <tr
+                                key={item.product_id}
+                                style={{ borderBottom: '1px solid #E5E7EB' }}
+                              >
+                                <td
+                                  style={{
+                                    padding: '8px',
+                                    fontFamily: 'monospace',
+                                  }}
+                                >
+                                  {item.code}
+                                </td>
+                                <td
+                                  style={{ padding: '8px', fontWeight: '600' }}
+                                >
+                                  {item.description}
+                                </td>
+                                <td
+                                  style={{
+                                    padding: '8px',
+                                    textAlign: 'center',
+                                  }}
+                                >
+                                  {item.quantity}
+                                </td>
+                                <td
+                                  style={{ padding: '8px', textAlign: 'right' }}
+                                >
+                                  ${Number(item.unit_price_usd).toFixed(2)}
+                                </td>
+                                <td
+                                  style={{
+                                    padding: '8px',
+                                    textAlign: 'right',
+                                    color: '#B45309',
+                                  }}
+                                >
+                                  $
+                                  {Number(
+                                    item.discounted_unit_price_usd
+                                  ).toFixed(2)}
+                                </td>
+                                <td
+                                  style={{
+                                    padding: '8px',
+                                    textAlign: 'right',
+                                    fontWeight: '700',
+                                  }}
+                                >
+                                  ${Number(item.total_line_usd).toFixed(2)}
+                                </td>
+                                <td
+                                  style={{
+                                    padding: '8px',
+                                    textAlign: 'center',
+                                  }}
+                                >
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      handleEditNoteRemoveItem(item.product_id)
+                                    }
+                                    style={{
+                                      border: 'none',
+                                      background: 'none',
+                                      cursor: 'pointer',
+                                      color: '#dc2626',
+                                    }}
+                                  >
+                                    <Trash2 size={16} />
+                                  </button>
+                                </td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                    {/* Mobile Cards Edit */}
+                    <div className="admin-mobile-cards">
+                      {editNoteItems.length === 0 ? (
+                        <div
+                          style={{
+                            padding: '16px',
+                            textAlign: 'center',
+                            color: '#9CA3AF',
+                          }}
+                        >
+                          No hay productos.
+                        </div>
+                      ) : (
+                        renderProductCards(
+                          editNoteItems,
+                          true,
+                          handleEditNoteRemoveItem
+                        )
+                      )}
+                    </div>
+
+                    <div
                       style={{
-                        display: 'block',
+                        display: 'flex',
+                        justifyContent: 'flex-end',
+                        marginBottom: '12px',
                         fontSize: '12px',
-                        fontWeight: '700',
-                        marginBottom: '4px',
                       }}
                     >
-                      Observación:
-                    </label>
-                    <textarea
-                      rows="2"
-                      value={editNoteObservation}
-                      onChange={(e) => setEditNoteObservation(e.target.value)}
+                      <div
+                        style={{
+                          width: '300px',
+                          backgroundColor: '#F9FAFB',
+                          padding: '10px',
+                          borderRadius: '8px',
+                          border: '1px solid #E5E7EB',
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            marginBottom: '4px',
+                          }}
+                        >
+                          <span>Total sin Descuento: </span>
+                          <strong>${editTotalSinDesc.toFixed(2)}</strong>
+                        </div>
+                        <div
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            marginBottom: '4px',
+                            color: '#B45309',
+                          }}
+                        >
+                          <span>% de descuento aplicado: </span>
+                          <strong>-${editMontoAhorrado.toFixed(2)}</strong>
+                        </div>
+                        <div
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            borderTop: '1px solid #D1D5DB',
+                            paddingTop: '4px',
+                            fontSize: '13px',
+                            fontWeight: '900',
+                          }}
+                        >
+                          <span>Precio Final: </span>
+                          <span style={{ color: '#059669' }}>
+                            ${editPrecioFinal.toFixed(2)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div style={{ marginBottom: '12px' }}>
+                      <label
+                        style={{
+                          display: 'block',
+                          fontSize: '12px',
+                          fontWeight: '700',
+                          marginBottom: '4px',
+                        }}
+                      >
+                        Observación:
+                      </label>
+                      <textarea
+                        rows="2"
+                        value={editNoteObservation}
+                        onChange={(e) => setEditNoteObservation(e.target.value)}
+                        style={{
+                          width: '100%',
+                          padding: '6px 8px',
+                          fontSize: '12px',
+                          border: '1px solid #D1D5DB',
+                          borderRadius: '6px',
+                          boxSizing: 'border-box',
+                        }}
+                      ></textarea>
+                    </div>
+
+                    <div
                       style={{
-                        width: '100%',
-                        padding: '6px 8px',
-                        fontSize: '12px',
-                        border: '1px solid #D1D5DB',
+                        backgroundColor: '#F3F4F6',
+                        padding: '10px',
                         borderRadius: '6px',
-                        boxSizing: 'border-box',
-                      }}
-                    ></textarea>
-                  </div>
-                  <div
-                    style={{
-                      backgroundColor: '#F3F4F6',
-                      padding: '10px',
-                      borderRadius: '6px',
-                      fontSize: '10px',
-                      color: '#4B5563',
-                      lineHeight: '1.4',
-                      marginBottom: '12px',
-                      textAlign: 'justify',
-                    }}
-                  >
-                    <strong>Términos y condiciones: </strong> {globalTerms}
-                  </div>
-                  <div
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      flexWrap: 'wrap',
-                      gap: '12px',
-                      borderTop: '1px solid #e5e7eb',
-                      paddingTop: '16px',
-                    }}
-                  >
-                    <button
-                      type="button"
-                      onClick={() => handleSaveEditedNote(editingNote)}
-                      disabled={loading}
-                      style={{
-                        padding: '10px 16px',
-                        backgroundColor: '#111827',
-                        color: '#ffffff',
-                        border: 'none',
-                        borderRadius: '8px',
-                        fontSize: '12px',
-                        fontWeight: '700',
-                        cursor: 'pointer',
+                        fontSize: '10px',
+                        color: '#4B5563',
+                        lineHeight: '1.4',
+                        marginBottom: '12px',
+                        textAlign: 'justify',
                       }}
                     >
-                      Guardar Cambios N.E.
-                    </button>
-                    <div style={{ display: 'flex', gap: '10px' }}>
+                      <strong>Términos y condiciones: </strong> {globalTerms}
+                    </div>
+
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        flexWrap: 'wrap',
+                        gap: '12px',
+                        borderTop: '1px solid #e5e7eb',
+                        paddingTop: '16px',
+                      }}
+                    >
                       <button
                         type="button"
-                        onClick={() => handleApproveNote(editingNote)}
+                        onClick={() => handleSaveEditedNote(editingNote)}
                         disabled={loading}
                         style={{
-                          padding: '10px 20px',
-                          backgroundColor: '#059669',
+                          padding: '10px 16px',
+                          backgroundColor: '#111827',
                           color: '#ffffff',
                           border: 'none',
                           borderRadius: '8px',
                           fontSize: '12px',
                           fontWeight: '700',
                           cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '6px',
                         }}
                       >
-                        <CheckCircle size={16} /> Aprobar Nota
+                        Guardar Cambios N.E.
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => setRejectModalNote(editingNote)}
-                        style={{
-                          padding: '10px 20px',
-                          backgroundColor: '#dc2626',
-                          color: '#ffffff',
-                          border: 'none',
-                          borderRadius: '8px',
-                          fontSize: '12px',
-                          fontWeight: '700',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '6px',
-                        }}
-                      >
-                        <XCircle size={16} /> Rechazar Nota
-                      </button>
+                      <div style={{ display: 'flex', gap: '10px' }}>
+                        <button
+                          type="button"
+                          onClick={() => handleApproveNote(editingNote)}
+                          disabled={loading}
+                          style={{
+                            padding: '10px 20px',
+                            backgroundColor: '#059669',
+                            color: '#ffffff',
+                            border: 'none',
+                            borderRadius: '8px',
+                            fontSize: '12px',
+                            fontWeight: '700',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                          }}
+                        >
+                          <CheckCircle size={16} /> Aprobar Nota
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setRejectModalNote(editingNote)}
+                          style={{
+                            padding: '10px 20px',
+                            backgroundColor: '#dc2626',
+                            color: '#ffffff',
+                            border: 'none',
+                            borderRadius: '8px',
+                            fontSize: '12px',
+                            fontWeight: '700',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                          }}
+                        >
+                          <XCircle size={16} /> Rechazar Nota
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -5367,6 +5452,7 @@ ${penaltiesHtml}
           )}
         </div>
       )}
+
       {/* PESTAÑA COBRANZA */}
       {activeTab === 'cobranza' && (
         <div style={tabContentWrapperStyle}>
@@ -5403,6 +5489,7 @@ ${penaltiesHtml}
               </button>
             ))}
           </div>
+
           {/* SUB-PESTAÑA 1: CONTROL DE N.E. */}
           {cobranzaInternalTab === 'control_ne' && (
             <>
@@ -5456,6 +5543,7 @@ ${penaltiesHtml}
                   )}
                 </div>
               )}
+
               <div
                 style={{
                   display: 'flex',
@@ -5566,6 +5654,7 @@ ${penaltiesHtml}
                   )}
                 </button>
               </div>
+
               <div
                 style={{
                   backgroundColor: '#ffffff',
@@ -5687,7 +5776,11 @@ ${penaltiesHtml}
                             <td style={{ padding: '10px 14px' }}>
                               {String(note.payment_discount) === '53.38'
                                 ? `${globalDiscount53}% ($)`
-                                : `${globalDiscount23}% (Bs)`}
+                                : String(note.payment_discount) === '23.08'
+                                ? `${globalDiscount23}% (Bs)`
+                                : String(note.payment_discount) === '10'
+                                ? `${globalDiscount10}% (Esp)`
+                                : `${globalDiscount0}% (0)`}
                             </td>
                             <td
                               style={{
@@ -5974,7 +6067,11 @@ ${penaltiesHtml}
                             <span className="admin-mobile-card-value">
                               {String(note.payment_discount) === '53.38'
                                 ? `${globalDiscount53}% ($)`
-                                : `${globalDiscount23}% (Bs)`}
+                                : String(note.payment_discount) === '23.08'
+                                ? `${globalDiscount23}% (Bs)`
+                                : String(note.payment_discount) === '10'
+                                ? `${globalDiscount10}% (Esp)`
+                                : `${globalDiscount0}% (0)`}
                             </span>
                           </div>
                           <div className="admin-mobile-card-row">
@@ -6167,6 +6264,7 @@ ${penaltiesHtml}
               </div>
             </>
           )}
+
           {/* SUB-PESTAÑA 2: HISTÓRICO DE PAGOS */}
           {cobranzaInternalTab === 'historico_pagos' && (
             <div
@@ -6240,6 +6338,7 @@ ${penaltiesHtml}
                   <Trash2 size={14} /> Borrar Historial
                 </button>
               </div>
+
               <div
                 style={{
                   backgroundColor: '#ffffff',
@@ -6573,6 +6672,7 @@ ${penaltiesHtml}
               </div>
             </div>
           )}
+
           {/* PANEL EDITABLE COBRANZA */}
           {editingNote && isCobranzaNEModal && (
             <div
@@ -6724,17 +6824,7 @@ ${penaltiesHtml}
                         value={editNotePaymentDiscount}
                         onChange={(e) => {
                           setEditNotePaymentDiscount(e.target.value);
-                          const newPct = getDiscountPercent(e.target.value);
-                          const recalculated = editNoteItems.map((item) => {
-                            const newDiscPrice =
-                              item.unit_price_usd * (1 - newPct / 100);
-                            return {
-                              ...item,
-                              discounted_unit_price_usd: newDiscPrice,
-                              total_line_usd: item.quantity * newDiscPrice,
-                            };
-                          });
-                          setEditNoteItems(recalculated);
+                          handleEditNoteRecalculatePrices(e.target.value);
                         }}
                         style={{
                           width: '100%',
@@ -6763,6 +6853,7 @@ ${penaltiesHtml}
                       </select>
                     </div>
                   </div>
+
                   <div
                     style={{
                       backgroundColor: '#ffffff',
@@ -6857,6 +6948,7 @@ ${penaltiesHtml}
                       </button>
                     </div>
                   </div>
+
                   <div
                     style={{
                       backgroundColor: '#ffffff',
@@ -6905,7 +6997,6 @@ ${penaltiesHtml}
                         </p>
                       </div>
                     </div>
-
                     {/* Desktop Table Modal Cobranza */}
                     <div
                       style={{ width: '100%', overflowX: 'auto' }}
@@ -7043,7 +7134,6 @@ ${penaltiesHtml}
                         </tbody>
                       </table>
                     </div>
-
                     {/* Mobile Cards Modal Cobranza */}
                     <div className="admin-mobile-cards">
                       {editNoteItems.length === 0 ? (
@@ -7120,6 +7210,7 @@ ${penaltiesHtml}
                         </div>
                       </div>
                     </div>
+
                     <div style={{ marginBottom: '12px' }}>
                       <label
                         style={{
@@ -7145,6 +7236,7 @@ ${penaltiesHtml}
                         }}
                       ></textarea>
                     </div>
+
                     <div
                       style={{
                         backgroundColor: '#F3F4F6',
@@ -7159,6 +7251,7 @@ ${penaltiesHtml}
                     >
                       <strong>Términos y condiciones: </strong> {globalTerms}
                     </div>
+
                     <div
                       style={{
                         display: 'flex',
@@ -7195,6 +7288,7 @@ ${penaltiesHtml}
           )}
         </div>
       )}
+
       {/* PESTAÑA VALES Y PENALIZACIÓN */}
       {activeTab === 'vales_penalizaciones' && (
         <div style={tabContentWrapperStyle}>
@@ -7232,6 +7326,7 @@ ${penaltiesHtml}
               </button>
             ))}
           </div>
+
           {valesSubTab === 'vales_lista' && (
             <div
               style={{
@@ -7656,6 +7751,7 @@ ${penaltiesHtml}
               </div>
             </div>
           )}
+
           {valesSubTab === 'asignar_vale' && (
             <div
               style={{
@@ -7778,6 +7874,7 @@ ${penaltiesHtml}
               </div>
             </div>
           )}
+
           {valesSubTab === 'penalidades_lista' && (
             <div
               style={{
@@ -8030,6 +8127,7 @@ ${penaltiesHtml}
               </div>
             </div>
           )}
+
           {valesSubTab === 'asignar_penalidad' && (
             <div
               style={{
@@ -8193,6 +8291,7 @@ ${penaltiesHtml}
               </div>
             </div>
           )}
+
           {valeVistaNote && (
             <div
               style={{
@@ -8435,6 +8534,7 @@ ${penaltiesHtml}
           )}
         </div>
       )}
+
       {/* PESTAÑA CIERRE DE CICLO QUINCENAL */}
       {activeTab === 'quincena' && (
         <div style={tabContentWrapperStyle}>
@@ -8540,6 +8640,7 @@ ${penaltiesHtml}
               </div>
             )}
           </div>
+
           {quincenaSubView === 'liquidar' ? (
             <>
               <div
@@ -8607,6 +8708,7 @@ ${penaltiesHtml}
                   </select>
                 </div>
               </div>
+
               <div
                 style={{
                   backgroundColor: '#fffbeb',
@@ -8655,6 +8757,7 @@ ${penaltiesHtml}
                   </div>
                 </div>
               </div>
+
               <div
                 style={{
                   backgroundColor: '#ffffff',
@@ -9036,6 +9139,7 @@ ${penaltiesHtml}
                   />
                 </div>
               </div>
+
               <div
                 style={{
                   backgroundColor: '#ffffff',
@@ -9367,6 +9471,7 @@ ${penaltiesHtml}
           )}
         </div>
       )}
+
       {/* MODAL DE LIQUIDACIÓN QUINCENAL */}
       {settlementModalData && (
         <div
@@ -9430,6 +9535,7 @@ ${penaltiesHtml}
                 <X size={20} />
               </button>
             </div>
+
             <div
               style={{
                 display: 'grid',
@@ -9463,6 +9569,7 @@ ${penaltiesHtml}
                 </p>
               </div>
             </div>
+
             {settlementModalData.sueldoFijoOriginal > 0 && (
               <div
                 style={{
@@ -9543,6 +9650,7 @@ ${penaltiesHtml}
                 </div>
               </div>
             )}
+
             <h3
               style={{
                 fontSize: '13px',
@@ -9659,6 +9767,7 @@ ${penaltiesHtml}
                 </tbody>
               </table>
             </div>
+
             {settlementModalData.hierarchyData?.evaluatedOrders?.length > 0 && (
               <>
                 <h3
@@ -9757,6 +9866,7 @@ ${penaltiesHtml}
                 </div>
               </>
             )}
+
             {(settlementModalData.vales.length > 0 ||
               settlementModalData.penalties?.length > 0) && (
               <>
@@ -9771,12 +9881,12 @@ ${penaltiesHtml}
                   Deducciones de Vales Aprobados y Penalizaciones por Modalidad
                   (
                   {settlementModalData.penaltyChargeMethod === '53.38'
-                    ? 'Reflejado en 53.38%'
+                    ? `Reflejado en ${globalDiscount53}%`
                     : settlementModalData.penaltyChargeMethod === '23.08'
-                    ? 'Reflejado en 23.08%'
+                    ? `Reflejado en ${globalDiscount23}%`
                     : settlementModalData.penaltyChargeMethod === '10'
-                    ? 'Reflejado en 10%'
-                    : 'Reflejado en 0%'}
+                    ? `Reflejado en ${globalDiscount10}%`
+                    : `Reflejado en ${globalDiscount0}%`}
                   ):
                 </h3>
                 <div style={{ overflowX: 'auto', marginBottom: '16px' }}>
@@ -10027,7 +10137,9 @@ ${penaltiesHtml}
               {(settlementModalData.comm23GrossUsd > 0 ||
                 settlementModalData.valesDeduction23Usd > 0 ||
                 settlementModalData.penDeduction23 > 0 ||
-                settlementModalData.hierarchyUsd23 > 0) && (
+                settlementModalData.hierarchyUsd23 > 0 ||
+                (sueldoFijoCurrency === 'BS' &&
+                  settlementModalData.sueldoFijoOriginal > 0)) && (
                 <div
                   style={{
                     background: '#f0f9ff',
@@ -10047,7 +10159,7 @@ ${penaltiesHtml}
                       fontWeight: 'bold',
                     }}
                   >
-                    N.E. {globalDiscount23}% (Ref Bs BCV Eq $)
+                    N.E. con {globalDiscount23}% (Ref Bs BCV Eq $)
                   </span>
                   <div
                     style={{
@@ -10184,7 +10296,7 @@ ${penaltiesHtml}
                       fontWeight: 'bold',
                     }}
                   >
-                    N.E. {globalDiscount10}% (Ref Bs BCV Eq $)
+                    N.E. con {globalDiscount10}% (Ref Bs BCV Eq $)
                   </span>
                   <div
                     style={{
@@ -10302,7 +10414,7 @@ ${penaltiesHtml}
                       fontWeight: 'bold',
                     }}
                   >
-                    N.E. {globalDiscount0}% (Ref Bs BCV Eq $)
+                    N.E. con {globalDiscount0}% (Ref Bs BCV Eq $)
                   </span>
                   <div
                     style={{
@@ -10510,6 +10622,7 @@ ${penaltiesHtml}
                 </option>
               </select>
             </div>
+
             <div
               style={{
                 display: 'flex',
@@ -10556,6 +10669,7 @@ ${penaltiesHtml}
           </div>
         </div>
       )}
+
       {/* Modal Historial: Ver Factura Capturada */}
       {historyInvoiceModalData && (
         <div
@@ -10643,6 +10757,7 @@ ${penaltiesHtml}
           </div>
         </div>
       )}
+
       {/* MODAL FLOTANTE DE NOTIFICACIONES DE ABONO */}
       <div
         id="notif-modal-popup"
@@ -10758,6 +10873,7 @@ ${penaltiesHtml}
           )}
         </div>
       </div>
+
       {/* MODAL VER DETALLE NOTIFICACIÓN */}
       {viewNotifModalData && (
         <div
@@ -11094,6 +11210,7 @@ ${penaltiesHtml}
           </div>
         </div>
       )}
+
       {/* MODAL EDITAR MONTO ABONADO */}
       {editAbonoModalData && (
         <div
@@ -11212,6 +11329,7 @@ ${penaltiesHtml}
           </div>
         </div>
       )}
+
       {/* MODAL DE ABONO MANUAL */}
       {abonoModalNote && (
         <div
@@ -11498,6 +11616,7 @@ ${penaltiesHtml}
           </div>
         </div>
       )}
+
       {/* MODAL DE BORRADO MASIVO */}
       {bulkDeleteModal.open && (
         <div
@@ -11672,6 +11791,7 @@ ${penaltiesHtml}
           </div>
         </div>
       )}
+
       {/* MODAL PREVISUALIZACIÓN DE IMAGEN */}
       {imagePreviewModal && (
         <div
@@ -11753,6 +11873,7 @@ ${penaltiesHtml}
           </div>
         </div>
       )}
+
       {/* MODAL RECHAZO */}
       {rejectModalNote && (
         <div
@@ -11857,6 +11978,7 @@ ${penaltiesHtml}
           </div>
         </div>
       )}
+
       {/* MODAL GPS */}
       {modalGpsNote && (
         <div
