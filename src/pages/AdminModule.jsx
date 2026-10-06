@@ -1343,7 +1343,7 @@ export default function AdminModule() {
     };
   };
 
-  // --- D. LÓGICA DE LIQUIDACIÓN CON 4 BLOQUES Y REGLA ESTRICTA ---
+  // --- D. LÓGICA DE LIQUIDACIÓN CORREGIDA (SUELDO SEPARADO) ---
   const calculateUserSettlementDetails = (
     user,
     userNotes,
@@ -1358,21 +1358,13 @@ export default function AdminModule() {
     let comm10GrossUsd = 0;
     let comm0GrossUsd = 0;
 
-    // Vales independientes se distribuyen proporcionalmente o se asignan a la modalidad principal (53.38) para el cálculo del Total USD
-    // Según requerimiento: Total USD = Neto 53.38. Por lo tanto, los vales restan aquí.
+    // Inicializar deducciones por modalidad
     let valesDeduction53Usd = 0;
     let valesDeduction23Usd = 0;
     let valesDeduction10Usd = 0;
     let valesDeduction0Usd = 0;
 
-    // Distribución simple de vales: Si no tienen modalidad asociada, asumimos que restan del bloque principal (53.38) para efectos del "Total a Pagar USD"
-    // O podemos dividirlos equitativamente. Para cumplir "Total USD = Neto 53.38", asignaremos todos los vales al bloque 53.38.
-    const totalValesAmount = userVales.reduce(
-      (acc, v) => acc + Number(v.requested_amount_usd || 0),
-      0
-    );
-    valesDeduction53Usd = totalValesAmount;
-
+    // Sumar comisiones propias por nota
     userNotes.forEach((n) => {
       const mode = String(n.payment_discount || '53.38');
       const commission = calcOrderCommissionUSD(n, user);
@@ -1382,68 +1374,72 @@ export default function AdminModule() {
       else if (mode === '0') comm0GrossUsd += commission;
     });
 
+    // Distribuir vales independientes según la modalidad de la N.E. asociada o al 53.38% por defecto
+    userVales.forEach((v) => {
+      const mode = String(v.order?.payment_discount || '53.38');
+      const valAmt = Number(v.requested_amount_usd || 0);
+      if (mode === '53.38') valesDeduction53Usd += valAmt;
+      else if (mode === '23.08') valesDeduction23Usd += valAmt;
+      else if (mode === '10') valesDeduction10Usd += valAmt;
+      else if (mode === '0') valesDeduction0Usd += valAmt;
+    });
+
     const totalPenaltiesUsd = userPenalties.reduce(
       (acc, p) => acc + Number(p.amount || 0),
       0
     );
+
     const hierarchyData = calculateHierarchyCommissionsForUser(user);
 
+    // Asignar penalizaciones a la modalidad seleccionada
     let penDeduction53 = penChargeMethod === '53.38' ? totalPenaltiesUsd : 0;
     let penDeduction23 = penChargeMethod === '23.08' ? totalPenaltiesUsd : 0;
     let penDeduction10 = penChargeMethod === '10' ? totalPenaltiesUsd : 0;
     let penDeduction0 = penChargeMethod === '0' ? totalPenaltiesUsd : 0;
 
+    // Obtener comisiones jerárquicas desglosadas
     const hierarchyUsd53 = hierarchyData.hierarchyCommissionUsd53 || 0;
     const hierarchyUsd23 = hierarchyData.hierarchyCommissionUsd23 || 0;
     const hierarchyUsd10 = hierarchyData.hierarchyCommissionUsd10 || 0;
     const hierarchyUsd0 = hierarchyData.hierarchyCommissionUsd0 || 0;
     const hierarchyUsd = hierarchyData.hierarchyCommissionUsd || 0;
 
-    // CÁLCULO NETO POR BLOQUE
+    // CÁLCULO NETO POR BLOQUE (SIN SUELDO INCLUIDO AÚN)
     const comm53NetUsd = Math.max(
       0,
       comm53GrossUsd + hierarchyUsd53 - valesDeduction53Usd - penDeduction53
     );
 
-    // Los otros bloques no tienen deducción de vales directa en este modelo estricto,
-    // pero si quisiéramos distribuir, sería aquí. Dejamos en 0 para mantener integridad del Total USD.
     const comm23NetUsd = Math.max(
       0,
       comm23GrossUsd + hierarchyUsd23 - valesDeduction23Usd - penDeduction23
     );
+
     const comm10NetUsd = Math.max(
       0,
       comm10GrossUsd + hierarchyUsd10 - valesDeduction10Usd - penDeduction10
     );
+
     const comm0NetUsd = Math.max(
       0,
       comm0GrossUsd + hierarchyUsd0 - valesDeduction0Usd - penDeduction0
     );
 
+    // SUELDO FIJO (MITAD DEL CICLO)
     const rawSueldoFijo = Number(user.sueldo_fijo_usd || 0) / 2;
     const currentRate = Number(Number(rateVal || 1).toFixed(2));
 
-    // Sueldo se suma al bloque correspondiente según moneda
-    const sueldoFijoBs = sfCurr === 'BS' ? rawSueldoFijo * currentRate : 0;
-    const sueldoFijoEquivalentUsd = rawSueldoFijo;
-
-    // TOTAL A PAGAR USD: Estrictamente el bloque 53.38 (+ sueldo si es USD)
+    // TOTAL A PAGAR USD: Bloque 53.38% + Sueldo (si es USD)
     const totalEquivalentUsd =
       sfCurr === 'USD' ? comm53NetUsd + rawSueldoFijo : comm53NetUsd;
 
-    // TOTAL A PAGAR BS: Suma de equivalentes Bs de los otros bloques (+ sueldo si es BS)
-    // Bloque 23.08
-    const base23Bs = (comm23NetUsd + hierarchyUsd23) * currentRate;
-    // Bloque 10
-    const base10Bs = (comm10NetUsd + hierarchyUsd10) * currentRate;
-    // Bloque 0
-    const base0Bs = (comm0NetUsd + hierarchyUsd0) * currentRate;
-
+    // TOTAL A PAGAR BS: (Bloques 23 + 10 + 0) * Tasa + Sueldo (si es BS convertido)
+    const baseToMultiplyByRateBs = comm23NetUsd + comm10NetUsd + comm0NetUsd;
     const totalNetoPagarBs =
-      base23Bs +
-      base10Bs +
-      base0Bs +
-      (sfCurr === 'BS' ? rawSueldoFijo * currentRate : 0);
+      Math.max(
+        0,
+        baseToMultiplyByRateBs + (sfCurr === 'BS' ? rawSueldoFijo : 0)
+      ) * currentRate;
 
     return {
       user,
@@ -1451,15 +1447,14 @@ export default function AdminModule() {
       vales: userVales,
       penalties: userPenalties,
       totalPenaltiesUsd,
-      sueldoFijoOriginal: rawSueldoFijo,
+      sueldoFijoOriginal: rawSueldoFijo, // Este es el valor correcto ($50)
       sueldoFijoCurrency: sfCurr,
       penaltyChargeMethod: penChargeMethod,
       penDeduction53,
       penDeduction23,
       penDeduction10,
       penDeduction0,
-      sueldoFijoBs,
-      sueldoFijoEquivalentUsd,
+      sueldoFijoEquivalentUsd: rawSueldoFijo,
       comm53GrossUsd,
       comm23GrossUsd,
       comm10GrossUsd,
@@ -1468,17 +1463,17 @@ export default function AdminModule() {
       valesDeduction23Usd,
       valesDeduction10Usd,
       valesDeduction0Usd,
-      comm53NetUsd,
-      comm23NetUsd,
-      comm10NetUsd,
-      comm0NetUsd,
+      comm53NetUsd, // Neto SIN sueldo
+      comm23NetUsd, // Neto SIN sueldo
+      comm10NetUsd, // Neto SIN sueldo
+      comm0NetUsd, // Neto SIN sueldo
       hierarchyUsd,
       hierarchyUsd53,
       hierarchyUsd23,
       hierarchyUsd10,
       hierarchyUsd0,
-      totalEquivalentUsd, // Este es el TOTAL USD
-      totalNetoPagarBs, // Este es el TOTAL BS
+      totalEquivalentUsd,
+      totalNetoPagarBs,
       hierarchyData,
     };
   };
@@ -9377,13 +9372,14 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
               border: '2px solid #111827',
               borderRadius: '12px',
               width: '100%',
-              maxWidth: '750px',
+              maxWidth: '800px',
               maxHeight: '90vh',
               overflowY: 'auto',
               padding: '24px',
               boxShadow: '0 10px 40px rgba(0,0,0,0.3)',
             }}
           >
+            {/* ENCABEZADO FACTURA */}
             <div
               style={{
                 display: 'flex',
@@ -9419,6 +9415,8 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                 <X size={20} />
               </button>
             </div>
+
+            {/* DATOS GENERALES */}
             <div
               style={{
                 display: 'grid',
@@ -9452,6 +9450,8 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                 </p>
               </div>
             </div>
+
+            {/* CONFIGURACIÓN SUELDO FIJO */}
             {settlementModalData.sueldoFijoOriginal > 0 && (
               <div
                 style={{
@@ -9506,6 +9506,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                     onChange={(e) => {
                       const newCurr = e.target.value;
                       setSueldoFijoCurrency(newCurr);
+                      // Recalcular detalles al cambiar moneda
                       const updatedDetails = calculateUserSettlementDetails(
                         settlementModalData.user,
                         settlementModalData.notes,
@@ -9532,6 +9533,8 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                 </div>
               </div>
             )}
+
+            {/* TABLAS DETALLADAS (Notas Propias y Jerarquía) - Se mantienen igual que antes */}
             <h3
               style={{
                 fontSize: '13px',
@@ -9648,6 +9651,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                 </tbody>
               </table>
             </div>
+
             {settlementModalData.hierarchyData?.evaluatedOrders?.length > 0 && (
               <>
                 <h3
@@ -9746,6 +9750,8 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                 </div>
               </>
             )}
+
+            {/* DEDUCCIONES (Vales y Penalizaciones) */}
             {(settlementModalData.vales.length > 0 ||
               settlementModalData.penalties?.length > 0) && (
               <>
@@ -9757,16 +9763,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                     color: '#dc2626',
                   }}
                 >
-                  Deducciones de Vales Aprobados y Penalizaciones por Modalidad
-                  (
-                  {settlementModalData.penaltyChargeMethod === '53.38'
-                    ? `Reflejado en ${globalDiscount53}%`
-                    : settlementModalData.penaltyChargeMethod === '23.08'
-                    ? `Reflejado en ${globalDiscount23}%`
-                    : settlementModalData.penaltyChargeMethod === '10'
-                    ? `Reflejado en ${globalDiscount10}%`
-                    : `Reflejado en ${globalDiscount0}%`}
-                  ):
+                  Deducciones de Vales Aprobados y Penalizaciones por Modalidad:
                 </h3>
                 <div style={{ overflowX: 'auto', marginBottom: '16px' }}>
                   <table
@@ -9785,11 +9782,9 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                         }}
                       >
                         <th style={{ padding: '8px' }}>Fecha</th>
-                        <th style={{ padding: '8px' }}>
-                          Tipo / Ref N.E. Respaldo
-                        </th>
+                        <th style={{ padding: '8px' }}>Tipo / Ref N.E.</th>
                         <th style={{ padding: '8px', textAlign: 'center' }}>
-                          Modalidad / Razón
+                          Razón
                         </th>
                         <th style={{ padding: '8px', textAlign: 'right' }}>
                           Monto Deducido ($)
@@ -9797,50 +9792,44 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                       </tr>
                     </thead>
                     <tbody>
-                      {settlementModalData.vales.map((v) => {
-                        return (
-                          <tr
-                            key={`vale-${v.id}`}
-                            style={{ borderBottom: '1px solid #e5e7eb' }}
+                      {settlementModalData.vales.map((v) => (
+                        <tr
+                          key={`vale-${v.id}`}
+                          style={{ borderBottom: '1px solid #e5e7eb' }}
+                        >
+                          <td style={{ padding: '8px' }}>
+                            {new Date(v.created_at).toLocaleDateString()}
+                          </td>
+                          <td style={{ padding: '8px', fontWeight: 'bold' }}>
+                            Vale Independiente
+                          </td>
+                          <td
+                            style={{
+                              padding: '8px',
+                              textAlign: 'center',
+                              fontWeight: 'bold',
+                            }}
                           >
-                            <td style={{ padding: '8px' }}>
-                              {new Date(v.created_at).toLocaleDateString()}
-                            </td>
-                            <td style={{ padding: '8px', fontWeight: 'bold' }}>
-                              Vale Independiente
-                            </td>
-                            <td
-                              style={{
-                                padding: '8px',
-                                textAlign: 'center',
-                                fontWeight: 'bold',
-                              }}
-                            >
-                              Asignación Directa
-                            </td>
-                            <td
-                              style={{
-                                padding: '8px',
-                                textAlign: 'right',
-                                fontWeight: 'bold',
-                                color: '#dc2626',
-                              }}
-                            >
-                              -${Number(v.requested_amount_usd).toFixed(2)}
-                            </td>
-                          </tr>
-                        );
-                      })}
+                            Asignación Directa
+                          </td>
+                          <td
+                            style={{
+                              padding: '8px',
+                              textAlign: 'right',
+                              fontWeight: 'bold',
+                              color: '#dc2626',
+                            }}
+                          >
+                            -${Number(v.requested_amount_usd).toFixed(2)}
+                          </td>
+                        </tr>
+                      ))}
                       {settlementModalData.penalties?.map((pen) => {
                         const matchedOrd = allOrdersList.find(
                           (o) => String(o.id) === String(pen.order_id)
                         );
                         const neNum = matchedOrd?.transaction_number
                           ? `#${matchedOrd.transaction_number}`
-                          : pen.linked_order?.transaction_number
-                          ? `#${pen.linked_order.transaction_number}`
-                          : pen.order_id
-                          ? `#${String(pen.order_id).substring(0, 8)}`
                           : 'N/A';
                         return (
                           <tr
@@ -9853,12 +9842,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                             <td style={{ padding: '8px', fontWeight: 'bold' }}>
                               Penalización - N.E. {neNum}
                             </td>
-                            <td
-                              style={{
-                                padding: '8px',
-                                textAlign: 'center',
-                              }}
-                            >
+                            <td style={{ padding: '8px', textAlign: 'center' }}>
                               {pen.reason || 'Cargo por incumplimiento'}
                             </td>
                             <td
@@ -9879,6 +9863,8 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                 </div>
               </>
             )}
+
+            {/* D. 4 CUADROS INDEPENDIENTES CON OPERACIONES CORRECTAS */}
             <div
               style={{
                 display: 'grid',
@@ -9887,80 +9873,82 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                 marginBottom: '16px',
               }}
             >
-              {/* 1. 53.38% - BASE PARA TOTAL USD */}
-              <div
-                style={{
-                  background: '#f0fdf4',
-                  border: '1px solid #bbf7d0',
-                  padding: '12px',
-                  borderRadius: '8px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '4px',
-                  fontSize: '12px',
-                }}
-              >
-                <span
-                  style={{
-                    fontSize: '11px',
-                    color: '#166534',
-                    fontWeight: 'bold',
-                  }}
-                >
-                  N.E. con {globalDiscount53}% (Pago $)
-                </span>
+              {/* 1. BLOQUE 53.38% - PAGO $ */}
+              {(Number(settlementModalData.comm53GrossUsd) > 0 ||
+                Number(settlementModalData.hierarchyUsd53) > 0 ||
+                Number(settlementModalData.valesDeduction53Usd) > 0 ||
+                Number(settlementModalData.penDeduction53) > 0 ||
+                (sueldoFijoCurrency === 'USD' &&
+                  Number(settlementModalData.sueldoFijoOriginal) > 0)) && (
                 <div
                   style={{
-                    color: '#15803d',
+                    background: '#f0fdf4',
+                    border: '1px solid #bbf7d0',
+                    padding: '12px',
+                    borderRadius: '8px',
                     display: 'flex',
-                    justifyContent: 'space-between',
+                    flexDirection: 'column',
+                    gap: '4px',
+                    fontSize: '12px',
                   }}
                 >
-                  <span>Bruto Com. {globalDiscount53}%: </span>
-                  <strong>
-                    +${settlementModalData.comm53GrossUsd.toFixed(2)}
-                  </strong>
-                </div>
-                <div
-                  style={{
-                    color: '#1d4ed8',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                  }}
-                >
-                  <span>Comisión Jerarquía ({globalDiscount53}%): </span>
-                  <strong>
-                    +${(settlementModalData.hierarchyUsd53 || 0).toFixed(2)}
-                  </strong>
-                </div>
-                {sueldoFijoCurrency === 'USD' &&
-                  settlementModalData.sueldoFijoOriginal > 0 && (
-                    <div
-                      style={{
-                        color: '#15803d',
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                      }}
-                    >
-                      <span>Sueldo Fijo (USD): </span>
-                      <strong>
-                        +${settlementModalData.sueldoFijoOriginal.toFixed(2)}
-                      </strong>
-                    </div>
-                  )}
-                <div
-                  style={{
-                    color: '#b91c1c',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                  }}
-                >
-                  <span>Vales (Deducción Total): </span>
-                  <strong>
-                    -${settlementModalData.valesDeduction53Usd.toFixed(2)}
-                  </strong>
-                </div>
-                {settlementModalData.penDeduction53 > 0 && (
+                  <span
+                    style={{
+                      fontSize: '11px',
+                      color: '#166534',
+                      fontWeight: 'bold',
+                    }}
+                  >
+                    N.E. con {globalDiscount53}% (Pago $)
+                  </span>
+                  <div
+                    style={{
+                      color: '#15803d',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                    }}
+                  >
+                    <span>Bruto Com. {globalDiscount53}%: </span>
+                    <strong>
+                      +${Number(settlementModalData.comm53GrossUsd).toFixed(2)}
+                    </strong>
+                  </div>
+                  <div
+                    style={{
+                      color: '#1d4ed8',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                    }}
+                  >
+                    <span>Comisión Jerarquía ({globalDiscount53}%): </span>
+                    <strong>
+                      +$
+                      {Number(settlementModalData.hierarchyUsd53 || 0).toFixed(
+                        2
+                      )}
+                    </strong>
+                  </div>
+
+                  {/* SUELDO EN USD: Se suma aquí visualmente */}
+                  {sueldoFijoCurrency === 'USD' &&
+                    Number(settlementModalData.sueldoFijoOriginal) > 0 && (
+                      <div
+                        style={{
+                          color: '#15803d',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                        }}
+                      >
+                        <span>Sueldo Fijo (USD): </span>
+                        <strong>
+                          +$
+                          {Number(
+                            settlementModalData.sueldoFijoOriginal
+                          ).toFixed(2)}
+                        </strong>
+                      </div>
+                    )}
+
                   <div
                     style={{
                       color: '#b91c1c',
@@ -9968,316 +9956,472 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                       justifyContent: 'space-between',
                     }}
                   >
-                    <span>Penalizaciones: </span>
+                    <span>Vales (Deducción Total): </span>
                     <strong>
-                      -${settlementModalData.penDeduction53.toFixed(2)}
+                      -$
+                      {Number(settlementModalData.valesDeduction53Usd).toFixed(
+                        2
+                      )}
                     </strong>
                   </div>
-                )}
-                <div
-                  style={{
-                    fontSize: '15px',
-                    fontWeight: '900',
-                    color: '#15803d',
-                    borderTop: '1px solid #bbf7d0',
-                    marginTop: '4px',
-                    paddingTop: '4px',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                  }}
-                >
-                  <span>Neto Final ($): </span>
-                  <span>
-                    $
-                    {(
-                      settlementModalData.comm53NetUsd +
-                      (sueldoFijoCurrency === 'USD' &&
-                      settlementModalData.sueldoFijoOriginal > 0
-                        ? settlementModalData.sueldoFijoOriginal
-                        : 0)
-                    ).toFixed(2)}{' '}
-                    USD
-                  </span>
-                </div>
-              </div>
+                  {Number(settlementModalData.penDeduction53) > 0 && (
+                    <div
+                      style={{
+                        color: '#b91c1c',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                      }}
+                    >
+                      <span>Penalizaciones: </span>
+                      <strong>
+                        -$
+                        {Number(settlementModalData.penDeduction53).toFixed(2)}
+                      </strong>
+                    </div>
+                  )}
 
-              {/* 2. 23.08% - PARTE DE TOTAL BS */}
-              <div
-                style={{
-                  background: '#f0f9ff',
-                  border: '1px solid #bae6fd',
-                  padding: '12px',
-                  borderRadius: '8px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '4px',
-                  fontSize: '12px',
-                }}
-              >
-                <span
-                  style={{
-                    fontSize: '11px',
-                    color: '#0369a1',
-                    fontWeight: 'bold',
-                  }}
-                >
-                  N.E. con {globalDiscount23}% (Ref Bs BCV Eq $)
-                </span>
-                <div
-                  style={{
-                    color: '#0284c7',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                  }}
-                >
-                  <span>Bruto Com. {globalDiscount23}%: </span>
-                  <strong>
-                    +${settlementModalData.comm23GrossUsd.toFixed(2)}
-                  </strong>
-                </div>
-                <div
-                  style={{
-                    color: '#1d4ed8',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                  }}
-                >
-                  <span>Comisión Jerarquía ({globalDiscount23}%): </span>
-                  <strong>
-                    +${(settlementModalData.hierarchyUsd23 || 0).toFixed(2)}
-                  </strong>
-                </div>
-                {settlementModalData.sueldoFijoOriginal > 0 && (
+                  {/* NETO FINAL: comm53NetUsd (comisiones) + sueldoFijoOriginal (si aplica) */}
                   <div
                     style={{
+                      fontSize: '15px',
+                      fontWeight: '900',
+                      color: '#15803d',
+                      borderTop: '1px solid #bbf7d0',
+                      marginTop: '4px',
+                      paddingTop: '4px',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                    }}
+                  >
+                    <span>Neto Final ($): </span>
+                    <span>
+                      $
+                      {(
+                        Number(settlementModalData.comm53NetUsd) +
+                        (sueldoFijoCurrency === 'USD'
+                          ? Number(settlementModalData.sueldoFijoOriginal)
+                          : 0)
+                      ).toFixed(2)}{' '}
+                      USD
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* 2. BLOQUE 23.08% - REF BS BCV EQ $ */}
+              {(Number(settlementModalData.comm23GrossUsd) > 0 ||
+                Number(settlementModalData.hierarchyUsd23) > 0 ||
+                Number(settlementModalData.valesDeduction23Usd) > 0 ||
+                Number(settlementModalData.penDeduction23) > 0 ||
+                (sueldoFijoCurrency === 'BS' &&
+                  Number(settlementModalData.sueldoFijoOriginal) > 0)) && (
+                <div
+                  style={{
+                    background: '#f0f9ff',
+                    border: '1px solid #bae6fd',
+                    padding: '12px',
+                    borderRadius: '8px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '4px',
+                    fontSize: '12px',
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: '11px',
+                      color: '#0369a1',
+                      fontWeight: 'bold',
+                    }}
+                  >
+                    N.E. con {globalDiscount23}% (Ref Bs BCV Eq $)
+                  </span>
+                  <div
+                    style={{
+                      color: '#0284c7',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                    }}
+                  >
+                    <span>Bruto Com. {globalDiscount23}%: </span>
+                    <strong>
+                      +${Number(settlementModalData.comm23GrossUsd).toFixed(2)}
+                    </strong>
+                  </div>
+                  <div
+                    style={{
+                      color: '#1d4ed8',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                    }}
+                  >
+                    <span>Comisión Jerarquía ({globalDiscount23}%): </span>
+                    <strong>
+                      +$
+                      {Number(settlementModalData.hierarchyUsd23 || 0).toFixed(
+                        2
+                      )}
+                    </strong>
+                  </div>
+
+                  {/* SUELDO EN BS: Se suma aquí visualmente */}
+                  {sueldoFijoCurrency === 'BS' &&
+                    Number(settlementModalData.sueldoFijoOriginal) > 0 && (
+                      <div
+                        style={{
+                          color: '#0369a1',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                        }}
+                      >
+                        <span>Sueldo Fijo Eq. (BS): </span>
+                        <strong>
+                          +$
+                          {Number(
+                            settlementModalData.sueldoFijoOriginal
+                          ).toFixed(2)}{' '}
+                          USD
+                        </strong>
+                      </div>
+                    )}
+
+                  <div
+                    style={{
+                      color: '#b91c1c',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                    }}
+                  >
+                    <span>Vales {globalDiscount23}%: </span>
+                    <strong>
+                      -$
+                      {Number(settlementModalData.valesDeduction23Usd).toFixed(
+                        2
+                      )}
+                    </strong>
+                  </div>
+                  {Number(settlementModalData.penDeduction23) > 0 && (
+                    <div
+                      style={{
+                        color: '#b91c1c',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                      }}
+                    >
+                      <span>Penalizaciones: </span>
+                      <strong>
+                        -$
+                        {Number(settlementModalData.penDeduction23).toFixed(2)}
+                      </strong>
+                    </div>
+                  )}
+
+                  {/* NETO EQ: comm23NetUsd (comisiones) + sueldoFijoOriginal (si aplica) */}
+                  <div
+                    style={{
+                      fontSize: '15px',
+                      fontWeight: '900',
+                      color: '#0369a1',
+                      borderTop: '1px solid #bae6fd',
+                      marginTop: '4px',
+                      paddingTop: '4px',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                    }}
+                  >
+                    <span>Neto Eq ($): </span>
+                    <span>
+                      $
+                      {(
+                        Number(settlementModalData.comm23NetUsd) +
+                        (sueldoFijoCurrency === 'BS'
+                          ? Number(settlementModalData.sueldoFijoOriginal)
+                          : 0)
+                      ).toFixed(2)}{' '}
+                      USD
+                    </span>
+                  </div>
+
+                  {/* EQUIVALENTE EN BS: Multiplica el Neto ya corregido por la tasa */}
+                  <div
+                    style={{
+                      marginTop: '4px',
+                      paddingTop: '4px',
+                      borderTop: '1px dashed #bae6fd',
+                      fontSize: '11px',
+                      fontWeight: 'bold',
                       color: '#0369a1',
                       display: 'flex',
                       justifyContent: 'space-between',
                     }}
                   >
-                    <span>Sueldo Fijo Eq. (BS): </span>
+                    <span>
+                      Equivalente en Bs (Tasa {Number(bcvRateUsd).toFixed(2)}):
+                    </span>
+                    <span>
+                      {formatBs(
+                        (Number(settlementModalData.comm23NetUsd) +
+                          (sueldoFijoCurrency === 'BS'
+                            ? Number(settlementModalData.sueldoFijoOriginal)
+                            : 0)) *
+                          Number(bcvRateUsd)
+                      )}{' '}
+                      Bs.
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* 3. BLOQUE 10% - REF BS BCV EQ $ */}
+              {(Number(settlementModalData.comm10GrossUsd) > 0 ||
+                Number(settlementModalData.hierarchyUsd10) > 0 ||
+                Number(settlementModalData.valesDeduction10Usd) > 0 ||
+                Number(settlementModalData.penDeduction10) > 0) && (
+                <div
+                  style={{
+                    background: '#fffbeb',
+                    border: '1px solid #fde68a',
+                    padding: '12px',
+                    borderRadius: '8px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '4px',
+                    fontSize: '12px',
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: '11px',
+                      color: '#92400e',
+                      fontWeight: 'bold',
+                    }}
+                  >
+                    N.E. con {globalDiscount10}% (Ref Bs BCV Eq $)
+                  </span>
+                  <div
+                    style={{
+                      color: '#d97706',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                    }}
+                  >
+                    <span>Bruto Com. {globalDiscount10}%: </span>
                     <strong>
-                      +
-                      {sueldoFijoCurrency === 'BS'
-                        ? `$${settlementModalData.sueldoFijoOriginal.toFixed(
-                            2
-                          )} USD`
-                        : '$0.00 USD'}
+                      +${Number(settlementModalData.comm10GrossUsd).toFixed(2)}
                     </strong>
                   </div>
-                )}
-                <div
-                  style={{
-                    fontSize: '15px',
-                    fontWeight: '900',
-                    color: '#0369a1',
-                    borderTop: '1px solid #bae6fd',
-                    marginTop: '4px',
-                    paddingTop: '4px',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                  }}
-                >
-                  <span>Neto Eq ($): </span>
-                  <span>
-                    ${settlementModalData.comm23NetUsd.toFixed(2)} USD
-                  </span>
+                  <div
+                    style={{
+                      color: '#1d4ed8',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                    }}
+                  >
+                    <span>Comisión Jerarquía ({globalDiscount10}%): </span>
+                    <strong>
+                      +$
+                      {Number(settlementModalData.hierarchyUsd10 || 0).toFixed(
+                        2
+                      )}
+                    </strong>
+                  </div>
+                  <div
+                    style={{
+                      color: '#b91c1c',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                    }}
+                  >
+                    <span>Vales {globalDiscount10}%: </span>
+                    <strong>
+                      -$
+                      {Number(settlementModalData.valesDeduction10Usd).toFixed(
+                        2
+                      )}
+                    </strong>
+                  </div>
+                  {Number(settlementModalData.penDeduction10) > 0 && (
+                    <div
+                      style={{
+                        color: '#b91c1c',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                      }}
+                    >
+                      <span>Penalizaciones: </span>
+                      <strong>
+                        -$
+                        {Number(settlementModalData.penDeduction10).toFixed(2)}
+                      </strong>
+                    </div>
+                  )}
+                  <div
+                    style={{
+                      fontSize: '15px',
+                      fontWeight: '900',
+                      color: '#92400e',
+                      borderTop: '1px solid #fde68a',
+                      marginTop: '4px',
+                      paddingTop: '4px',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                    }}
+                  >
+                    <span>Neto Eq ($): </span>
+                    <span>
+                      ${Number(settlementModalData.comm10NetUsd).toFixed(2)} USD
+                    </span>
+                  </div>
+                  <div
+                    style={{
+                      marginTop: '4px',
+                      paddingTop: '4px',
+                      borderTop: '1px dashed #fde68a',
+                      fontSize: '11px',
+                      fontWeight: 'bold',
+                      color: '#92400e',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                    }}
+                  >
+                    <span>
+                      Equivalente en Bs (Tasa {Number(bcvRateUsd).toFixed(2)}):
+                    </span>
+                    <span>
+                      {formatBs(
+                        Number(settlementModalData.comm10NetUsd) *
+                          Number(bcvRateUsd)
+                      )}{' '}
+                      Bs.
+                    </span>
+                  </div>
                 </div>
-                <div
-                  style={{
-                    marginTop: '4px',
-                    paddingTop: '4px',
-                    borderTop: '1px dashed #bae6fd',
-                    fontSize: '11px',
-                    fontWeight: 'bold',
-                    color: '#0369a1',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                  }}
-                >
-                  <span>
-                    Equivalente en Bs (Tasa {Number(bcvRateUsd).toFixed(2)}):
-                  </span>
-                  <span>
-                    {formatBs(
-                      settlementModalData.comm23NetUsd * Number(bcvRateUsd)
-                    )}{' '}
-                    Bs.
-                  </span>
-                </div>
-              </div>
+              )}
 
-              {/* 3. 10% - PARTE DE TOTAL BS */}
-              <div
-                style={{
-                  background: '#fffbeb',
-                  border: '1px solid #fde68a',
-                  padding: '12px',
-                  borderRadius: '8px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '4px',
-                  fontSize: '12px',
-                }}
-              >
-                <span
-                  style={{
-                    fontSize: '11px',
-                    color: '#92400e',
-                    fontWeight: 'bold',
-                  }}
-                >
-                  N.E. con {globalDiscount10}% (Ref Bs BCV Eq $)
-                </span>
+              {/* 4. BLOQUE 0% - REF BS BCV EQ $ */}
+              {(Number(settlementModalData.comm0GrossUsd) > 0 ||
+                Number(settlementModalData.hierarchyUsd0) > 0 ||
+                Number(settlementModalData.valesDeduction0Usd) > 0 ||
+                Number(settlementModalData.penDeduction0) > 0) && (
                 <div
                   style={{
-                    color: '#d97706',
+                    background: '#f3f4f6',
+                    border: '1px solid #e5e7eb',
+                    padding: '12px',
+                    borderRadius: '8px',
                     display: 'flex',
-                    justifyContent: 'space-between',
+                    flexDirection: 'column',
+                    gap: '4px',
+                    fontSize: '12px',
                   }}
                 >
-                  <span>Bruto Com. {globalDiscount10}%: </span>
-                  <strong>
-                    +${settlementModalData.comm10GrossUsd.toFixed(2)}
-                  </strong>
-                </div>
-                <div
-                  style={{
-                    color: '#1d4ed8',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                  }}
-                >
-                  <span>Comisión Jerarquía ({globalDiscount10}%): </span>
-                  <strong>
-                    +${(settlementModalData.hierarchyUsd10 || 0).toFixed(2)}
-                  </strong>
-                </div>
-                <div
-                  style={{
-                    fontSize: '15px',
-                    fontWeight: '900',
-                    color: '#92400e',
-                    borderTop: '1px solid #fde68a',
-                    marginTop: '4px',
-                    paddingTop: '4px',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                  }}
-                >
-                  <span>Neto Eq ($): </span>
-                  <span>
-                    ${settlementModalData.comm10NetUsd.toFixed(2)} USD
+                  <span
+                    style={{
+                      fontSize: '11px',
+                      color: '#374151',
+                      fontWeight: 'bold',
+                    }}
+                  >
+                    N.E. con {globalDiscount0}% (Ref Bs BCV Eq $)
                   </span>
+                  <div
+                    style={{
+                      color: '#4b5563',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                    }}
+                  >
+                    <span>Bruto Com. {globalDiscount0}%: </span>
+                    <strong>
+                      +${Number(settlementModalData.comm0GrossUsd).toFixed(2)}
+                    </strong>
+                  </div>
+                  <div
+                    style={{
+                      color: '#1d4ed8',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                    }}
+                  >
+                    <span>Comisión Jerarquía ({globalDiscount0}%): </span>
+                    <strong>
+                      +$
+                      {Number(settlementModalData.hierarchyUsd0 || 0).toFixed(
+                        2
+                      )}
+                    </strong>
+                  </div>
+                  <div
+                    style={{
+                      color: '#b91c1c',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                    }}
+                  >
+                    <span>Vales {globalDiscount0}%: </span>
+                    <strong>
+                      -$
+                      {Number(settlementModalData.valesDeduction0Usd).toFixed(
+                        2
+                      )}
+                    </strong>
+                  </div>
+                  {Number(settlementModalData.penDeduction0) > 0 && (
+                    <div
+                      style={{
+                        color: '#b91c1c',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                      }}
+                    >
+                      <span>Penalizaciones: </span>
+                      <strong>
+                        -${Number(settlementModalData.penDeduction0).toFixed(2)}
+                      </strong>
+                    </div>
+                  )}
+                  <div
+                    style={{
+                      fontSize: '15px',
+                      fontWeight: '900',
+                      color: '#374151',
+                      borderTop: '1px solid #e5e7eb',
+                      marginTop: '4px',
+                      paddingTop: '4px',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                    }}
+                  >
+                    <span>Neto Eq ($): </span>
+                    <span>
+                      ${Number(settlementModalData.comm0NetUsd).toFixed(2)} USD
+                    </span>
+                  </div>
+                  <div
+                    style={{
+                      marginTop: '4px',
+                      paddingTop: '4px',
+                      borderTop: '1px dashed #e5e7eb',
+                      fontSize: '11px',
+                      fontWeight: 'bold',
+                      color: '#374151',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                    }}
+                  >
+                    <span>
+                      Equivalente en Bs (Tasa {Number(bcvRateUsd).toFixed(2)}):
+                    </span>
+                    <span>
+                      {formatBs(
+                        Number(settlementModalData.comm0NetUsd) *
+                          Number(bcvRateUsd)
+                      )}{' '}
+                      Bs.
+                    </span>
+                  </div>
                 </div>
-                <div
-                  style={{
-                    marginTop: '4px',
-                    paddingTop: '4px',
-                    borderTop: '1px dashed #fde68a',
-                    fontSize: '11px',
-                    fontWeight: 'bold',
-                    color: '#92400e',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                  }}
-                >
-                  <span>
-                    Equivalente en Bs (Tasa {Number(bcvRateUsd).toFixed(2)}):
-                  </span>
-                  <span>
-                    {formatBs(
-                      settlementModalData.comm10NetUsd * Number(bcvRateUsd)
-                    )}{' '}
-                    Bs.
-                  </span>
-                </div>
-              </div>
-
-              {/* 4. 0% - PARTE DE TOTAL BS */}
-              <div
-                style={{
-                  background: '#f3f4f6',
-                  border: '1px solid #e5e7eb',
-                  padding: '12px',
-                  borderRadius: '8px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '4px',
-                  fontSize: '12px',
-                }}
-              >
-                <span
-                  style={{
-                    fontSize: '11px',
-                    color: '#374151',
-                    fontWeight: 'bold',
-                  }}
-                >
-                  N.E. con {globalDiscount0}% (Ref Bs BCV Eq $)
-                </span>
-                <div
-                  style={{
-                    color: '#4b5563',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                  }}
-                >
-                  <span>Bruto Com. {globalDiscount0}%: </span>
-                  <strong>
-                    +${settlementModalData.comm0GrossUsd.toFixed(2)}
-                  </strong>
-                </div>
-                <div
-                  style={{
-                    color: '#1d4ed8',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                  }}
-                >
-                  <span>Comisión Jerarquía ({globalDiscount0}%): </span>
-                  <strong>
-                    +${(settlementModalData.hierarchyUsd0 || 0).toFixed(2)}
-                  </strong>
-                </div>
-                <div
-                  style={{
-                    fontSize: '15px',
-                    fontWeight: '900',
-                    color: '#374151',
-                    borderTop: '1px solid #e5e7eb',
-                    marginTop: '4px',
-                    paddingTop: '4px',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                  }}
-                >
-                  <span>Neto Eq ($): </span>
-                  <span>${settlementModalData.comm0NetUsd.toFixed(2)} USD</span>
-                </div>
-                <div
-                  style={{
-                    marginTop: '4px',
-                    paddingTop: '4px',
-                    borderTop: '1px dashed #e5e7eb',
-                    fontSize: '11px',
-                    fontWeight: 'bold',
-                    color: '#374151',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                  }}
-                >
-                  <span>
-                    Equivalente en Bs (Tasa {Number(bcvRateUsd).toFixed(2)}):
-                  </span>
-                  <span>
-                    {formatBs(
-                      settlementModalData.comm0NetUsd * Number(bcvRateUsd)
-                    )}{' '}
-                    Bs.
-                  </span>
-                </div>
-              </div>
+              )}
             </div>
 
             {/* TOTALES FINALES ESTRICTOS */}
@@ -10307,7 +10451,8 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
               >
                 <span>TOTAL A PAGAR ($): </span>
                 <span>
-                  ${settlementModalData.totalEquivalentUsd.toFixed(2)} USD
+                  ${Number(settlementModalData.totalEquivalentUsd).toFixed(2)}{' '}
+                  USD
                 </span>
               </div>
               <div
@@ -10326,6 +10471,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
               </div>
             </div>
 
+            {/* SELECTOR DE MÉTODO DE PENALIZACIÓN */}
             <div
               style={{
                 background: '#fef2f2',
@@ -10395,6 +10541,8 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                 </option>
               </select>
             </div>
+
+            {/* BOTONES DE ACCIÓN */}
             <div
               style={{
                 display: 'flex',
