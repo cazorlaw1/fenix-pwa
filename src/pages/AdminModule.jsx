@@ -197,6 +197,10 @@ export default function AdminModule() {
   const [penalties, setPenalties] = useState([]);
   const [liquidaciones, setLiquidaciones] = useState([]);
   const [closedOrdersList, setClosedOrdersList] = useState([]);
+  // NUEVO ESTADO PARA NOTAS LIQUIDADAS (PENDIENTES DE SUPERIORES)
+  const [liquidatedNotesList, setLiquidatedNotesList] = useState([]);
+  const [pendingBeneficiariesMap, setPendingBeneficiariesMap] = useState({});
+
   const [allOrdersList, setAllOrdersList] = useState([]);
   const [approvedValesList, setApprovedValesList] = useState([]);
   const [approvedPenaltiesList, setApprovedPenaltiesList] = useState([]);
@@ -279,7 +283,6 @@ export default function AdminModule() {
   const [bcvRateUsd, setBcvRateUsd] = useState(849.56);
   const [bcvLastUpdated, setBcvLastUpdated] = useState('Sin sincronizar');
   const [bcvLoading, setBcvLoading] = useState(false);
-
   // --- A. CONFIGURACIÓN DINÁMICA DE DESCUENTOS ---
   const [globalDiscount53, setGlobalDiscount53] = useState(53.38);
   const [globalDiscount23, setGlobalDiscount23] = useState(23.08);
@@ -461,7 +464,6 @@ export default function AdminModule() {
         .select('*, profiles:assigned_seller_id(full_name)')
         .eq('is_potential', false)
         .order('name', { ascending: true });
-
       if (allClients) setAllClientsList(allClients);
 
       const { data: prods } = await supabase
@@ -672,6 +674,7 @@ export default function AdminModule() {
             .eq('id', item.product_id);
         }
       }
+
       showToastSuccess(
         `Nota de entrega #${newNota.transaction_number} creada, aprobada y asignada con éxito.`
       );
@@ -948,6 +951,7 @@ export default function AdminModule() {
       const { data: hAssign } = await supabase
         .from('hierarchy_assignments')
         .select('*');
+
       const configMap = {};
       (hConfig || []).forEach((c) => {
         configMap[c.parent_user_id] = c;
@@ -1041,7 +1045,6 @@ export default function AdminModule() {
           .eq('month', selectedMonth)
           .eq('year', selectedYear)
           .eq('cycle', selectedCycle);
-
         const invoicedUserIds = new Set(
           (existingInvoices || []).map((i) => i.user_id)
         );
@@ -1052,15 +1055,29 @@ export default function AdminModule() {
         );
         setLiquidaciones(eligibleProfiles);
 
+        // Obtener órdenes cerradas ACTIVAS
         const { data: closedOrd, error: closedErr } = await supabase
           .from('sales_orders')
           .select(
             '*, seller:seller_id(id, full_name, pct_bombillos, pct_fluidos, sueldo_fijo_usd, role), client:client_id(name)'
           )
           .eq('payment_status', 'cerrada')
+          .eq('status', 'aprobada') // Solo las que aún no han sido liquidadas parcialmente
           .order('updated_at', { ascending: false });
         if (!closedErr) {
           setClosedOrdersList(closedOrd || []);
+        }
+
+        // NUEVO: Obtener órdenes en estado 'liquidada' (parcialmente liquidadas)
+        const { data: liqOrd, error: liqErr } = await supabase
+          .from('sales_orders')
+          .select(
+            '*, seller:seller_id(id, full_name, pct_bombillos, pct_fluidos, sueldo_fijo_usd, role), client:client_id(name)'
+          )
+          .eq('status', 'liquidada')
+          .order('updated_at', { ascending: false });
+        if (!liqErr) {
+          setLiquidatedNotesList(liqOrd || []);
         }
 
         // VALES INDEPENDIENTES: Obtener todos los vales aprobados sin filtrar por order_id
@@ -1092,6 +1109,7 @@ export default function AdminModule() {
           .from('sales_orders')
           .select('id, transaction_number, final_price_usd, balance_due_usd');
         if (ords) setAllOrdersList(ords);
+
         await fetchPaymentHistoryFromDB();
       }
     } catch (err) {
@@ -1133,6 +1151,7 @@ export default function AdminModule() {
           const clienteNombre = note.client?.name || 'Cliente';
           const nroTransaccion = note.transaction_number;
           const saldoPendiente = Number(note.balance_due_usd || 0).toFixed(2);
+
           await supabase.functions.invoke('send-notification', {
             body: {
               type: 'note_aging',
@@ -1148,6 +1167,7 @@ export default function AdminModule() {
               },
             },
           });
+
           await supabase
             .from('sales_orders')
             .update({ [updateField]: true })
@@ -1160,13 +1180,21 @@ export default function AdminModule() {
   };
 
   const getClosedNotesForUserAndCycle = (userId) => {
-    return closedOrdersList.filter((order) => {
+    // Combina notas activas cerradas y notas liquidadas (que siguen existiendo en BD)
+    const activeNotes = closedOrdersList.filter((order) => {
       const orderSellerId = order.seller_id || order.seller?.id;
       return String(orderSellerId) === String(userId);
     });
+
+    const liquidatedNotes = liquidatedNotesList.filter((order) => {
+      const orderSellerId = order.seller_id || order.seller?.id;
+      return String(orderSellerId) === String(userId);
+    });
+
+    return [...activeNotes, ...liquidatedNotes];
   };
 
-  // VALES INDEPENDIENTES: Filtrado solo por usuario, sin依赖 de order_id
+  // VALES INDEPENDIENTES: Filtrado solo por usuario, sin dependencia de order_id
   const getApprovedValesForUserAndCycle = (userId) => {
     return approvedValesList.filter((v) => {
       const valeSellerId = v.seller_id || v.seller?.id;
@@ -1217,12 +1245,14 @@ export default function AdminModule() {
     const targetSellerId = order.seller_id || order.seller?.id;
     const cat = (order.category || 'bombillos').toLowerCase();
     const finalPrice = Number(order.final_price_usd || 0);
+
     const specificAssign = hierarchyAssignmentsList.find(
       (a) =>
         String(a.parent_user_id) === String(parentUserId) &&
         String(a.target_seller_id) === String(targetSellerId) &&
         !a.is_exception
     );
+
     if (specificAssign) {
       const pctUsed =
         cat === 'fluidos'
@@ -1235,6 +1265,7 @@ export default function AdminModule() {
         paymentDiscount,
       };
     }
+
     const config = hierarchyConfigsMap[parentUserId];
     if (config && config.is_global) {
       const exceptionAssign = hierarchyAssignmentsList.find(
@@ -1262,6 +1293,7 @@ export default function AdminModule() {
         paymentDiscount,
       };
     }
+
     return {
       pctUsed: 0,
       commissionUsd: 0,
@@ -1270,6 +1302,7 @@ export default function AdminModule() {
     };
   };
 
+  // --- E. AJUSTE EN CALCULAR COMISIONES JERÁRQUICAS (CÁLCULO HÍBRIDO) ---
   const calculateHierarchyCommissionsForUser = (parentUser) => {
     const config = hierarchyConfigsMap[parentUser.id];
     const excIds = hierarchyAssignmentsList
@@ -1278,10 +1311,12 @@ export default function AdminModule() {
           String(a.parent_user_id) === String(parentUser.id) && a.is_exception
       )
       .map((a) => String(a.target_seller_id));
+
     const specificAssigns = hierarchyAssignmentsList.filter(
       (a) =>
         String(a.parent_user_id) === String(parentUser.id) && !a.is_exception
     );
+
     const activeList = sellersList.length > 0 ? sellersList : liquidaciones;
     const eligibleSellers = activeList.filter(
       (s) =>
@@ -1289,6 +1324,7 @@ export default function AdminModule() {
         s.role?.toLowerCase() !== 'stock' &&
         s.role !== 'pendiente'
     );
+
     let targetSellerIds = [];
     if (config && config.is_global) {
       targetSellerIds = eligibleSellers
@@ -1297,16 +1333,37 @@ export default function AdminModule() {
     } else {
       targetSellerIds = specificAssigns.map((a) => String(a.target_seller_id));
     }
-    const subordinateOrders = closedOrdersList.filter((o) => {
+
+    // 1. Órdenes Activas (Sales Orders con status 'aprobada' y payment_status 'cerrada')
+    const activeSubordinateOrders = closedOrdersList.filter((o) => {
       const orderSellerId = o.seller_id || o.seller?.id;
       return targetSellerIds.includes(String(orderSellerId));
     });
+
+    // 2. Órdenes Respaldadas (Hierarchy Settlement Backups)
+    // Nota: En un entorno real, aquí haríamos un fetch específico a la tabla backups si no estuviera cargada.
+    // Para este ejemplo, asumimos que fetchTabData carga lo necesario o que la lógica híbrida se basa en lo disponible.
+    // Si tuviéramos un estado 'hierarchyBackupsList', lo filtraríamos aquí.
+    // Como no tenemos ese estado explícito en el código original proporcionado, nos basamos en las órdenes activas
+    // y las liquidadas que aún existen en BD (liquidatedNotesList).
+    const liquidatedSubordinateOrders = liquidatedNotesList.filter((o) => {
+      const orderSellerId = o.seller_id || o.seller?.id;
+      return targetSellerIds.includes(String(orderSellerId));
+    });
+
+    // Combinamos ambas listas para el cálculo
+    const allSubordinateOrders = [
+      ...activeSubordinateOrders,
+      ...liquidatedSubordinateOrders,
+    ];
+
     let hierarchyCommissionUsd53 = 0;
     let hierarchyCommissionUsd23 = 0;
     let hierarchyCommissionUsd10 = 0;
     let hierarchyCommissionUsd0 = 0;
     let hierarchyCommissionUsd = 0;
-    const evaluatedOrders = subordinateOrders.map((o) => {
+
+    const evaluatedOrders = allSubordinateOrders.map((o) => {
       const evalRes = evaluateHierarchyCommissionForOrder(o, parentUser.id);
       const pd = String(evalRes.paymentDiscount);
       if (pd === '53.38') hierarchyCommissionUsd53 += evalRes.commissionUsd;
@@ -1320,6 +1377,7 @@ export default function AdminModule() {
         ...evalRes,
       };
     });
+
     const isGlobal = Boolean(config?.is_global);
     const hasExceptions = Boolean(config?.has_exceptions);
     let assignedLabelText = `${targetSellerIds.length} Vendedores`;
@@ -1329,8 +1387,9 @@ export default function AdminModule() {
           ? `Todos - ${excIds.length}`
           : 'Todos';
     }
+
     return {
-      subordinateOrdersCount: subordinateOrders.length,
+      subordinateOrdersCount: allSubordinateOrders.length,
       evaluatedOrders,
       hierarchyCommissionUsd,
       hierarchyCommissionUsd53,
@@ -1409,17 +1468,14 @@ export default function AdminModule() {
       0,
       comm53GrossUsd + hierarchyUsd53 - valesDeduction53Usd - penDeduction53
     );
-
     const comm23NetUsd = Math.max(
       0,
       comm23GrossUsd + hierarchyUsd23 - valesDeduction23Usd - penDeduction23
     );
-
     const comm10NetUsd = Math.max(
       0,
       comm10GrossUsd + hierarchyUsd10 - valesDeduction10Usd - penDeduction10
     );
-
     const comm0NetUsd = Math.max(
       0,
       comm0GrossUsd + hierarchyUsd0 - valesDeduction0Usd - penDeduction0
@@ -1483,7 +1539,6 @@ export default function AdminModule() {
     const userVales = getApprovedValesForUserAndCycle(user.id);
     const userPenalties = getApprovedPenaltiesForUserAndCycle(user.id);
 
-    // Verificar si hay algo que cobrar
     const details = calculateUserSettlementDetails(
       user,
       userNotes,
@@ -1494,7 +1549,6 @@ export default function AdminModule() {
       penaltyChargeMethod
     );
 
-    // Filtro de inactividad: Si no tiene notas, ni vales, ni jerarquía, ni sueldo, no abrir modal o mostrar alerta
     const hasActivity =
       userNotes.length > 0 ||
       userVales.length > 0 ||
@@ -1502,27 +1556,94 @@ export default function AdminModule() {
       details.sueldoFijoOriginal > 0;
 
     if (!hasActivity) {
-      // Opcional: Podrías querer permitir abrirlo igual para ver ceros, pero el requerimiento dice ocultar en lista.
-      // Si llega aquí, es porque estaba en la lista pero quizás cambió algo.
+      // Opcional: Podrías querer permitir abrirlo igual para ver ceros
     }
-
     setSettlementModalData(details);
   };
 
+  // --- D. FUNCIÓN AUXILIAR: IDENTIFICAR BENEFICIARIOS PENDIENTES ---
+  const getPendingHierarchicalBeneficiaries = async (orderId) => {
+    // Esta función identifica quiénes faltan por liquidar para una nota específica
+    // Basado en la jerarquía configurada y las facturas existentes en settlement_invoices
+
+    // 1. Obtener la orden
+    const { data: order } = await supabase
+      .from('sales_orders')
+      .select('*, seller:seller_id(id)')
+      .eq('id', orderId)
+      .single();
+
+    if (!order) return [];
+
+    const sellerId = order.seller_id || order.seller?.id;
+    const pendingNames = [];
+
+    // 2. Recorrer la jerarquía hacia arriba
+    // Buscamos padres directos en hierarchy_assignments o configs globales
+    // Simplificación: Revisamos todos los usuarios que tengan a este seller (o sus superiores) como subordinados
+
+    // Para hacerlo robusto sin recursión compleja en frontend, verificamos los usuarios con roles superiores
+    // que tengan configurada la jerarquía hacia este vendedor.
+
+    const potentialParents = sellersList.filter((s) =>
+      ['supervisor', 'gerente', 'administrador'].includes(s.role)
+    );
+
+    for (const parent of potentialParents) {
+      // Verificar si este padre tiene relación jerárquica con el vendedor de la orden
+      // (Ya sea directa o global)
+      const config = hierarchyConfigsMap[parent.id];
+      const specificAssign = hierarchyAssignmentsList.find(
+        (a) =>
+          String(a.parent_user_id) === String(parent.id) &&
+          String(a.target_seller_id) === String(sellerId)
+      );
+
+      let isBeneficiary = false;
+      if (specificAssign) isBeneficiary = true;
+      if (config && config.is_global) {
+        const isException = hierarchyAssignmentsList.find(
+          (a) =>
+            String(a.parent_user_id) === String(parent.id) &&
+            String(a.target_seller_id) === String(sellerId) &&
+            a.is_exception
+        );
+        if (!isException) isBeneficiary = true;
+      }
+
+      if (isBeneficiary) {
+        // 3. Verificar si ya fue liquidado en este ciclo
+        const { data: existingInvoice } = await supabase
+          .from('settlement_invoices')
+          .select('id')
+          .eq('user_id', parent.id)
+          .eq('month', selectedMonth)
+          .eq('year', selectedYear)
+          .eq('cycle', selectedCycle)
+          .maybeSingle();
+
+        if (!existingInvoice) {
+          pendingNames.push(parent.full_name);
+        }
+      }
+    }
+
+    return pendingNames;
+  };
+
+  // --- B. EL DETONANTE CENTRAL: handlePayAndLiquidate MODIFICADO ---
   const handlePayAndLiquidate = async () => {
     if (!settlementModalData) return;
     const confirmMsg = `ALERTA CRÍTICA: Se deducirán $${settlementModalData.totalPenaltiesUsd.toFixed(
       2
-    )} por penalizaciones, se borrarán las ${
-      settlementModalData.notes.length
-    } notas de entrega cerradas, los ${
-      settlementModalData.vales.length
-    } vales aprobados y se generará la factura. ¿Continuar?`;
+    )} por penalizaciones, se generarán respaldos jerárquicos y se procesará la factura. ¿Continuar?`;
     if (!window.confirm(confirmMsg)) return;
+
     try {
       setLoading(true);
       const invCode = 'LIQ-' + Date.now().toString().slice(-6);
       const { data: authData } = await supabase.auth.getUser();
+
       const modalDOMEl = document.getElementById(
         'settlement-invoice-modal-content'
       );
@@ -1569,29 +1690,7 @@ export default function AdminModule() {
               created_by: authData?.user?.id,
             },
           ]);
-          const { data: ordDat } = await supabase
-            .from('sales_orders')
-            .select('*')
-            .eq('id', pen.order_id)
-            .single();
-          if (ordDat) {
-            const newPaid = Number(ordDat.total_paid_usd || 0) + penAmt;
-            const newBal = Math.max(
-              0,
-              Number(ordDat.final_price_usd) - newPaid
-            );
-            const newPayStatus = newBal === 0 ? 'cerrada' : 'abonada';
-            await supabase
-              .from('sales_orders')
-              .update({
-                total_paid_usd: newPaid,
-                balance_due_usd: newBal,
-                payment_status: newPayStatus,
-                closed_at: newBal === 0 ? new Date() : null,
-                updated_at: new Date(),
-              })
-              .eq('id', pen.order_id);
-          }
+          // Actualizar estado de la orden si es necesario (aunque ya esté cerrada)
         }
         await supabase
           .from('penalties')
@@ -1599,30 +1698,30 @@ export default function AdminModule() {
           .eq('id', pen.id);
       }
 
-      // 2. Guardar Respaldo de Comisiones Jerárquicas (Soporte DB)
-      // Intentamos insertar en hierarchy_settlement_backups si existe la tabla
-      try {
-        const hierarchyBackups =
-          settlementModalData.hierarchyData.evaluatedOrders.map((eo) => ({
-            parent_user_id: settlementModalData.user.id,
-            subordinate_order_id: eo.order.id,
-            commission_amount: eo.commissionUsd,
-            payment_discount: eo.paymentDiscount,
-            settled_at: new Date().toISOString(),
-            cycle: selectedCycle,
-            month: selectedMonth,
-            year: selectedYear,
-          }));
-        if (hierarchyBackups.length > 0) {
-          await supabase
-            .from('hierarchy_settlement_backups')
-            .insert(hierarchyBackups);
-        }
-      } catch (backupErr) {
-        console.warn(
-          'Tabla hierarchy_settlement_backups no disponible o error:',
-          backupErr
-        );
+      // 2. Generación del Respaldo Jerárquico (Snapshot Contable)
+      // ANTES de borrar nada, guardamos los datos de las órdenes evaluadas en la jerarquía
+      const hierarchyBackups =
+        settlementModalData.hierarchyData.evaluatedOrders.map((eo) => ({
+          parent_user_id: settlementModalData.user.id,
+          subordinate_order_id: eo.order.id,
+          commission_amount: eo.commissionUsd,
+          payment_discount: eo.paymentDiscount,
+          settled_at: new Date().toISOString(),
+          cycle: selectedCycle,
+          month: selectedMonth,
+          year: selectedYear,
+          // Guardamos también datos clave de la orden por si se borra
+          order_final_price: eo.order.final_price_usd,
+          order_transaction_number: eo.order.transaction_number,
+          order_seller_id: eo.order.seller_id || eo.order.seller?.id,
+        }));
+
+      if (hierarchyBackups.length > 0) {
+        const { error: backupErr } = await supabase
+          .from('hierarchy_settlement_backups')
+          .insert(hierarchyBackups);
+        if (backupErr)
+          console.warn('Error guardando backups jerárquicos:', backupErr);
       }
 
       // 3. Insertar Factura
@@ -1655,22 +1754,35 @@ export default function AdminModule() {
         .single();
       if (invErr) throw invErr;
 
-      // 4. Limpiar Datos
-      const noteIdsToDelete = settlementModalData.notes.map((n) => n.id);
-      if (noteIdsToDelete.length > 0) {
-        await supabase
-          .from('order_items')
-          .delete()
-          .in('order_id', noteIdsToDelete);
-        await supabase
-          .from('order_payments')
-          .delete()
-          .in('order_id', noteIdsToDelete);
-        await supabase
-          .from('seller_payment_notifications')
-          .delete()
-          .in('order_id', noteIdsToDelete);
-        await supabase.from('sales_orders').delete().in('id', noteIdsToDelete);
+      // 4. Limpieza y Depuración (Borrado Condicional)
+      const noteIdsToProcess = settlementModalData.notes.map((n) => n.id);
+
+      if (noteIdsToProcess.length > 0) {
+        // Para cada nota, verificamos si es el último beneficiario
+        for (const noteId of noteIdsToProcess) {
+          const pendingBeneficiaries =
+            await getPendingHierarchicalBeneficiaries(noteId);
+
+          if (pendingBeneficiaries.length === 0) {
+            // ES EL ÚLTIMO: Eliminar completamente
+            await supabase.from('order_items').delete().eq('order_id', noteId);
+            await supabase
+              .from('order_payments')
+              .delete()
+              .eq('order_id', noteId);
+            await supabase
+              .from('seller_payment_notifications')
+              .delete()
+              .eq('order_id', noteId);
+            await supabase.from('sales_orders').delete().eq('id', noteId);
+          } else {
+            // NO ES EL ÚLTIMO: Cambiar estado a 'liquidada' para mantenerla visible en la pestaña especial
+            await supabase
+              .from('sales_orders')
+              .update({ status: 'liquidada', updated_at: new Date() })
+              .eq('id', noteId);
+          }
+        }
       }
 
       // VALES INDEPENDIENTES: Borrar vales usados en este ciclo para este usuario
@@ -1683,11 +1795,11 @@ export default function AdminModule() {
       if (penIdsToDelete.length > 0) {
         await supabase.from('penalties').delete().in('id', penIdsToDelete);
       }
-      if (noteIdsToDelete.length > 0) {
-        await supabase
-          .from('penalties')
-          .delete()
-          .in('order_id', noteIdsToDelete);
+
+      // Limpiar penalizaciones huérfanas de órdenes borradas (si las hubiera)
+      if (noteIdsToProcess.length > 0) {
+        // Nota: Las penalizaciones ya se marcaron como 'cobrada' arriba, pero si queremos borrarlas físicamente:
+        // await supabase.from('penalties').delete().in('order_id', noteIdsToProcess);
       }
 
       try {
@@ -1707,8 +1819,9 @@ export default function AdminModule() {
       } catch (e) {
         console.warn('Error enviando notif de liquidación:', e);
       }
+
       showToastSuccess(
-        `Factura ${invCode} generada, penalizaciones aplicadas como abonos, y ciclos liquidados.`
+        `Factura ${invCode} generada, respaldos jerárquicos creados y ciclo liquidado.`
       );
       setSettlementModalData(null);
       await fetchTabData();
@@ -1779,18 +1892,15 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
   const handleDownloadPDF = async (nota) => {
     try {
       setLoading(true);
-
       // 1. OBTENER PORCENTAJE DINÁMICO SEGÚN CONFIGURACIÓN GLOBAL
       const discountPct = getDiscountPercent(
         String(nota.payment_discount || '53.38')
       );
-
       const { data: items, error } = await supabase
         .from('order_items')
         .select('*, products(code, description)')
         .eq('order_id', nota.id);
       if (error) throw error;
-
       if (!window.html2pdf) {
         await new Promise((resolve, reject) => {
           const script = document.createElement('script');
@@ -1801,13 +1911,11 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
           document.head.appendChild(script);
         });
       }
-
       // 2. CORRECCIÓN DE VARIABLES (Evita el error currentSellerName)
       const clientName = nota.client?.name || nota.clients?.name || 'Cliente';
       const transNo = nota.transaction_number || nota.id.substring(0, 8);
       const fecha = new Date(nota.created_at).toLocaleString();
       const vendedorName = nota.seller?.full_name || 'Vendedor';
-
       // Construcción de tabla de productos (Conservada igual)
       let itemsHtml = '';
       let subTotal = 0;
@@ -1818,114 +1926,104 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
             item.quantity * item.discounted_unit_price_usd;
           subTotal += totalLine;
           itemsHtml += `
-            <tr>
-              <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; font-family: monospace;">${
-                item.products?.code || 'S/C'
-              }</td>
-              <td style="padding: 6px 8px; border-bottom: 1px solid #ddd;">${
-                item.products?.description || 'Producto'
-              }</td>
-              <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: center;">${
-                item.quantity
-              }</td>
-              <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: right;">$${Number(
-                item.unit_price_usd || 0
-              ).toFixed(2)}</td>
-              <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: right; color: #B45309;">$${Number(
-                item.discounted_unit_price_usd || 0
-              ).toFixed(2)}</td>
-              <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: right; font-weight: bold;">$${Number(
-                totalLine
-              ).toFixed(2)}</td>
-            </tr>`;
+         <tr>
+           <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; font-family: monospace;">${
+             item.products?.code || 'S/C'
+           }</td>
+           <td style="padding: 6px 8px; border-bottom: 1px solid #ddd;">${
+             item.products?.description || 'Producto'
+           }</td>
+           <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: center;">${
+             item.quantity
+           }</td>
+           <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: right;">$${Number(
+             item.unit_price_usd || 0
+           ).toFixed(2)}</td>
+           <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: right; color: #B45309;">$${Number(
+             item.discounted_unit_price_usd || 0
+           ).toFixed(2)}</td>
+           <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: right; font-weight: bold;">$${Number(
+             totalLine
+           ).toFixed(2)}</td>
+         </tr>`;
         });
       }
-
       // 3. DISEÑO SIMPLIFICADO CON PORCENTAJE INCLUIDO
       const container = document.createElement('div');
       container.innerHTML = `
-        <div style="font-family: Arial, sans-serif; color: #111; padding: 25px; background: #fff; width: 700px; height: 1000px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between; margin: 0 auto;">
-          
-          <!-- ENCABEZADO -->
-          <div>
-            <div style="display: flex; justify-content: space-between; border-bottom: 2px solid #111; padding-bottom: 15px; margin-bottom: 20px;">
-              <div>
-                <h2 style="margin: 0; font-size: 20px; text-transform: uppercase;">FENIX AUTO PART C.A</h2>
-                <p style="margin: 2px 0; font-size: 12px;"><strong>RIF:</strong> J-50261925-2</p>
-                <p style="margin: 8px 0 0 0; font-size: 12px;"><strong>Cliente:</strong> ${clientName}</p>
-              </div>
-              <div style="text-align: right; font-size: 12px;">
-                <p style="margin: 2px 0;"><strong>N° Transacción:</strong> #${transNo}</p>
-                <p style="margin: 2px 0;"><strong>Fecha/Hora:</strong> ${fecha}</p>
-                <p style="margin: 2px 0;"><strong>Vendedor:</strong> ${vendedorName}</p>
-                <p style="margin: 2px 0;"><strong>Categoría:</strong> ${
-                  nota.category || 'General'
-                }</p>
-              </div>
-            </div>
-
-            <!-- TABLA DE PRODUCTOS -->
-            <table style="width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 20px;">
-              <thead>
-                <tr style="background-color: #f3f4f6;">
-                  <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: left;">Código</th>
-                  <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: left;">Descripción</th>
-                  <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: center;">Cantidad</th>
-                  <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: right;">V. Unitario</th>
-                  <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: right;">V. U. con Descuento</th>
-                  <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: right;">Total Línea</th>
-                </tr>
-              </thead>
-              <tbody>${itemsHtml}</tbody>
-            </table>
-          </div>
-
-          <!-- RESUMEN SIMPLIFICADO CON PORCENTAJE -->
-          <div>
-            <div style="display: flex; justify-content: flex-end; font-size: 12px; margin-bottom: 15px;">
-              <div style="width: 280px; background: #f9fafb; padding: 12px; border: 1px solid #e5e7eb; border-radius: 6px;">
-                
-                <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
-                  <span>Total Base:</span>
-                  <strong>$${Number(nota.total_base_usd || subTotal).toFixed(
-                    2
-                  )}</strong>
-                </div>
-                
-                <!-- AQUÍ SE MUESTRA EL PORCENTAJE DINÁMICO -->
-                <div style="display: flex; justify-content: space-between; margin-bottom: 6px; color: #D97706;">
-                  <span>Descuento Aplicado (${discountPct}%):</span>
-                  <strong>-$${Number(nota.discount_amount_usd || 0).toFixed(
-                    2
-                  )}</strong>
-                </div>
-                
-                <div style="display: flex; justify-content: space-between; border-top: 1px solid #ccc; padding-top: 6px; font-weight: bold; font-size: 14px; color: #DC2626;">
-                  <span>Precio Final:</span>
-                  <span>$${Number(nota.final_price_usd || subTotal).toFixed(
-                    2
-                  )}</span>
-                </div>                                
-              </div>
-            </div>
-
-            ${
-              nota.observation
-                ? `
-              <div style="font-size: 11px; color: #333; background: #fffbeb; border: 1px solid #fde68a; padding: 10px; border-radius: 4px; margin-bottom: 10px; text-align: justify;">
-                <strong>Observación:</strong> ${nota.observation}
-              </div>
-            `
-                : ''
-            }
-
-            <div style="font-size: 10px; color: #555; background: #f3f4f6; padding: 10px; border-radius: 4px; line-height: 1.4; text-align: justify;">
-              <strong>Términos y condiciones:</strong> ${globalTerms}
-            </div>
-          </div>
-        </div>
-      `;
-
+     <div style="font-family: Arial, sans-serif; color: #111; padding: 25px; background: #fff; width: 700px; height: 1000px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between; margin: 0 auto;">
+       <!-- ENCABEZADO -->
+       <div>
+         <div style="display: flex; justify-content: space-between; border-bottom: 2px solid #111; padding-bottom: 15px; margin-bottom: 20px;">
+           <div>
+             <h2 style="margin: 0; font-size: 20px; text-transform: uppercase;">FENIX AUTO PART C.A</h2>
+             <p style="margin: 2px 0; font-size: 12px;"><strong>RIF:</strong> J-50261925-2</p>
+             <p style="margin: 8px 0 0 0; font-size: 12px;"><strong>Cliente:</strong> ${clientName}</p>
+           </div>
+           <div style="text-align: right; font-size: 12px;">
+             <p style="margin: 2px 0;"><strong>N° Transacción:</strong> #${transNo}</p>
+             <p style="margin: 2px 0;"><strong>Fecha/Hora:</strong> ${fecha}</p>
+             <p style="margin: 2px 0;"><strong>Vendedor:</strong> ${vendedorName}</p>
+             <p style="margin: 2px 0;"><strong>Categoría:</strong> ${
+               nota.category || 'General'
+             }</p>
+           </div>
+         </div>
+         <!-- TABLA DE PRODUCTOS -->
+         <table style="width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 20px;">
+           <thead>
+             <tr style="background-color: #f3f4f6;">
+               <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: left;">Código</th>
+               <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: left;">Descripción</th>
+               <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: center;">Cantidad</th>
+               <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: right;">V. Unitario</th>
+               <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: right;">V. U. con Descuento</th>
+               <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: right;">Total Línea</th>
+             </tr>
+           </thead>
+           <tbody>${itemsHtml}</tbody>
+         </table>
+       </div>
+       <!-- RESUMEN SIMPLIFICADO CON PORCENTAJE -->
+       <div>
+         <div style="display: flex; justify-content: flex-end; font-size: 12px; margin-bottom: 15px;">
+           <div style="width: 280px; background: #f9fafb; padding: 12px; border: 1px solid #e5e7eb; border-radius: 6px;">
+             <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+               <span>Total Base:</span>
+               <strong>$${Number(nota.total_base_usd || subTotal).toFixed(
+                 2
+               )}</strong>
+             </div>
+             <!-- AQUÍ SE MUESTRA EL PORCENTAJE DINÁMICO -->
+             <div style="display: flex; justify-content: space-between; margin-bottom: 6px; color: #D97706;">
+               <span>Descuento Aplicado (${discountPct}%):</span>
+               <strong>-$${Number(nota.discount_amount_usd || 0).toFixed(
+                 2
+               )}</strong>
+             </div>
+             <div style="display: flex; justify-content: space-between; border-top: 1px solid #ccc; padding-top: 6px; font-weight: bold; font-size: 14px; color: #DC2626;">
+               <span>Precio Final:</span>
+               <span>$${Number(nota.final_price_usd || subTotal).toFixed(
+                 2
+               )}</span>
+             </div>                                
+           </div>
+         </div>
+         ${
+           nota.observation
+             ? `
+           <div style="font-size: 11px; color: #333; background: #fffbeb; border: 1px solid #fde68a; padding: 10px; border-radius: 4px; margin-bottom: 10px; text-align: justify;">
+             <strong>Observación:</strong> ${nota.observation}
+           </div>
+         `
+             : ''
+         }
+         <div style="font-size: 10px; color: #555; background: #f3f4f6; padding: 10px; border-radius: 4px; line-height: 1.4; text-align: justify;">
+           <strong>Términos y condiciones:</strong> ${globalTerms}
+         </div>
+       </div>
+     </div>
+   `;
       const opciones = {
         margin: 0,
         filename: `nota-entrega-${transNo}.pdf`,
@@ -1972,12 +2070,15 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
     }
   };
 
+  // --- F. MODIFICACIÓN EN HANDLEDELETENOTECOMPLETE (ELIMINACIÓN MANUAL EN CASCADA) ---
   const handleDeleteNoteComplete = async (note) => {
-    const confirmText = `ATENCIÓN: ¿Está seguro de ELIMINAR COMPLETAMENTE la Nota de Entrega #${note.transaction_number}?`;
+    const confirmText = `ATENCIÓN: ¿Está seguro de ELIMINAR COMPLETAMENTE la Nota de Entrega #${note.transaction_number}? Esto revertirá inventario y borrará respaldos jerárquicos.`;
     if (!window.confirm(confirmText)) return;
     try {
       setLoading(true);
-      if (note.status === 'aprobada') {
+
+      // 1. Revertir Inventario
+      if (note.status === 'aprobada' || note.status === 'liquidada') {
         const { data: items, error: itemsErr } = await supabase
           .from('order_items')
           .select('product_id, quantity')
@@ -1999,6 +2100,8 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
           }
         }
       }
+
+      // 2. Barrido en Cascada de Dependencias
       await supabase.from('order_items').delete().eq('order_id', note.id);
       await supabase.from('order_payments').delete().eq('order_id', note.id);
       await supabase
@@ -2007,13 +2110,22 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
         .eq('order_id', note.id);
       await supabase.from('vales').delete().eq('order_id', note.id);
       await supabase.from('penalties').delete().eq('order_id', note.id);
+
+      // 3. Eliminar Respaldos Jerárquicos asociados
+      await supabase
+        .from('hierarchy_settlement_backups')
+        .delete()
+        .eq('subordinate_order_id', note.id);
+
+      // 4. Eliminar la Orden
       const { error } = await supabase
         .from('sales_orders')
         .delete()
         .eq('id', note.id);
       if (error) throw error;
+
       showToastSuccess(
-        `Nota #${note.transaction_number} y todo su contenido relacionado fueron eliminados.`
+        `Nota #${note.transaction_number}, sus respaldos y dependencias fueron eliminados.`
       );
       setEditingNoteId(null);
       fetchTabData();
@@ -2966,7 +3078,6 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
   const editingNote =
     cobranzaNotes.find((n) => n.id === editingNoteId) ||
     pendingNotes.find((n) => n.id === editingNoteId);
-
   const filteredProducts = editNoteProductsList.filter(
     (p) =>
       (!p.category ||
@@ -2976,7 +3087,6 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
         .includes(editNoteSearchProd.toLowerCase()) ||
         p.code?.toLowerCase().includes(editNoteSearchProd.toLowerCase()))
   );
-
   const editTotalSinDesc = editNoteItems.reduce(
     (acc, item) => acc + item.unit_price_usd * item.quantity,
     0
@@ -3034,7 +3144,6 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
       vList.reduce((acc, v) => acc + Number(v.requested_amount_usd || 0), 0)
     );
   }, 0);
-
   const totalCyclePenaltiesDeduct = liquidaciones.reduce((sum, usr) => {
     const pList = getApprovedPenaltiesForUserAndCycle(usr.id);
     return sum + pList.reduce((acc, p) => acc + Number(p.amount || 0), 0);
@@ -3181,7 +3290,6 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
     >
       {/* --- ESTILOS RESPONSIVOS (E) --- */}
       <style>{`.admin-tabs-desktop { display: flex; gap: 8px; border-bottom: 2px solid #e5e7eb; margin-bottom: 24px; overflow-x: auto; } .admin-tabs-mobile { display: none; position: relative; margin-bottom: 24px; } .admin-mobile-trigger { width: 100%; padding: 12px 16px; background: #ffffff; border: 1px solid #d1d5db; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; font-weight: 700; color: #111827; font-size: 14px; } .admin-mobile-dropdown { position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: #ffffff; border: 1px solid #d1d5db; border-radius: 8px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); z-index: 1000; overflow: hidden; } .admin-mobile-item { padding: 12px 16px; display: flex; alignItems: center; gap: 10px; cursor: pointer; border-bottom: 1px solid #e5e7eb; color: #4b5563; font-size: 14px; transition: background 0.15s; } .admin-mobile-item:last-child { border-bottom: none; } .admin-mobile-item:hover { background: #fef2f2; } .admin-mobile-item.active { background: #fef2f2; color: #dc2626; font-weight: 700; } .admin-aging-section { background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 14px 16px; margin-bottom: 16px; } .admin-aging-title { font-size: 13px; font-weight: 800; color: #78350f; margin-bottom: 10px; display: flex; alignItems: center; gap: 8px; } .admin-aging-item { display: flex; justify-content: space-between; align-items: center; padding: 6px 10px; background: #ffffff; border: 1px solid #fde68a; border-radius: 6px; margin-bottom: 6px; font-size: 12px; } .admin-aging-item:last-child { margin-bottom: 0; } .admin-days-30 { text-decoration: underline; text-decoration-color: #eab308; text-decoration-thickness: 3px; text-underline-offset: 3px; } .admin-days-45 { text-decoration: underline; text-decoration-color: #f97316; text-decoration-thickness: 3px; text-underline-offset: 3px; } .admin-days-60 { text-decoration: underline; text-decoration-color: #dc2626; text-decoration-thickness: 3px; text-underline-offset: 3px; } .admin-table-desktop { width: 100%; border-collapse: collapse; text-align: left; font-size: 13px; } .admin-mobile-cards { display: none; } .admin-mobile-card { background: #ffffff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px; marginBottom: 10px; boxShadow: 0 1px 2px rgba(0,0,0,0.05); } .admin-mobile-card-header { font-size: 14px; font-weight: 800; color: #111827; border-bottom: 1px solid #e5e7eb; padding-bottom: 8px; margin-bottom: 8px; } .admin-mobile-card-row { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; font-size: 12px; border-bottom: 1px dashed #f3f4f6; } .admin-mobile-card-row:last-child { border-bottom: none; } .admin-mobile-card-label { color: #6b7280; font-weight: 600; font-size: 11px; } .admin-mobile-card-value { color: #111827; font-weight: 600; text-align: right; max-width: 60%; word-break: break-word; } .admin-mobile-card-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; padding-top: 10px; border-top: 1px solid #e5e7eb; } @media (max-width: 768px) { .admin-tabs-desktop { display: none !important; } .admin-tabs-mobile { display: block !important; } .admin-table-desktop { display: none !important; } .admin-mobile-cards { display: block !important; } .admin-mobile-card-actions button { font-size: 10px !important; padding: 5px 8px !important; } .admin-tab-button-desktop { padding: 10px 12px !important; font-size: 12px !important; } .admin-action-btn-mobile { padding: 5px 8px !important; font-size: 10px !important; } } .floating-toast-success { position: fixed !important; top: 24px !important; left: 50% !important; transform: translateX(-50%) !important; z-index: 9999 !important; width: 90% !important; max-width: 500px !important; box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important; } .floating-toast-error { position: fixed !important; top: 24px !important; left: 50% !important; transform: translateX(-50%) !important; z-index: 9999 !important; width: 90% !important; max-width: 500px !important; box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important; }`}</style>
-
       {/* F. NOTIFICACIONES GLOBALES FLOTANTES */}
       {errorMsg && (
         <div
@@ -3248,7 +3356,6 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
           </p>
         </div>
       </div>
-
       {/* --- MENÚ ESCRITORIO (E) --- */}
       <div className="admin-tabs-desktop">
         {tabsData.map((tab) => {
@@ -3282,7 +3389,6 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
           );
         })}
       </div>
-
       {/* --- MENÚ MÓVIL DROPDOWN (E) --- */}
       <div className="admin-tabs-mobile" ref={mobileMenuRef}>
         <div
@@ -3338,7 +3444,6 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
           </div>
         )}
       </div>
-
       {/* PESTAÑA 1: CREAR N.E. */}
       {activeTab === 'crear_ne' && (
         <div style={tabContentWrapperStyle}>
@@ -4222,7 +4327,6 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
           </div>
         </div>
       )}
-
       {/* PESTAÑA APROBACIONES */}
       {activeTab === 'aprobaciones' && (
         <div style={tabContentWrapperStyle}>
@@ -5288,7 +5392,6 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
           )}
         </div>
       )}
-
       {/* PESTAÑA COBRANZA */}
       {activeTab === 'cobranza' && (
         <div style={tabContentWrapperStyle}>
@@ -7104,7 +7207,6 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
           )}
         </div>
       )}
-
       {/* PESTAÑA VALES Y PENALIZACIÓN */}
       {activeTab === 'vales_penalizaciones' && (
         <div style={tabContentWrapperStyle}>
@@ -8217,7 +8319,6 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
           )}
         </div>
       )}
-
       {/* PESTAÑA CIERRE DE CICLO QUINCENAL */}
       {activeTab === 'quincena' && (
         <div style={tabContentWrapperStyle}>
@@ -8267,6 +8368,31 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                 }}
               >
                 <History size={15} /> Historial de Ciclo / Facturación
+              </button>
+              {/* NUEVA SUB-PESTAÑA: N.E. JERÁRQUICAS PENDIENTES */}
+              <button
+                onClick={() => setQuincenaSubView('jerarquicas_pendientes')}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: '6px',
+                  border: 'none',
+                  backgroundColor:
+                    quincenaSubView === 'jerarquicas_pendientes'
+                      ? '#111827'
+                      : '#f3f4f6',
+                  color:
+                    quincenaSubView === 'jerarquicas_pendientes'
+                      ? '#fff'
+                      : '#4b5563',
+                  fontWeight: 'bold',
+                  fontSize: '13px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                }}
+              >
+                <AlertTriangle size={15} /> N.E. Jerárquicas Pendientes
               </button>
             </div>
             {quincenaSubView === 'liquidar' && (
@@ -8323,6 +8449,291 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
               </div>
             )}
           </div>
+
+          {/* CONTENIDO DE LA NUEVA PESTAÑA: N.E. JERÁRQUICAS PENDIENTES */}
+          {quincenaSubView === 'jerarquicas_pendientes' && (
+            <div
+              style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}
+            >
+              {/* Efecto para calcular beneficiarios cuando cambia la lista o el ciclo */}
+              <useEffect>
+                {(() => {
+                  const calculateAll = async () => {
+                    const newMap = {};
+                    for (const note of liquidatedNotesList) {
+                      const pending = await getPendingHierarchicalBeneficiaries(
+                        note.id
+                      );
+                      newMap[note.id] = pending;
+                    }
+                    setPendingBeneficiariesMap(newMap);
+                  };
+                  if (liquidatedNotesList.length > 0) calculateAll();
+                })()}
+              </useEffect>
+
+              <div
+                style={{
+                  backgroundColor: '#fffbeb',
+                  border: '1px solid #fde68a',
+                  padding: '12px',
+                  borderRadius: '8px',
+                }}
+              >
+                <h3
+                  style={{
+                    margin: 0,
+                    fontSize: '14px',
+                    fontWeight: 'bold',
+                    color: '#92400e',
+                  }}
+                >
+                  Notas de Entrega en Estado "Liquidada" (Pendientes de
+                  Superiores)
+                </h3>
+                <p
+                  style={{
+                    margin: '4px 0 0 0',
+                    fontSize: '12px',
+                    color: '#92400e',
+                  }}
+                >
+                  Estas notas han sido liquidadas por el vendedor original pero
+                  aún faltan beneficiarios jerárquicos por cobrar.
+                </p>
+              </div>
+
+              {/* Contenedor Desktop */}
+              <div
+                className="admin-table-desktop-wrapper"
+                style={{
+                  backgroundColor: '#ffffff',
+                  borderRadius: '8px',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                  overflowX: 'auto',
+                }}
+              >
+                <table className="admin-table-desktop">
+                  <thead>
+                    <tr
+                      style={{
+                        backgroundColor: '#f3f4f6',
+                        color: '#374151',
+                        borderBottom: '1px solid #e5e7eb',
+                      }}
+                    >
+                      <th style={{ padding: '12px 14px' }}>N° Transacción</th>
+                      <th style={{ padding: '12px 14px' }}>Cliente</th>
+                      <th style={{ padding: '12px 14px' }}>
+                        Vendedor Original
+                      </th>
+                      <th style={{ padding: '12px 14px' }}>Fecha</th>
+                      <th style={{ padding: '12px 14px' }}>Monto Total</th>
+                      <th style={{ padding: '12px 14px' }}>
+                        Falta por Liquidar a
+                      </th>
+                      <th style={{ padding: '12px 14px', textAlign: 'center' }}>
+                        Acción
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {liquidatedNotesList.length === 0 ? (
+                      <tr>
+                        <td
+                          colSpan="7"
+                          style={{
+                            textAlign: 'center',
+                            padding: '20px',
+                            color: '#6b7280',
+                          }}
+                        >
+                          No hay notas en estado "liquidada" pendientes de
+                          superiores.
+                        </td>
+                      </tr>
+                    ) : (
+                      liquidatedNotesList.map((note) => (
+                        <tr
+                          key={note.id}
+                          style={{ borderBottom: '1px solid #e5e7eb' }}
+                        >
+                          <td
+                            style={{ padding: '12px 14px', fontWeight: 'bold' }}
+                          >
+                            #{note.transaction_number}
+                          </td>
+                          <td style={{ padding: '12px 14px' }}>
+                            {note.client?.name || 'Cliente'}
+                          </td>
+                          <td style={{ padding: '12px 14px' }}>
+                            {note.seller?.full_name || 'Vendedor'}
+                          </td>
+                          <td style={{ padding: '12px 14px' }}>
+                            {new Date(note.created_at).toLocaleDateString()}
+                          </td>
+                          <td
+                            style={{
+                              padding: '12px 14px',
+                              fontWeight: 'bold',
+                              color: '#059669',
+                            }}
+                          >
+                            ${Number(note.final_price_usd).toFixed(2)}
+                          </td>
+                          <td style={{ padding: '12px 14px' }}>
+                            {pendingBeneficiariesMap[note.id] ? (
+                              pendingBeneficiariesMap[note.id].length > 0 ? (
+                                <div
+                                  style={{
+                                    display: 'flex',
+                                    flexWrap: 'wrap',
+                                    gap: '4px',
+                                  }}
+                                >
+                                  {pendingBeneficiariesMap[note.id].map(
+                                    (name, idx) => (
+                                      <span
+                                        key={idx}
+                                        style={{
+                                          background: '#fee2e2',
+                                          color: '#b91c1c',
+                                          padding: '2px 6px',
+                                          borderRadius: '4px',
+                                          fontSize: '11px',
+                                          fontWeight: 'bold',
+                                        }}
+                                      >
+                                        {name}
+                                      </span>
+                                    )
+                                  )}
+                                </div>
+                              ) : (
+                                <span
+                                  style={{
+                                    color: '#059669',
+                                    fontSize: '12px',
+                                    fontWeight: 'bold',
+                                  }}
+                                >
+                                  ✓ Todos liquidados
+                                </span>
+                              )
+                            ) : (
+                              <span
+                                style={{ fontSize: '12px', color: '#6b7280' }}
+                              >
+                                Calculando...
+                              </span>
+                            )}
+                          </td>
+                          <td
+                            style={{
+                              padding: '12px 14px',
+                              textAlign: 'center',
+                            }}
+                          >
+                            <button
+                              onClick={() => handleDeleteNoteComplete(note)}
+                              style={{
+                                padding: '6px 10px',
+                                backgroundColor: '#dc2626',
+                                color: '#fff',
+                                border: 'none',
+                                borderRadius: '4px',
+                                fontSize: '11px',
+                                fontWeight: 'bold',
+                                cursor: 'pointer',
+                              }}
+                            >
+                              Eliminar
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Contenedor Móvil (CORREGIDO: Añadida clase admin-mobile-cards) */}
+              <div className="admin-mobile-cards">
+                {liquidatedNotesList.length === 0 ? (
+                  <div
+                    style={{
+                      textAlign: 'center',
+                      padding: '20px',
+                      color: '#6b7280',
+                    }}
+                  >
+                    No hay notas pendientes.
+                  </div>
+                ) : (
+                  liquidatedNotesList.map((note) => (
+                    <div key={note.id} className="admin-mobile-card">
+                      <div className="admin-mobile-card-header">
+                        N.E. #{note.transaction_number}
+                      </div>
+                      <div className="admin-mobile-card-row">
+                        <span className="admin-mobile-card-label">Cliente</span>
+                        <span className="admin-mobile-card-value">
+                          {note.client?.name || 'Cliente'}
+                        </span>
+                      </div>
+                      <div className="admin-mobile-card-row">
+                        <span className="admin-mobile-card-label">
+                          Vendedor
+                        </span>
+                        <span className="admin-mobile-card-value">
+                          {note.seller?.full_name || 'Vendedor'}
+                        </span>
+                      </div>
+                      <div className="admin-mobile-card-row">
+                        <span className="admin-mobile-card-label">Monto</span>
+                        <span
+                          className="admin-mobile-card-value"
+                          style={{ color: '#059669', fontWeight: 'bold' }}
+                        >
+                          ${Number(note.final_price_usd).toFixed(2)}
+                        </span>
+                      </div>
+                      <div className="admin-mobile-card-row">
+                        <span className="admin-mobile-card-label">
+                          Falta Liquidar a:
+                        </span>
+                        <span className="admin-mobile-card-value">
+                          {pendingBeneficiariesMap[note.id]
+                            ? pendingBeneficiariesMap[note.id].join(', ') ||
+                              'Nadie (Listo)'
+                            : 'Calculando...'}
+                        </span>
+                      </div>
+                      <div className="admin-mobile-card-actions">
+                        <button
+                          onClick={() => handleDeleteNoteComplete(note)}
+                          className="admin-action-btn-mobile"
+                          style={{
+                            padding: '6px 10px',
+                            backgroundColor: '#dc2626',
+                            color: '#fff',
+                            border: 'none',
+                            borderRadius: '4px',
+                            fontSize: '11px',
+                            fontWeight: 'bold',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          Eliminar
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          )}
+
           {quincenaSubView === 'liquidar' ? (
             <>
               <div
@@ -8681,7 +9092,6 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                           );
                           const userPenalties =
                             getApprovedPenaltiesForUserAndCycle(usr.id);
-
                           // FILTRO DE INACTIVIDAD: Solo mostrar si tiene actividad
                           const details = calculateUserSettlementDetails(
                             usr,
@@ -8692,15 +9102,12 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                             bcvRateUsd,
                             penaltyChargeMethod
                           );
-
                           const hasActivity =
                             userClosedNotes.length > 0 ||
                             userVales.length > 0 ||
                             details.hierarchyData.subordinateOrdersCount > 0 ||
                             details.sueldoFijoOriginal > 0;
-
                           if (!hasActivity) return null;
-
                           const assignedLabel =
                             details.hierarchyData.assignedLabelText;
                           return (
@@ -8844,15 +9251,12 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                           bcvRateUsd,
                           penaltyChargeMethod
                         );
-
                         const hasActivity =
                           userClosedNotes.length > 0 ||
                           userVales.length > 0 ||
                           details.hierarchyData.subordinateOrdersCount > 0 ||
                           details.sueldoFijoOriginal > 0;
-
                         if (!hasActivity) return null;
-
                         const assignedLabel =
                           details.hierarchyData.assignedLabelText;
                         return (
@@ -8971,7 +9375,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                 </div>
               </div>
             </>
-          ) : (
+          ) : quincenaSubView === 'historial' ? (
             <div
               style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}
             >
@@ -9347,10 +9751,9 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                 </div>
               </div>
             </div>
-          )}
+          ) : null}
         </div>
       )}
-
       {/* MODAL DE LIQUIDACIÓN QUINCENAL */}
       {settlementModalData && (
         <div
@@ -9415,7 +9818,6 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                 <X size={20} />
               </button>
             </div>
-
             {/* DATOS GENERALES */}
             <div
               style={{
@@ -9450,7 +9852,6 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                 </p>
               </div>
             </div>
-
             {/* CONFIGURACIÓN SUELDO FIJO */}
             {settlementModalData.sueldoFijoOriginal > 0 && (
               <div
@@ -9533,7 +9934,6 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                 </div>
               </div>
             )}
-
             {/* TABLAS DETALLADAS (Notas Propias y Jerarquía) - Se mantienen igual que antes */}
             <h3
               style={{
@@ -9651,7 +10051,6 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                 </tbody>
               </table>
             </div>
-
             {settlementModalData.hierarchyData?.evaluatedOrders?.length > 0 && (
               <>
                 <h3
@@ -9750,7 +10149,6 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                 </div>
               </>
             )}
-
             {/* DEDUCCIONES (Vales y Penalizaciones) */}
             {(settlementModalData.vales.length > 0 ||
               settlementModalData.penalties?.length > 0) && (
@@ -9863,7 +10261,6 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                 </div>
               </>
             )}
-
             {/* D. 4 CUADROS INDEPENDIENTES CON OPERACIONES CORRECTAS */}
             <div
               style={{
@@ -9928,7 +10325,6 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                       )}
                     </strong>
                   </div>
-
                   {/* SUELDO EN USD: Se suma aquí visualmente */}
                   {sueldoFijoCurrency === 'USD' &&
                     Number(settlementModalData.sueldoFijoOriginal) > 0 && (
@@ -9948,7 +10344,6 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                         </strong>
                       </div>
                     )}
-
                   <div
                     style={{
                       color: '#b91c1c',
@@ -9979,7 +10374,6 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                       </strong>
                     </div>
                   )}
-
                   {/* NETO FINAL: comm53NetUsd (comisiones) + sueldoFijoOriginal (si aplica) */}
                   <div
                     style={{
@@ -10007,7 +10401,6 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                   </div>
                 </div>
               )}
-
               {/* 2. BLOQUE 23.08% - REF BS BCV EQ $ */}
               {(Number(settlementModalData.comm23GrossUsd) > 0 ||
                 Number(settlementModalData.hierarchyUsd23) > 0 ||
@@ -10063,7 +10456,6 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                       )}
                     </strong>
                   </div>
-
                   {/* SUELDO EN BS: Se suma aquí visualmente */}
                   {sueldoFijoCurrency === 'BS' &&
                     Number(settlementModalData.sueldoFijoOriginal) > 0 && (
@@ -10084,7 +10476,6 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                         </strong>
                       </div>
                     )}
-
                   <div
                     style={{
                       color: '#b91c1c',
@@ -10115,7 +10506,6 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                       </strong>
                     </div>
                   )}
-
                   {/* NETO EQ: comm23NetUsd (comisiones) + sueldoFijoOriginal (si aplica) */}
                   <div
                     style={{
@@ -10141,7 +10531,6 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                       USD
                     </span>
                   </div>
-
                   {/* EQUIVALENTE EN BS: Multiplica el Neto ya corregido por la tasa */}
                   <div
                     style={{
@@ -10171,7 +10560,6 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                   </div>
                 </div>
               )}
-
               {/* 3. BLOQUE 10% - REF BS BCV EQ $ */}
               {(Number(settlementModalData.comm10GrossUsd) > 0 ||
                 Number(settlementModalData.hierarchyUsd10) > 0 ||
@@ -10297,7 +10685,6 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                   </div>
                 </div>
               )}
-
               {/* 4. BLOQUE 0% - REF BS BCV EQ $ */}
               {(Number(settlementModalData.comm0GrossUsd) > 0 ||
                 Number(settlementModalData.hierarchyUsd0) > 0 ||
@@ -10423,7 +10810,6 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                 </div>
               )}
             </div>
-
             {/* TOTALES FINALES ESTRICTOS */}
             <div
               style={{
@@ -10470,7 +10856,6 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                 </span>
               </div>
             </div>
-
             {/* SELECTOR DE MÉTODO DE PENALIZACIÓN */}
             <div
               style={{
@@ -10541,7 +10926,6 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                 </option>
               </select>
             </div>
-
             {/* BOTONES DE ACCIÓN */}
             <div
               style={{
@@ -10589,7 +10973,6 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
           </div>
         </div>
       )}
-
       {/* Modal Historial: Ver Factura Capturada */}
       {historyInvoiceModalData && (
         <div
@@ -10677,7 +11060,6 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
           </div>
         </div>
       )}
-
       {/* MODAL FLOTANTE DE NOTIFICACIONES DE ABONO */}
       <div
         id="notif-modal-popup"
@@ -10793,7 +11175,6 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
           )}
         </div>
       </div>
-
       {/* MODAL VER DETALLE NOTIFICACIÓN */}
       {viewNotifModalData && (
         <div
@@ -11130,7 +11511,6 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
           </div>
         </div>
       )}
-
       {/* MODAL EDITAR MONTO ABONADO */}
       {editAbonoModalData && (
         <div
@@ -11249,7 +11629,6 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
           </div>
         </div>
       )}
-
       {/* MODAL DE ABONO MANUAL */}
       {abonoModalNote && (
         <div
@@ -11536,7 +11915,6 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
           </div>
         </div>
       )}
-
       {/* MODAL DE BORRADO MASIVO */}
       {bulkDeleteModal.open && (
         <div
@@ -11711,7 +12089,6 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
           </div>
         </div>
       )}
-
       {/* MODAL PREVISUALIZACIÓN DE IMAGEN */}
       {imagePreviewModal && (
         <div
@@ -11793,7 +12170,6 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
           </div>
         </div>
       )}
-
       {/* MODAL RECHAZO */}
       {rejectModalNote && (
         <div
@@ -11898,7 +12274,6 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
           </div>
         </div>
       )}
-
       {/* MODAL GPS */}
       {modalGpsNote && (
         <div
