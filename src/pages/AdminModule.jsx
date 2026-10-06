@@ -279,6 +279,7 @@ export default function AdminModule() {
   const [bcvRateUsd, setBcvRateUsd] = useState(849.56);
   const [bcvLastUpdated, setBcvLastUpdated] = useState('Sin sincronizar');
   const [bcvLoading, setBcvLoading] = useState(false);
+
   // --- A. CONFIGURACIÓN DINÁMICA DE DESCUENTOS ---
   const [globalDiscount53, setGlobalDiscount53] = useState(53.38);
   const [globalDiscount23, setGlobalDiscount23] = useState(23.08);
@@ -454,10 +455,13 @@ export default function AdminModule() {
         );
       if (sellers) setSellersList(sellers);
 
+      // FILTRO DE CLIENTES OFICIALES (is_potential = false)
       const { data: allClients } = await supabase
         .from('clients')
         .select('*, profiles:assigned_seller_id(full_name)')
+        .eq('is_potential', false)
         .order('name', { ascending: true });
+
       if (allClients) setAllClientsList(allClients);
 
       const { data: prods } = await supabase
@@ -479,17 +483,13 @@ export default function AdminModule() {
   // --- E. GESTIÓN DE FOLIOS CORREGIDA ---
   const fetchEstimatedFolio = async () => {
     try {
-      // Intentamos consultar directamente el siguiente valor de la secuencia de PostgreSQL
       const { data, error } = await supabase.rpc('get_next_sales_order_folio');
-
       if (!error && data) {
         setEstimatedNextFolio(String(data));
       } else {
-        // Fallback si la función RPC no existe aún: buscar el máximo pero sumándole 1 limpio
         const { data: ordData } = await supabase
           .from('sales_orders')
           .select('transaction_number');
-
         if (ordData && ordData.length > 0) {
           const numbers = ordData
             .map((item) => Number(item.transaction_number))
@@ -526,7 +526,6 @@ export default function AdminModule() {
         `Secuencia de folios actualizada. Siguiente automático será aprox. ${num}.`
       );
       setSequenceResetTargetNum('');
-      // Forzar recarga inmediata para reflejar cambio visualmente
       await fetchEstimatedFolio();
     } catch (err) {
       setErrorMsg('Error al reconfigurar secuencia RPC: ' + err.message);
@@ -673,7 +672,6 @@ export default function AdminModule() {
             .eq('id', item.product_id);
         }
       }
-
       showToastSuccess(
         `Nota de entrega #${newNota.transaction_number} creada, aprobada y asignada con éxito.`
       );
@@ -704,6 +702,7 @@ export default function AdminModule() {
       setCobranzaSortAsc(true);
     }
   };
+
   const handleSortQuincena = (field) => {
     if (quincenaSortField === field) {
       setQuincenaSortAsc(!quincenaSortAsc);
@@ -997,10 +996,11 @@ export default function AdminModule() {
           setPaymentNotifications(notifs || []);
         }
       } else if (activeTab === 'vales_penalizaciones') {
+        // VALES INDEPENDIENTES: Sin join obligatorio a order_id
         const { data, error } = await supabase
           .from('vales')
           .select(
-            '*, seller:seller_id(id, full_name, email, pct_bombillos, pct_fluidos, sueldo_fijo_usd), order:order_id(*, client:client_id(name), seller:seller_id(id, full_name))'
+            '*, seller:seller_id(id, full_name, email, pct_bombillos, pct_fluidos, sueldo_fijo_usd)'
           )
           .order('created_at', { ascending: false });
         if (error) throw error;
@@ -1033,7 +1033,24 @@ export default function AdminModule() {
           .select('*')
           .in('role', ['vendedor', 'supervisor', 'gerente', 'administrador']);
         if (profErr) throw profErr;
-        setLiquidaciones(profs || []);
+
+        // CANDADO UNIVERSAL: Obtener facturas existentes para el ciclo seleccionado
+        const { data: existingInvoices, error: invErr } = await supabase
+          .from('settlement_invoices')
+          .select('user_id')
+          .eq('month', selectedMonth)
+          .eq('year', selectedYear)
+          .eq('cycle', selectedCycle);
+
+        const invoicedUserIds = new Set(
+          (existingInvoices || []).map((i) => i.user_id)
+        );
+
+        // Filtrar perfiles que ya tienen factura
+        const eligibleProfiles = (profs || []).filter(
+          (p) => !invoicedUserIds.has(p.id)
+        );
+        setLiquidaciones(eligibleProfiles);
 
         const { data: closedOrd, error: closedErr } = await supabase
           .from('sales_orders')
@@ -1046,11 +1063,10 @@ export default function AdminModule() {
           setClosedOrdersList(closedOrd || []);
         }
 
+        // VALES INDEPENDIENTES: Obtener todos los vales aprobados sin filtrar por order_id
         const { data: appVales, error: valErr } = await supabase
           .from('vales')
-          .select(
-            '*, seller:seller_id(id, full_name), order:order_id(transaction_number, payment_discount)'
-          )
+          .select('*, seller:seller_id(id, full_name)')
           .eq('status', 'aprobada');
         if (!valErr) {
           setApprovedValesList(appVales || []);
@@ -1076,7 +1092,6 @@ export default function AdminModule() {
           .from('sales_orders')
           .select('id, transaction_number, final_price_usd, balance_due_usd');
         if (ords) setAllOrdersList(ords);
-
         await fetchPaymentHistoryFromDB();
       }
     } catch (err) {
@@ -1151,6 +1166,7 @@ export default function AdminModule() {
     });
   };
 
+  // VALES INDEPENDIENTES: Filtrado solo por usuario, sin依赖 de order_id
   const getApprovedValesForUserAndCycle = (userId) => {
     return approvedValesList.filter((v) => {
       const valeSellerId = v.seller_id || v.seller?.id;
@@ -1327,7 +1343,7 @@ export default function AdminModule() {
     };
   };
 
-  // --- D. LÓGICA DE LIQUIDACIÓN CON 4 BLOQUES ---
+  // --- D. LÓGICA DE LIQUIDACIÓN CON 4 BLOQUES Y REGLA ESTRICTA ---
   const calculateUserSettlementDetails = (
     user,
     userNotes,
@@ -1341,10 +1357,21 @@ export default function AdminModule() {
     let comm23GrossUsd = 0;
     let comm10GrossUsd = 0;
     let comm0GrossUsd = 0;
+
+    // Vales independientes se distribuyen proporcionalmente o se asignan a la modalidad principal (53.38) para el cálculo del Total USD
+    // Según requerimiento: Total USD = Neto 53.38. Por lo tanto, los vales restan aquí.
     let valesDeduction53Usd = 0;
     let valesDeduction23Usd = 0;
     let valesDeduction10Usd = 0;
     let valesDeduction0Usd = 0;
+
+    // Distribución simple de vales: Si no tienen modalidad asociada, asumimos que restan del bloque principal (53.38) para efectos del "Total a Pagar USD"
+    // O podemos dividirlos equitativamente. Para cumplir "Total USD = Neto 53.38", asignaremos todos los vales al bloque 53.38.
+    const totalValesAmount = userVales.reduce(
+      (acc, v) => acc + Number(v.requested_amount_usd || 0),
+      0
+    );
+    valesDeduction53Usd = totalValesAmount;
 
     userNotes.forEach((n) => {
       const mode = String(n.payment_discount || '53.38');
@@ -1353,15 +1380,6 @@ export default function AdminModule() {
       else if (mode === '23.08') comm23GrossUsd += commission;
       else if (mode === '10') comm10GrossUsd += commission;
       else if (mode === '0') comm0GrossUsd += commission;
-    });
-
-    userVales.forEach((v) => {
-      const mode = String(v.order?.payment_discount || '53.38');
-      const valAmt = Number(v.requested_amount_usd || 0);
-      if (mode === '53.38') valesDeduction53Usd += valAmt;
-      else if (mode === '23.08') valesDeduction23Usd += valAmt;
-      else if (mode === '10') valesDeduction10Usd += valAmt;
-      else if (mode === '0') valesDeduction0Usd += valAmt;
     });
 
     const totalPenaltiesUsd = userPenalties.reduce(
@@ -1381,10 +1399,14 @@ export default function AdminModule() {
     const hierarchyUsd0 = hierarchyData.hierarchyCommissionUsd0 || 0;
     const hierarchyUsd = hierarchyData.hierarchyCommissionUsd || 0;
 
+    // CÁLCULO NETO POR BLOQUE
     const comm53NetUsd = Math.max(
       0,
       comm53GrossUsd + hierarchyUsd53 - valesDeduction53Usd - penDeduction53
     );
+
+    // Los otros bloques no tienen deducción de vales directa en este modelo estricto,
+    // pero si quisiéramos distribuir, sería aquí. Dejamos en 0 para mantener integridad del Total USD.
     const comm23NetUsd = Math.max(
       0,
       comm23GrossUsd + hierarchyUsd23 - valesDeduction23Usd - penDeduction23
@@ -1400,34 +1422,28 @@ export default function AdminModule() {
 
     const rawSueldoFijo = Number(user.sueldo_fijo_usd || 0) / 2;
     const currentRate = Number(Number(rateVal || 1).toFixed(2));
+
+    // Sueldo se suma al bloque correspondiente según moneda
     const sueldoFijoBs = sfCurr === 'BS' ? rawSueldoFijo * currentRate : 0;
     const sueldoFijoEquivalentUsd = rawSueldoFijo;
 
-    // Para efectos de total en BS, sumamos todos los netos equivalentes + sueldo si aplica
-    const totalNetoAllUsd =
-      comm53NetUsd + comm23NetUsd + comm10NetUsd + comm0NetUsd;
-    const comm23NetUsdWithSueldo =
-      sfCurr === 'BS' ? comm23NetUsd + rawSueldoFijo : comm23NetUsd;
-
-    // Base para conversión BS (solo lo que no es 53.38 directo)
-    const baseToMultiplyByRateBs =
-      comm23NetUsd +
-      comm10NetUsd +
-      comm0NetUsd -
-      valesDeduction23Usd -
-      valesDeduction10Usd -
-      valesDeduction0Usd -
-      penDeduction23 -
-      penDeduction10 -
-      penDeduction0 +
-      hierarchyUsd23 +
-      hierarchyUsd10 +
-      hierarchyUsd0 +
-      (sfCurr === 'BS' ? rawSueldoFijo : 0);
-
-    const total23NetBs = Math.max(0, baseToMultiplyByRateBs) * currentRate;
+    // TOTAL A PAGAR USD: Estrictamente el bloque 53.38 (+ sueldo si es USD)
     const totalEquivalentUsd =
-      sfCurr === 'USD' ? rawSueldoFijo + totalNetoAllUsd : totalNetoAllUsd;
+      sfCurr === 'USD' ? comm53NetUsd + rawSueldoFijo : comm53NetUsd;
+
+    // TOTAL A PAGAR BS: Suma de equivalentes Bs de los otros bloques (+ sueldo si es BS)
+    // Bloque 23.08
+    const base23Bs = (comm23NetUsd + hierarchyUsd23) * currentRate;
+    // Bloque 10
+    const base10Bs = (comm10NetUsd + hierarchyUsd10) * currentRate;
+    // Bloque 0
+    const base0Bs = (comm0NetUsd + hierarchyUsd0) * currentRate;
+
+    const totalNetoPagarBs =
+      base23Bs +
+      base10Bs +
+      base0Bs +
+      (sfCurr === 'BS' ? rawSueldoFijo * currentRate : 0);
 
     return {
       user,
@@ -1461,9 +1477,8 @@ export default function AdminModule() {
       hierarchyUsd23,
       hierarchyUsd10,
       hierarchyUsd0,
-      comm23NetUsdWithSueldo,
-      total23NetBs,
-      totalEquivalentUsd,
+      totalEquivalentUsd, // Este es el TOTAL USD
+      totalNetoPagarBs, // Este es el TOTAL BS
       hierarchyData,
     };
   };
@@ -1472,6 +1487,8 @@ export default function AdminModule() {
     const userNotes = getClosedNotesForUserAndCycle(user.id);
     const userVales = getApprovedValesForUserAndCycle(user.id);
     const userPenalties = getApprovedPenaltiesForUserAndCycle(user.id);
+
+    // Verificar si hay algo que cobrar
     const details = calculateUserSettlementDetails(
       user,
       userNotes,
@@ -1481,6 +1498,19 @@ export default function AdminModule() {
       bcvRateUsd,
       penaltyChargeMethod
     );
+
+    // Filtro de inactividad: Si no tiene notas, ni vales, ni jerarquía, ni sueldo, no abrir modal o mostrar alerta
+    const hasActivity =
+      userNotes.length > 0 ||
+      userVales.length > 0 ||
+      details.hierarchyData.subordinateOrdersCount > 0 ||
+      details.sueldoFijoOriginal > 0;
+
+    if (!hasActivity) {
+      // Opcional: Podrías querer permitir abrirlo igual para ver ceros, pero el requerimiento dice ocultar en lista.
+      // Si llega aquí, es porque estaba en la lista pero quizás cambió algo.
+    }
+
     setSettlementModalData(details);
   };
 
@@ -1530,6 +1560,7 @@ export default function AdminModule() {
         capturedHTMLContent = clonedNode.innerHTML;
       }
 
+      // 1. Procesar Penalizaciones como Abonos
       for (const pen of settlementModalData.penalties) {
         const penAmt = Number(pen.amount || 0);
         if (pen.order_id && penAmt > 0) {
@@ -1573,6 +1604,33 @@ export default function AdminModule() {
           .eq('id', pen.id);
       }
 
+      // 2. Guardar Respaldo de Comisiones Jerárquicas (Soporte DB)
+      // Intentamos insertar en hierarchy_settlement_backups si existe la tabla
+      try {
+        const hierarchyBackups =
+          settlementModalData.hierarchyData.evaluatedOrders.map((eo) => ({
+            parent_user_id: settlementModalData.user.id,
+            subordinate_order_id: eo.order.id,
+            commission_amount: eo.commissionUsd,
+            payment_discount: eo.paymentDiscount,
+            settled_at: new Date().toISOString(),
+            cycle: selectedCycle,
+            month: selectedMonth,
+            year: selectedYear,
+          }));
+        if (hierarchyBackups.length > 0) {
+          await supabase
+            .from('hierarchy_settlement_backups')
+            .insert(hierarchyBackups);
+        }
+      } catch (backupErr) {
+        console.warn(
+          'Tabla hierarchy_settlement_backups no disponible o error:',
+          backupErr
+        );
+      }
+
+      // 3. Insertar Factura
       const { data: insertedInv, error: invErr } = await supabase
         .from('settlement_invoices')
         .insert([
@@ -1592,7 +1650,7 @@ export default function AdminModule() {
             comm_53_net_usd: settlementModalData.comm53NetUsd,
             comm_23_net_usd: settlementModalData.comm23NetUsd,
             total_neto_pagar_usd: settlementModalData.totalEquivalentUsd,
-            total_neto_pagar_bs: settlementModalData.total23NetBs,
+            total_neto_pagar_bs: settlementModalData.totalNetoPagarBs,
             captured_html: capturedHTMLContent,
             status: 'pagada',
             created_by: authData?.user?.id,
@@ -1602,6 +1660,7 @@ export default function AdminModule() {
         .single();
       if (invErr) throw invErr;
 
+      // 4. Limpiar Datos
       const noteIdsToDelete = settlementModalData.notes.map((n) => n.id);
       if (noteIdsToDelete.length > 0) {
         await supabase
@@ -1619,6 +1678,7 @@ export default function AdminModule() {
         await supabase.from('sales_orders').delete().in('id', noteIdsToDelete);
       }
 
+      // VALES INDEPENDIENTES: Borrar vales usados en este ciclo para este usuario
       const valeIdsToDelete = settlementModalData.vales.map((v) => v.id);
       if (valeIdsToDelete.length > 0) {
         await supabase.from('vales').delete().in('id', valeIdsToDelete);
@@ -1628,7 +1688,6 @@ export default function AdminModule() {
       if (penIdsToDelete.length > 0) {
         await supabase.from('penalties').delete().in('id', penIdsToDelete);
       }
-
       if (noteIdsToDelete.length > 0) {
         await supabase
           .from('penalties')
@@ -1646,14 +1705,13 @@ export default function AdminModule() {
               fechaInicio: `${selectedMonth}/${selectedYear}`,
               fechaFin: `${selectedMonth}/${selectedYear}`,
               montoDivisas: settlementModalData.totalEquivalentUsd.toFixed(2),
-              montoBs: settlementModalData.total23NetBs.toFixed(2),
+              montoBs: settlementModalData.totalNetoPagarBs.toFixed(2),
             },
           },
         });
       } catch (e) {
         console.warn('Error enviando notif de liquidación:', e);
       }
-
       showToastSuccess(
         `Factura ${invCode} generada, penalizaciones aplicadas como abonos, y ciclos liquidados.`
       );
@@ -1726,11 +1784,18 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
   const handleDownloadPDF = async (nota) => {
     try {
       setLoading(true);
+
+      // 1. OBTENER PORCENTAJE DINÁMICO SEGÚN CONFIGURACIÓN GLOBAL
+      const discountPct = getDiscountPercent(
+        String(nota.payment_discount || '53.38')
+      );
+
       const { data: items, error } = await supabase
         .from('order_items')
         .select('*, products(code, description)')
         .eq('order_id', nota.id);
       if (error) throw error;
+
       if (!window.html2pdf) {
         await new Promise((resolve, reject) => {
           const script = document.createElement('script');
@@ -1741,24 +1806,14 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
           document.head.appendChild(script);
         });
       }
+
+      // 2. CORRECCIÓN DE VARIABLES (Evita el error currentSellerName)
       const clientName = nota.client?.name || nota.clients?.name || 'Cliente';
       const transNo = nota.transaction_number || nota.id.substring(0, 8);
       const fecha = new Date(nota.created_at).toLocaleString();
       const vendedorName = nota.seller?.full_name || 'Vendedor';
-      const associatedPenalties = penalties.filter(
-        (p) => String(p.order_id) === String(nota.id)
-      );
-      let penaltiesHtml = '';
-      if (associatedPenalties.length > 0) {
-        associatedPenalties.forEach((p) => {
-          penaltiesHtml += `
-<div style="display: flex; justify-content: space-between; margin-bottom: 4px; color: #DC2626;">
-<span>Penalización (${p.status || 'pendiente'}): </span>
-<strong>$${Number(p.amount || 0).toFixed(2)} </strong>
-</div>
-`;
-        });
-      }
+
+      // Construcción de tabla de productos (Conservada igual)
       let itemsHtml = '';
       let subTotal = 0;
       if (items && items.length > 0) {
@@ -1768,98 +1823,114 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
             item.quantity * item.discounted_unit_price_usd;
           subTotal += totalLine;
           itemsHtml += `
-<tr>
-<td style="padding: 6px 8px; border-bottom: 1px solid #ddd; font-family: monospace;">${
-            item.products?.code || 'S/C'
-          } </td>
-<td style="padding: 6px 8px; border-bottom: 1px solid #ddd;">${
-            item.products?.description || 'Producto'
-          } </td>
-<td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: center;">${
-            item.quantity
-          } </td>
-<td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: right;">$${Number(
-            item.unit_price_usd || 0
-          ).toFixed(2)} </td>
-<td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: right; color: #B45309;">$${Number(
-            item.discounted_unit_price_usd || 0
-          ).toFixed(2)} </td>
-<td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: right; font-weight: bold;">$${Number(
-            totalLine
-          ).toFixed(2)} </td>
-</tr>
-`;
+            <tr>
+              <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; font-family: monospace;">${
+                item.products?.code || 'S/C'
+              }</td>
+              <td style="padding: 6px 8px; border-bottom: 1px solid #ddd;">${
+                item.products?.description || 'Producto'
+              }</td>
+              <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: center;">${
+                item.quantity
+              }</td>
+              <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: right;">$${Number(
+                item.unit_price_usd || 0
+              ).toFixed(2)}</td>
+              <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: right; color: #B45309;">$${Number(
+                item.discounted_unit_price_usd || 0
+              ).toFixed(2)}</td>
+              <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: right; font-weight: bold;">$${Number(
+                totalLine
+              ).toFixed(2)}</td>
+            </tr>`;
         });
       }
+
+      // 3. DISEÑO SIMPLIFICADO CON PORCENTAJE INCLUIDO
       const container = document.createElement('div');
       container.innerHTML = `
-<div style="font-family: Arial, sans-serif; color: #111; padding: 25px; background: #fff; width: 700px; height: 1000px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between; margin: 0 auto;">
-<div>
-<div style="display: flex; justify-content: space-between; border-bottom: 2px solid #111; padding-bottom: 15px; margin-bottom: 20px;">
-<div>
-<h2 style="margin: 0; font-size: 20px; text-transform: uppercase;">FENIX AUTO PART C.A </h2>
-<p style="margin: 2px 0; font-size: 12px;"> <strong>RIF: </strong> J-50261925-2 </p>
-<p style="margin: 8px 0 0 0; font-size: 12px;"> <strong>Cliente: </strong> ${clientName} </p>
-</div>
-<div style="text-align: right; font-size: 12px;">
-<p style="margin: 2px 0;"> <strong>N° Transacción: </strong> #${transNo} </p>
-<p style="margin: 2px 0;"> <strong>Fecha/Hora: </strong> ${fecha} </p>
-<p style="margin: 2px 0;"> <strong>Vendedor: </strong> ${vendedorName} </p>
-<p style="margin: 2px 0;"> <strong>Categoría: </strong> ${
-        nota.category || 'General'
-      } </p>
-</div>
-</div>
-<table style="width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 20px;">
-<thead>
-<tr style="background-color: #f3f4f6;">
-<th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: left;">Código </th>
-<th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: left;">Descripción </th>
-<th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: center;">Cantidad </th>
-<th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: right;">V. Unitario </th>
-<th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: right;">V. U. con Descuento </th>
-<th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: right;">Total Línea </th>
-</tr>
-</thead>
-<tbody>
-${itemsHtml}
-</tbody>
-</table>
-</div>
-<div>
-<div style="display: flex; justify-content: flex-end; font-size: 12px; margin-bottom: 15px;">
-<div style="width: 300px; background: #f9fafb; padding: 12px; border: 1px solid #ddd; border-radius: 6px;">
-<div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
-<span>Total Base: </span>
-<strong>$${Number(nota.total_base_usd || subTotal).toFixed(2)} </strong>
-</div>
-<div style="display: flex; justify-content: space-between; margin-bottom: 6px; color: #B45309;">
-<span>Descuento Aplicado: </span>
-<strong>-$${Number(nota.discount_amount_usd || 0).toFixed(2)} </strong>
-</div>
-${penaltiesHtml}
-<div style="display: flex; justify-content: space-between; border-top: 1px solid #ccc; padding-top: 6px; font-weight: bold; font-size: 14px; color: #DC2626;">
-<span>Precio Final: </span>
-<span>$${Number(nota.final_price_usd || subTotal).toFixed(2)} </span>
-</div>
-<div style="display: flex; justify-content: space-between; margin-top: 4px; font-size: 12px;">
-<span>Abonado Total: </span>
-<span>$${Number(nota.total_paid_usd || 0).toFixed(2)} </span>
-</div>
-<div style="display: flex; justify-content: space-between; margin-top: 4px; font-size: 12px; color: ${
-        Number(nota.balance_due_usd || 0) > 0 ? '#DC2626' : '#16A34A'
-      }; font-weight: bold;">
-<span>Saldo Pendiente: </span>
-<span>$${Number(nota.balance_due_usd || 0).toFixed(2)} </span>
-</div>
-</div>
-</div>
-<div style="font-size: 10px; color: #555; background: #f3f4f6; padding: 10px; border-radius: 4px; line-height: 1.4; text-align: justify;">
-<strong>Términos y condiciones: </strong> ${globalTerms}
-</div>
-</div>
-</div>
-`;
+        <div style="font-family: Arial, sans-serif; color: #111; padding: 25px; background: #fff; width: 700px; height: 1000px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between; margin: 0 auto;">
+          
+          <!-- ENCABEZADO -->
+          <div>
+            <div style="display: flex; justify-content: space-between; border-bottom: 2px solid #111; padding-bottom: 15px; margin-bottom: 20px;">
+              <div>
+                <h2 style="margin: 0; font-size: 20px; text-transform: uppercase;">FENIX AUTO PART C.A</h2>
+                <p style="margin: 2px 0; font-size: 12px;"><strong>RIF:</strong> J-50261925-2</p>
+                <p style="margin: 8px 0 0 0; font-size: 12px;"><strong>Cliente:</strong> ${clientName}</p>
+              </div>
+              <div style="text-align: right; font-size: 12px;">
+                <p style="margin: 2px 0;"><strong>N° Transacción:</strong> #${transNo}</p>
+                <p style="margin: 2px 0;"><strong>Fecha/Hora:</strong> ${fecha}</p>
+                <p style="margin: 2px 0;"><strong>Vendedor:</strong> ${vendedorName}</p>
+                <p style="margin: 2px 0;"><strong>Categoría:</strong> ${
+                  nota.category || 'General'
+                }</p>
+              </div>
+            </div>
+
+            <!-- TABLA DE PRODUCTOS -->
+            <table style="width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 20px;">
+              <thead>
+                <tr style="background-color: #f3f4f6;">
+                  <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: left;">Código</th>
+                  <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: left;">Descripción</th>
+                  <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: center;">Cantidad</th>
+                  <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: right;">V. Unitario</th>
+                  <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: right;">V. U. con Descuento</th>
+                  <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: right;">Total Línea</th>
+                </tr>
+              </thead>
+              <tbody>${itemsHtml}</tbody>
+            </table>
+          </div>
+
+          <!-- RESUMEN SIMPLIFICADO CON PORCENTAJE -->
+          <div>
+            <div style="display: flex; justify-content: flex-end; font-size: 12px; margin-bottom: 15px;">
+              <div style="width: 280px; background: #f9fafb; padding: 12px; border: 1px solid #e5e7eb; border-radius: 6px;">
+                
+                <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+                  <span>Total Base:</span>
+                  <strong>$${Number(nota.total_base_usd || subTotal).toFixed(
+                    2
+                  )}</strong>
+                </div>
+                
+                <!-- AQUÍ SE MUESTRA EL PORCENTAJE DINÁMICO -->
+                <div style="display: flex; justify-content: space-between; margin-bottom: 6px; color: #D97706;">
+                  <span>Descuento Aplicado (${discountPct}%):</span>
+                  <strong>-$${Number(nota.discount_amount_usd || 0).toFixed(
+                    2
+                  )}</strong>
+                </div>
+                
+                <div style="display: flex; justify-content: space-between; border-top: 1px solid #ccc; padding-top: 6px; font-weight: bold; font-size: 14px; color: #DC2626;">
+                  <span>Precio Final:</span>
+                  <span>$${Number(nota.final_price_usd || subTotal).toFixed(
+                    2
+                  )}</span>
+                </div>                                
+              </div>
+            </div>
+
+            ${
+              nota.observation
+                ? `
+              <div style="font-size: 11px; color: #333; background: #fffbeb; border: 1px solid #fde68a; padding: 10px; border-radius: 4px; margin-bottom: 10px; text-align: justify;">
+                <strong>Observación:</strong> ${nota.observation}
+              </div>
+            `
+                : ''
+            }
+
+            <div style="font-size: 10px; color: #555; background: #f3f4f6; padding: 10px; border-radius: 4px; line-height: 1.4; text-align: justify;">
+              <strong>Términos y condiciones:</strong> ${globalTerms}
+            </div>
+          </div>
+        </div>
+      `;
+
       const opciones = {
         margin: 0,
         filename: `nota-entrega-${transNo}.pdf`,
@@ -1975,13 +2046,11 @@ ${penaltiesHtml}
       );
       if (duplicate) {
         const confirmDup = window.confirm(
-          `⚠️ PAGO DUPLICADO DETECTADO
-Ya existe un pago con Monto: $${montoNum.toFixed(
+          `⚠️ PAGO DUPLICADO DETECTADO Ya existe un pago con Monto: $${montoNum.toFixed(
             2
           )} y Referencia: "${refNum}" registrado el ${new Date(
             duplicate.payment_date
-          ).toLocaleDateString()}.
-¿Desea continuar aprobando este pago duplicado de todas formas?`
+          ).toLocaleDateString()}. ¿Desea continuar aprobando este pago duplicado de todas formas?`
         );
         if (!confirmDup) {
           setLoading(false);
@@ -2031,7 +2100,6 @@ Ya existe un pago con Monto: $${montoNum.toFixed(
         .eq('id', notif.order_id)
         .single();
       if (orderFetchErr) throw orderFetchErr;
-
       const nuevoAbonado = Number(orderData.total_paid_usd || 0) + montoNum;
       const nuevoSaldo = Math.max(
         0,
@@ -2049,13 +2117,11 @@ Ya existe un pago con Monto: $${montoNum.toFixed(
         })
         .eq('id', notif.order_id);
       if (orderUpdateErr) throw orderUpdateErr;
-
       const { error: notifUpdateErr } = await supabase
         .from('seller_payment_notifications')
         .update({ status: 'approved' })
         .eq('id', notif.id);
       if (notifUpdateErr) throw notifUpdateErr;
-
       try {
         const vendedorEmail = notif.seller?.email;
         const vendedorNombre = notif.seller?.full_name;
@@ -2090,7 +2156,6 @@ Ya existe un pago con Monto: $${montoNum.toFixed(
           notifErr
         );
       }
-
       showToastSuccess(
         `Notificación de abono de $${montoNum.toFixed(
           2
@@ -2220,11 +2285,9 @@ Ya existe un pago con Monto: $${montoNum.toFixed(
           duplicates[0].payment_date
         ).toLocaleDateString();
         const continueAnyway = window.confirm(
-          `⚠️ ATENCIÓN: Este pago parece estar duplicado.
-Ya existe un registro con Monto: $${montoNum.toFixed(
+          `⚠️ ATENCIÓN: Este pago parece estar duplicado. Ya existe un registro con Monto: $${montoNum.toFixed(
             2
-          )} y Referencia: "${refNum}" fechado el ${dupDate}.
-¿Desea continuar guardando este abono de todas formas?`
+          )} y Referencia: "${refNum}" fechado el ${dupDate}. ¿Desea continuar guardando este abono de todas formas?`
         );
         if (!continueAnyway) return;
       }
@@ -2451,7 +2514,6 @@ Ya existe un registro con Monto: $${montoNum.toFixed(
         .select('*, products(code, description)')
         .eq('order_id', note.id);
       if (itemsErr) throw itemsErr;
-
       const mappedItems = (items || []).map((item) => ({
         product_id: item.product_id,
         code: item.products?.code || 'S/C',
@@ -2464,7 +2526,6 @@ Ya existe un registro con Monto: $${montoNum.toFixed(
             item.quantity * Number(item.discounted_unit_price_usd || 0)
         ),
       }));
-
       setEditingNoteId(note.id);
       setEditNoteClientName(note.client?.name || 'Cliente');
       setEditNoteCategory(note.category || 'bombillos');
@@ -2504,7 +2565,6 @@ Ya existe un registro con Monto: $${montoNum.toFixed(
       alert('La cantidad debe ser mayor a 0');
       return;
     }
-    // Recalcular descuento dinámicamente basado en el selector actual
     const descPct = getDiscountPercent(editNotePaymentDiscount);
     const vuConDesc = Number(prod.price_usd) * (1 - descPct / 100);
     const existingIdx = editNoteItems.findIndex(
@@ -2594,7 +2654,6 @@ Ya existe un registro con Monto: $${montoNum.toFixed(
         .delete()
         .eq('order_id', note.id);
       if (delErr) throw delErr;
-
       if (editNoteItems.length > 0) {
         const rowsToInsert = editNoteItems.map((item) => ({
           order_id: note.id,
@@ -2697,7 +2756,8 @@ Ya existe un registro con Monto: $${montoNum.toFixed(
       const valeActual = vales.find((v) => v.id === valeId);
       const vendedorEmail = valeActual?.seller?.email;
       const vendedorNombre = valeActual?.seller?.full_name;
-      const nroTransaccion = valeActual?.order?.transaction_number || 'N/A';
+      // VALES INDEPENDIENTES: Sin N.E. asociada obligatoria
+      const nroTransaccion = 'VALE-IND';
       const montoVale = Number(valeActual?.requested_amount_usd || 0).toFixed(
         2
       );
@@ -2877,25 +2937,19 @@ Ya existe un registro con Monto: $${montoNum.toFixed(
     }
   };
 
+  // VALES INDEPENDIENTES: Asignación sin order_id obligatorio
   const handleAdminAssignVale = async () => {
     if (!assignTargetUserId) return alert('Seleccione un usuario.');
     const amt = Number(assignAmountUsd);
     if (isNaN(amt) || amt <= 0) return alert('Monto inválido.');
     setLoading(true);
     try {
-      const selOrd = allOrdersList.find(
-        (o) => String(o.id) === String(assignLinkedOrderId)
-      );
-      const sellerObj = sellersList.find(
-        (s) => String(s.id) === String(assignTargetUserId)
-      );
-      const estComm = calcOrderCommissionUSD(selOrd, sellerObj);
       const payload = {
         seller_id: assignTargetUserId,
         requested_amount_usd: amt,
-        estimated_commission_usd: estComm,
+        estimated_commission_usd: 0, // No depende de orden
         status: 'aprobada',
-        order_id: assignLinkedOrderId || null,
+        order_id: null, // Independiente
       };
       const { error } = await supabase.from('vales').insert([payload]);
       if (error) throw error;
@@ -2918,7 +2972,6 @@ Ya existe un registro con Monto: $${montoNum.toFixed(
     cobranzaNotes.find((n) => n.id === editingNoteId) ||
     pendingNotes.find((n) => n.id === editingNoteId);
 
-  // Productos filtrados para edición (recalculando precios visuales según selector actual)
   const filteredProducts = editNoteProductsList.filter(
     (p) =>
       (!p.category ||
@@ -2978,6 +3031,7 @@ Ya existe un registro con Monto: $${montoNum.toFixed(
     (o) => String(o.seller_id || o.seller?.id) === String(assignTargetUserId)
   );
 
+  // CÁLCULO DE TOTALES GLOBALES PARA RESUMEN
   const totalCycleValesDeduct = liquidaciones.reduce((sum, usr) => {
     const vList = getApprovedValesForUserAndCycle(usr.id);
     return (
@@ -3084,19 +3138,19 @@ Ya existe un registro con Monto: $${montoNum.toFixed(
           }}
         >
           <div>
-            <span style={{ color: '#6b7280' }}>Código:</span>{' '}
+            <span style={{ color: '#6b7280' }}>Código: </span>{' '}
             <strong>{item.code}</strong>
           </div>
           <div style={{ textAlign: 'right' }}>
-            <span style={{ color: '#6b7280' }}>Cant:</span>{' '}
+            <span style={{ color: '#6b7280' }}>Cant: </span>{' '}
             <strong>{item.quantity}</strong>
           </div>
           <div>
-            <span style={{ color: '#6b7280' }}>P. Unit:</span>{' '}
+            <span style={{ color: '#6b7280' }}>P. Unit: </span>{' '}
             <strong>${Number(item.unit_price_usd).toFixed(2)}</strong>
           </div>
           <div style={{ textAlign: 'right' }}>
-            <span style={{ color: '#b45309' }}>Desc:</span>{' '}
+            <span style={{ color: '#b45309' }}>Desc: </span>{' '}
             <strong>
               ${Number(item.discounted_unit_price_usd).toFixed(2)}
             </strong>
@@ -3131,220 +3185,7 @@ Ya existe un registro con Monto: $${montoNum.toFixed(
       }}
     >
       {/* --- ESTILOS RESPONSIVOS (E) --- */}
-      <style>{`
-.admin-tabs-desktop {
-display: flex;
-gap: 8px;
-border-bottom: 2px solid #e5e7eb;
-margin-bottom: 24px;
-overflow-x: auto;
-}
-.admin-tabs-mobile {
-display: none;
-position: relative;
-margin-bottom: 24px;
-}
-.admin-mobile-trigger {
-width: 100%;
-padding: 12px 16px;
-background: #ffffff;
-border: 1px solid #d1d5db;
-border-radius: 8px;
-display: flex;
-justify-content: space-between;
-align-items: center;
-cursor: pointer;
-font-weight: 700;
-color: #111827;
-font-size: 14px;
-}
-.admin-mobile-dropdown {
-position: absolute;
-top: calc(100% + 4px);
-left: 0;
-right: 0;
-background: #ffffff;
-border: 1px solid #d1d5db;
-border-radius: 8px;
-box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); /* Sombra original preferida */
-z-index: 1000;
-overflow: hidden;
-}
-.admin-mobile-item {
-padding: 12px 16px;
-display: flex;
-alignItems: center;
-gap: 10px;
-cursor: pointer;
-border-bottom: 1px solid #e5e7eb;
-color: #4b5563;
-font-size: 14px;
-transition: background 0.15s;
-}
-.admin-mobile-item:last-child {
-border-bottom: none;
-}
-.admin-mobile-item:hover {
-background: #fef2f2; /* Fondo hover preferido */
-}
-.admin-mobile-item.active {
-background: #fef2f2; /* Fondo activo preferido */
-color: #dc2626;
-font-weight: 700;
-}
-.admin-aging-section {
-background: #fffbeb;
-border: 1px solid #fde68a;
-border-radius: 8px;
-padding: 14px 16px;
-margin-bottom: 16px;
-}
-.admin-aging-title {
-font-size: 13px;
-font-weight: 800;
-color: #78350f;
-margin-bottom: 10px;
-display: flex;
-alignItems: center;
-gap: 8px;
-}
-.admin-aging-item {
-display: flex;
-justify-content: space-between;
-align-items: center;
-padding: 6px 10px;
-background: #ffffff;
-border: 1px solid #fde68a;
-border-radius: 6px;
-margin-bottom: 6px;
-font-size: 12px;
-}
-.admin-aging-item:last-child {
-margin-bottom: 0;
-}
-.admin-days-30 {
-text-decoration: underline;
-text-decoration-color: #eab308;
-text-decoration-thickness: 3px;
-text-underline-offset: 3px;
-}
-.admin-days-45 {
-text-decoration: underline;
-text-decoration-color: #f97316;
-text-decoration-thickness: 3px;
-text-underline-offset: 3px;
-}
-.admin-days-60 {
-text-decoration: underline;
-text-decoration-color: #dc2626;
-text-decoration-thickness: 3px;
-text-underline-offset: 3px;
-}
-/* --- TABLAS RESPONSIVAS (E) --- */
-.admin-table-desktop {
-width: 100%;
-border-collapse: collapse;
-text-align: left;
-font-size: 13px;
-}
-.admin-mobile-cards {
-display: none;
-}
-.admin-mobile-card {
-background: #ffffff;
-border: 1px solid #e5e7eb;
-border-radius: 8px;
-padding: 12px;
-marginBottom: 10px;
-boxShadow: 0 1px 2px rgba(0,0,0,0.05);
-}
-.admin-mobile-card-header {
-font-size: 14px;
-font-weight: 800;
-color: #111827;
-border-bottom: 1px solid #e5e7eb;
-padding-bottom: 8px;
-margin-bottom: 8px;
-}
-.admin-mobile-card-row {
-display: flex;
-justify-content: space-between;
-align-items: center;
-padding: 4px 0;
-font-size: 12px;
-border-bottom: 1px dashed #f3f4f6;
-}
-.admin-mobile-card-row:last-child {
-border-bottom: none;
-}
-.admin-mobile-card-label {
-color: #6b7280;
-font-weight: 600;
-font-size: 11px;
-}
-.admin-mobile-card-value {
-color: #111827;
-font-weight: 600;
-text-align: right;
-max-width: 60%;
-word-break: break-word;
-}
-.admin-mobile-card-actions {
-display: flex;
-flex-wrap: wrap;
-gap: 6px;
-margin-top: 10px;
-padding-top: 10px;
-border-top: 1px solid #e5e7eb;
-}
-@media (max-width: 768px) {
-.admin-tabs-desktop {
-display: none !important;
-}
-.admin-tabs-mobile {
-display: block !important;
-}
-.admin-table-desktop {
-display: none !important;
-}
-.admin-mobile-cards {
-display: block !important;
-}
-.admin-mobile-card-actions button {
-font-size: 10px !important;
-padding: 5px 8px !important;
-}
-.admin-tab-button-desktop {
-padding: 10px 12px !important;
-font-size: 12px !important;
-}
-.admin-action-btn-mobile {
-padding: 5px 8px !important;
-font-size: 10px !important;
-}
-}
-/* F. NOTIFICACIONES FLOTANTES */
-.floating-toast-success {
-position: fixed !important;
-top: 24px !important;
-left: 50% !important;
-transform: translateX(-50%) !important;
-z-index: 9999 !important;
-width: 90% !important;
-max-width: 500px !important;
-box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
-}
-.floating-toast-error {
-position: fixed !important;
-top: 24px !important;
-left: 50% !important;
-transform: translateX(-50%) !important;
-z-index: 9999 !important;
-width: 90% !important;
-max-width: 500px !important;
-box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
-}
-`}</style>
+      <style>{`.admin-tabs-desktop { display: flex; gap: 8px; border-bottom: 2px solid #e5e7eb; margin-bottom: 24px; overflow-x: auto; } .admin-tabs-mobile { display: none; position: relative; margin-bottom: 24px; } .admin-mobile-trigger { width: 100%; padding: 12px 16px; background: #ffffff; border: 1px solid #d1d5db; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; font-weight: 700; color: #111827; font-size: 14px; } .admin-mobile-dropdown { position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: #ffffff; border: 1px solid #d1d5db; border-radius: 8px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); z-index: 1000; overflow: hidden; } .admin-mobile-item { padding: 12px 16px; display: flex; alignItems: center; gap: 10px; cursor: pointer; border-bottom: 1px solid #e5e7eb; color: #4b5563; font-size: 14px; transition: background 0.15s; } .admin-mobile-item:last-child { border-bottom: none; } .admin-mobile-item:hover { background: #fef2f2; } .admin-mobile-item.active { background: #fef2f2; color: #dc2626; font-weight: 700; } .admin-aging-section { background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 14px 16px; margin-bottom: 16px; } .admin-aging-title { font-size: 13px; font-weight: 800; color: #78350f; margin-bottom: 10px; display: flex; alignItems: center; gap: 8px; } .admin-aging-item { display: flex; justify-content: space-between; align-items: center; padding: 6px 10px; background: #ffffff; border: 1px solid #fde68a; border-radius: 6px; margin-bottom: 6px; font-size: 12px; } .admin-aging-item:last-child { margin-bottom: 0; } .admin-days-30 { text-decoration: underline; text-decoration-color: #eab308; text-decoration-thickness: 3px; text-underline-offset: 3px; } .admin-days-45 { text-decoration: underline; text-decoration-color: #f97316; text-decoration-thickness: 3px; text-underline-offset: 3px; } .admin-days-60 { text-decoration: underline; text-decoration-color: #dc2626; text-decoration-thickness: 3px; text-underline-offset: 3px; } .admin-table-desktop { width: 100%; border-collapse: collapse; text-align: left; font-size: 13px; } .admin-mobile-cards { display: none; } .admin-mobile-card { background: #ffffff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px; marginBottom: 10px; boxShadow: 0 1px 2px rgba(0,0,0,0.05); } .admin-mobile-card-header { font-size: 14px; font-weight: 800; color: #111827; border-bottom: 1px solid #e5e7eb; padding-bottom: 8px; margin-bottom: 8px; } .admin-mobile-card-row { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; font-size: 12px; border-bottom: 1px dashed #f3f4f6; } .admin-mobile-card-row:last-child { border-bottom: none; } .admin-mobile-card-label { color: #6b7280; font-weight: 600; font-size: 11px; } .admin-mobile-card-value { color: #111827; font-weight: 600; text-align: right; max-width: 60%; word-break: break-word; } .admin-mobile-card-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; padding-top: 10px; border-top: 1px solid #e5e7eb; } @media (max-width: 768px) { .admin-tabs-desktop { display: none !important; } .admin-tabs-mobile { display: block !important; } .admin-table-desktop { display: none !important; } .admin-mobile-cards { display: block !important; } .admin-mobile-card-actions button { font-size: 10px !important; padding: 5px 8px !important; } .admin-tab-button-desktop { padding: 10px 12px !important; font-size: 12px !important; } .admin-action-btn-mobile { padding: 5px 8px !important; font-size: 10px !important; } } .floating-toast-success { position: fixed !important; top: 24px !important; left: 50% !important; transform: translateX(-50%) !important; z-index: 9999 !important; width: 90% !important; max-width: 500px !important; box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important; } .floating-toast-error { position: fixed !important; top: 24px !important; left: 50% !important; transform: translateX(-50%) !important; z-index: 9999 !important; width: 90% !important; max-width: 500px !important; box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important; }`}</style>
 
       {/* F. NOTIFICACIONES GLOBALES FLOTANTES */}
       {errorMsg && (
@@ -3383,7 +3224,6 @@ box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
           <Check size={20} /> {successMsg}
         </div>
       )}
-
       <div
         style={{
           display: 'flex',
@@ -3714,7 +3554,6 @@ box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
               </div>
             )}
           </div>
-
           <div
             style={{
               backgroundColor: '#f8fafc',
@@ -3830,7 +3669,6 @@ box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
               </div>
             </div>
           </div>
-
           <div
             style={{
               backgroundColor: '#ffffff',
@@ -3961,7 +3799,6 @@ box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
                 <option value="fluidos">Fluidos</option>
               </select>
             </div>
-            {/* B. LISTA DESPLEGABLE DINÁMICA DE PORCENTAJES */}
             <div>
               <label
                 style={{
@@ -3999,7 +3836,6 @@ box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
               </select>
             </div>
           </div>
-
           <div
             style={{
               backgroundColor: '#ffffff',
@@ -4068,7 +3904,7 @@ box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
                     border: '1px solid #D1D5DB',
                     borderRadius: '6px',
                     boxSizing: 'border-box',
-                    height: '42px', // Match dropdown height
+                    height: '42px',
                   }}
                 />
               </div>
@@ -4090,7 +3926,6 @@ box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
               </button>
             </div>
           </div>
-
           <div
             style={{
               backgroundColor: '#ffffff',
@@ -4138,7 +3973,6 @@ box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
                 </p>
               </div>
             </div>
-            {/* B. TABLA ESCRITORIO / TARJETAS MÓVIL PRODUCTOS */}
             <div className="admin-table-desktop-wrapper">
               <div
                 style={{ width: '100%', overflowX: 'auto' }}
@@ -4256,7 +4090,6 @@ box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
                 </table>
               </div>
             </div>
-            {/* Mobile Cards for Cart */}
             <div className="admin-mobile-cards">
               {neCart.length === 0 ? (
                 <div
@@ -4272,7 +4105,6 @@ box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
                 renderProductCards(neCart, true, handleRemoveFromCartCreateNe)
               )}
             </div>
-
             <div
               style={{
                 display: 'flex',
@@ -4308,7 +4140,9 @@ box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
                     color: '#B45309',
                   }}
                 >
-                  <span>% de descuento aplicado: </span>
+                  <span>
+                    {getDiscountPercent(neTipoPago)}% de descuento aplicado:{' '}
+                  </span>
                   <strong>-${montoAhorradoNe.toFixed(2)}</strong>
                 </div>
                 <div
@@ -4328,7 +4162,6 @@ box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
                 </div>
               </div>
             </div>
-
             <div style={{ marginBottom: '12px' }}>
               <label
                 style={{
@@ -4354,7 +4187,6 @@ box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
                 }}
               ></textarea>
             </div>
-
             <div
               style={{
                 backgroundColor: '#F3F4F6',
@@ -4369,7 +4201,6 @@ box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
             >
               <strong>Términos y condiciones: </strong> {globalTerms}
             </div>
-
             <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
               <button
                 onClick={handleCreateDirectNE}
@@ -4408,7 +4239,6 @@ box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
               overflowX: 'auto',
             }}
           >
-            {/* --- TABLA ESCRITORIO --- */}
             <table className="admin-table-desktop">
               <thead>
                 <tr
@@ -4655,7 +4485,6 @@ box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
                 )}
               </tbody>
             </table>
-            {/* --- TARJETAS MÓVIL --- */}
             <div className="admin-mobile-cards">
               {loading && !editingNoteId ? (
                 <div
@@ -4815,8 +4644,6 @@ box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
               )}
             </div>
           </div>
-
-          {/* MODAL EDITABLE PARA APROBACIONES (D) */}
           {editingNote && !isCobranzaNEModal && (
             <div
               style={{
@@ -4951,7 +4778,6 @@ box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
                         <option value="fluidos">Fluidos</option>
                       </select>
                     </div>
-                    {/* C. SELECT DINÁMICO EN EDICIÓN */}
                     <div>
                       <label
                         style={{
@@ -4996,7 +4822,6 @@ box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
                       </select>
                     </div>
                   </div>
-
                   <div
                     style={{
                       backgroundColor: '#ffffff',
@@ -5091,7 +4916,6 @@ box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
                       </button>
                     </div>
                   </div>
-
                   <div
                     style={{
                       backgroundColor: '#ffffff',
@@ -5140,7 +4964,6 @@ box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
                         </p>
                       </div>
                     </div>
-                    {/* Desktop Table Edit */}
                     <div
                       style={{ width: '100%', overflowX: 'auto' }}
                       className="admin-table-desktop"
@@ -5277,7 +5100,6 @@ box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
                         </tbody>
                       </table>
                     </div>
-                    {/* Mobile Cards Edit */}
                     <div className="admin-mobile-cards">
                       {editNoteItems.length === 0 ? (
                         <div
@@ -5297,7 +5119,6 @@ box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
                         )
                       )}
                     </div>
-
                     <div
                       style={{
                         display: 'flex',
@@ -5333,7 +5154,10 @@ box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
                             color: '#B45309',
                           }}
                         >
-                          <span>% de descuento aplicado: </span>
+                          <span>
+                            {getDiscountPercent(editNotePaymentDiscount)}% de
+                            descuento aplicado:{' '}
+                          </span>
                           <strong>-${editMontoAhorrado.toFixed(2)}</strong>
                         </div>
                         <div
@@ -5353,7 +5177,6 @@ box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
                         </div>
                       </div>
                     </div>
-
                     <div style={{ marginBottom: '12px' }}>
                       <label
                         style={{
@@ -5379,7 +5202,6 @@ box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
                         }}
                       ></textarea>
                     </div>
-
                     <div
                       style={{
                         backgroundColor: '#F3F4F6',
@@ -5394,7 +5216,6 @@ box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
                     >
                       <strong>Términos y condiciones: </strong> {globalTerms}
                     </div>
-
                     <div
                       style={{
                         display: 'flex',
@@ -5509,11 +5330,8 @@ box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
               </button>
             ))}
           </div>
-
-          {/* SUB-PESTAÑA 1: CONTROL DE N.E. */}
           {cobranzaInternalTab === 'control_ne' && (
             <>
-              {/* --- SECCIÓN ALERTA DE ANTIGÜEDAD (B) --- */}
               {agingNotes.length > 0 && (
                 <div className="admin-aging-section">
                   <div className="admin-aging-title">
@@ -5563,7 +5381,6 @@ box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
                   )}
                 </div>
               )}
-
               <div
                 style={{
                   display: 'flex',
@@ -5674,7 +5491,6 @@ box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
                   )}
                 </button>
               </div>
-
               <div
                 style={{
                   backgroundColor: '#ffffff',
@@ -5683,7 +5499,6 @@ box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
                   overflowX: 'auto',
                 }}
               >
-                {/* --- TABLA ESCRITORIO COBRANZA --- */}
                 <table className="admin-table-desktop">
                   <thead>
                     <tr
@@ -6021,7 +5836,6 @@ box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
                     )}
                   </tbody>
                 </table>
-                {/* --- TARJETAS MÓVIL COBRANZA --- */}
                 <div className="admin-mobile-cards">
                   {sortedCobranzaNotes.length === 0 ? (
                     <div
@@ -6284,8 +6098,6 @@ box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
               </div>
             </>
           )}
-
-          {/* SUB-PESTAÑA 2: HISTÓRICO DE PAGOS */}
           {cobranzaInternalTab === 'historico_pagos' && (
             <div
               style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}
@@ -6358,7 +6170,6 @@ box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
                   <Trash2 size={14} /> Borrar Historial
                 </button>
               </div>
-
               <div
                 style={{
                   backgroundColor: '#ffffff',
@@ -6367,7 +6178,6 @@ box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
                   overflowX: 'auto',
                 }}
               >
-                {/* --- TABLA ESCRITORIO HISTÓRICO --- */}
                 <table className="admin-table-desktop">
                   <thead>
                     <tr
@@ -6543,7 +6353,6 @@ box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
                     )}
                   </tbody>
                 </table>
-                {/* --- TARJETAS MÓVIL HISTÓRICO --- */}
                 <div className="admin-mobile-cards">
                   {loading ? (
                     <div
@@ -6692,8 +6501,6 @@ box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
               </div>
             </div>
           )}
-
-          {/* PANEL EDITABLE COBRANZA */}
           {editingNote && isCobranzaNEModal && (
             <div
               style={{
@@ -6828,7 +6635,6 @@ box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
                         <option value="fluidos">Fluidos</option>
                       </select>
                     </div>
-                    {/* C. SELECT DINÁMICO EN MODAL COBRANZA */}
                     <div>
                       <label
                         style={{
@@ -6873,7 +6679,6 @@ box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
                       </select>
                     </div>
                   </div>
-
                   <div
                     style={{
                       backgroundColor: '#ffffff',
@@ -6968,7 +6773,6 @@ box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
                       </button>
                     </div>
                   </div>
-
                   <div
                     style={{
                       backgroundColor: '#ffffff',
@@ -7017,7 +6821,6 @@ box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
                         </p>
                       </div>
                     </div>
-                    {/* Desktop Table Modal Cobranza */}
                     <div
                       style={{ width: '100%', overflowX: 'auto' }}
                       className="admin-table-desktop"
@@ -7154,7 +6957,6 @@ box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
                         </tbody>
                       </table>
                     </div>
-                    {/* Mobile Cards Modal Cobranza */}
                     <div className="admin-mobile-cards">
                       {editNoteItems.length === 0 ? (
                         <div
@@ -7174,7 +6976,6 @@ box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
                         )
                       )}
                     </div>
-
                     <div
                       style={{
                         display: 'flex',
@@ -7210,7 +7011,10 @@ box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
                             color: '#B45309',
                           }}
                         >
-                          <span>% de descuento aplicado: </span>
+                          <span>
+                            {getDiscountPercent(editNotePaymentDiscount)}% de
+                            descuento aplicado:{' '}
+                          </span>
                           <strong>-${editMontoAhorrado.toFixed(2)}</strong>
                         </div>
                         <div
@@ -7230,7 +7034,6 @@ box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
                         </div>
                       </div>
                     </div>
-
                     <div style={{ marginBottom: '12px' }}>
                       <label
                         style={{
@@ -7256,7 +7059,6 @@ box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
                         }}
                       ></textarea>
                     </div>
-
                     <div
                       style={{
                         backgroundColor: '#F3F4F6',
@@ -7271,7 +7073,6 @@ box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
                     >
                       <strong>Términos y condiciones: </strong> {globalTerms}
                     </div>
-
                     <div
                       style={{
                         display: 'flex',
@@ -7346,7 +7147,6 @@ box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
               </button>
             ))}
           </div>
-
           {valesSubTab === 'vales_lista' && (
             <div
               style={{
@@ -7356,7 +7156,6 @@ box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
                 overflowX: 'auto',
               }}
             >
-              {/* --- TABLA ESCRITORIO VALES --- */}
               <table className="admin-table-desktop">
                 <thead>
                   <tr
@@ -7366,13 +7165,11 @@ box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
                       borderBottom: '1px solid #e5e7eb',
                     }}
                   >
-                    <th style={{ padding: '12px 16px' }}>Ver N.E.</th>
                     <th style={{ padding: '12px 16px' }}>Fecha</th>
                     <th style={{ padding: '12px 16px' }}>Vendedor</th>
-                    <th style={{ padding: '12px 16px' }}>N° N.E.</th>
-                    <th style={{ padding: '12px 16px' }}>Categoría / Cierre</th>
-                    <th style={{ padding: '12px 16px' }}>Comisión</th>
-                    <th style={{ padding: '12px 16px' }}>Solicitado ($)</th>
+                    <th style={{ padding: '12px 16px' }}>
+                      Monto Solicitado ($)
+                    </th>
                     <th style={{ padding: '12px 16px' }}>Estado</th>
                     <th style={{ padding: '12px 16px', textAlign: 'center' }}>
                       Acción
@@ -7383,7 +7180,7 @@ box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
                   {loading ? (
                     <tr>
                       <td
-                        colSpan="9"
+                        colSpan="5"
                         style={{ textAlign: 'center', padding: '20px' }}
                       >
                         Cargando vales...
@@ -7392,7 +7189,7 @@ box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
                   ) : vales.length === 0 ? (
                     <tr>
                       <td
-                        colSpan="9"
+                        colSpan="5"
                         style={{
                           textAlign: 'center',
                           padding: '20px',
@@ -7404,67 +7201,16 @@ box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
                     </tr>
                   ) : (
                     vales.map((v) => {
-                      const comm = calcOrderCommissionUSD(v.order, v.seller);
                       return (
                         <tr
                           key={v.id}
                           style={{ borderBottom: '1px solid #e5e7eb' }}
                         >
                           <td style={{ padding: '12px 16px' }}>
-                            {v.order ? (
-                              <button
-                                onClick={() => handleOpenValeVistaNE(v.order)}
-                                style={{
-                                  padding: '5px 10px',
-                                  backgroundColor: '#1e40af',
-                                  color: '#ffffff',
-                                  border: 'none',
-                                  borderRadius: '4px',
-                                  fontSize: '11px',
-                                  fontWeight: '600',
-                                  cursor: 'pointer',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '4px',
-                                }}
-                              >
-                                <Eye size={12} /> Ver N.E
-                              </button>
-                            ) : (
-                              <span
-                                style={{ fontSize: '11px', color: '#9ca3af' }}
-                              >
-                                N/A
-                              </span>
-                            )}
-                          </td>
-                          <td style={{ padding: '12px 16px' }}>
                             {new Date(v.created_at).toLocaleDateString()}
                           </td>
                           <td style={{ padding: '12px 16px' }}>
                             {v.seller?.full_name || 'Vendedor'}
-                          </td>
-                          <td
-                            style={{ padding: '12px 16px', fontWeight: 'bold' }}
-                          >
-                            #{v.order?.transaction_number || '-'}
-                          </td>
-                          <td
-                            style={{
-                              padding: '12px 16px',
-                              textTransform: 'capitalize',
-                            }}
-                          >
-                            {v.order?.category || 'bombillos'}
-                          </td>
-                          <td
-                            style={{
-                              padding: '12px 16px',
-                              fontWeight: 'bold',
-                              color: '#059669',
-                            }}
-                          >
-                            ${comm.toFixed(2)}
                           </td>
                           <td
                             style={{
@@ -7583,7 +7329,6 @@ box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
                   )}
                 </tbody>
               </table>
-              {/* --- TARJETAS MÓVIL VALES --- */}
               <div className="admin-mobile-cards">
                 {loading ? (
                   <div
@@ -7607,7 +7352,6 @@ box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
                   </div>
                 ) : (
                   vales.map((v) => {
-                    const comm = calcOrderCommissionUSD(v.order, v.seller);
                     return (
                       <div key={v.id} className="admin-mobile-card">
                         <div className="admin-mobile-card-header">
@@ -7625,25 +7369,6 @@ box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
                           </span>
                           <span className="admin-mobile-card-value">
                             {v.seller?.full_name || 'Vendedor'}
-                          </span>
-                        </div>
-                        <div className="admin-mobile-card-row">
-                          <span className="admin-mobile-card-label">
-                            N° N.E.
-                          </span>
-                          <span className="admin-mobile-card-value">
-                            #{v.order?.transaction_number || '-'}
-                          </span>
-                        </div>
-                        <div className="admin-mobile-card-row">
-                          <span className="admin-mobile-card-label">
-                            Comisión
-                          </span>
-                          <span
-                            className="admin-mobile-card-value"
-                            style={{ color: '#059669', fontWeight: '700' }}
-                          >
-                            ${comm.toFixed(2)}
                           </span>
                         </div>
                         <div className="admin-mobile-card-row">
@@ -7687,24 +7412,6 @@ box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
                           </span>
                         </div>
                         <div className="admin-mobile-card-actions">
-                          {v.order && (
-                            <button
-                              onClick={() => handleOpenValeVistaNE(v.order)}
-                              className="admin-action-btn-mobile"
-                              style={{
-                                padding: '5px 10px',
-                                backgroundColor: '#1e40af',
-                                color: '#ffffff',
-                                border: 'none',
-                                borderRadius: '4px',
-                                fontSize: '11px',
-                                fontWeight: '600',
-                                cursor: 'pointer',
-                              }}
-                            >
-                              Ver N.E
-                            </button>
-                          )}
                           {v.status === 'pendiente' && (
                             <>
                               <button
@@ -7771,7 +7478,6 @@ box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
               </div>
             </div>
           )}
-
           {valesSubTab === 'asignar_vale' && (
             <div
               style={{
@@ -7785,7 +7491,7 @@ box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
               }}
             >
               <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 'bold' }}>
-                Asignar Adelanto / Vale a Usuario
+                Asignar Adelanto / Vale a Usuario (Independiente)
               </h3>
               <div
                 style={{
@@ -7841,39 +7547,6 @@ box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
                     }}
                   />
                 </div>
-                <div>
-                  <label
-                    style={{
-                      display: 'block',
-                      fontSize: '12px',
-                      fontWeight: 'bold',
-                      marginBottom: '4px',
-                    }}
-                  >
-                    Vincular a N.E. (Buscador)
-                  </label>
-                  <SearchableDropdown
-                    options={selectedTargetUserOrders.map((o) => {
-                      const comm = calcOrderCommissionUSD(
-                        o,
-                        sellersList.find(
-                          (s) => String(s.id) === String(assignTargetUserId)
-                        )
-                      );
-                      return {
-                        value: o.id,
-                        label: `N.E. #${
-                          o.transaction_number
-                        } | Final: $${Number(o.final_price_usd).toFixed(
-                          2
-                        )} | Comis.: $${comm.toFixed(2)}`,
-                      };
-                    })}
-                    value={assignLinkedOrderId}
-                    onChange={setAssignLinkedOrderId}
-                    placeholder="Sin vincular a N.E."
-                  />
-                </div>
               </div>
               <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                 <button
@@ -7894,7 +7567,6 @@ box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
               </div>
             </div>
           )}
-
           {valesSubTab === 'penalidades_lista' && (
             <div
               style={{
@@ -7904,7 +7576,6 @@ box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
                 overflowX: 'auto',
               }}
             >
-              {/* --- TABLA ESCRITORIO PENALIZACIONES --- */}
               <table className="admin-table-desktop">
                 <thead>
                   <tr
@@ -8032,7 +7703,6 @@ box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
                   )}
                 </tbody>
               </table>
-              {/* --- TARJETAS MÓVIL PENALIZACIONES --- */}
               <div className="admin-mobile-cards">
                 {penalties.length === 0 ? (
                   <div
@@ -8147,7 +7817,6 @@ box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
               </div>
             </div>
           )}
-
           {valesSubTab === 'asignar_penalidad' && (
             <div
               style={{
@@ -8311,7 +7980,6 @@ box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
               </div>
             </div>
           )}
-
           {valeVistaNote && (
             <div
               style={{
@@ -8660,7 +8328,6 @@ box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
               </div>
             )}
           </div>
-
           {quincenaSubView === 'liquidar' ? (
             <>
               <div
@@ -8728,7 +8395,6 @@ box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
                   </select>
                 </div>
               </div>
-
               <div
                 style={{
                   backgroundColor: '#fffbeb',
@@ -8777,7 +8443,6 @@ box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
                   </div>
                 </div>
               </div>
-
               <div
                 style={{
                   backgroundColor: '#ffffff',
@@ -8786,7 +8451,6 @@ box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
                   overflowX: 'auto',
                 }}
               >
-                {/* --- TABLA ESCRITORIO QUINCENA --- */}
                 <table className="admin-table-desktop">
                   <thead>
                     <tr
@@ -8953,7 +8617,8 @@ box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
                             color: '#6b7280',
                           }}
                         >
-                          No se encontraron perfiles para liquidar.
+                          No se encontraron perfiles activos para liquidar en
+                          este ciclo.
                         </td>
                       </tr>
                     ) : (
@@ -8983,7 +8648,6 @@ box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
                             bcvRateUsd,
                             penaltyChargeMethod
                           );
-
                           let valA, valB;
                           if (quincenaSortField === 'full_name') {
                             valA = a.full_name || '';
@@ -9009,7 +8673,6 @@ box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
                             valA = Number(a.pct_fluidos ?? 2);
                             valB = Number(b.pct_fluidos ?? 2);
                           }
-
                           if (valA < valB) return quincenaSortAsc ? -1 : 1;
                           if (valA > valB) return quincenaSortAsc ? 1 : -1;
                           return 0;
@@ -9023,6 +8686,8 @@ box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
                           );
                           const userPenalties =
                             getApprovedPenaltiesForUserAndCycle(usr.id);
+
+                          // FILTRO DE INACTIVIDAD: Solo mostrar si tiene actividad
                           const details = calculateUserSettlementDetails(
                             usr,
                             userClosedNotes,
@@ -9032,6 +8697,15 @@ box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
                             bcvRateUsd,
                             penaltyChargeMethod
                           );
+
+                          const hasActivity =
+                            userClosedNotes.length > 0 ||
+                            userVales.length > 0 ||
+                            details.hierarchyData.subordinateOrdersCount > 0 ||
+                            details.sueldoFijoOriginal > 0;
+
+                          if (!hasActivity) return null;
+
                           const assignedLabel =
                             details.hierarchyData.assignedLabelText;
                           return (
@@ -9130,10 +8804,10 @@ box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
                             </tr>
                           );
                         })
+                        .filter(Boolean) // Remover nulls
                     )}
                   </tbody>
                 </table>
-                {/* --- TARJETAS MÓVIL QUINCENA --- */}
                 <div className="admin-mobile-cards">
                   {loading ? (
                     <div
@@ -9153,137 +8827,151 @@ box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
                         color: '#6b7280',
                       }}
                     >
-                      No se encontraron perfiles para liquidar.
+                      No se encontraron perfiles activos para liquidar.
                     </div>
                   ) : (
-                    liquidaciones.map((usr) => {
-                      const userClosedNotes = getClosedNotesForUserAndCycle(
-                        usr.id
-                      );
-                      const userVales = getApprovedValesForUserAndCycle(usr.id);
-                      const userPenalties = getApprovedPenaltiesForUserAndCycle(
-                        usr.id
-                      );
-                      const details = calculateUserSettlementDetails(
-                        usr,
-                        userClosedNotes,
-                        userVales,
-                        userPenalties,
-                        sueldoFijoCurrency,
-                        bcvRateUsd,
-                        penaltyChargeMethod
-                      );
-                      const assignedLabel =
-                        details.hierarchyData.assignedLabelText;
-                      return (
-                        <div key={usr.id} className="admin-mobile-card">
-                          <div className="admin-mobile-card-header">
-                            {usr.full_name}
+                    liquidaciones
+                      .map((usr) => {
+                        const userClosedNotes = getClosedNotesForUserAndCycle(
+                          usr.id
+                        );
+                        const userVales = getApprovedValesForUserAndCycle(
+                          usr.id
+                        );
+                        const userPenalties =
+                          getApprovedPenaltiesForUserAndCycle(usr.id);
+                        const details = calculateUserSettlementDetails(
+                          usr,
+                          userClosedNotes,
+                          userVales,
+                          userPenalties,
+                          sueldoFijoCurrency,
+                          bcvRateUsd,
+                          penaltyChargeMethod
+                        );
+
+                        const hasActivity =
+                          userClosedNotes.length > 0 ||
+                          userVales.length > 0 ||
+                          details.hierarchyData.subordinateOrdersCount > 0 ||
+                          details.sueldoFijoOriginal > 0;
+
+                        if (!hasActivity) return null;
+
+                        const assignedLabel =
+                          details.hierarchyData.assignedLabelText;
+                        return (
+                          <div key={usr.id} className="admin-mobile-card">
+                            <div className="admin-mobile-card-header">
+                              {usr.full_name}
+                            </div>
+                            <div className="admin-mobile-card-row">
+                              <span className="admin-mobile-card-label">
+                                Rol
+                              </span>
+                              <span
+                                className="admin-mobile-card-value"
+                                style={{ textTransform: 'capitalize' }}
+                              >
+                                {usr.role}
+                              </span>
+                            </div>
+                            <div className="admin-mobile-card-row">
+                              <span className="admin-mobile-card-label">
+                                Asignados
+                              </span>
+                              <span
+                                className="admin-mobile-card-value"
+                                style={{ color: '#1e40af', fontWeight: '700' }}
+                              >
+                                {assignedLabel}
+                              </span>
+                            </div>
+                            <div className="admin-mobile-card-row">
+                              <span className="admin-mobile-card-label">
+                                Sueldo Fijo
+                              </span>
+                              <span className="admin-mobile-card-value">
+                                ${Number(usr.sueldo_fijo_usd || 0).toFixed(2)}
+                              </span>
+                            </div>
+                            <div className="admin-mobile-card-row">
+                              <span className="admin-mobile-card-label">
+                                N.E. Cerradas
+                              </span>
+                              <span
+                                className="admin-mobile-card-value"
+                                style={{
+                                  color:
+                                    userClosedNotes.length > 0
+                                      ? '#059669'
+                                      : '#6b7280',
+                                  fontWeight: '700',
+                                }}
+                              >
+                                {userClosedNotes.length}
+                              </span>
+                            </div>
+                            <div className="admin-mobile-card-row">
+                              <span className="admin-mobile-card-label">
+                                % Bombillos
+                              </span>
+                              <span className="admin-mobile-card-value">
+                                {usr.pct_bombillos ?? 3}%
+                              </span>
+                            </div>
+                            <div className="admin-mobile-card-row">
+                              <span className="admin-mobile-card-label">
+                                % Fluidos
+                              </span>
+                              <span className="admin-mobile-card-value">
+                                {usr.pct_fluidos ?? 2}%
+                              </span>
+                            </div>
+                            <div className="admin-mobile-card-row">
+                              <span className="admin-mobile-card-label">
+                                Neto 53.38%
+                              </span>
+                              <span
+                                className="admin-mobile-card-value"
+                                style={{ color: '#059669', fontWeight: '700' }}
+                              >
+                                ${details.comm53NetUsd.toFixed(2)}
+                              </span>
+                            </div>
+                            <div className="admin-mobile-card-row">
+                              <span className="admin-mobile-card-label">
+                                Neto 23.08%
+                              </span>
+                              <span
+                                className="admin-mobile-card-value"
+                                style={{ color: '#0369a1', fontWeight: '700' }}
+                              >
+                                ${details.comm23NetUsd.toFixed(2)}
+                              </span>
+                            </div>
+                            <div className="admin-mobile-card-actions">
+                              <button
+                                onClick={() => handleOpenSettlementModal(usr)}
+                                className="admin-action-btn-mobile"
+                                style={{
+                                  padding: '6px 12px',
+                                  backgroundColor: '#111827',
+                                  color: '#ffffff',
+                                  border: 'none',
+                                  borderRadius: '4px',
+                                  fontSize: '11px',
+                                  fontWeight: 'bold',
+                                  cursor: 'pointer',
+                                }}
+                              >
+                                Ver Detalle / Factura
+                              </button>
+                            </div>
                           </div>
-                          <div className="admin-mobile-card-row">
-                            <span className="admin-mobile-card-label">Rol</span>
-                            <span
-                              className="admin-mobile-card-value"
-                              style={{ textTransform: 'capitalize' }}
-                            >
-                              {usr.role}
-                            </span>
-                          </div>
-                          <div className="admin-mobile-card-row">
-                            <span className="admin-mobile-card-label">
-                              Asignados
-                            </span>
-                            <span
-                              className="admin-mobile-card-value"
-                              style={{ color: '#1e40af', fontWeight: '700' }}
-                            >
-                              {assignedLabel}
-                            </span>
-                          </div>
-                          <div className="admin-mobile-card-row">
-                            <span className="admin-mobile-card-label">
-                              Sueldo Fijo
-                            </span>
-                            <span className="admin-mobile-card-value">
-                              ${Number(usr.sueldo_fijo_usd || 0).toFixed(2)}
-                            </span>
-                          </div>
-                          <div className="admin-mobile-card-row">
-                            <span className="admin-mobile-card-label">
-                              N.E. Cerradas
-                            </span>
-                            <span
-                              className="admin-mobile-card-value"
-                              style={{
-                                color:
-                                  userClosedNotes.length > 0
-                                    ? '#059669'
-                                    : '#6b7280',
-                                fontWeight: '700',
-                              }}
-                            >
-                              {userClosedNotes.length}
-                            </span>
-                          </div>
-                          <div className="admin-mobile-card-row">
-                            <span className="admin-mobile-card-label">
-                              % Bombillos
-                            </span>
-                            <span className="admin-mobile-card-value">
-                              {usr.pct_bombillos ?? 3}%
-                            </span>
-                          </div>
-                          <div className="admin-mobile-card-row">
-                            <span className="admin-mobile-card-label">
-                              % Fluidos
-                            </span>
-                            <span className="admin-mobile-card-value">
-                              {usr.pct_fluidos ?? 2}%
-                            </span>
-                          </div>
-                          <div className="admin-mobile-card-row">
-                            <span className="admin-mobile-card-label">
-                              Neto 53.38%
-                            </span>
-                            <span
-                              className="admin-mobile-card-value"
-                              style={{ color: '#059669', fontWeight: '700' }}
-                            >
-                              ${details.comm53NetUsd.toFixed(2)}
-                            </span>
-                          </div>
-                          <div className="admin-mobile-card-row">
-                            <span className="admin-mobile-card-label">
-                              Neto 23.08%
-                            </span>
-                            <span
-                              className="admin-mobile-card-value"
-                              style={{ color: '#0369a1', fontWeight: '700' }}
-                            >
-                              ${details.comm23NetUsd.toFixed(2)}
-                            </span>
-                          </div>
-                          <div className="admin-mobile-card-actions">
-                            <button
-                              onClick={() => handleOpenSettlementModal(usr)}
-                              className="admin-action-btn-mobile"
-                              style={{
-                                padding: '6px 12px',
-                                backgroundColor: '#111827',
-                                color: '#ffffff',
-                                border: 'none',
-                                borderRadius: '4px',
-                                fontSize: '11px',
-                                fontWeight: 'bold',
-                                cursor: 'pointer',
-                              }}
-                            >
-                              Ver Detalle / Factura
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })
+                        );
+                      })
+                      .filter(Boolean)
                   )}
                 </div>
               </div>
@@ -9338,7 +9026,6 @@ box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
                   />
                 </div>
               </div>
-
               <div
                 style={{
                   backgroundColor: '#ffffff',
@@ -9347,7 +9034,6 @@ box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
                   overflowX: 'auto',
                 }}
               >
-                {/* --- TABLA ESCRITORIO HISTORIAL --- */}
                 <table className="admin-table-desktop">
                   <thead>
                     <tr
@@ -9524,7 +9210,6 @@ box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
                     )}
                   </tbody>
                 </table>
-                {/* --- TARJETAS MÓVIL HISTORIAL LIQUIDACIÓN --- */}
                 <div className="admin-mobile-cards">
                   {filteredHistory.length === 0 ? (
                     <div
@@ -9734,7 +9419,6 @@ box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
                 <X size={20} />
               </button>
             </div>
-
             <div
               style={{
                 display: 'grid',
@@ -9768,7 +9452,6 @@ box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
                 </p>
               </div>
             </div>
-
             {settlementModalData.sueldoFijoOriginal > 0 && (
               <div
                 style={{
@@ -9849,7 +9532,6 @@ box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
                 </div>
               </div>
             )}
-
             <h3
               style={{
                 fontSize: '13px',
@@ -9966,7 +9648,6 @@ box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
                 </tbody>
               </table>
             </div>
-
             {settlementModalData.hierarchyData?.evaluatedOrders?.length > 0 && (
               <>
                 <h3
@@ -10065,7 +9746,6 @@ box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
                 </div>
               </>
             )}
-
             {(settlementModalData.vales.length > 0 ||
               settlementModalData.penalties?.length > 0) && (
               <>
@@ -10118,9 +9798,6 @@ box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
                     </thead>
                     <tbody>
                       {settlementModalData.vales.map((v) => {
-                        const modeOfVale = String(
-                          v.order?.payment_discount || '53.38'
-                        );
                         return (
                           <tr
                             key={`vale-${v.id}`}
@@ -10130,8 +9807,7 @@ box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
                               {new Date(v.created_at).toLocaleDateString()}
                             </td>
                             <td style={{ padding: '8px', fontWeight: 'bold' }}>
-                              Vale - N.E. #$
-                              {v.order?.transaction_number || 'N/A'}
+                              Vale Independiente
                             </td>
                             <td
                               style={{
@@ -10140,7 +9816,7 @@ box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
                                 fontWeight: 'bold',
                               }}
                             >
-                              {modeOfVale}% (Vales Aprobados)
+                              Asignación Directa
                             </td>
                             <td
                               style={{
@@ -10203,8 +9879,6 @@ box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
                 </div>
               </>
             )}
-
-            {/* D. 4 CUADROS INDEPENDIENTES (OCULTAMIENTO CONDICIONAL) */}
             <div
               style={{
                 display: 'grid',
@@ -10213,196 +9887,80 @@ box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
                 marginBottom: '16px',
               }}
             >
-              {/* 1. 53.38% */}
-              {(settlementModalData.comm53GrossUsd > 0 ||
-                settlementModalData.valesDeduction53Usd > 0 ||
-                settlementModalData.penDeduction53 > 0 ||
-                settlementModalData.hierarchyUsd53 > 0) && (
-                <div
+              {/* 1. 53.38% - BASE PARA TOTAL USD */}
+              <div
+                style={{
+                  background: '#f0fdf4',
+                  border: '1px solid #bbf7d0',
+                  padding: '12px',
+                  borderRadius: '8px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '4px',
+                  fontSize: '12px',
+                }}
+              >
+                <span
                   style={{
-                    background: '#f0fdf4',
-                    border: '1px solid #bbf7d0',
-                    padding: '12px',
-                    borderRadius: '8px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '4px',
-                    fontSize: '12px',
+                    fontSize: '11px',
+                    color: '#166534',
+                    fontWeight: 'bold',
                   }}
                 >
-                  <span
-                    style={{
-                      fontSize: '11px',
-                      color: '#166534',
-                      fontWeight: 'bold',
-                    }}
-                  >
-                    N.E. con {globalDiscount53}% (Pago $)
-                  </span>
-                  <div
-                    style={{
-                      color: '#15803d',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                    }}
-                  >
-                    <span>Bruto Com. {globalDiscount53}%: </span>
-                    <strong>
-                      +${settlementModalData.comm53GrossUsd.toFixed(2)}
-                    </strong>
-                  </div>
-                  <div
-                    style={{
-                      color: '#1d4ed8',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                    }}
-                  >
-                    <span>Comisión Jerarquía ({globalDiscount53}%): </span>
-                    <strong>
-                      +${(settlementModalData.hierarchyUsd53 || 0).toFixed(2)}
-                    </strong>
-                  </div>
-                  {sueldoFijoCurrency === 'USD' &&
-                    settlementModalData.sueldoFijoOriginal > 0 && (
-                      <div
-                        style={{
-                          color: '#15803d',
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                        }}
-                      >
-                        <span>Sueldo Fijo (USD): </span>
-                        <strong>
-                          +${settlementModalData.sueldoFijoOriginal.toFixed(2)}
-                        </strong>
-                      </div>
-                    )}
-                  <div
-                    style={{
-                      color: '#b91c1c',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                    }}
-                  >
-                    <span>Vales {globalDiscount53}%: </span>
-                    <strong>
-                      -${settlementModalData.valesDeduction53Usd.toFixed(2)}
-                    </strong>
-                  </div>
-                  {settlementModalData.penDeduction53 > 0 && (
-                    <div
-                      style={{
-                        color: '#b91c1c',
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                      }}
-                    >
-                      <span>Penalizaciones: </span>
-                      <strong>
-                        -${settlementModalData.penDeduction53.toFixed(2)}
-                      </strong>
-                    </div>
-                  )}
-                  <div
-                    style={{
-                      fontSize: '15px',
-                      fontWeight: '900',
-                      color: '#15803d',
-                      borderTop: '1px solid #bbf7d0',
-                      marginTop: '4px',
-                      paddingTop: '4px',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                    }}
-                  >
-                    <span>Neto Final ($): </span>
-                    <span>
-                      $
-                      {(
-                        settlementModalData.comm53NetUsd +
-                        (sueldoFijoCurrency === 'USD' &&
-                        settlementModalData.sueldoFijoOriginal > 0
-                          ? settlementModalData.sueldoFijoOriginal
-                          : 0)
-                      ).toFixed(2)}{' '}
-                      USD
-                    </span>
-                  </div>
+                  N.E. con {globalDiscount53}% (Pago $)
+                </span>
+                <div
+                  style={{
+                    color: '#15803d',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                  }}
+                >
+                  <span>Bruto Com. {globalDiscount53}%: </span>
+                  <strong>
+                    +${settlementModalData.comm53GrossUsd.toFixed(2)}
+                  </strong>
                 </div>
-              )}
-
-              {/* 2. 23.08% */}
-              {(settlementModalData.comm23GrossUsd > 0 ||
-                settlementModalData.valesDeduction23Usd > 0 ||
-                settlementModalData.penDeduction23 > 0 ||
-                settlementModalData.hierarchyUsd23 > 0 ||
-                (sueldoFijoCurrency === 'BS' &&
-                  settlementModalData.sueldoFijoOriginal > 0)) && (
                 <div
                   style={{
-                    background: '#f0f9ff',
-                    border: '1px solid #bae6fd',
-                    padding: '12px',
-                    borderRadius: '8px',
+                    color: '#1d4ed8',
                     display: 'flex',
-                    flexDirection: 'column',
-                    gap: '4px',
-                    fontSize: '12px',
+                    justifyContent: 'space-between',
                   }}
                 >
-                  <span
-                    style={{
-                      fontSize: '11px',
-                      color: '#0369a1',
-                      fontWeight: 'bold',
-                    }}
-                  >
-                    N.E. con {globalDiscount23}% (Ref Bs BCV Eq $)
-                  </span>
-                  <div
-                    style={{
-                      color: '#0284c7',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                    }}
-                  >
-                    <span>Bruto Com. {globalDiscount23}%: </span>
-                    <strong>
-                      +${settlementModalData.comm23GrossUsd.toFixed(2)}
-                    </strong>
-                  </div>
-                  <div
-                    style={{
-                      color: '#1d4ed8',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                    }}
-                  >
-                    <span>Comisión Jerarquía ({globalDiscount23}%): </span>
-                    <strong>
-                      +${(settlementModalData.hierarchyUsd23 || 0).toFixed(2)}
-                    </strong>
-                  </div>
-                  {settlementModalData.sueldoFijoOriginal > 0 && (
+                  <span>Comisión Jerarquía ({globalDiscount53}%): </span>
+                  <strong>
+                    +${(settlementModalData.hierarchyUsd53 || 0).toFixed(2)}
+                  </strong>
+                </div>
+                {sueldoFijoCurrency === 'USD' &&
+                  settlementModalData.sueldoFijoOriginal > 0 && (
                     <div
                       style={{
-                        color: '#0369a1',
+                        color: '#15803d',
                         display: 'flex',
                         justifyContent: 'space-between',
                       }}
                     >
-                      <span>Sueldo Fijo Eq. (BS): </span>
+                      <span>Sueldo Fijo (USD): </span>
                       <strong>
-                        +
-                        {sueldoFijoCurrency === 'BS'
-                          ? `$${settlementModalData.sueldoFijoOriginal.toFixed(
-                              2
-                            )} USD`
-                          : '$0.00 USD'}
+                        +${settlementModalData.sueldoFijoOriginal.toFixed(2)}
                       </strong>
                     </div>
                   )}
+                <div
+                  style={{
+                    color: '#b91c1c',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                  }}
+                >
+                  <span>Vales (Deducción Total): </span>
+                  <strong>
+                    -${settlementModalData.valesDeduction53Usd.toFixed(2)}
+                  </strong>
+                </div>
+                {settlementModalData.penDeduction53 > 0 && (
                   <div
                     style={{
                       color: '#b91c1c',
@@ -10410,304 +9968,319 @@ box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
                       justifyContent: 'space-between',
                     }}
                   >
-                    <span>Vales {globalDiscount23}%: </span>
+                    <span>Penalizaciones: </span>
                     <strong>
-                      -${settlementModalData.valesDeduction23Usd.toFixed(2)}
+                      -${settlementModalData.penDeduction53.toFixed(2)}
                     </strong>
                   </div>
-                  {settlementModalData.penDeduction23 > 0 && (
-                    <div
-                      style={{
-                        color: '#b91c1c',
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                      }}
-                    >
-                      <span>Penalizaciones: </span>
-                      <strong>
-                        -${settlementModalData.penDeduction23.toFixed(2)}
-                      </strong>
-                    </div>
-                  )}
+                )}
+                <div
+                  style={{
+                    fontSize: '15px',
+                    fontWeight: '900',
+                    color: '#15803d',
+                    borderTop: '1px solid #bbf7d0',
+                    marginTop: '4px',
+                    paddingTop: '4px',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                  }}
+                >
+                  <span>Neto Final ($): </span>
+                  <span>
+                    $
+                    {(
+                      settlementModalData.comm53NetUsd +
+                      (sueldoFijoCurrency === 'USD' &&
+                      settlementModalData.sueldoFijoOriginal > 0
+                        ? settlementModalData.sueldoFijoOriginal
+                        : 0)
+                    ).toFixed(2)}{' '}
+                    USD
+                  </span>
+                </div>
+              </div>
+
+              {/* 2. 23.08% - PARTE DE TOTAL BS */}
+              <div
+                style={{
+                  background: '#f0f9ff',
+                  border: '1px solid #bae6fd',
+                  padding: '12px',
+                  borderRadius: '8px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '4px',
+                  fontSize: '12px',
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: '11px',
+                    color: '#0369a1',
+                    fontWeight: 'bold',
+                  }}
+                >
+                  N.E. con {globalDiscount23}% (Ref Bs BCV Eq $)
+                </span>
+                <div
+                  style={{
+                    color: '#0284c7',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                  }}
+                >
+                  <span>Bruto Com. {globalDiscount23}%: </span>
+                  <strong>
+                    +${settlementModalData.comm23GrossUsd.toFixed(2)}
+                  </strong>
+                </div>
+                <div
+                  style={{
+                    color: '#1d4ed8',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                  }}
+                >
+                  <span>Comisión Jerarquía ({globalDiscount23}%): </span>
+                  <strong>
+                    +${(settlementModalData.hierarchyUsd23 || 0).toFixed(2)}
+                  </strong>
+                </div>
+                {settlementModalData.sueldoFijoOriginal > 0 && (
                   <div
                     style={{
-                      fontSize: '15px',
-                      fontWeight: '900',
-                      color: '#0369a1',
-                      borderTop: '1px solid #bae6fd',
-                      marginTop: '4px',
-                      paddingTop: '4px',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                    }}
-                  >
-                    <span>Neto Eq ($): </span>
-                    <span>
-                      ${settlementModalData.comm23NetUsd.toFixed(2)} USD
-                    </span>
-                  </div>
-                  <div
-                    style={{
-                      marginTop: '4px',
-                      paddingTop: '4px',
-                      borderTop: '1px dashed #bae6fd',
-                      fontSize: '11px',
-                      fontWeight: 'bold',
                       color: '#0369a1',
                       display: 'flex',
                       justifyContent: 'space-between',
                     }}
                   >
-                    <span>
-                      Equivalente en Bs (Tasa {Number(bcvRateUsd).toFixed(2)}):
-                    </span>
-                    <span>
-                      {formatBs(
-                        settlementModalData.comm23NetUsd * Number(bcvRateUsd)
-                      )}{' '}
-                      Bs.
-                    </span>
+                    <span>Sueldo Fijo Eq. (BS): </span>
+                    <strong>
+                      +
+                      {sueldoFijoCurrency === 'BS'
+                        ? `$${settlementModalData.sueldoFijoOriginal.toFixed(
+                            2
+                          )} USD`
+                        : '$0.00 USD'}
+                    </strong>
                   </div>
-                </div>
-              )}
-
-              {/* 3. 10% */}
-              {(settlementModalData.comm10GrossUsd > 0 ||
-                settlementModalData.valesDeduction10Usd > 0 ||
-                settlementModalData.penDeduction10 > 0 ||
-                settlementModalData.hierarchyUsd10 > 0) && (
+                )}
                 <div
                   style={{
-                    background: '#fffbeb',
-                    border: '1px solid #fde68a',
-                    padding: '12px',
-                    borderRadius: '8px',
+                    fontSize: '15px',
+                    fontWeight: '900',
+                    color: '#0369a1',
+                    borderTop: '1px solid #bae6fd',
+                    marginTop: '4px',
+                    paddingTop: '4px',
                     display: 'flex',
-                    flexDirection: 'column',
-                    gap: '4px',
-                    fontSize: '12px',
+                    justifyContent: 'space-between',
                   }}
                 >
-                  <span
-                    style={{
-                      fontSize: '11px',
-                      color: '#92400e',
-                      fontWeight: 'bold',
-                    }}
-                  >
-                    N.E. con {globalDiscount10}% (Ref Bs BCV Eq $)
+                  <span>Neto Eq ($): </span>
+                  <span>
+                    ${settlementModalData.comm23NetUsd.toFixed(2)} USD
                   </span>
-                  <div
-                    style={{
-                      color: '#d97706',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                    }}
-                  >
-                    <span>Bruto Com. {globalDiscount10}%: </span>
-                    <strong>
-                      +${settlementModalData.comm10GrossUsd.toFixed(2)}
-                    </strong>
-                  </div>
-                  <div
-                    style={{
-                      color: '#1d4ed8',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                    }}
-                  >
-                    <span>Comisión Jerarquía ({globalDiscount10}%): </span>
-                    <strong>
-                      +${(settlementModalData.hierarchyUsd10 || 0).toFixed(2)}
-                    </strong>
-                  </div>
-                  <div
-                    style={{
-                      color: '#b91c1c',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                    }}
-                  >
-                    <span>Vales {globalDiscount10}%: </span>
-                    <strong>
-                      -${settlementModalData.valesDeduction10Usd.toFixed(2)}
-                    </strong>
-                  </div>
-                  {settlementModalData.penDeduction10 > 0 && (
-                    <div
-                      style={{
-                        color: '#b91c1c',
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                      }}
-                    >
-                      <span>Penalizaciones: </span>
-                      <strong>
-                        -${settlementModalData.penDeduction10.toFixed(2)}
-                      </strong>
-                    </div>
-                  )}
-                  <div
-                    style={{
-                      fontSize: '15px',
-                      fontWeight: '900',
-                      color: '#92400e',
-                      borderTop: '1px solid #fde68a',
-                      marginTop: '4px',
-                      paddingTop: '4px',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                    }}
-                  >
-                    <span>Neto Eq ($): </span>
-                    <span>
-                      ${settlementModalData.comm10NetUsd.toFixed(2)} USD
-                    </span>
-                  </div>
-                  <div
-                    style={{
-                      marginTop: '4px',
-                      paddingTop: '4px',
-                      borderTop: '1px dashed #fde68a',
-                      fontSize: '11px',
-                      fontWeight: 'bold',
-                      color: '#92400e',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                    }}
-                  >
-                    <span>
-                      Equivalente en Bs (Tasa {Number(bcvRateUsd).toFixed(2)}):
-                    </span>
-                    <span>
-                      {formatBs(
-                        settlementModalData.comm10NetUsd * Number(bcvRateUsd)
-                      )}{' '}
-                      Bs.
-                    </span>
-                  </div>
                 </div>
-              )}
-
-              {/* 4. 0% */}
-              {(settlementModalData.comm0GrossUsd > 0 ||
-                settlementModalData.valesDeduction0Usd > 0 ||
-                settlementModalData.penDeduction0 > 0 ||
-                settlementModalData.hierarchyUsd0 > 0) && (
                 <div
                   style={{
-                    background: '#f3f4f6',
-                    border: '1px solid #e5e7eb',
-                    padding: '12px',
-                    borderRadius: '8px',
+                    marginTop: '4px',
+                    paddingTop: '4px',
+                    borderTop: '1px dashed #bae6fd',
+                    fontSize: '11px',
+                    fontWeight: 'bold',
+                    color: '#0369a1',
                     display: 'flex',
-                    flexDirection: 'column',
-                    gap: '4px',
-                    fontSize: '12px',
+                    justifyContent: 'space-between',
                   }}
                 >
-                  <span
-                    style={{
-                      fontSize: '11px',
-                      color: '#374151',
-                      fontWeight: 'bold',
-                    }}
-                  >
-                    N.E. con {globalDiscount0}% (Ref Bs BCV Eq $)
+                  <span>
+                    Equivalente en Bs (Tasa {Number(bcvRateUsd).toFixed(2)}):
                   </span>
-                  <div
-                    style={{
-                      color: '#4b5563',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                    }}
-                  >
-                    <span>Bruto Com. {globalDiscount0}%: </span>
-                    <strong>
-                      +${settlementModalData.comm0GrossUsd.toFixed(2)}
-                    </strong>
-                  </div>
-                  <div
-                    style={{
-                      color: '#1d4ed8',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                    }}
-                  >
-                    <span>Comisión Jerarquía ({globalDiscount0}%): </span>
-                    <strong>
-                      +${(settlementModalData.hierarchyUsd0 || 0).toFixed(2)}
-                    </strong>
-                  </div>
-                  <div
-                    style={{
-                      color: '#b91c1c',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                    }}
-                  >
-                    <span>Vales {globalDiscount0}%: </span>
-                    <strong>
-                      -${settlementModalData.valesDeduction0Usd.toFixed(2)}
-                    </strong>
-                  </div>
-                  {settlementModalData.penDeduction0 > 0 && (
-                    <div
-                      style={{
-                        color: '#b91c1c',
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                      }}
-                    >
-                      <span>Penalizaciones: </span>
-                      <strong>
-                        -${settlementModalData.penDeduction0.toFixed(2)}
-                      </strong>
-                    </div>
-                  )}
-                  <div
-                    style={{
-                      fontSize: '15px',
-                      fontWeight: '900',
-                      color: '#374151',
-                      borderTop: '1px solid #e5e7eb',
-                      marginTop: '4px',
-                      paddingTop: '4px',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                    }}
-                  >
-                    <span>Neto Eq ($): </span>
-                    <span>
-                      ${settlementModalData.comm0NetUsd.toFixed(2)} USD
-                    </span>
-                  </div>
-                  <div
-                    style={{
-                      marginTop: '4px',
-                      paddingTop: '4px',
-                      borderTop: '1px dashed #e5e7eb',
-                      fontSize: '11px',
-                      fontWeight: 'bold',
-                      color: '#374151',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                    }}
-                  >
-                    <span>
-                      Equivalente en Bs (Tasa {Number(bcvRateUsd).toFixed(2)}):
-                    </span>
-                    <span>
-                      {formatBs(
-                        settlementModalData.comm0NetUsd * Number(bcvRateUsd)
-                      )}{' '}
-                      Bs.
-                    </span>
-                  </div>
+                  <span>
+                    {formatBs(
+                      settlementModalData.comm23NetUsd * Number(bcvRateUsd)
+                    )}{' '}
+                    Bs.
+                  </span>
                 </div>
-              )}
+              </div>
+
+              {/* 3. 10% - PARTE DE TOTAL BS */}
+              <div
+                style={{
+                  background: '#fffbeb',
+                  border: '1px solid #fde68a',
+                  padding: '12px',
+                  borderRadius: '8px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '4px',
+                  fontSize: '12px',
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: '11px',
+                    color: '#92400e',
+                    fontWeight: 'bold',
+                  }}
+                >
+                  N.E. con {globalDiscount10}% (Ref Bs BCV Eq $)
+                </span>
+                <div
+                  style={{
+                    color: '#d97706',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                  }}
+                >
+                  <span>Bruto Com. {globalDiscount10}%: </span>
+                  <strong>
+                    +${settlementModalData.comm10GrossUsd.toFixed(2)}
+                  </strong>
+                </div>
+                <div
+                  style={{
+                    color: '#1d4ed8',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                  }}
+                >
+                  <span>Comisión Jerarquía ({globalDiscount10}%): </span>
+                  <strong>
+                    +${(settlementModalData.hierarchyUsd10 || 0).toFixed(2)}
+                  </strong>
+                </div>
+                <div
+                  style={{
+                    fontSize: '15px',
+                    fontWeight: '900',
+                    color: '#92400e',
+                    borderTop: '1px solid #fde68a',
+                    marginTop: '4px',
+                    paddingTop: '4px',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                  }}
+                >
+                  <span>Neto Eq ($): </span>
+                  <span>
+                    ${settlementModalData.comm10NetUsd.toFixed(2)} USD
+                  </span>
+                </div>
+                <div
+                  style={{
+                    marginTop: '4px',
+                    paddingTop: '4px',
+                    borderTop: '1px dashed #fde68a',
+                    fontSize: '11px',
+                    fontWeight: 'bold',
+                    color: '#92400e',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                  }}
+                >
+                  <span>
+                    Equivalente en Bs (Tasa {Number(bcvRateUsd).toFixed(2)}):
+                  </span>
+                  <span>
+                    {formatBs(
+                      settlementModalData.comm10NetUsd * Number(bcvRateUsd)
+                    )}{' '}
+                    Bs.
+                  </span>
+                </div>
+              </div>
+
+              {/* 4. 0% - PARTE DE TOTAL BS */}
+              <div
+                style={{
+                  background: '#f3f4f6',
+                  border: '1px solid #e5e7eb',
+                  padding: '12px',
+                  borderRadius: '8px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '4px',
+                  fontSize: '12px',
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: '11px',
+                    color: '#374151',
+                    fontWeight: 'bold',
+                  }}
+                >
+                  N.E. con {globalDiscount0}% (Ref Bs BCV Eq $)
+                </span>
+                <div
+                  style={{
+                    color: '#4b5563',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                  }}
+                >
+                  <span>Bruto Com. {globalDiscount0}%: </span>
+                  <strong>
+                    +${settlementModalData.comm0GrossUsd.toFixed(2)}
+                  </strong>
+                </div>
+                <div
+                  style={{
+                    color: '#1d4ed8',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                  }}
+                >
+                  <span>Comisión Jerarquía ({globalDiscount0}%): </span>
+                  <strong>
+                    +${(settlementModalData.hierarchyUsd0 || 0).toFixed(2)}
+                  </strong>
+                </div>
+                <div
+                  style={{
+                    fontSize: '15px',
+                    fontWeight: '900',
+                    color: '#374151',
+                    borderTop: '1px solid #e5e7eb',
+                    marginTop: '4px',
+                    paddingTop: '4px',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                  }}
+                >
+                  <span>Neto Eq ($): </span>
+                  <span>${settlementModalData.comm0NetUsd.toFixed(2)} USD</span>
+                </div>
+                <div
+                  style={{
+                    marginTop: '4px',
+                    paddingTop: '4px',
+                    borderTop: '1px dashed #e5e7eb',
+                    fontSize: '11px',
+                    fontWeight: 'bold',
+                    color: '#374151',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                  }}
+                >
+                  <span>
+                    Equivalente en Bs (Tasa {Number(bcvRateUsd).toFixed(2)}):
+                  </span>
+                  <span>
+                    {formatBs(
+                      settlementModalData.comm0NetUsd * Number(bcvRateUsd)
+                    )}{' '}
+                    Bs.
+                  </span>
+                </div>
+              </div>
             </div>
 
+            {/* TOTALES FINALES ESTRICTOS */}
             <div
               style={{
                 background: '#f9fafb',
@@ -10747,11 +10320,12 @@ box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
                 }}
               >
                 <span>TOTAL A PAGAR (Bs): </span>
-                <span>{formatBs(settlementModalData.total23NetBs)} Bs.</span>
+                <span>
+                  {formatBs(settlementModalData.totalNetoPagarBs)} Bs.
+                </span>
               </div>
             </div>
 
-            {/* D. SELECT DE PENALIZACIONES CON 4 OPCIONES */}
             <div
               style={{
                 background: '#fef2f2',
@@ -10821,7 +10395,6 @@ box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
                 </option>
               </select>
             </div>
-
             <div
               style={{
                 display: 'flex',
