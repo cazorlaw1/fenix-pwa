@@ -80,7 +80,7 @@ function SearchableDropdown({
         onClick={() => setIsOpen(!isOpen)}
         style={{
           width: '100%',
-          padding: '10px 12px', // Tamaño grande como AdminModule
+          padding: '10px 12px',
           fontSize: '14px',
           border: '1px solid #D1D5DB',
           borderRadius: '6px',
@@ -233,7 +233,6 @@ export default function SalesModule() {
   const [clienteTab, setClienteTab] = useState('registrar');
   const [visitasTab, setVisitasTab] = useState('potenciales');
   const [neTab, setNeTab] = useState('crear_ne');
-
   const [message, setMessage] = useState({ type: '', text: '' });
   const [loading, setLoading] = useState(false);
 
@@ -250,7 +249,6 @@ export default function SalesModule() {
     vales: 0.0,
   });
   const [paymentNotificationsMap, setPaymentNotificationsMap] = useState({});
-
   const [imageModal, setImageModal] = useState({
     open: false,
     url: '',
@@ -266,7 +264,6 @@ export default function SalesModule() {
   const [globalDiscount0, setGlobalDiscount0] = useState(0); // Nueva modalidad
   const [globalTerms, setGlobalTerms] = useState('Cargando términos...');
   const [estimatedNextFolio, setEstimatedNextFolio] = useState('...');
-
   const [userSettlementHistory, setUserSettlementHistory] = useState([]);
   const [historySearch, setHistorySearch] = useState('');
 
@@ -286,9 +283,7 @@ export default function SalesModule() {
   const [ciFile, setCiFile] = useState(null);
   const [rifFile, setRifFile] = useState(null);
   const [adicionalFile, setAdicionalFile] = useState(null);
-
   const [searchPotencialesQuery, setSearchPotencialesQuery] = useState('');
-
   const [editClientModal, setEditClientModal] = useState({
     open: false,
     clientData: null,
@@ -313,7 +308,6 @@ export default function SalesModule() {
   const [searchClientQuery, setSearchClientQuery] = useState('');
   const [visitasGps, setVisitasGps] = useState({});
   const [visitasFiles, setVisitasFiles] = useState({});
-
   const [potencialForm, setPotencialForm] = useState({
     nombre: '',
     direccion: '',
@@ -321,7 +315,6 @@ export default function SalesModule() {
   });
   const [potencialFile, setPotencialFile] = useState(null);
   const [potencialGps, setPotencialGps] = useState(null);
-
   const [convertModal, setConvertModal] = useState({
     open: false,
     potencialData: null,
@@ -344,18 +337,16 @@ export default function SalesModule() {
   // 3. ESTADOS: SECCIÓN NOTA DE ENTREGA
   // ---------------------------------------------------------------------------
   const [editModeId, setEditModeId] = useState(null);
-
   // Estados para SearchableDropdowns en Crear N.E.
   const [neClientId, setNeClientId] = useState('');
   const [neSearchProduct, setNeSearchProduct] = useState('');
   const [neSelectedProdId, setNeSelectedProdId] = useState('');
   const [neCategoria, setNeCategoria] = useState('bombillos');
-
   // B. ACTUALIZACIÓN: Modalidad ahora soporta 4 valores
   const [neTipoPago, setNeTipoPago] = useState('53.38');
-
   const [neQuantity, setNeQuantity] = useState(1);
   const [neCart, setNeCart] = useState([]);
+
   // NUEVO: Efecto para recalcular precios del carrito al cambiar el tipo de pago/descuento
   useEffect(() => {
     if (neCart.length > 0) {
@@ -371,18 +362,16 @@ export default function SalesModule() {
       setNeCart(carritoActualizado);
     }
   }, [neTipoPago]);
+
   const [neObservacion, setNeObservacion] = useState('');
   const [neGpsLocation, setNeGpsLocation] = useState(null);
-
   const [searchHistoryQuery, setSearchHistoryQuery] = useState('');
   const [showFullSellerCard, setShowFullSellerCard] = useState(true);
-
   const [valeModal, setValeModal] = useState({
     open: false,
     notaId: null,
     monto: '',
   });
-
   const [abonoNotifModal, setAbonoNotifModal] = useState({
     open: false,
     notaId: null,
@@ -395,6 +384,37 @@ export default function SalesModule() {
     user_note: '',
   });
   const [abonoFiles, setAbonoFiles] = useState({});
+  // Nuevo estado para historial de vales independientes
+  const [independentValesHistory, setIndependentValesHistory] = useState([]);
+
+  // ---------------------------------------------------------------------------
+  // NUEVOS ESTADOS PARA REQUERIMIENTOS
+  // ---------------------------------------------------------------------------
+  // B. Bloqueo Anti-Spam
+  const [valesLocked, setValesLocked] = useState(false);
+  const [notifLocked, setNotifLocked] = useState(false);
+
+  // A. Modal de Edición de Nota de Entrega
+  const [editNeModal, setEditNeModal] = useState({
+    open: false,
+    noteData: null,
+  });
+  const [editNeForm, setEditNeForm] = useState({
+    client_id: '',
+    category: 'bombillos',
+    payment_discount: '53.38',
+    observation: '',
+  });
+  const [editNeCart, setEditNeCart] = useState([]);
+  const [editNeSearchProd, setEditNeSearchProd] = useState('');
+  const [editNeSelectedProdId, setEditNeSelectedProdId] = useState('');
+  const [editNeQuantity, setEditNeQuantity] = useState(1);
+
+  // D. Estado para Vales Independientes
+  const [independentValeForm, setIndependentValeForm] = useState({
+    monto: '',
+    motivo: '',
+  });
 
   // ---------------------------------------------------------------------------
   // EFECTO PARA AUTO-OCULTAR NOTIFICACIONES
@@ -423,6 +443,7 @@ export default function SalesModule() {
     fetchComisionesYVales();
     fetchPaymentNotifications();
     fetchUserSettlementHistory();
+    fetchIndependentValesHistory();
   }, [user, role]);
 
   const fetchGlobalSettings = async () => {
@@ -635,6 +656,7 @@ export default function SalesModule() {
           }
         });
       }
+
       const { data: penaltiesData, error: penErr } = await supabase
         .from('penalties')
         .select('amount, status')
@@ -644,6 +666,7 @@ export default function SalesModule() {
         !penErr && penaltiesData
           ? penaltiesData.reduce((acc, p) => acc + (Number(p.amount) || 0), 0)
           : 0;
+
       setComisionesData({
         pendientes: totalCerradas,
         pendientesNe: totalPendientesNe,
@@ -654,7 +677,23 @@ export default function SalesModule() {
       console.error('Error obteniendo comisiones/vales:', err);
     }
   };
+  // Función para cargar historial de vales independientes
+  const fetchIndependentValesHistory = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('vales')
+        .select('*')
+        .eq('seller_id', user?.id)
+        .is('order_id', null) // Solo vales sin N.E. asociada
+        .order('created_at', { ascending: false });
 
+      if (!error && data) {
+        setIndependentValesHistory(data);
+      }
+    } catch (err) {
+      console.error('Error cargando historial de vales:', err);
+    }
+  };
   const sellerProfile = sellersList.find((s) => s.id === user?.id);
   const currentSellerName =
     sellerProfile?.full_name ||
@@ -662,9 +701,11 @@ export default function SalesModule() {
     user?.user_metadata?.full_name ||
     'Vendedor Registrado';
   const currentUserRole = sellerProfile?.role || role || 'vendedor';
+
   const now = new Date();
   const currentMonth = now.getMonth() + 1;
   const currentYear = now.getFullYear();
+
   const totalNeFromHistory = salesHistory.reduce(
     (acc, n) => acc + (Number(n.final_price_usd) || 0),
     0
@@ -860,6 +901,7 @@ export default function SalesModule() {
         }
         adicUrl = await uploadFile(editAdicionalFile, 'documents', 'adicional');
       }
+
       const { error } = await supabase
         .from('clients')
         .update({
@@ -914,12 +956,14 @@ export default function SalesModule() {
         setLoading(false);
         return;
       }
+
       const { data: client, error: fetchErr } = await supabase
         .from('clients')
         .select('*')
         .eq('id', clientId)
         .single();
       if (fetchErr) throw fetchErr;
+
       const docPaths = [
         getStoragePathFromUrl(client.ci_photo_url, 'documents'),
         getStoragePathFromUrl(client.rif_photo_url, 'documents'),
@@ -929,12 +973,14 @@ export default function SalesModule() {
         client.last_visit_photo_url,
         'visits'
       );
+
       if (docPaths.length > 0) {
         await supabase.storage.from('documents').remove(docPaths);
       }
       if (visitPath) {
         await supabase.storage.from('visits').remove([visitPath]);
       }
+
       const { error: deleteErr } = await supabase
         .from('clients')
         .delete()
@@ -1047,11 +1093,13 @@ export default function SalesModule() {
         last_gps_location: { lat: gps.lat, lng: gps.lng },
       };
       if (adjuntoUrl) updateData.last_visit_photo_url = adjuntoUrl;
+
       const { error } = await supabase
         .from('clients')
         .update(updateData)
         .eq('id', id);
       if (error) throw error;
+
       try {
         await supabase.from('client_visits').insert([
           {
@@ -1068,6 +1116,7 @@ export default function SalesModule() {
           visitErr
         );
       }
+
       setMessage({
         type: 'success',
         text: 'Visita actualizada y coordenadas GPS guardadas con éxito.',
@@ -1164,7 +1213,6 @@ export default function SalesModule() {
   // ---------------------------------------------------------------------------
   // MANEJADORES: NOTA DE ENTREGA & DESCARGA/ENVÍO PDF
   // ---------------------------------------------------------------------------
-
   // B. FUNCIÓN AUXILIAR PARA OBTENER PORCENTAJE DINÁMICO
   const getDiscountPercent = (type) => {
     switch (String(type)) {
@@ -1182,7 +1230,6 @@ export default function SalesModule() {
   };
 
   const porcentajeDescuento = getDiscountPercent(neTipoPago);
-
   const filteredProducts = products.filter(
     (p) =>
       (!p.category || p.category.toLowerCase() === neCategoria.toLowerCase()) &&
@@ -1204,10 +1251,8 @@ export default function SalesModule() {
       alert(`Stock insuficiente. Disponible: ${prod.stock_current}`);
       return;
     }
-
     const valorUnitario = prod.price_usd;
     const vuConDescuento = valorUnitario * (1 - porcentajeDescuento / 100);
-
     if (inCart) {
       setNeCart(
         neCart.map((item) =>
@@ -1273,8 +1318,10 @@ export default function SalesModule() {
         longitude: neGpsLocation.lng,
         gps_captured_at: neGpsLocation.timestamp || new Date().toISOString(),
       };
+
       let orderId = editModeId;
       let transactionNumber = null;
+
       if (editModeId) {
         const { data: updatedData, error } = await supabase
           .from('sales_orders')
@@ -1295,6 +1342,7 @@ export default function SalesModule() {
         orderId = newNota.id;
         transactionNumber = newNota.transaction_number;
       }
+
       const detalles = neCart.map((item) => ({
         order_id: orderId,
         product_id: item.product_id,
@@ -1318,6 +1366,7 @@ export default function SalesModule() {
           notifErr
         );
       }
+
       setMessage({
         type: 'success',
         text: editModeId
@@ -1340,61 +1389,189 @@ export default function SalesModule() {
     }
   };
 
-  const handleEditNE = async (nota) => {
-    setEditModeId(nota.id);
-    setNeClientId(nota.client_id);
-    setNeCategoria(nota.category || 'bombillos');
-    setNeTipoPago(nota.payment_discount || '53.38');
-    setNeObservacion(nota.observation || '');
+  // ---------------------------------------------------------------------------
+  // A. LÓGICA DE EDICIÓN MEDIANTE MODAL
+  // ---------------------------------------------------------------------------
+  const handleOpenEditNeModal = async (nota) => {
+    try {
+      setLoading(true);
+      // Cargar items de la orden
+      const { data: items, error } = await supabase
+        .from('order_items')
+        .select('*, products(code, description)')
+        .eq('order_id', nota.id);
 
-    // Consulta a Supabase trayendo la relación de productos
-    const { data: detalles, error } = await supabase
-      .from('order_items')
-      .select(
-        `
-        *,
-        products (
-          code,
-          description
-        )
-      `
-      )
-      .eq('order_id', nota.id);
+      if (error) throw error;
 
-    if (error) {
-      console.error('Error cargando detalles para editar:', error);
-      alert('Error al cargar los productos de la nota.');
-      return;
-    }
-
-    if (detalles) {
-      const loadedCart = detalles.map((d) => ({
-        product_id: d.product_id,
-        // Tomamos el código y descripción de la relación de la BD o respaldos
-        code: d.products?.code || d.code || 'S/C',
-        description:
-          d.products?.description ||
-          d.description ||
-          'Producto sin descripción',
-        quantity: d.quantity,
-        unit_price_usd: d.unit_price_usd,
-        discounted_unit_price_usd: d.discounted_unit_price_usd,
-        total_line_usd: d.total_line_usd,
+      const mappedItems = (items || []).map((item) => ({
+        product_id: item.product_id,
+        code: item.products?.code || 'S/C',
+        description: item.products?.description || 'Producto',
+        quantity: item.quantity,
+        unit_price_usd: Number(item.unit_price_usd || 0),
+        discounted_unit_price_usd: Number(item.discounted_unit_price_usd || 0),
+        total_line_usd: Number(
+          item.total_line_usd ||
+            item.quantity * Number(item.discounted_unit_price_usd || 0)
+        ),
       }));
 
-      // 1. Cargamos el carrito con los productos de la nota
-      setNeCart(loadedCart);
+      setEditNeForm({
+        client_id: nota.client_id,
+        category: nota.category || 'bombillos',
+        payment_discount: String(nota.payment_discount || '53.38'),
+        observation: nota.observation || '',
+      });
+      setEditNeCart(mappedItems);
+      setEditNeModal({ open: true, noteData: nota });
+    } catch (err) {
+      console.error(err);
+      setMessage({
+        type: 'error',
+        text: 'Error al cargar datos para edición.',
+      });
+    } finally {
+      setLoading(false);
     }
+  };
 
-    // 2. Nos movemos a la pestaña de creación/edición de la Nota de Entrega
-    setNeTab('crear_ne');
+  const handleEditNeRecalculatePrices = (newDiscountType) => {
+    const newPct = getDiscountPercent(newDiscountType);
+    const recalculated = editNeCart.map((item) => {
+      const newDiscPrice = item.unit_price_usd * (1 - newPct / 100);
+      return {
+        ...item,
+        discounted_unit_price_usd: newDiscPrice,
+        total_line_usd: item.quantity * newDiscPrice,
+      };
+    });
+    setEditNeCart(recalculated);
+  };
 
-    // 3. ADICIONAL PARA ESCRITORIO:
-    // Si tu tabla de escritorio depende de que neSelectedProdId tenga un valor o
-    // que se limpie la búsqueda para renderizar el contenedor del carrito,
-    // puedes resetear estos estados auxiliares aquí:
-    setNeSearchProduct('');
-    setNeSelectedProdId('');
+  const handleEditNeAddProduct = () => {
+    if (!editNeSelectedProdId) return;
+    const prod = products.find((p) => p.id === editNeSelectedProdId);
+    if (!prod) return;
+    const qty = Number(editNeQuantity);
+    if (qty <= 0) return alert('La cantidad debe ser mayor a 0');
+
+    const descPct = getDiscountPercent(editNeForm.payment_discount);
+    const vuConDesc = Number(prod.price_usd) * (1 - descPct / 100);
+
+    const existingIdx = editNeCart.findIndex((i) => i.product_id === prod.id);
+    if (existingIdx > -1) {
+      const updated = [...editNeCart];
+      const newQty = updated[existingIdx].quantity + qty;
+      updated[existingIdx] = {
+        ...updated[existingIdx],
+        quantity: newQty,
+        discounted_unit_price_usd: vuConDesc,
+        total_line_usd: newQty * vuConDesc,
+      };
+      setEditNeCart(updated);
+    } else {
+      setEditNeCart([
+        ...editNeCart,
+        {
+          product_id: prod.id,
+          code: prod.code || 'S/C',
+          description: prod.description,
+          quantity: qty,
+          unit_price_usd: Number(prod.price_usd),
+          discounted_unit_price_usd: vuConDesc,
+          total_line_usd: qty * vuConDesc,
+        },
+      ]);
+    }
+    setEditNeSelectedProdId('');
+    setEditNeQuantity(1);
+  };
+
+  const handleEditNeRemoveItem = (product_id) => {
+    setEditNeCart(editNeCart.filter((i) => i.product_id !== product_id));
+  };
+
+  const handleSaveEditedNe = async () => {
+    if (!editNeModal.noteData) return;
+
+    const totalBase = editNeCart.reduce(
+      (acc, item) => acc + item.unit_price_usd * item.quantity,
+      0
+    );
+    const finalPrice = editNeCart.reduce(
+      (acc, item) => acc + item.total_line_usd,
+      0
+    );
+    const discountAmount = Math.max(0, totalBase - finalPrice);
+
+    try {
+      setLoading(true);
+
+      // Actualizar cabecera de la orden y CAMBIAR ESTADO A PENDIENTE
+      const { error: updateErr } = await supabase
+        .from('sales_orders')
+        .update({
+          client_id: editNeForm.client_id,
+          category: editNeForm.category,
+          payment_discount: editNeForm.payment_discount,
+          total_base_usd: totalBase,
+          discount_amount_usd: discountAmount,
+          final_price_usd: finalPrice,
+          balance_due_usd:
+            finalPrice - Number(editNeModal.noteData.total_paid_usd || 0),
+          observation: editNeForm.observation,
+          status: 'pendiente', // Requisito A: Cambiar estado a pendiente
+          updated_at: new Date(),
+        })
+        .eq('id', editNeModal.noteData.id);
+
+      if (updateErr) throw updateErr;
+
+      // Eliminar items antiguos
+      const { error: delErr } = await supabase
+        .from('order_items')
+        .delete()
+        .eq('order_id', editNeModal.noteData.id);
+
+      if (delErr) throw delErr;
+
+      // Insertar nuevos items
+      if (editNeCart.length > 0) {
+        const rowsToInsert = editNeCart.map((item) => ({
+          order_id: editNeModal.noteData.id,
+          product_id: item.product_id,
+          quantity: item.quantity,
+          unit_price_usd: item.unit_price_usd,
+          discounted_unit_price_usd: item.discounted_unit_price_usd,
+          total_line_usd: item.total_line_usd,
+        }));
+        const { error: insErr } = await supabase
+          .from('order_items')
+          .insert(rowsToInsert);
+        if (insErr) throw insErr;
+      }
+
+      setMessage({
+        type: 'success',
+        text: 'Nota de Entrega editada y enviada a aprobación.',
+      });
+      setEditNeModal({ open: false, noteData: null });
+      fetchSalesHistory();
+      fetchComisionesYVales();
+      fetchIndependentValesHistory();
+    } catch (err) {
+      setMessage({
+        type: 'error',
+        text: err.message || 'Error al guardar cambios.',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEditNE = async (nota) => {
+    // Redirección antigua eliminada. Ahora abre modal.
+    handleOpenEditNeModal(nota);
   };
 
   const handleDeleteNE = async (nota) => {
@@ -1488,103 +1665,43 @@ export default function SalesModule() {
             item.total_line_usd ||
             item.quantity * item.discounted_unit_price_usd;
           subTotal += totalLine;
-          itemsHtml += `
-         <tr>
-           <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; font-family: monospace;">${
-             item.products?.code || 'S/C'
-           }</td>
-           <td style="padding: 6px 8px; border-bottom: 1px solid #ddd;">${
-             item.products?.description || 'Producto'
-           }</td>
-           <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: center;">${
-             item.quantity
-           }</td>
-           <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: right;">$${Number(
-             item.unit_price_usd || 0
-           ).toFixed(2)}</td>
-           <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: right; color: #B45309;">$${Number(
-             item.discounted_unit_price_usd || 0
-           ).toFixed(2)}</td>
-           <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: right; font-weight: bold;">$${Number(
-             totalLine
-           ).toFixed(2)}</td>
-         </tr>
-       `;
+          itemsHtml += `<tr> <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; font-family: monospace;">${
+            item.products?.code || 'S/C'
+          }</td> <td style="padding: 6px 8px; border-bottom: 1px solid #ddd;">${
+            item.products?.description || 'Producto'
+          }</td> <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: center;">${
+            item.quantity
+          }</td> <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: right;">$${Number(
+            item.unit_price_usd || 0
+          ).toFixed(
+            2
+          )}</td> <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: right; color: #B45309;">$${Number(
+            item.discounted_unit_price_usd || 0
+          ).toFixed(
+            2
+          )}</td> <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: right; font-weight: bold;">$${Number(
+            totalLine
+          ).toFixed(2)}</td> </tr>`;
         });
       }
       const container = document.createElement('div');
-      container.innerHTML = `
-     <div style="font-family: Arial, sans-serif; color: #111; padding: 25px; background: #fff; width: 700px; height: 1000px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between; margin: 0 auto;">
-       <div>
-         <div style="display: flex; justify-content: space-between; border-bottom: 2px solid #111; padding-bottom: 15px; margin-bottom: 20px;">
-           <div>
-             <h2 style="margin: 0; font-size: 20px; text-transform: uppercase;">FENIX AUTO PART C.A</h2>
-             <p style="margin: 2px 0; font-size: 12px;"><strong>RIF:</strong> J-50261925-2</p>
-             <p style="margin: 8px 0 0 0; font-size: 12px;"><strong>Cliente:</strong> ${clientName}</p>
-           </div>
-           <div style="text-align: right; font-size: 12px;">
-             <p style="margin: 2px 0;"><strong>N° Transacción:</strong> #${transNo}</p>
-             <p style="margin: 2px 0;"><strong>Fecha/Hora:</strong> ${fecha}</p>
-             <p style="margin: 2px 0;"><strong>Vendedor:</strong> ${vendedorName}</p>
-             <p style="margin: 2px 0;"><strong>Categoría:</strong> ${
-               nota.category || 'General'
-             }</p>
-           </div>
-         </div>
-         <table style="width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 20px;">
-           <thead>
-             <tr style="background-color: #f3f4f6;">
-               <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: left;">Código</th>
-               <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: left;">Descripción</th>
-               <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: center;">Cantidad</th>
-               <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: right;">V. Unitario</th>
-               <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: right;">V. U. con Descuento</th>
-               <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: right;">Total Línea</th>
-             </tr>
-           </thead>
-           <tbody>
-             ${itemsHtml}
-           </tbody>
-         </table>
-       </div>
-       <div>
-         <div style="display: flex; justify-content: flex-end; font-size: 12px; margin-bottom: 15px;">
-           <div style="width: 280px; background: #f9fafb; padding: 12px; border: 1px solid #ddd; border-radius: 6px;">
-             <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
-               <span>Total Base:</span>
-               <strong>$${Number(nota.total_base_usd || subTotal).toFixed(
-                 2
-               )}</strong>
-             </div>
-             <div style="display: flex; justify-content: space-between; margin-bottom: 6px; color: #B45309;">
-               <span>Descuento Aplicado:</span>
-               <strong>-$${Number(nota.discount_amount_usd || 0).toFixed(
-                 2
-               )}</strong>
-             </div>
-             <div style="display: flex; justify-content: space-between; border-top: 1px solid #ccc; padding-top: 6px; font-weight: bold; font-size: 14px; color: #DC2626;">
-               <span>Precio Final:</span>
-               <span>$${Number(nota.final_price_usd || subTotal).toFixed(
-                 2
-               )}</span>
-             </div>
-           </div>
-         </div>
-         ${
-           nota.observation
-             ? `
-           <div style="font-size: 11px; color: #333; background: #fffbeb; border: 1px solid #fde68a; padding: 10px; border-radius: 4px; margin-bottom: 10px; text-align: justify;">
-             <strong>Observación:</strong> ${nota.observation}
-           </div>
-           `
-             : ''
-         }
-         <div style="font-size: 10px; color: #555; background: #f3f4f6; padding: 10px; border-radius: 4px; line-height: 1.4; text-align: justify;">
-           <strong>Términos y condiciones:</strong> ${globalTerms}
-         </div>
-       </div>
-     </div>
-   `;
+      container.innerHTML = `<div style="font-family: Arial, sans-serif; color: #111; padding: 25px; background: #fff; width: 700px; height: 1000px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between; margin: 0 auto;"> <div> <div style="display: flex; justify-content: space-between; border-bottom: 2px solid #111; padding-bottom: 15px; margin-bottom: 20px;"> <div> <h2 style="margin: 0; font-size: 20px; text-transform: uppercase;">FENIX AUTO PART C.A</h2> <p style="margin: 2px 0; font-size: 12px;"><strong>RIF:</strong> J-50261925-2</p> <p style="margin: 8px 0 0 0; font-size: 12px;"><strong>Cliente:</strong> ${clientName}</p> </div> <div style="text-align: right; font-size: 12px;"> <p style="margin: 2px 0;"><strong>N° Transacción:</strong> #${transNo}</p> <p style="margin: 2px 0;"><strong>Fecha/Hora:</strong> ${fecha}</p> <p style="margin: 2px 0;"><strong>Vendedor:</strong> ${vendedorName}</p> <p style="margin: 2px 0;"><strong>Categoría:</strong> ${
+        nota.category || 'General'
+      }</p> </div> </div> <table style="width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 20px;"> <thead> <tr style="background-color: #f3f4f6;"> <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: left;">Código</th> <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: left;">Descripción</th> <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: center;">Cantidad</th> <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: right;">V. Unitario</th> <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: right;">V. U. con Descuento</th> <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: right;">Total Línea</th> </tr> </thead> <tbody> ${itemsHtml} </tbody> </table> </div> <div> <div style="display: flex; justify-content: flex-end; font-size: 12px; margin-bottom: 15px;"> <div style="width: 280px; background: #f9fafb; padding: 12px; border: 1px solid #ddd; border-radius: 6px;"> <div style="display: flex; justify-content: space-between; margin-bottom: 6px;"> <span>Total Base:</span> <strong>$${Number(
+        nota.total_base_usd || subTotal
+      ).toFixed(
+        2
+      )}</strong> </div> <div style="display: flex; justify-content: space-between; margin-bottom: 6px; color: #B45309;"> <span>Descuento Aplicado:</span> <strong>-$${Number(
+        nota.discount_amount_usd || 0
+      ).toFixed(
+        2
+      )}</strong> </div> <div style="display: flex; justify-content: space-between; border-top: 1px solid #ccc; padding-top: 6px; font-weight: bold; font-size: 14px; color: #DC2626;"> <span>Precio Final:</span> <span>$${Number(
+        nota.final_price_usd || subTotal
+      ).toFixed(2)}</span> </div> </div> </div> ${
+        nota.observation
+          ? `<div style="font-size: 11px; color: #333; background: #fffbeb; border: 1px solid #fde68a; padding: 10px; border-radius: 4px; margin-bottom: 10px; text-align: justify;"><strong>Observación:</strong> ${nota.observation}</div>`
+          : ''
+      } <div style="font-size: 10px; color: #555; background: #f3f4f6; padding: 10px; border-radius: 4px; line-height: 1.4; text-align: justify;"><strong>Términos y condiciones:</strong> ${globalTerms}</div> </div> </div>`;
       const opciones = {
         margin: 0,
         filename: `nota-entrega-${transNo}.pdf`,
@@ -1696,12 +1813,9 @@ export default function SalesModule() {
         nota.final_price_usd || subTotal
       ).toFixed(2)}</span> </div> </div> </div> ${
         nota.observation
-          ? ` <div style= "font-size: 11px; color: #333; background: #fffbeb; border: 1px solid #fde68a; padding: 10px; border-radius: 4px; margin-bottom: 10px; text-align: justify; " >
- <strong >Observación: </strong > ${nota.observation}
- </div >
- `
+          ? `<div style="font-size: 11px; color: #333; background: #fffbeb; border: 1px solid #fde68a; padding: 10px; border-radius: 4px; margin-bottom: 10px; text-align: justify;"><strong>Observación:</strong> ${nota.observation}</div>`
           : ''
-      } <div style="font-size: 10px; color: #555; background: #f3f4f6; padding: 10px; border-radius: 4px; line-height: 1.4; text-align: justify;"> <strong>Términos y condiciones:</strong> ${globalTerms} </div> </div> </div>`;
+      } <div style="font-size: 10px; color: #555; background: #f3f4f6; padding: 10px; border-radius: 4px; line-height: 1.4; text-align: justify;"><strong>Términos y condiciones:</strong> ${globalTerms}</div> </div> </div>`;
       const opt = {
         margin: 0,
         filename: `Nota-${transNo}.pdf`,
@@ -1754,20 +1868,89 @@ export default function SalesModule() {
     }
   };
 
-  const handleSolicitarVale = async () => {
-    if (!valeModal.monto || Number(valeModal.monto) <= 0)
+  // C. Lógica de Vale Independiente (CORREGIDA)
+  const handleSolicitarValeIndependiente = async (e) => {
+    e.preventDefault();
+
+    // Validación básica
+    if (!independentValeForm.monto || Number(independentValeForm.monto) <= 0) {
       return alert('Ingrese un monto válido');
+    }
+
+    // B. Bloqueo Anti-Spam (5 segundos)
+    if (valesLocked) return;
+    setValesLocked(true);
+    setTimeout(() => setValesLocked(false), 5000);
+
     setLoading(true);
     try {
-      const notaAsociada = salesHistory.find((n) => n.id === valeModal.notaId);
-      const nroTransaccion =
-        notaAsociada?.transaction_number ||
-        valeModal.notaId?.substring(0, 6) ||
-        'N/A';
-      const clienteNombre = notaAsociada?.clients?.name || 'Cliente';
+      // CORRECCIÓN: Solo insertamos las columnas que existen en la tabla 'vales'
+      // order_id: null (para hacerlo independiente)
+      // seller_id: usuario actual
+      // requested_amount_usd: el monto ingresado
+      // status: pendiente para aprobación
       const { error } = await supabase.from('vales').insert([
         {
-          order_id: valeModal.notaId,
+          order_id: null,
+          seller_id: user?.id,
+          estimated_commission_usd: 0, // Opcional, pero suele existir para cálculos
+          requested_amount_usd: Number(independentValeForm.monto),
+          status: 'pendiente',
+          // NOTA: Se eliminó 'reason' y 'motivo' porque no existen en la tabla
+        },
+      ]);
+
+      if (error) throw error;
+
+      // Notificación opcional al admin (si tienes configurada la función edge)
+      try {
+        await supabase.functions.invoke('send-notification', {
+          body: {
+            type: 'new_vale_request',
+            payload: {
+              nroTransaccion: 'VALE-IND',
+              vendedorNombre: currentSellerName,
+              clienteNombre: 'N/A',
+              montoVale: Number(independentValeForm.monto).toFixed(2),
+            },
+          },
+        });
+      } catch (notifErr) {
+        console.warn('Error enviando notificación de vale:', notifErr);
+      }
+
+      setMessage({
+        type: 'success',
+        text: 'Solicitud de vale independiente enviada correctamente.',
+      });
+
+      // Limpiar formulario y recargar datos
+      setIndependentValeForm({ monto: '', motivo: '' });
+      fetchComisionesYVales();
+    } catch (err) {
+      console.error(err);
+      setMessage({ type: 'error', text: err.message });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSolicitarVale = async () => {
+    // Mantenido por compatibilidad si se llama desde otro lado, pero redirige lógica
+    if (!valeModal.monto || Number(valeModal.monto) <= 0)
+      return alert('Ingrese un monto válido');
+
+    // B. Bloqueo Anti-Spam
+    if (valesLocked) return;
+    setValesLocked(true);
+    setTimeout(() => setValesLocked(false), 5000);
+
+    setLoading(true);
+    try {
+      // C. Vale Independiente (ignoramos notaId si viene, o lo usamos solo para referencia textual si se desea, pero DB es null)
+      const { error } = await supabase.from('vales').insert([
+        {
+          order_id: null, // Independiente
           seller_id: user?.id,
           estimated_commission_usd: 0,
           requested_amount_usd: Number(valeModal.monto),
@@ -1780,9 +1963,9 @@ export default function SalesModule() {
           body: {
             type: 'new_vale_request',
             payload: {
-              nroTransaccion: nroTransaccion,
+              nroTransaccion: 'VALE-IND',
               vendedorNombre: currentSellerName,
-              clienteNombre: clienteNombre,
+              clienteNombre: 'N/A',
               montoVale: Number(valeModal.monto).toFixed(2),
             },
           },
@@ -1835,6 +2018,12 @@ export default function SalesModule() {
   const handleEnviarNotificacionAbono = async (e) => {
     e.preventDefault();
     if (!abonoNotifModal.notaId) return;
+
+    // B. Bloqueo Anti-Spam
+    if (notifLocked) return;
+    setNotifLocked(true);
+    setTimeout(() => setNotifLocked(false), 5000);
+
     const fileToUpload = abonoFiles[abonoNotifModal.notaId];
     if (!fileToUpload) {
       alert('Es obligatorio adjuntar una foto del billete o recibo.');
@@ -2144,60 +2333,7 @@ export default function SalesModule() {
         boxSizing: 'border-box',
       }}
     >
-      <style>{`
-@media (max-width: 768px) {
-.desktop-tabs { display: none !important; }
-.mobile-menu-container { display: block !important; }
-.desktop-table { display: none !important; }
-.desktop-cards-grid { display: none !important; }
-.mobile-cards-container { display: flex !important; flex-direction: column; gap: 12px; }
-.action-buttons-wrapper { 
-   display: flex !important;
-   flex-wrap: nowrap !important;
-   justify-content: stretch !important; 
-   align-items: stretch !important;
-   gap: 4px !important; 
-   margin-top: 6px !important;
-   padding-top: 8px !important;
-   border-top: 1px solid #E5E7EB !important;
- } 
- .action-buttons-wrapper button { 
-   display: inline-flex !important; 
-   align-items: center !important;
-   justify-content: center !important;
-   padding: 8px 4px !important; 
-   font-size: 9px !important; 
-   white-space: nowrap !important; 
-   overflow: hidden !important;
-   text-overflow: ellipsis !important;
-   border-radius: 6px !important;
-   line-height: 1.2 !important; 
-   height: auto !important; 
-   box-sizing: border-box !important;
-   min-height: 36px !important;
-   width: auto !important; 
-   margin-top: 0 !important; 
- }
- .action-buttons-wrapper button:not(:last-child) {
-   flex: 1 !important;
-   min-width: 0 !important; 
- }
- .action-buttons-wrapper button:last-child {
-   flex: 0 0 auto !important; 
-   width: 36px !important; 
-   min-width: 36px !important;
-   max-width: 36px !important;
-   padding: 8px 0 !important; 
- }
-}
-@media (min-width: 769px) {
-.desktop-tabs { display: flex !important; }
-.mobile-menu-container { display: none !important; }
-.desktop-table { display: none !important; }
-.desktop-cards-grid { display: grid !important; }
-.mobile-cards-container { display: none !important; }
-}
-`}</style>
+      <style>{`@media (max-width: 768px) { .desktop-tabs { display: none !important; } .mobile-menu-container { display: block !important; } .desktop-table { display: none !important; } .desktop-cards-grid { display: none !important; } .mobile-cards-container { display: flex !important; flex-direction: column; gap: 12px; } .action-buttons-wrapper { display: flex !important; flex-wrap: nowrap !important; justify-content: stretch !important; align-items: stretch !important; gap: 4px !important; margin-top: 6px !important; padding-top: 8px !important; border-top: 1px solid #E5E7EB !important; } .action-buttons-wrapper button { display: inline-flex !important; align-items: center !important; justify-content: center !important; padding: 8px 4px !important; font-size: 9px !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; border-radius: 6px !important; line-height: 1.2 !important; height: auto !important; box-sizing: border-box !important; min-height: 36px !important; width: auto !important; margin-top: 0 !important; } .action-buttons-wrapper button:not(:last-child) { flex: 1 !important; min-width: 0 !important; } .action-buttons-wrapper button:last-child { flex: 0 0 auto !important; width: 36px !important; min-width: 36px !important; max-width: 36px !important; padding: 8px 0 !important; } } @media (min-width: 769px) { .desktop-tabs { display: flex !important; } .mobile-menu-container { display: none !important; } .desktop-table { display: none !important; } .desktop-cards-grid { display: grid !important; } .mobile-cards-container { display: none !important; } }`}</style>
       <div
         style={{
           display: 'flex',
@@ -2226,6 +2362,7 @@ export default function SalesModule() {
           </p>
         </div>
       </div>
+
       {/* MENÚ HORIZONTAL (DESKTOP) */}
       <div
         className="desktop-tabs"
@@ -2267,6 +2404,7 @@ export default function SalesModule() {
           );
         })}
       </div>
+
       {/* MENÚ DROPDOWN (MÓVIL) */}
       <div
         className="mobile-menu-container"
@@ -2358,6 +2496,7 @@ export default function SalesModule() {
           </div>
         )}
       </div>
+
       {message.text && (
         <div
           style={{
@@ -2393,6 +2532,7 @@ export default function SalesModule() {
           </span>
         </div>
       )}
+
       {activeSubMenu === 'clientes' && (
         <div>
           <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
@@ -2435,6 +2575,7 @@ export default function SalesModule() {
               <Users style={{ width: '14px', height: '14px' }} /> Mis Clientes
             </button>
           </div>
+
           {clienteTab === 'registrar' && (
             <div
               style={{
@@ -2780,6 +2921,7 @@ export default function SalesModule() {
               </form>
             </div>
           )}
+
           {clienteTab === 'cartera' && (
             <div
               style={{
@@ -2841,6 +2983,7 @@ export default function SalesModule() {
                   />
                 </div>
               </div>
+
               {/* GRID DE TARJETAS ESCRITORIO */}
               <div
                 className="desktop-cards-grid"
@@ -3190,6 +3333,7 @@ export default function SalesModule() {
                     ))
                 )}
               </div>
+
               {/* TABLA DESKTOP */}
               <div
                 className="desktop-table"
@@ -3328,7 +3472,10 @@ export default function SalesModule() {
                                     }}
                                   >
                                     <Eye
-                                      style={{ width: '12px', height: '12px' }}
+                                      style={{
+                                        width: '12px',
+                                        height: '12px',
+                                      }}
                                     />{' '}
                                     C.I.
                                   </button>
@@ -3368,7 +3515,10 @@ export default function SalesModule() {
                                     }}
                                   >
                                     <Eye
-                                      style={{ width: '12px', height: '12px' }}
+                                      style={{
+                                        width: '12px',
+                                        height: '12px',
+                                      }}
                                     />{' '}
                                     RIF
                                   </button>
@@ -3408,7 +3558,10 @@ export default function SalesModule() {
                                     }}
                                   >
                                     <Eye
-                                      style={{ width: '12px', height: '12px' }}
+                                      style={{
+                                        width: '12px',
+                                        height: '12px',
+                                      }}
                                     />{' '}
                                     Adicional
                                   </button>
@@ -3530,6 +3683,7 @@ export default function SalesModule() {
                   </tbody>
                 </table>
               </div>
+
               {/* TARJETAS MÓVIL */}
               <div className="mobile-cards-container">
                 {clients.filter((c) =>
@@ -3849,6 +4003,7 @@ export default function SalesModule() {
           )}
         </div>
       )}
+
       {/* MODAL IMAGEN (Global) */}
       {imageModal.open && (
         <div
@@ -3998,6 +4153,7 @@ export default function SalesModule() {
           </div>
         </div>
       )}
+
       {/* MODAL EDITAR CLIENTE */}
       {editClientModal.open && (
         <div
@@ -4421,6 +4577,7 @@ export default function SalesModule() {
           </div>
         </div>
       )}
+
       {activeSubMenu === 'visitas' && (
         <div>
           <div
@@ -4464,6 +4621,7 @@ export default function SalesModule() {
               Mis Clientes Registrados
             </button>
           </div>
+
           {visitasTab === 'potenciales' && (
             <div
               style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}
@@ -4636,7 +4794,7 @@ export default function SalesModule() {
                       <MapPin style={{ width: '14px', height: '14px' }} />
                       {potencialGps
                         ? 'GPS Capturado OK (Click para recapturar)'
-                        : 'Capturar GPS *'}
+                        : 'Capturar GPS'}
                     </button>
                   </div>
                   <div>
@@ -4660,6 +4818,7 @@ export default function SalesModule() {
                   </div>
                 </form>
               </div>
+
               <div
                 style={{
                   backgroundColor: '#FFFFFF',
@@ -4722,6 +4881,7 @@ export default function SalesModule() {
                     />
                   </div>
                 </div>
+
                 {/* GRID DE TARJETAS ESCRITORIO */}
                 <div
                   className="desktop-cards-grid"
@@ -5019,6 +5179,7 @@ export default function SalesModule() {
                       ))
                   )}
                 </div>
+
                 {/* TABLA DESKTOP */}
                 <div
                   className="desktop-table"
@@ -5157,7 +5318,10 @@ export default function SalesModule() {
                                       }}
                                     />
                                     <Eye
-                                      style={{ width: '14px', height: '14px' }}
+                                      style={{
+                                        width: '14px',
+                                        height: '14px',
+                                      }}
                                     />
                                   </button>
                                 ) : (
@@ -5278,7 +5442,10 @@ export default function SalesModule() {
                                     title="Agregar como Cliente Oficial"
                                   >
                                     <UserPlus
-                                      style={{ width: '13px', height: '13px' }}
+                                      style={{
+                                        width: '13px',
+                                        height: '13px',
+                                      }}
                                     />
                                     Reg. Cliente
                                   </button>
@@ -5297,7 +5464,10 @@ export default function SalesModule() {
                                     title="Eliminar Cliente Potencial"
                                   >
                                     <Trash2
-                                      style={{ width: '14px', height: '14px' }}
+                                      style={{
+                                        width: '14px',
+                                        height: '14px',
+                                      }}
                                     />
                                   </button>
                                 </div>
@@ -5308,6 +5478,7 @@ export default function SalesModule() {
                     </tbody>
                   </table>
                 </div>
+
                 {/* TARJETAS MÓVIL */}
                 <div className="mobile-cards-container">
                   {potenciales.filter((p) =>
@@ -5577,6 +5748,7 @@ export default function SalesModule() {
               </div>
             </div>
           )}
+
           {visitasTab === 'clientes' && (
             <div
               style={{
@@ -5609,6 +5781,7 @@ export default function SalesModule() {
                   }}
                 />
               </div>
+
               {/* GRID DE TARJETAS ESCRITORIO */}
               <div
                 className="desktop-cards-grid"
@@ -5866,6 +6039,7 @@ export default function SalesModule() {
                     </div>
                   ))}
               </div>
+
               {/* TABLA DESKTOP */}
               <div
                 className="desktop-table"
@@ -6118,6 +6292,7 @@ export default function SalesModule() {
                   </tbody>
                 </table>
               </div>
+
               {/* TARJETAS MÓVIL */}
               <div className="mobile-cards-container">
                 {clients
@@ -6342,6 +6517,7 @@ export default function SalesModule() {
           )}
         </div>
       )}
+
       {/* MODAL CONVERTIR POTENCIAL */}
       {convertModal.open && (
         <div
@@ -6653,7 +6829,10 @@ export default function SalesModule() {
                   required
                   value={convertForm.telefono}
                   onChange={(e) =>
-                    setConvertForm({ ...convertForm, telefono: e.target.value })
+                    setConvertForm({
+                      ...convertForm,
+                      telefono: e.target.value,
+                    })
                   }
                   style={{
                     width: '100%',
@@ -6725,6 +6904,7 @@ export default function SalesModule() {
           </div>
         </div>
       )}
+
       {activeSubMenu === 'nota_entrega' && (
         <div>
           <div
@@ -6765,6 +6945,25 @@ export default function SalesModule() {
             >
               {editModeId ? 'Editando N.E.' : 'Crear N.E.'}
             </button>
+
+            {/* C. Nueva Pestaña Solicitar Vale */}
+            <button
+              onClick={() => setNeTab('solicitar_vale')}
+              style={{
+                padding: '6px 12px',
+                fontSize: '12px',
+                fontWeight: '700',
+                borderRadius: '6px',
+                border: '1px solid #D1D5DB',
+                backgroundColor:
+                  neTab === 'solicitar_vale' ? '#111827' : '#FFFFFF',
+                color: neTab === 'solicitar_vale' ? '#FFFFFF' : '#374151',
+                cursor: 'pointer',
+              }}
+            >
+              Solicitar Vale
+            </button>
+
             <button
               onClick={() => setNeTab('historial')}
               style={{
@@ -6781,6 +6980,7 @@ export default function SalesModule() {
               Mis Notas de Entrega
             </button>
           </div>
+
           {neTab === 'comisiones' && (
             <div
               style={{
@@ -6919,6 +7119,7 @@ export default function SalesModule() {
               </div>
             </div>
           )}
+
           {neTab === 'crear_ne' && (
             <div
               style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}
@@ -6957,6 +7158,7 @@ export default function SalesModule() {
                   </div>
                 </div>
               </div>
+
               <div
                 style={{
                   backgroundColor: '#ffffff',
@@ -7059,6 +7261,7 @@ export default function SalesModule() {
                   </select>
                 </div>
               </div>
+
               <div
                 style={{
                   backgroundColor: '#ffffff',
@@ -7149,6 +7352,7 @@ export default function SalesModule() {
                   </button>
                 </div>
               </div>
+
               <div
                 style={{
                   backgroundColor: '#FFFFFF',
@@ -7179,19 +7383,20 @@ export default function SalesModule() {
                       RIF: J-50261925-2
                     </p>
                     <p style={{ margin: '6px 0 0 0' }}>
-                      <strong>Cliente:</strong>{' '}
+                      <strong>Cliente: </strong>{' '}
                       {selectedClientData?.name || '---'}
                     </p>
                   </div>
                   <div style={{ textAlign: 'right' }}>
                     <p style={{ margin: 0 }}>
-                      <strong>Fecha/Hora:</strong> {new Date().toLocaleString()}
+                      <strong>Fecha/Hora: </strong>{' '}
+                      {new Date().toLocaleString()}
                     </p>
                     <p style={{ margin: '2px 0' }}>
-                      <strong>Registrado por:</strong> {currentSellerName}
+                      <strong>Registrado por: </strong> {currentSellerName}
                     </p>
                     <p style={{ margin: '2px 0' }}>
-                      <strong>N° Transacción:</strong> #{estimatedNextFolio}{' '}
+                      <strong>N° Transacción: </strong> #{estimatedNextFolio}{' '}
                       (Proyectado)
                     </p>
                   </div>
@@ -7404,6 +7609,7 @@ export default function SalesModule() {
                     </div>
                   </div>
                 </div>
+
                 <div style={{ marginBottom: '12px' }}>
                   <label
                     style={{
@@ -7430,6 +7636,7 @@ export default function SalesModule() {
                     }}
                   ></textarea>
                 </div>
+
                 <div
                   style={{
                     backgroundColor: '#F3F4F6',
@@ -7444,6 +7651,7 @@ export default function SalesModule() {
                 >
                   <strong>Términos y condiciones:</strong> {globalTerms}
                 </div>
+
                 <div
                   style={{
                     display: 'flex',
@@ -7506,6 +7714,220 @@ export default function SalesModule() {
               </div>
             </div>
           )}
+
+          {/* C. Pestaña Solicitar Vale Independiente */}
+          {neTab === 'solicitar_vale' && (
+            <div
+              style={{
+                backgroundColor: '#FFFFFF',
+                padding: '16px',
+                borderRadius: '12px',
+                border: '1px solid #E5E7EB',
+                maxWidth: '600px',
+                margin: '0 auto',
+              }}
+            >
+              <h3
+                style={{
+                  fontSize: '15px',
+                  fontWeight: '900',
+                  marginBottom: '16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                }}
+              >
+                <CreditCard size={20} color="#DC2626" /> Solicitar Vale
+              </h3>
+              <p
+                style={{
+                  fontSize: '13px',
+                  color: '#6B7280',
+                  marginBottom: '16px',
+                }}
+              >
+                Esta solicitud será revisada por administración.
+              </p>
+              <form
+                onSubmit={handleSolicitarValeIndependiente}
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '12px',
+                }}
+              >
+                <div>
+                  <label
+                    style={{
+                      display: 'block',
+                      fontSize: '12px',
+                      fontWeight: '700',
+                      marginBottom: '4px',
+                    }}
+                  >
+                    Monto Solicitado ($) *
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    required
+                    value={independentValeForm.monto}
+                    onChange={(e) =>
+                      setIndependentValeForm({
+                        ...independentValeForm,
+                        monto: e.target.value,
+                      })
+                    }
+                    placeholder="0.00"
+                    style={{
+                      width: '100%',
+                      padding: '10px',
+                      border: '1px solid #D1D5DB',
+                      borderRadius: '6px',
+                      boxSizing: 'border-box',
+                    }}
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={loading || valesLocked}
+                  style={{
+                    padding: '10px',
+                    backgroundColor: valesLocked ? '#9CA3AF' : '#DC2626',
+                    color: '#FFFFFF',
+                    border: 'none',
+                    borderRadius: '6px',
+                    fontWeight: '700',
+                    cursor: valesLocked ? 'not-allowed' : 'pointer',
+                    marginTop: '8px',
+                  }}
+                >
+                  {valesLocked
+                    ? 'Espere 5 segundos...'
+                    : 'Enviar Solicitud de Vale'}
+                </button>
+                {/* Historial Informativo de Vales Independientes */}
+                <div>
+                  <label
+                    style={{
+                      display: 'block',
+                      fontSize: '12px',
+                      fontWeight: '700',
+                      marginBottom: '8px',
+                      color: '#6B7280',
+                    }}
+                  >
+                    📋 Historial de Solicitudes Anteriores
+                  </label>
+
+                  {independentValesHistory.length === 0 ? (
+                    <div
+                      style={{
+                        padding: '16px',
+                        textAlign: 'center',
+                        backgroundColor: '#F9FAFB',
+                        border: '1px dashed #D1D5DB',
+                        borderRadius: '8px',
+                        fontSize: '12px',
+                        color: '#9CA3AF',
+                      }}
+                    >
+                      No hay solicitudes de vales independientes anteriores.
+                    </div>
+                  ) : (
+                    <div
+                      style={{
+                        maxHeight: '200px',
+                        overflowY: 'auto',
+                        border: '1px solid #E5E7EB',
+                        borderRadius: '8px',
+                        backgroundColor: '#FFFFFF',
+                      }}
+                    >
+                      {independentValesHistory.map((vale) => {
+                        const statusColors = {
+                          pendiente: {
+                            bg: '#FEF3C7',
+                            text: '#92400E',
+                            label: 'Pendiente',
+                          },
+                          aprobada: {
+                            bg: '#DCFCE7',
+                            text: '#166534',
+                            label: 'Aprobada',
+                          },
+                          rechazada: {
+                            bg: '#FEE2E2',
+                            text: '#991B1B',
+                            label: 'Rechazada',
+                          },
+                        };
+                        const style =
+                          statusColors[vale.status] || statusColors.pendiente;
+
+                        return (
+                          <div
+                            key={vale.id}
+                            style={{
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                              padding: '10px 12px',
+                              borderBottom: '1px solid #F3F4F6',
+                              fontSize: '12px',
+                            }}
+                          >
+                            <div
+                              style={{
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '2px',
+                              }}
+                            >
+                              <span
+                                style={{ fontWeight: '700', color: '#111827' }}
+                              >
+                                ${Number(vale.requested_amount_usd).toFixed(2)}
+                              </span>
+                              <span
+                                style={{ color: '#6B7280', fontSize: '11px' }}
+                              >
+                                {new Date(vale.created_at).toLocaleDateString(
+                                  'es-VE',
+                                  {
+                                    day: '2-digit',
+                                    month: 'short',
+                                    year: 'numeric',
+                                    hour: '2-digit',
+                                    minute: '2-digit',
+                                  }
+                                )}
+                              </span>
+                            </div>
+                            <span
+                              style={{
+                                padding: '3px 8px',
+                                borderRadius: '12px',
+                                backgroundColor: style.bg,
+                                color: style.text,
+                                fontWeight: '700',
+                                fontSize: '10px',
+                                whiteSpace: 'nowrap',
+                              }}
+                            >
+                              {style.label}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </form>
+            </div>
+          )}
+
           {neTab === 'historial' && (
             <div
               style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}
@@ -7750,6 +8172,7 @@ export default function SalesModule() {
                   </div>
                 )}
               </div>
+
               <div
                 style={{
                   backgroundColor: '#FFFFFF',
@@ -7784,6 +8207,7 @@ export default function SalesModule() {
                   }}
                 />
               </div>
+
               <div
                 style={{
                   backgroundColor: '#FFFFFF',
@@ -7829,6 +8253,20 @@ export default function SalesModule() {
                       const pendingNotif = paymentNotificationsMap[nota.id];
                       const hasPendingNotif =
                         pendingNotif && pendingNotif.status === 'pending';
+
+                      // E. Obtener porcentaje dinámico para visualización
+                      const discountPct = getDiscountPercent(
+                        nota.payment_discount
+                      );
+                      const modeLabel =
+                        String(nota.payment_discount) === '53.38'
+                          ? `${discountPct}% ($)`
+                          : String(nota.payment_discount) === '23.08'
+                          ? `${discountPct}% (Bs)`
+                          : String(nota.payment_discount) === '10'
+                          ? `${discountPct}% (Esp)`
+                          : `${discountPct}% (0)`;
+
                       return (
                         <div
                           key={nota.id}
@@ -7899,6 +8337,7 @@ export default function SalesModule() {
                               </span>
                             </div>
                           </div>
+
                           {/* Info Grid */}
                           <div
                             style={{
@@ -7966,7 +8405,29 @@ export default function SalesModule() {
                                 {isCerrada ? 'Cerrada' : 'Pendiente'}
                               </span>
                             </div>
+
+                            {/* E. Visualización del Porcentaje */}
+                            <div style={{ gridColumn: '1 / -1' }}>
+                              <span
+                                style={{ fontWeight: '700', color: '#4B5563' }}
+                              >
+                                Modalidad:
+                              </span>{' '}
+                              <span
+                                style={{
+                                  padding: '2px 6px',
+                                  backgroundColor: '#EFF6FF',
+                                  color: '#1D4ED8',
+                                  borderRadius: '4px',
+                                  fontSize: '11px',
+                                  fontWeight: '700',
+                                }}
+                              >
+                                {modeLabel}
+                              </span>
+                            </div>
                           </div>
+
                           {/* Finanzas */}
                           <div
                             style={{
@@ -8012,6 +8473,7 @@ export default function SalesModule() {
                               )}
                             </div>
                           </div>
+
                           {/* Acciones Intermedias */}
                           <div
                             style={{
@@ -8047,69 +8509,27 @@ export default function SalesModule() {
                                 onClick={() =>
                                   handleOpenAbonoNotifModal(nota.id)
                                 }
+                                disabled={notifLocked}
                                 style={{
                                   padding: '4px 8px',
-                                  backgroundColor: '#0284C7',
+                                  backgroundColor: notifLocked
+                                    ? '#9CA3AF'
+                                    : '#0284C7',
                                   color: '#FFFFFF',
                                   border: 'none',
                                   borderRadius: '4px',
                                   fontSize: '10px',
-                                  cursor: 'pointer',
+                                  cursor: notifLocked
+                                    ? 'not-allowed'
+                                    : 'pointer',
                                   fontWeight: '700',
                                 }}
                               >
-                                Notif. Abono
-                              </button>
-                            )}
-                            {valeEstado && valeEstado !== 'rechazada' ? (
-                              <span
-                                style={{
-                                  padding: '4px 8px',
-                                  borderRadius: '4px',
-                                  fontSize: '10px',
-                                  fontWeight: '900',
-                                  textTransform: 'capitalize',
-                                  backgroundColor:
-                                    valeEstado === 'aprobada'
-                                      ? '#DCFCE7'
-                                      : '#FEF3C7',
-                                  color:
-                                    valeEstado === 'aprobada'
-                                      ? '#15803D'
-                                      : '#B45309',
-                                }}
-                              >
-                                Vale: {valeEstado}
-                              </span>
-                            ) : (
-                              <button
-                                onClick={() =>
-                                  setValeModal({
-                                    open: true,
-                                    notaId: nota.id,
-                                    monto: '',
-                                  })
-                                }
-                                style={{
-                                  padding: '4px 8px',
-                                  backgroundColor:
-                                    valeEstado === 'rechazada'
-                                      ? '#DC2626'
-                                      : '#F59E0B',
-                                  color: '#FFFFFF',
-                                  border: 'none',
-                                  borderRadius: '4px',
-                                  fontSize: '10px',
-                                  cursor: 'pointer',
-                                  fontWeight: '700',
-                                }}
-                              >
-                                {valeEstado === 'rechazada'
-                                  ? 'Reintentar Vale'
-                                  : 'Solicitar'}
+                                {notifLocked ? 'Espere...' : 'Notif. Abono'}
                               </button>
                             )}
                           </div>
+
                           {/* Botones Principales */}
                           <div
                             className="action-buttons-wrapper"
@@ -8216,6 +8636,7 @@ export default function SalesModule() {
                     })
                   )}
                 </div>
+
                 {/* TABLA DESKTOP */}
                 <div
                   className="desktop-table"
@@ -8269,9 +8690,6 @@ export default function SalesModule() {
                         <th style={{ padding: '8px 12px', minWidth: '120px' }}>
                           Notif. Abono
                         </th>
-                        <th style={{ padding: '8px 12px', minWidth: '90px' }}>
-                          Vale
-                        </th>
                         <th style={{ padding: '8px 12px', minWidth: '70px' }}>
                           Editar
                         </th>
@@ -8315,6 +8733,20 @@ export default function SalesModule() {
                           const pendingNotif = paymentNotificationsMap[nota.id];
                           const hasPendingNotif =
                             pendingNotif && pendingNotif.status === 'pending';
+
+                          // E. Visualización Dinámica
+                          const discountPct = getDiscountPercent(
+                            nota.payment_discount
+                          );
+                          const modeLabel =
+                            String(nota.payment_discount) === '53.38'
+                              ? `${discountPct}% ($)`
+                              : String(nota.payment_discount) === '23.08'
+                              ? `${discountPct}% (Bs)`
+                              : String(nota.payment_discount) === '10'
+                              ? `${discountPct}% (Esp)`
+                              : `${discountPct}% (0)`;
+
                           return (
                             <tr
                               key={nota.id}
@@ -8425,6 +8857,7 @@ export default function SalesModule() {
                                     onClick={() =>
                                       handleOpenAbonoNotifModal(nota.id)
                                     }
+                                    disabled
                                     style={{
                                       padding: '4px 8px',
                                       backgroundColor: '#FEF3C7',
@@ -8432,13 +8865,14 @@ export default function SalesModule() {
                                       border: '1px solid #FDE68A',
                                       borderRadius: '4px',
                                       fontSize: '10px',
-                                      cursor: 'pointer',
+                                      cursor: 'not-allowed',
                                       fontWeight: '700',
                                       display: 'flex',
                                       alignItems: 'center',
                                       gap: '4px',
+                                      opacity: 0.7,
                                     }}
-                                    title="Notificación pendiente de aprobación"
+                                    title="Ya existe una notificación pendiente"
                                   >
                                     <Bell size={11} /> $
                                     {Number(pendingNotif.amount_usd).toFixed(2)}
@@ -8448,73 +8882,23 @@ export default function SalesModule() {
                                     onClick={() =>
                                       handleOpenAbonoNotifModal(nota.id)
                                     }
+                                    disabled={notifLocked}
                                     style={{
                                       padding: '4px 8px',
-                                      backgroundColor: '#0284C7',
+                                      backgroundColor: notifLocked
+                                        ? '#9CA3AF'
+                                        : '#0284C7',
                                       color: '#FFFFFF',
                                       border: 'none',
                                       borderRadius: '4px',
                                       fontSize: '10px',
-                                      cursor: 'pointer',
+                                      cursor: notifLocked
+                                        ? 'not-allowed'
+                                        : 'pointer',
                                       fontWeight: '700',
                                     }}
                                   >
-                                    Notif. Abono
-                                  </button>
-                                )}
-                              </td>
-                              <td style={{ padding: '8px 12px' }}>
-                                {valeEstado && valeEstado !== 'rechazada' ? (
-                                  <span
-                                    style={{
-                                      padding: '4px 8px',
-                                      borderRadius: '4px',
-                                      fontSize: '10px',
-                                      fontWeight: '900',
-                                      textTransform: 'capitalize',
-                                      backgroundColor:
-                                        valeEstado === 'aprobada'
-                                          ? '#DCFCE7'
-                                          : '#FEF3C7',
-                                      color:
-                                        valeEstado === 'aprobada'
-                                          ? '#15803D'
-                                          : '#B45309',
-                                    }}
-                                  >
-                                    {valeEstado}
-                                  </span>
-                                ) : (
-                                  <button
-                                    onClick={() =>
-                                      setValeModal({
-                                        open: true,
-                                        notaId: nota.id,
-                                        monto: '',
-                                      })
-                                    }
-                                    style={{
-                                      padding: '4px 8px',
-                                      backgroundColor:
-                                        valeEstado === 'rechazada'
-                                          ? '#DC2626'
-                                          : '#F59E0B',
-                                      color: '#FFFFFF',
-                                      border: 'none',
-                                      borderRadius: '4px',
-                                      fontSize: '10px',
-                                      cursor: 'pointer',
-                                      fontWeight: '700',
-                                    }}
-                                    title={
-                                      valeEstado === 'rechazada'
-                                        ? 'Rechazado. Volver a solicitar'
-                                        : 'Solicitar vale'
-                                    }
-                                  >
-                                    {valeEstado === 'rechazada'
-                                      ? 'Reintentar Vale'
-                                      : 'Solicitar'}
+                                    {notifLocked ? 'Espere...' : 'Notif. Abono'}
                                   </button>
                                 )}
                               </td>
@@ -8610,6 +8994,7 @@ export default function SalesModule() {
                     </tbody>
                   </table>
                 </div>
+
                 {/* TARJETAS MÓVIL */}
                 <div
                   className="mobile-cards-container"
@@ -8640,6 +9025,20 @@ export default function SalesModule() {
                       const pendingNotif = paymentNotificationsMap[nota.id];
                       const hasPendingNotif =
                         pendingNotif && pendingNotif.status === 'pending';
+
+                      // E. Visualización Dinámica
+                      const discountPct = getDiscountPercent(
+                        nota.payment_discount
+                      );
+                      const modeLabel =
+                        String(nota.payment_discount) === '53.38'
+                          ? `${discountPct}% ($)`
+                          : String(nota.payment_discount) === '23.08'
+                          ? `${discountPct}% (Bs)`
+                          : String(nota.payment_discount) === '10'
+                          ? `${discountPct}% (Esp)`
+                          : `${discountPct}% (0)`;
+
                       return (
                         <div
                           key={nota.id}
@@ -8768,6 +9167,28 @@ export default function SalesModule() {
                               </span>
                             </div>
                           </div>
+
+                          {/* E. Visualización del Porcentaje en Móvil */}
+                          <div style={{ fontSize: '12px' }}>
+                            <span
+                              style={{ fontWeight: '700', color: '#4B5563' }}
+                            >
+                              Modalidad:
+                            </span>{' '}
+                            <span
+                              style={{
+                                padding: '2px 6px',
+                                backgroundColor: '#EFF6FF',
+                                color: '#1D4ED8',
+                                borderRadius: '4px',
+                                fontSize: '11px',
+                                fontWeight: '700',
+                              }}
+                            >
+                              {modeLabel}
+                            </span>
+                          </div>
+
                           <div
                             style={{
                               display: 'grid',
@@ -8806,6 +9227,7 @@ export default function SalesModule() {
                               )}
                             </div>
                           </div>
+
                           <div
                             style={{
                               display: 'flex',
@@ -8820,6 +9242,7 @@ export default function SalesModule() {
                                 onClick={() =>
                                   handleOpenAbonoNotifModal(nota.id)
                                 }
+                                disabled
                                 style={{
                                   padding: '4px 8px',
                                   backgroundColor: '#FEF3C7',
@@ -8827,8 +9250,9 @@ export default function SalesModule() {
                                   border: '1px solid #FDE68A',
                                   borderRadius: '6px',
                                   fontSize: '11px',
-                                  cursor: 'pointer',
+                                  cursor: 'not-allowed',
                                   fontWeight: '700',
+                                  opacity: 0.7,
                                 }}
                               >
                                 ${Number(pendingNotif.amount_usd).toFixed(2)}{' '}
@@ -8839,69 +9263,27 @@ export default function SalesModule() {
                                 onClick={() =>
                                   handleOpenAbonoNotifModal(nota.id)
                                 }
+                                disabled={notifLocked}
                                 style={{
                                   padding: '4px 8px',
-                                  backgroundColor: '#0284C7',
+                                  backgroundColor: notifLocked
+                                    ? '#9CA3AF'
+                                    : '#0284C7',
                                   color: '#FFFFFF',
                                   border: 'none',
                                   borderRadius: '6px',
                                   fontSize: '11px',
-                                  cursor: 'pointer',
+                                  cursor: notifLocked
+                                    ? 'not-allowed'
+                                    : 'pointer',
                                   fontWeight: '700',
                                 }}
                               >
-                                Notif. Abono
-                              </button>
-                            )}
-                            {valeEstado && valeEstado !== 'rechazada' ? (
-                              <span
-                                style={{
-                                  padding: '4px 8px',
-                                  borderRadius: '6px',
-                                  fontSize: '11px',
-                                  fontWeight: '900',
-                                  textTransform: 'capitalize',
-                                  backgroundColor:
-                                    valeEstado === 'aprobada'
-                                      ? '#DCFCE7'
-                                      : '#FEF3C7',
-                                  color:
-                                    valeEstado === 'aprobada'
-                                      ? '#15803D'
-                                      : '#B45309',
-                                }}
-                              >
-                                Vale: {valeEstado}
-                              </span>
-                            ) : (
-                              <button
-                                onClick={() =>
-                                  setValeModal({
-                                    open: true,
-                                    notaId: nota.id,
-                                    monto: '',
-                                  })
-                                }
-                                style={{
-                                  padding: '4px 8px',
-                                  backgroundColor:
-                                    valeEstado === 'rechazada'
-                                      ? '#DC2626'
-                                      : '#F59E0B',
-                                  color: '#FFFFFF',
-                                  border: 'none',
-                                  borderRadius: '6px',
-                                  fontSize: '11px',
-                                  cursor: 'pointer',
-                                  fontWeight: '700',
-                                }}
-                              >
-                                {valeEstado === 'rechazada'
-                                  ? 'Reintentar Vale'
-                                  : 'Solicitar Vale'}
+                                {notifLocked ? 'Espere...' : 'Notif. Abono'}
                               </button>
                             )}
                           </div>
+
                           <div
                             className="action-buttons-wrapper"
                             style={{
@@ -9007,6 +9389,7 @@ export default function SalesModule() {
           )}
         </div>
       )}
+
       {activeSubMenu === 'historial_ventas' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           {/* Encabezado y Buscador */}
@@ -9065,6 +9448,7 @@ export default function SalesModule() {
               />
             </div>
           </div>
+
           {/* Contenedor Principal de Datos */}
           <div
             style={{
@@ -9299,6 +9683,7 @@ export default function SalesModule() {
                 ))
               )}
             </div>
+
             {/* --- TABLA DESKTOP --- */}
             <div
               className="desktop-table"
@@ -9478,6 +9863,7 @@ export default function SalesModule() {
                 </tbody>
               </table>
             </div>
+
             {/* --- TARJETAS MÓVIL --- */}
             <div className="mobile-cards-container" style={{ padding: '12px' }}>
               {filteredSettlementHistory.length === 0 ? (
@@ -9653,6 +10039,7 @@ export default function SalesModule() {
           </div>
         </div>
       )}
+
       {/* MODAL VALE */}
       {valeModal.open && (
         <div
@@ -9738,22 +10125,668 @@ export default function SalesModule() {
               </button>
               <button
                 onClick={handleSolicitarVale}
+                disabled={valesLocked}
                 style={{
                   padding: '6px 10px',
-                  backgroundColor: '#DC2626',
+                  backgroundColor: valesLocked ? '#9CA3AF' : '#DC2626',
                   color: '#FFFFFF',
                   border: 'none',
                   borderRadius: '6px',
-                  cursor: 'pointer',
+                  cursor: valesLocked ? 'not-allowed' : 'pointer',
                   fontWeight: '700',
                 }}
               >
-                Enviar Solicitud
+                {valesLocked ? 'Espere...' : 'Enviar Solicitud'}
               </button>
             </div>
           </div>
         </div>
       )}
+
+      {/* A. MODAL DE EDICIÓN DE NOTA DE ENTREGA */}
+      {editNeModal.open && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0,0,0,0.6)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1250,
+            padding: '16px',
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: '#ffffff',
+              border: '2px solid #111827',
+              borderRadius: '12px',
+              width: '100%',
+              maxWidth: '850px',
+              maxHeight: '90vh',
+              overflowY: 'auto',
+              padding: '24px',
+              boxShadow: '0 10px 40px rgba(0,0,0,0.3)',
+              boxSizing: 'border-box',
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '16px',
+                borderBottom: '2px solid #111827',
+                paddingBottom: '12px',
+              }}
+            >
+              <div>
+                <h2 style={{ fontSize: '18px', fontWeight: '900', margin: 0 }}>
+                  Panel Editable - Nota de Entrega #
+                  {editNeModal.noteData?.transaction_number}
+                </h2>
+              </div>
+              <button
+                onClick={() => setEditNeModal({ open: false, noteData: null })}
+                style={{
+                  background: '#111827',
+                  color: '#fff',
+                  border: 'none',
+                  padding: '6px 12px',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontSize: '12px',
+                  fontWeight: 'bold',
+                }}
+              >
+                Cerrar Panel
+              </button>
+            </div>
+            <div
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '16px',
+              }}
+            >
+              <div
+                style={{
+                  backgroundColor: '#ffffff',
+                  padding: '16px',
+                  borderRadius: '12px',
+                  border: '1px solid #E5E7EB',
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+                  gap: '12px',
+                }}
+              >
+                <div>
+                  <label
+                    style={{
+                      display: 'block',
+                      fontSize: '12px',
+                      fontWeight: '700',
+                      marginBottom: '4px',
+                    }}
+                  >
+                    Cliente
+                  </label>
+                  <SearchableDropdown
+                    options={clients.map((c) => ({
+                      value: c.id,
+                      label: c.name,
+                    }))}
+                    value={editNeForm.client_id}
+                    onChange={(val) =>
+                      setEditNeForm({ ...editNeForm, client_id: val })
+                    }
+                    placeholder="Seleccionar cliente..."
+                  />
+                </div>
+                <div>
+                  <label
+                    style={{
+                      display: 'block',
+                      fontSize: '12px',
+                      fontWeight: '700',
+                      marginBottom: '4px',
+                    }}
+                  >
+                    Categoría *
+                  </label>
+                  <select
+                    value={editNeForm.category}
+                    onChange={(e) =>
+                      setEditNeForm({ ...editNeForm, category: e.target.value })
+                    }
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px',
+                      fontSize: '14px',
+                      border: '1px solid #D1D5DB',
+                      borderRadius: '6px',
+                      backgroundColor: '#FFFFFF',
+                      boxSizing: 'border-box',
+                    }}
+                  >
+                    <option value="bombillos">Bombillos</option>
+                    <option value="fluidos">Fluidos</option>
+                  </select>
+                </div>
+                <div>
+                  <label
+                    style={{
+                      display: 'block',
+                      fontSize: '12px',
+                      fontWeight: '700',
+                      marginBottom: '4px',
+                    }}
+                  >
+                    % Descuento (Pago Bs) *
+                  </label>
+                  <select
+                    value={editNeForm.payment_discount}
+                    onChange={(e) => {
+                      setEditNeForm({
+                        ...editNeForm,
+                        payment_discount: e.target.value,
+                      });
+                      handleEditNeRecalculatePrices(e.target.value);
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px',
+                      fontSize: '14px',
+                      border: '1px solid #F59E0B',
+                      borderRadius: '6px',
+                      backgroundColor: '#FEF3C7',
+                      color: '#78350F',
+                      fontWeight: '700',
+                      boxSizing: 'border-box',
+                    }}
+                  >
+                    <option value="53.38">
+                      {globalDiscount53}% Pagará en $
+                    </option>
+                    <option value="23.08">
+                      {globalDiscount23}% Pagará en Bs BCV
+                    </option>
+                    <option value="10">
+                      {globalDiscount10}% Descuento Especial
+                    </option>
+                    <option value="0">{globalDiscount0}% Sin Descuento</option>
+                  </select>
+                </div>
+              </div>
+
+              <div
+                style={{
+                  backgroundColor: '#ffffff',
+                  padding: '16px',
+                  borderRadius: '12px',
+                  border: '1px solid #E5E7EB',
+                }}
+              >
+                <h3
+                  style={{
+                    fontSize: '13px',
+                    fontWeight: '900',
+                    textTransform: 'uppercase',
+                    marginBottom: '8px',
+                  }}
+                >
+                  Agregar Productos
+                </h3>
+                <div
+                  style={{
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    gap: '10px',
+                    alignItems: 'flex-end',
+                  }}
+                >
+                  <div style={{ flex: '1 1 300px' }}>
+                    <SearchableDropdown
+                      options={products
+                        .filter(
+                          (p) =>
+                            !p.category ||
+                            p.category.toLowerCase() ===
+                              editNeForm.category.toLowerCase()
+                        )
+                        .map((p) => {
+                          const descPct = getDiscountPercent(
+                            editNeForm.payment_discount
+                          );
+                          const desc =
+                            Number(p.price_usd) * (1 - descPct / 100);
+                          return {
+                            value: p.id,
+                            label: `${p.description} | Stock: ${
+                              p.stock_current
+                            } | Base: $${Number(p.price_usd).toFixed(
+                              2
+                            )} | Desc: $${desc.toFixed(2)}`,
+                          };
+                        })}
+                      value={editNeSelectedProdId}
+                      onChange={setEditNeSelectedProdId}
+                      placeholder="Seleccionar del catálogo..."
+                    />
+                  </div>
+                  <div style={{ width: '100px' }}>
+                    <label
+                      style={{
+                        display: 'block',
+                        fontSize: '11px',
+                        fontWeight: '600',
+                        marginBottom: '4px',
+                      }}
+                    >
+                      Cantidad
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={editNeQuantity}
+                      onChange={(e) => setEditNeQuantity(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '10px 12px',
+                        fontSize: '14px',
+                        border: '1px solid #D1D5DB',
+                        borderRadius: '6px',
+                        boxSizing: 'border-box',
+                        height: '42px',
+                      }}
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleEditNeAddProduct}
+                    style={{
+                      padding: '10px 20px',
+                      backgroundColor: '#059669',
+                      color: '#FFFFFF',
+                      border: 'none',
+                      borderRadius: '6px',
+                      fontSize: '14px',
+                      fontWeight: '700',
+                      cursor: 'pointer',
+                      height: '42px',
+                    }}
+                  >
+                    Agregar
+                  </button>
+                </div>
+              </div>
+
+              <div
+                style={{
+                  backgroundColor: '#ffffff',
+                  border: '2px solid #111827',
+                  borderRadius: '12px',
+                  padding: '16px',
+                }}
+              >
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    borderBottom: '1px solid #E5E7EB',
+                    paddingBottom: '12px',
+                    marginBottom: '12px',
+                    fontSize: '12px',
+                    flexWrap: 'wrap',
+                    gap: '12px',
+                  }}
+                >
+                  <div>
+                    <h2
+                      style={{
+                        fontSize: '15px',
+                        fontWeight: '900',
+                        margin: 0,
+                      }}
+                    >
+                      FENIX AUTO PART C.A
+                    </h2>
+                    <p style={{ fontWeight: '700', margin: '2px 0' }}>
+                      RIF: J-50261925-2
+                    </p>
+                    <p style={{ margin: '6px 0 0 0' }}>
+                      <strong>Cliente: </strong>{' '}
+                      {clients.find((c) => c.id === editNeForm.client_id)
+                        ?.name || '...'}
+                    </p>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <p style={{ margin: 0 }}>
+                      <strong>Fecha/Hora: </strong>{' '}
+                      {new Date(
+                        editNeModal.noteData?.created_at
+                      ).toLocaleString()}
+                    </p>
+                    <p style={{ margin: '2px 0' }}>
+                      <strong>N° Transacción: </strong> #
+                      {editNeModal.noteData?.transaction_number}
+                    </p>
+                  </div>
+                </div>
+
+                <div
+                  style={{ width: '100%', overflowX: 'auto' }}
+                  className="admin-table-desktop"
+                >
+                  <table
+                    style={{
+                      width: '100%',
+                      minWidth: '700px',
+                      borderCollapse: 'collapse',
+                      textAlign: 'left',
+                      fontSize: '12px',
+                      marginBottom: '12px',
+                    }}
+                  >
+                    <thead>
+                      <tr
+                        style={{
+                          backgroundColor: '#F3F4F6',
+                          borderBottom: '1px solid #D1D5DB',
+                          fontWeight: '700',
+                        }}
+                      >
+                        <th style={{ padding: '8px' }}>Código</th>
+                        <th style={{ padding: '8px' }}>Descripción</th>
+                        <th style={{ padding: '8px', textAlign: 'center' }}>
+                          Cantidad
+                        </th>
+                        <th style={{ padding: '8px', textAlign: 'right' }}>
+                          Valor Unitario
+                        </th>
+                        <th style={{ padding: '8px', textAlign: 'right' }}>
+                          V. U. con descuento
+                        </th>
+                        <th style={{ padding: '8px', textAlign: 'right' }}>
+                          Valor Total
+                        </th>
+                        <th style={{ padding: '8px', textAlign: 'center' }}>
+                          Eliminar
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {editNeCart.length === 0 ? (
+                        <tr>
+                          <td
+                            colSpan="7"
+                            style={{
+                              padding: '16px',
+                              textAlign: 'center',
+                              color: '#9CA3AF',
+                              fontStyle: 'italic',
+                            }}
+                          >
+                            No hay productos añadidos a la nota de entrega.
+                          </td>
+                        </tr>
+                      ) : (
+                        editNeCart.map((item) => (
+                          <tr
+                            key={item.product_id}
+                            style={{ borderBottom: '1px solid #E5E7EB' }}
+                          >
+                            <td
+                              style={{
+                                padding: '8px',
+                                fontFamily: 'monospace',
+                              }}
+                            >
+                              {item.code}
+                            </td>
+                            <td style={{ padding: '8px', fontWeight: '600' }}>
+                              {item.description}
+                            </td>
+                            <td
+                              style={{
+                                padding: '8px',
+                                textAlign: 'center',
+                              }}
+                            >
+                              {item.quantity}
+                            </td>
+                            <td style={{ padding: '8px', textAlign: 'right' }}>
+                              ${Number(item.unit_price_usd).toFixed(2)}
+                            </td>
+                            <td
+                              style={{
+                                padding: '8px',
+                                textAlign: 'right',
+                                color: '#B45309',
+                              }}
+                            >
+                              $
+                              {Number(item.discounted_unit_price_usd).toFixed(
+                                2
+                              )}
+                            </td>
+                            <td
+                              style={{
+                                padding: '8px',
+                                textAlign: 'right',
+                                fontWeight: '700',
+                              }}
+                            >
+                              ${Number(item.total_line_usd).toFixed(2)}
+                            </td>
+                            <td
+                              style={{
+                                padding: '8px',
+                                textAlign: 'center',
+                              }}
+                            >
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleEditNeRemoveItem(item.product_id)
+                                }
+                                style={{
+                                  border: 'none',
+                                  background: 'none',
+                                  cursor: 'pointer',
+                                  color: '#dc2626',
+                                }}
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="admin-mobile-cards">
+                  {editNeCart.length === 0 ? (
+                    <div
+                      style={{
+                        padding: '16px',
+                        textAlign: 'center',
+                        color: '#9CA3AF',
+                      }}
+                    >
+                      No hay productos.
+                    </div>
+                  ) : (
+                    renderProductCards(editNeCart, true, handleEditNeRemoveItem)
+                  )}
+                </div>
+
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'flex-end',
+                    marginBottom: '12px',
+                    fontSize: '12px',
+                  }}
+                >
+                  <div
+                    style={{
+                      width: '300px',
+                      backgroundColor: '#F9FAFB',
+                      padding: '10px',
+                      borderRadius: '8px',
+                      border: '1px solid #E5E7EB',
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        marginBottom: '4px',
+                      }}
+                    >
+                      <span>Total sin Descuento: </span>
+                      <strong>
+                        $
+                        {editNeCart
+                          .reduce(
+                            (acc, i) => acc + i.unit_price_usd * i.quantity,
+                            0
+                          )
+                          .toFixed(2)}
+                      </strong>
+                    </div>
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        marginBottom: '4px',
+                        color: '#B45309',
+                      }}
+                    >
+                      <span>
+                        {getDiscountPercent(editNeForm.payment_discount)}% de
+                        descuento aplicado:{' '}
+                      </span>
+                      <strong>
+                        -$
+                        {(
+                          editNeCart.reduce(
+                            (acc, i) => acc + i.unit_price_usd * i.quantity,
+                            0
+                          ) -
+                          editNeCart.reduce(
+                            (acc, i) => acc + i.total_line_usd,
+                            0
+                          )
+                        ).toFixed(2)}
+                      </strong>
+                    </div>
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        borderTop: '1px solid #D1D5DB',
+                        paddingTop: '4px',
+                        fontSize: '13px',
+                        fontWeight: '900',
+                      }}
+                    >
+                      <span>Precio Final: </span>
+                      <span style={{ color: '#059669' }}>
+                        $
+                        {editNeCart
+                          .reduce((acc, i) => acc + i.total_line_usd, 0)
+                          .toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ marginBottom: '12px' }}>
+                  <label
+                    style={{
+                      display: 'block',
+                      fontSize: '12px',
+                      fontWeight: '700',
+                      marginBottom: '4px',
+                    }}
+                  >
+                    Observación:
+                  </label>
+                  <textarea
+                    rows="2"
+                    value={editNeForm.observation}
+                    onChange={(e) =>
+                      setEditNeForm({
+                        ...editNeForm,
+                        observation: e.target.value,
+                      })
+                    }
+                    style={{
+                      width: '100%',
+                      padding: '6px 8px',
+                      fontSize: '12px',
+                      border: '1px solid #D1D5DB',
+                      borderRadius: '6px',
+                      boxSizing: 'border-box',
+                    }}
+                  ></textarea>
+                </div>
+
+                <div
+                  style={{
+                    backgroundColor: '#F3F4F6',
+                    padding: '10px',
+                    borderRadius: '6px',
+                    fontSize: '10px',
+                    color: '#4B5563',
+                    lineHeight: '1.4',
+                    marginBottom: '12px',
+                    textAlign: 'justify',
+                  }}
+                >
+                  <strong>Términos y condiciones: </strong> {globalTerms}
+                </div>
+
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    flexWrap: 'wrap',
+                    gap: '12px',
+                    borderTop: '1px solid #e5e7eb',
+                    paddingTop: '16px',
+                  }}
+                >
+                  <button
+                    type="button"
+                    onClick={handleSaveEditedNe}
+                    disabled={loading}
+                    style={{
+                      padding: '10px 16px',
+                      backgroundColor: '#111827',
+                      color: '#ffffff',
+                      border: 'none',
+                      borderRadius: '8px',
+                      fontSize: '12px',
+                      fontWeight: '700',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Guardar y Enviar a Aprobación
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* MODAL ABONO */}
       {abonoNotifModal.open && (
         <div
@@ -10061,6 +11094,7 @@ export default function SalesModule() {
           </div>
         </div>
       )}
+
       {/* MODAL HISTORIAL CAPTURADO */}
       <div
         id="captured-history-modal"
