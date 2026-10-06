@@ -1271,77 +1271,70 @@ export default function AdminModule() {
   };
 
   const calculateHierarchyCommissionsForUser = (parentUser) => {
-    const config = hierarchyConfigsMap[parentUser.id];
-    const excIds = hierarchyAssignmentsList
-      .filter(
-        (a) =>
-          String(a.parent_user_id) === String(parentUser.id) && a.is_exception
-      )
-      .map((a) => String(a.target_seller_id));
-    const specificAssigns = hierarchyAssignmentsList.filter(
-      (a) =>
-        String(a.parent_user_id) === String(parentUser.id) && !a.is_exception
-    );
-    const activeList = sellersList.length > 0 ? sellersList : liquidaciones;
-    const eligibleSellers = activeList.filter(
-      (s) =>
-        String(s.id) !== String(parentUser.id) &&
-        s.role?.toLowerCase() !== 'stock' &&
-        s.role !== 'pendiente'
-    );
-    let targetSellerIds = [];
-    if (config && config.is_global) {
-      targetSellerIds = eligibleSellers
-        .filter((s) => !excIds.includes(String(s.id)))
-        .map((s) => String(s.id));
-    } else {
-      targetSellerIds = specificAssigns.map((a) => String(a.target_seller_id));
-    }
-    const subordinateOrders = closedOrdersList.filter((o) => {
-      const orderSellerId = o.seller_id || o.seller?.id;
-      return targetSellerIds.includes(String(orderSellerId));
-    });
-    let hierarchyCommissionUsd53 = 0;
-    let hierarchyCommissionUsd23 = 0;
-    let hierarchyCommissionUsd10 = 0;
-    let hierarchyCommissionUsd0 = 0;
-    let hierarchyCommissionUsd = 0;
-    const evaluatedOrders = subordinateOrders.map((o) => {
-      const evalRes = evaluateHierarchyCommissionForOrder(o, parentUser.id);
-      const pd = String(evalRes.paymentDiscount);
-      if (pd === '53.38') hierarchyCommissionUsd53 += evalRes.commissionUsd;
-      else if (pd === '23.08')
-        hierarchyCommissionUsd23 += evalRes.commissionUsd;
-      else if (pd === '10') hierarchyCommissionUsd10 += evalRes.commissionUsd;
-      else if (pd === '0') hierarchyCommissionUsd0 += evalRes.commissionUsd;
-      hierarchyCommissionUsd += evalRes.commissionUsd;
-      return {
-        order: o,
-        ...evalRes,
-      };
-    });
-    const isGlobal = Boolean(config?.is_global);
-    const hasExceptions = Boolean(config?.has_exceptions);
-    let assignedLabelText = `${targetSellerIds.length} Vendedores`;
-    if (isGlobal) {
-      assignedLabelText =
-        hasExceptions && excIds.length > 0
-          ? `Todos - ${excIds.length}`
-          : 'Todos';
-    }
-    return {
-      subordinateOrdersCount: subordinateOrders.length,
-      evaluatedOrders,
-      hierarchyCommissionUsd,
-      hierarchyCommissionUsd53,
-      hierarchyCommissionUsd23,
-      hierarchyCommissionUsd10,
-      hierarchyCommissionUsd0,
-      assignedLabelText,
-      isGlobal,
-      hasExceptions,
-    };
+  const config = hierarchyConfigsMap[parentUser.id];
+  const excIds = hierarchyAssignmentsList
+    .filter((a) => String(a.parent_user_id) === String(parentUser.id) && a.is_exception)
+    .map((a) => String(a.target_seller_id));
+  
+  const specificAssigns = hierarchyAssignmentsList.filter(
+    (a) => String(a.parent_user_id) === String(parentUser.id) && !a.is_exception
+  );
+
+  const activeList = sellersList.length > 0 ? sellersList : liquidaciones;
+  const eligibleSellers = activeList.filter(
+    (s) => String(s.id) !== String(parentUser.id) && s.role?.toLowerCase() !== 'stock' && s.role !== 'pendiente'
+  );
+
+  let targetSellerIds = [];
+  if (config && config.is_global) {
+    targetSellerIds = eligibleSellers.filter((s) => !excIds.includes(String(s.id))).map((s) => String(s.id));
+  } else {
+    targetSellerIds = specificAssigns.map((a) => String(a.target_seller_id));
+  }
+
+  // Obtener órdenes cerradas activas
+  const subordinateOrders = closedOrdersList.filter((o) => {
+    const orderSellerId = o.seller_id || o.seller?.id;
+    return targetSellerIds.includes(String(orderSellerId));
+  });
+
+  let hierarchyCommissionUsd53 = 0;
+  let hierarchyCommissionUsd23 = 0;
+  let hierarchyCommissionUsd10 = 0;
+  let hierarchyCommissionUsd0 = 0;
+  let hierarchyCommissionUsd = 0;
+
+  const evaluatedOrders = subordinateOrders.map((o) => {
+    const evalRes = evaluateHierarchyCommissionForOrder(o, parentUser.id);
+    const pd = String(evalRes.paymentDiscount);
+    if (pd === '53.38') hierarchyCommissionUsd53 += evalRes.commissionUsd;
+    else if (pd === '23.08') hierarchyCommissionUsd23 += evalRes.commissionUsd;
+    else if (pd === '10') hierarchyCommissionUsd10 += evalRes.commissionUsd;
+    else if (pd === '0') hierarchyCommissionUsd0 += evalRes.commissionUsd;
+    hierarchyCommissionUsd += evalRes.commissionUsd;
+    return { order: o, ...evalRes };
+  });
+
+  const isGlobal = Boolean(config?.is_global);
+  const hasExceptions = Boolean(config?.has_exceptions);
+  let assignedLabelText = `${targetSellerIds.length} Vendedores`;
+  if (isGlobal) {
+    assignedLabelText = hasExceptions && excIds.length > 0 ? `Todos - ${excIds.length}` : 'Todos';
+  }
+
+  return {
+    subordinateOrdersCount: subordinateOrders.length,
+    evaluatedOrders,
+    hierarchyCommissionUsd,
+    hierarchyCommissionUsd53,
+    hierarchyCommissionUsd23,
+    hierarchyCommissionUsd10,
+    hierarchyCommissionUsd0,
+    assignedLabelText,
+    isGlobal,
+    hasExceptions,
   };
+};
 
   // --- D. LÓGICA DE LIQUIDACIÓN CORREGIDA (SUELDO SEPARADO) ---
   const calculateUserSettlementDetails = (
@@ -1510,215 +1503,156 @@ export default function AdminModule() {
   };
 
   const handlePayAndLiquidate = async () => {
-    if (!settlementModalData) return;
-    const confirmMsg = `ALERTA CRÍTICA: Se deducirán $${settlementModalData.totalPenaltiesUsd.toFixed(
-      2
-    )} por penalizaciones, se borrarán las ${
-      settlementModalData.notes.length
-    } notas de entrega cerradas, los ${
-      settlementModalData.vales.length
-    } vales aprobados y se generará la factura. ¿Continuar?`;
-    if (!window.confirm(confirmMsg)) return;
-    try {
-      setLoading(true);
-      const invCode = 'LIQ-' + Date.now().toString().slice(-6);
-      const { data: authData } = await supabase.auth.getUser();
-      const modalDOMEl = document.getElementById(
-        'settlement-invoice-modal-content'
-      );
-      let capturedHTMLContent = '';
-      if (modalDOMEl) {
-        const clonedNode = modalDOMEl.cloneNode(true);
-        clonedNode.querySelectorAll('div').forEach((d) => {
-          if (
-            d.textContent &&
-            d.textContent.includes(
-              'Método para reflejar / cobrar penalizaciones'
-            )
-          ) {
-            d.remove();
-          }
-        });
-        clonedNode.querySelectorAll('select').forEach((sel) => {
-          const selectedText =
-            sel.options[sel.selectedIndex]?.text ||
-            (sel.value === 'BS' ? 'Bolívares (B.s)' : 'USD ($)');
-          const span = document.createElement('span');
-          span.style.fontWeight = 'bold';
-          span.style.fontSize = '12px';
-          span.style.color = '#166534';
-          span.textContent = selectedText;
-          sel.parentNode.replaceChild(span, sel);
-        });
-        const interactiveEls = clonedNode.querySelectorAll('button, input');
-        interactiveEls.forEach((el) => el.remove());
-        capturedHTMLContent = clonedNode.innerHTML;
-      }
+  if (!settlementModalData) return;
+  
+  const confirmMsg = `ALERTA CRÍTICA: Se deducirán $${settlementModalData.totalPenaltiesUsd.toFixed(2)} por penalizaciones, se borrarán las ${settlementModalData.notes.length} notas de entrega cerradas, los ${settlementModalData.vales.length} vales aprobados y se generará la factura. ¿Continuar?`;
+  if (!window.confirm(confirmMsg)) return;
 
-      // 1. Procesar Penalizaciones como Abonos
-      for (const pen of settlementModalData.penalties) {
-        const penAmt = Number(pen.amount || 0);
-        if (pen.order_id && penAmt > 0) {
-          await supabase.from('order_payments').insert([
-            {
-              order_id: pen.order_id,
-              payment_date: new Date().toISOString().split('T')[0],
-              amount_usd: penAmt,
-              payment_method: 'Deducción Penalización (Liquidación Ciclo)',
-              reference_number: `LIQ-PEN-${Date.now().toString().slice(-5)}`,
-              created_by: authData?.user?.id,
-            },
-          ]);
-          const { data: ordDat } = await supabase
-            .from('sales_orders')
-            .select('*')
-            .eq('id', pen.order_id)
-            .single();
-          if (ordDat) {
-            const newPaid = Number(ordDat.total_paid_usd || 0) + penAmt;
-            const newBal = Math.max(
-              0,
-              Number(ordDat.final_price_usd) - newPaid
-            );
-            const newPayStatus = newBal === 0 ? 'cerrada' : 'abonada';
-            await supabase
-              .from('sales_orders')
-              .update({
-                total_paid_usd: newPaid,
-                balance_due_usd: newBal,
-                payment_status: newPayStatus,
-                closed_at: newBal === 0 ? new Date() : null,
-                updated_at: new Date(),
-              })
-              .eq('id', pen.order_id);
-          }
+  try {
+    setLoading(true);
+    const invCode = 'LIQ-' + Date.now().toString().slice(-6);
+    const { data: authData } = await supabase.auth.getUser();
+    
+    // Capturar HTML para la factura histórica
+    const modalDOMEl = document.getElementById('settlement-invoice-modal-content');
+    let capturedHTMLContent = '';
+    if (modalDOMEl) {
+      const clonedNode = modalDOMEl.cloneNode(true);
+      clonedNode.querySelectorAll('div').forEach((d) => {
+        if (d.textContent && d.textContent.includes('Método para reflejar / cobrar penalizaciones')) {
+          d.remove();
         }
-        await supabase
-          .from('penalties')
-          .update({ status: 'cobrada' })
-          .eq('id', pen.id);
-      }
-
-      // 2. Guardar Respaldo de Comisiones Jerárquicas (Soporte DB)
-      // Intentamos insertar en hierarchy_settlement_backups si existe la tabla
-      try {
-        const hierarchyBackups =
-          settlementModalData.hierarchyData.evaluatedOrders.map((eo) => ({
-            parent_user_id: settlementModalData.user.id,
-            subordinate_order_id: eo.order.id,
-            commission_amount: eo.commissionUsd,
-            payment_discount: eo.paymentDiscount,
-            settled_at: new Date().toISOString(),
-            cycle: selectedCycle,
-            month: selectedMonth,
-            year: selectedYear,
-          }));
-        if (hierarchyBackups.length > 0) {
-          await supabase
-            .from('hierarchy_settlement_backups')
-            .insert(hierarchyBackups);
-        }
-      } catch (backupErr) {
-        console.warn(
-          'Tabla hierarchy_settlement_backups no disponible o error:',
-          backupErr
-        );
-      }
-
-      // 3. Insertar Factura
-      const { data: insertedInv, error: invErr } = await supabase
-        .from('settlement_invoices')
-        .insert([
-          {
-            invoice_code: invCode,
-            user_id: settlementModalData.user.id,
-            month: selectedMonth,
-            year: selectedYear,
-            cycle: selectedCycle,
-            bcv_rate: Number(bcvRateUsd).toFixed(2),
-            sueldo_fijo_usd: settlementModalData.sueldoFijoOriginal,
-            sueldo_fijo_currency: settlementModalData.sueldoFijoCurrency,
-            comm_53_gross_usd: settlementModalData.comm53GrossUsd,
-            comm_23_gross_usd: settlementModalData.comm23GrossUsd,
-            vales_deduction_53_usd: settlementModalData.valesDeduction53Usd,
-            vales_deduction_23_usd: settlementModalData.valesDeduction23Usd,
-            comm_53_net_usd: settlementModalData.comm53NetUsd,
-            comm_23_net_usd: settlementModalData.comm23NetUsd,
-            total_neto_pagar_usd: settlementModalData.totalEquivalentUsd,
-            total_neto_pagar_bs: settlementModalData.totalNetoPagarBs,
-            captured_html: capturedHTMLContent,
-            status: 'pagada',
-            created_by: authData?.user?.id,
-          },
-        ])
-        .select()
-        .single();
-      if (invErr) throw invErr;
-
-      // 4. Limpiar Datos
-      const noteIdsToDelete = settlementModalData.notes.map((n) => n.id);
-      if (noteIdsToDelete.length > 0) {
-        await supabase
-          .from('order_items')
-          .delete()
-          .in('order_id', noteIdsToDelete);
-        await supabase
-          .from('order_payments')
-          .delete()
-          .in('order_id', noteIdsToDelete);
-        await supabase
-          .from('seller_payment_notifications')
-          .delete()
-          .in('order_id', noteIdsToDelete);
-        await supabase.from('sales_orders').delete().in('id', noteIdsToDelete);
-      }
-
-      // VALES INDEPENDIENTES: Borrar vales usados en este ciclo para este usuario
-      const valeIdsToDelete = settlementModalData.vales.map((v) => v.id);
-      if (valeIdsToDelete.length > 0) {
-        await supabase.from('vales').delete().in('id', valeIdsToDelete);
-      }
-
-      const penIdsToDelete = settlementModalData.penalties.map((p) => p.id);
-      if (penIdsToDelete.length > 0) {
-        await supabase.from('penalties').delete().in('id', penIdsToDelete);
-      }
-      if (noteIdsToDelete.length > 0) {
-        await supabase
-          .from('penalties')
-          .delete()
-          .in('order_id', noteIdsToDelete);
-      }
-
-      try {
-        await supabase.functions.invoke('send-notification', {
-          body: {
-            type: 'settlement_processed',
-            payload: {
-              userEmail: settlementModalData.user.email,
-              userName: settlementModalData.user.full_name,
-              fechaInicio: `${selectedMonth}/${selectedYear}`,
-              fechaFin: `${selectedMonth}/${selectedYear}`,
-              montoDivisas: settlementModalData.totalEquivalentUsd.toFixed(2),
-              montoBs: settlementModalData.totalNetoPagarBs.toFixed(2),
-            },
-          },
-        });
-      } catch (e) {
-        console.warn('Error enviando notif de liquidación:', e);
-      }
-      showToastSuccess(
-        `Factura ${invCode} generada, penalizaciones aplicadas como abonos, y ciclos liquidados.`
-      );
-      setSettlementModalData(null);
-      await fetchTabData();
-      setQuincenaSubView('historial');
-    } catch (err) {
-      setErrorMsg('Error al guardar y liquidar: ' + err.message);
-    } finally {
-      setLoading(false);
+      });
+      clonedNode.querySelectorAll('select').forEach((sel) => {
+        const selectedText = sel.options[sel.selectedIndex]?.text || (sel.value === 'BS' ? 'Bolívares (B.s)' : 'USD ($)');
+        const span = document.createElement('span');
+        span.style.fontWeight = 'bold';
+        span.style.fontSize = '12px';
+        span.style.color = '#166534';
+        span.textContent = selectedText;
+        sel.parentNode.replaceChild(span, sel);
+      });
+      clonedNode.querySelectorAll('button, input').forEach((el) => el.remove());
+      capturedHTMLContent = clonedNode.innerHTML;
     }
-  };
+
+    // 1. PROCESAR PENALIZACIONES COMO ABONOS
+    for (const pen of settlementModalData.penalties) {
+      const penAmt = Number(pen.amount || 0);
+      if (pen.order_id && penAmt > 0) {
+        await supabase.from('order_payments').insert([{
+          order_id: pen.order_id,
+          payment_date: new Date().toISOString().split('T')[0],
+          amount_usd: penAmt,
+          payment_method: 'Deducción Penalización (Liquidación Ciclo)',
+          reference_number: `LIQ-PEN-${Date.now().toString().slice(-5)}`,
+          created_by: authData?.user?.id,
+        }]);
+        
+        const { data: ordDat } = await supabase.from('sales_orders').select('*').eq('id', pen.order_id).single();
+        if (ordDat) {
+          const newPaid = Number(ordDat.total_paid_usd || 0) + penAmt;
+          const newBal = Math.max(0, Number(ordDat.final_price_usd) - newPaid);
+          await supabase.from('sales_orders').update({
+            total_paid_usd: newPaid,
+            balance_due_usd: newBal,
+            payment_status: newBal === 0 ? 'cerrada' : 'abonada',
+            closed_at: newBal === 0 ? new Date() : null,
+            updated_at: new Date(),
+          }).eq('id', pen.order_id);
+        }
+      }
+      await supabase.from('penalties').update({ status: 'cobrada' }).eq('id', pen.id);
+    }
+
+    // 2. GUARDAR RESPALDO DE COMISIONES JERÁRQUICAS (CRÍTICO PARA PAGOS DIFERIDOS)
+    try {
+      const hierarchyBackups = settlementModalData.hierarchyData.evaluatedOrders.map((eo) => ({
+        parent_user_id: settlementModalData.user.id,
+        subordinate_order_id: eo.order.id,
+        commission_amount: eo.commissionUsd,
+        payment_discount: eo.paymentDiscount,
+        settled_at: new Date().toISOString(),
+        cycle: selectedCycle,
+        month: selectedMonth,
+        year: selectedYear,
+      }));
+      
+      if (hierarchyBackups.length > 0) {
+        const { error: backupErr } = await supabase.from('hierarchy_settlement_backups').insert(hierarchyBackups);
+        if (backupErr) console.warn('Error guardando backup jerárquico:', backupErr.message);
+      }
+    } catch (backupErr) {
+      console.warn('Tabla hierarchy_settlement_backups no disponible:', backupErr);
+    }
+
+    // 3. INSERTAR FACTURA DE LIQUIDACIÓN
+    const { error: invErr } = await supabase.from('settlement_invoices').insert([{
+      invoice_code: invCode,
+      user_id: settlementModalData.user.id,
+      month: selectedMonth,
+      year: selectedYear,
+      cycle: selectedCycle,
+      bcv_rate: Number(bcvRateUsd).toFixed(2),
+      sueldo_fijo_usd: settlementModalData.sueldoFijoOriginal,
+      sueldo_fijo_currency: settlementModalData.sueldoFijoCurrency,
+      comm_53_gross_usd: settlementModalData.comm53GrossUsd,
+      comm_23_gross_usd: settlementModalData.comm23GrossUsd,
+      vales_deduction_53_usd: settlementModalData.valesDeduction53Usd,
+      vales_deduction_23_usd: settlementModalData.valesDeduction23Usd,
+      comm_53_net_usd: settlementModalData.comm53NetUsd,
+      comm_23_net_usd: settlementModalData.comm23NetUsd,
+      total_neto_pagar_usd: settlementModalData.totalEquivalentUsd,
+      total_neto_pagar_bs: settlementModalData.totalNetoPagarBs,
+      captured_html: capturedHTMLContent,
+      status: 'pagada',
+      created_by: authData?.user?.id,
+    }]);
+    if (invErr) throw invErr;
+
+    // 4. LIMPIEZA DE DATOS (SOLO DESPUÉS DE GUARDAR BACKUP Y FACTURA)
+    const noteIdsToDelete = settlementModalData.notes.map((n) => n.id);
+    if (noteIdsToDelete.length > 0) {
+      await supabase.from('order_items').delete().in('order_id', noteIdsToDelete);
+      await supabase.from('order_payments').delete().in('order_id', noteIdsToDelete);
+      await supabase.from('seller_payment_notifications').delete().in('order_id', noteIdsToDelete);
+      await supabase.from('sales_orders').delete().in('id', noteIdsToDelete);
+      await supabase.from('penalties').delete().in('order_id', noteIdsToDelete);
+    }
+    
+    const valeIdsToDelete = settlementModalData.vales.map((v) => v.id);
+    if (valeIdsToDelete.length > 0) await supabase.from('vales').delete().in('id', valeIdsToDelete);
+    
+    const penIdsToDelete = settlementModalData.penalties.map((p) => p.id);
+    if (penIdsToDelete.length > 0) await supabase.from('penalties').delete().in('id', penIdsToDelete);
+
+    // Notificación al usuario
+    try {
+      await supabase.functions.invoke('send-notification', {
+        body: {
+          type: 'settlement_processed',
+          payload: {
+            userEmail: settlementModalData.user.email,
+            userName: settlementModalData.user.full_name,
+            fechaInicio: `${selectedMonth}/${selectedYear}`,
+            fechaFin: `${selectedMonth}/${selectedYear}`,
+            montoDivisas: settlementModalData.totalEquivalentUsd.toFixed(2),
+            montoBs: settlementModalData.totalNetoPagarBs.toFixed(2),
+          },
+        },
+      });
+    } catch (e) { console.warn('Error enviando notif de liquidación:', e); }
+
+    showToastSuccess(`Factura ${invCode} generada y ciclo liquidado correctamente.`);
+    setSettlementModalData(null);
+    await fetchTabData();
+    setQuincenaSubView('historial');
+  } catch (err) {
+    setErrorMsg('Error al guardar y liquidar: ' + err.message);
+  } finally {
+    setLoading(false);
+  }
+};
 
   const handlePrintCapturedInvoicePDF = async (histItem) => {
     try {
