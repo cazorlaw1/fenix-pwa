@@ -464,21 +464,29 @@ export default function Vendedores({ currentUser }) {
   };
 
   const handleSaveSeller = async (vendedor) => {
-    try {
-      setSavingId(vendedor.id);
-      const { error } = await supabase
-        .from('profiles')
-        .update({ sales_goal_usd: parseFloat(vendedor.sales_goal_usd) || 0 })
-        .eq('id', vendedor.id);
-      if (error) throw error;
-      alert(`Meta actualizada para ${vendedor.full_name}`);
-      fetchVendedoresData();
-    } catch (err) {
-      alert(`Error: ${err.message}`);
-    } finally {
-      setSavingId(null);
-    }
-  };
+  try {
+    setSavingId(vendedor.id);
+    const { error } = await supabase
+      .from('profiles')
+      .update({ sales_goal_usd: parseFloat(vendedor.sales_goal_usd) || 0 })
+      .eq('id', vendedor.id);
+    if (error) throw error;
+    alert(`Meta actualizada para ${vendedor.full_name}`);
+    
+    // Actualiza el estado local directamente en lugar de recargar todo el módulo
+    setVendedores((prev) =>
+      prev.map((item) =>
+        item.id === vendedor.id
+          ? { ...item, sales_goal_usd: parseFloat(vendedor.sales_goal_usd) || 0 }
+          : item
+      )
+    );
+  } catch (err) {
+    alert(`Error: ${err.message}`);
+  } finally {
+    setSavingId(null);
+  }
+};
 
   const openHistoryModal = async (seller) => {
     try {
