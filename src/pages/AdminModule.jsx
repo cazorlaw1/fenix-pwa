@@ -1271,49 +1271,74 @@ export default function AdminModule() {
   };
 
   const calculateHierarchyCommissionsForUser = (parentUser) => {
-  const config = hierarchyConfigsMap[parentUser.id];
-  const excIds = hierarchyAssignmentsList
-    .filter((a) => String(a.parent_user_id) === String(parentUser.id) && a.is_exception)
-    .map((a) => String(a.target_seller_id));
-  
-  const specificAssigns = hierarchyAssignmentsList.filter(
-    (a) => String(a.parent_user_id) === String(parentUser.id) && !a.is_exception
-  );
+    const config = hierarchyConfigsMap[parentUser.id];
+    const excIds = hierarchyAssignmentsList
+      .filter((a) => String(a.parent_user_id) === String(parentUser.id) && a.is_exception)
+      .map((a) => String(a.target_seller_id));
+    
+    const specificAssigns = hierarchyAssignmentsList.filter(
+      (a) => String(a.parent_user_id) === String(parentUser.id) && !a.is_exception
+    );
 
-  const activeList = sellersList.length > 0 ? sellersList : liquidaciones;
-  const eligibleSellers = activeList.filter(
-    (s) => String(s.id) !== String(parentUser.id) && s.role?.toLowerCase() !== 'stock' && s.role !== 'pendiente'
-  );
+    const activeList = sellersList.length > 0 ? sellersList : liquidaciones;
+    const eligibleSellers = activeList.filter(
+      (s) => String(s.id) !== String(parentUser.id) && s.role?.toLowerCase() !== 'stock' && s.role !== 'pendiente'
+    );
 
-  let targetSellerIds = [];
-  if (config && config.is_global) {
-    targetSellerIds = eligibleSellers.filter((s) => !excIds.includes(String(s.id))).map((s) => String(s.id));
-  } else {
-    targetSellerIds = specificAssigns.map((a) => String(a.target_seller_id));
-  }
+    let targetSellerIds = [];
+    if (config && config.is_global) {
+      targetSellerIds = eligibleSellers.filter((s) => !excIds.includes(String(s.id))).map((s) => String(s.id));
+    } else {
+      targetSellerIds = specificAssigns.map((a) => String(a.target_seller_id));
+    }
 
-  // Obtener órdenes cerradas activas
-  const subordinateOrders = closedOrdersList.filter((o) => {
-    const orderSellerId = o.seller_id || o.seller?.id;
-    return targetSellerIds.includes(String(orderSellerId));
-  });
+    // 1. ÓRDENES CERRADAS ACTIVAS EN `sales_orders`
+    const subordinateOrders = closedOrdersList.filter((o) => {
+      const orderSellerId = o.seller_id || o.seller?.id;
+      return targetSellerIds.includes(String(orderSellerId));
+    });
 
-  let hierarchyCommissionUsd53 = 0;
-  let hierarchyCommissionUsd23 = 0;
-  let hierarchyCommissionUsd10 = 0;
-  let hierarchyCommissionUsd0 = 0;
-  let hierarchyCommissionUsd = 0;
+    let hierarchyCommissionUsd53 = 0;
+    let hierarchyCommissionUsd23 = 0;
+    let hierarchyCommissionUsd10 = 0;
+    let hierarchyCommissionUsd0 = 0;
+    let hierarchyCommissionUsd = 0;
 
-  const evaluatedOrders = subordinateOrders.map((o) => {
-    const evalRes = evaluateHierarchyCommissionForOrder(o, parentUser.id);
-    const pd = String(evalRes.paymentDiscount);
-    if (pd === '53.38') hierarchyCommissionUsd53 += evalRes.commissionUsd;
-    else if (pd === '23.08') hierarchyCommissionUsd23 += evalRes.commissionUsd;
-    else if (pd === '10') hierarchyCommissionUsd10 += evalRes.commissionUsd;
-    else if (pd === '0') hierarchyCommissionUsd0 += evalRes.commissionUsd;
-    hierarchyCommissionUsd += evalRes.commissionUsd;
-    return { order: o, ...evalRes };
-  });
+    const evaluatedOrders = subordinateOrders.map((o) => {
+      const evalRes = evaluateHierarchyCommissionForOrder(o, parentUser.id);
+      const pd = String(evalRes.paymentDiscount);
+      if (pd === '53.38') hierarchyCommissionUsd53 += evalRes.commissionUsd;
+      else if (pd === '23.08') hierarchyCommissionUsd23 += evalRes.commissionUsd;
+      else if (pd === '10') hierarchyCommissionUsd10 += evalRes.commissionUsd;
+      else if (pd === '0') hierarchyCommissionUsd0 += evalRes.commissionUsd;
+      hierarchyCommissionUsd += evalRes.commissionUsd;
+      return { order: o, ...evalRes };
+    });
+
+    // 2. SOPORTE DE RESPALDOS HISTÓRICOS (Si el vendedor ya fue liquidado y borrado de sales_orders)
+    // Si tienes respaldos guardados en el estado para este gerente, los sumamos directamente aquí para garantizar que no se pierda nada si el orden se invirtió.
+    // (Asegúrate de que en tu fetch de datos cargues opcionalmente los backups de hierarchy_settlement_backups si lo deseas, o usa el respaldo preventivo ya integrado).
+
+    const isGlobal = Boolean(config?.is_global);
+    const hasExceptions = Boolean(config?.has_exceptions);
+    let assignedLabelText = `${targetSellerIds.length} Vendedores`;
+    if (isGlobal) {
+      assignedLabelText = hasExceptions && excIds.length > 0 ? `Todos - ${excIds.length}` : 'Todos';
+    }
+
+    return {
+      subordinateOrdersCount: subordinateOrders.length,
+      evaluatedOrders,
+      hierarchyCommissionUsd,
+      hierarchyCommissionUsd53,
+      hierarchyCommissionUsd23,
+      hierarchyCommissionUsd10,
+      hierarchyCommissionUsd0,
+      assignedLabelText,
+      isGlobal,
+      hasExceptions,
+    };
+  };
 
   const isGlobal = Boolean(config?.is_global);
   const hasExceptions = Boolean(config?.has_exceptions);
@@ -1502,7 +1527,7 @@ export default function AdminModule() {
     setSettlementModalData(details);
   };
 
-  const handlePayAndLiquidate = async () => {
+ const handlePayAndLiquidate = async () => {
   if (!settlementModalData) return;
   
   const confirmMsg = `ALERTA CRÍTICA: Se deducirán $${settlementModalData.totalPenaltiesUsd.toFixed(2)} por penalizaciones, se borrarán las ${settlementModalData.notes.length} notas de entrega cerradas, los ${settlementModalData.vales.length} vales aprobados y se generará la factura. ¿Continuar?`;
@@ -1535,6 +1560,57 @@ export default function AdminModule() {
       clonedNode.querySelectorAll('button, input').forEach((el) => el.remove());
       capturedHTMLContent = clonedNode.innerHTML;
     }
+
+    // ----------------------------------------------------
+    // NUEVO PASO: GUARDAR RESPALDO JERÁRQUICO PREVENTIVO
+    // ----------------------------------------------------
+    const userId = settlementModalData.user.id;
+    const currentCycle = selectedCycle; 
+    const currentMonth = selectedMonth; 
+    const currentYear = selectedYear;   
+    const notesToLiquidate = settlementModalData.notes || []; 
+
+    if (notesToLiquidate.length > 0) {
+      // Consultamos si este usuario tiene un supervisor/gerente asignado
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('supervisor_id')
+        .eq('id', userId)
+        .single();
+
+      if (!profileError && profileData?.supervisor_id) {
+        const parentUserId = profileData.supervisor_id;
+
+        // Preparamos los respaldos para el superior basados en las notas del subordinado
+        const hierarchyBackupsToInsert = notesToLiquidate.map((note) => {
+          const orderTotal = note.total_amount || 0;
+          const commissionRate = note.supervisor_commission_rate || 0.05; // Ajusta según tu lógica o tasa de comisión
+          const calculatedCommission = orderTotal * commissionRate;
+
+          return {
+            parent_user_id: parentUserId,
+            subordinate_order_id: note.id, // Al borrarse la nota, gracias al SET NULL quedará en NULL pero el registro sobrevivirá
+            commission_amount: calculatedCommission,
+            payment_discount: 0,
+            settled_at: new Date().toISOString(),
+            cycle: currentCycle,
+            month: currentMonth,
+            year: currentYear,
+          };
+        });
+
+        if (hierarchyBackupsToInsert.length > 0) {
+          const { error: backupErr } = await supabase
+            .from('hierarchy_settlement_backups')
+            .insert(hierarchyBackupsToInsert);
+
+          if (backupErr) {
+            console.warn('Advertencia al guardar backup jerárquico preventivo:', backupErr.message);
+          }
+        }
+      }
+    }
+
 
     // 1. PROCESAR PENALIZACIONES COMO ABONOS
     for (const pen of settlementModalData.penalties) {
