@@ -308,7 +308,8 @@ export default function Vendedores({ currentUser }) {
     return vendedores.filter((v) => {
       return (
         v.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        v.email?.toLowerCase().includes(searchTerm.toLowerCase())
+        v.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        v.city?.toLowerCase().includes(term)
       );
     });
   }, [vendedores, searchTerm]);
@@ -623,7 +624,7 @@ export default function Vendedores({ currentUser }) {
         fontFamily: 'system-ui',
       }}
     >
-      <div
+            <div
         style={{
           display: 'flex',
           justifyContent: 'space-between',
@@ -659,7 +660,7 @@ export default function Vendedores({ currentUser }) {
           />
           <input
             type="text"
-            placeholder="Buscar vendedor..."
+            placeholder="Buscar vendedor o ciudad..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             style={{
