@@ -2091,7 +2091,222 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
       setLoading(false);
     }
   };
+  const handlePrintNE = async (nota) => {
+    try {
+      setLoading(true);
 
+      // 1. OBTENER DATOS Y PORCENTAJE DINÁMICO
+      const discountPct = getDiscountPercent(
+        String(nota.payment_discount || '53.38')
+      );
+      const { data: items, error } = await supabase
+        .from('order_items')
+        .select('*, products(code, description)')
+        .eq('order_id', nota.id);
+      if (error) throw error;
+
+      const clientName = nota.client?.name || nota.clients?.name || 'Cliente';
+      const transNo = nota.transaction_number || nota.id.substring(0, 8);
+      const fecha = new Date(nota.created_at).toLocaleString();
+      const vendedorName = nota.seller?.full_name || 'Vendedor';
+
+      // Construir tabla de productos
+      let itemsHtml = '';
+      if (items && items.length > 0) {
+        items.forEach((item) => {
+          const totalLine =
+            item.total_line_usd ||
+            item.quantity * item.discounted_unit_price_usd;
+          itemsHtml += `
+           <tr>
+             <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; font-family: monospace;">${
+               item.products?.code || 'S/C'
+             }</td>
+             <td style="padding: 6px 8px; border-bottom: 1px solid #ddd;">${
+               item.products?.description || 'Producto'
+             }</td>
+             <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: center;">${
+               item.quantity
+             }</td>
+             <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: right;">$${Number(
+               item.unit_price_usd || 0
+             ).toFixed(2)}</td>
+             <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: right; color: #B45309;">$${Number(
+               item.discounted_unit_price_usd || 0
+             ).toFixed(2)}</td>
+             <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: right; font-weight: bold;">$${Number(
+               totalLine
+             ).toFixed(2)}</td>
+           </tr>`;
+        });
+      }
+
+      // 2. CREAR IFRAME OCULTO PARA IMPRESIÓN (Evita bloqueadores de pop-ups)
+      let printFrame = document.getElementById('ne-print-frame');
+      if (!printFrame) {
+        printFrame = document.createElement('iframe');
+        printFrame.id = 'ne-print-frame';
+        printFrame.style.position = 'absolute';
+        printFrame.style.width = '0';
+        printFrame.style.height = '0';
+        printFrame.style.border = 'none';
+        printFrame.style.visibility = 'hidden';
+        document.body.appendChild(printFrame);
+      }
+
+      // 3. INYECTAR HTML CON ESTILOS AISLADOS Y PIE DE PÁGINA FORZADO AL FINAL
+      const printContent = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>N.E. #${transNo}</title>
+          <style>
+            @page { margin: 15mm; size: A4 portrait; }
+            
+            /* RESET BÁSICO */
+            * { box-sizing: border-box; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+            
+            body { 
+              font-family: Arial, sans-serif; 
+              color: #111; 
+              padding: 0; 
+              margin: 0; 
+              background: #fff; 
+              width: 700px; 
+              min-height: 950px; /* ALTURA FIJA: Empuja el contenido hacia abajo para simular hoja A4 */
+              display: flex;
+              flex-direction: column;
+            }
+            
+            table { width: 100%; border-collapse: collapse; font-size: 12px; }
+            th { padding: 8px; border-bottom: 2px solid #ddd; background-color: #f3f4f6; }
+            td { padding: 6px 8px; border-bottom: 1px solid #ddd; }
+            
+            /* Contenedor del Pie de Página */
+            .print-footer-container {
+              margin-top: auto; /* CLAVE: Esto empuja el footer al fondo de la altura mínima del body */
+              page-break-inside: avoid;
+              padding-bottom: 20px;
+            }
+            
+            .summary-box { 
+              width: 280px; 
+              background: #f9fafb !important; 
+              padding: 12px; 
+              border: 1px solid #e5e7eb; 
+              border-radius: 6px; 
+              float: right; 
+              font-size: 12px; 
+              margin-bottom: 15px;
+            }
+            
+            .obs-box {
+              clear: both;
+              font-size: 11px; 
+              color: #333; 
+              background: #fffbeb !important; 
+              border: 1px solid #fde68a; 
+              padding: 10px; 
+              border-radius: 4px; 
+              margin-bottom: 10px; 
+              text-align: justify;
+            }
+            
+            .terms-box { 
+              clear: both;
+              font-size: 10px; 
+              color: #555; 
+              background: #f3f4f6 !important; 
+              padding: 10px; 
+              border-radius: 4px; 
+              line-height: 1.4; 
+              text-align: justify; 
+            }
+          </style>
+        </head>
+        <body>
+          <!-- ENCABEZADO -->
+          <div style="display: flex; justify-content: space-between; border-bottom: 2px solid #111; padding-bottom: 15px; margin-bottom: 20px;">
+            <div>
+              <h2 style="margin: 0; font-size: 20px; text-transform: uppercase;">FENIX AUTO PART C.A</h2>
+              <p style="margin: 2px 0; font-size: 12px;"><strong>RIF:</strong> J-50261925-2</p>
+              <p style="margin: 8px 0 0 0; font-size: 12px;"><strong>Cliente:</strong> ${clientName}</p>
+            </div>
+            <div style="text-align: right; font-size: 12px;">
+              <p style="margin: 2px 0;"><strong>N° Transacción:</strong> #${transNo}</p>
+              <p style="margin: 2px 0;"><strong>Fecha/Hora:</strong> ${fecha}</p>
+              <p style="margin: 2px 0;"><strong>Vendedor:</strong> ${vendedorName}</p>
+              <p style="margin: 2px 0;"><strong>Categoría:</strong> ${
+                nota.category || 'General'
+              }</p>
+            </div>
+          </div>
+          
+          <!-- TABLA DE PRODUCTOS -->
+          <table>
+            <thead>
+              <tr>
+                <th style="text-align: left;">Código</th>
+                <th style="text-align: left;">Descripción</th>
+                <th style="text-align: center;">Cantidad</th>
+                <th style="text-align: right;">V. Unitario</th>
+                <th style="text-align: right;">V. U. con Descuento</th>
+                <th style="text-align: right;">Total Línea</th>
+              </tr>
+            </thead>
+            <tbody>${itemsHtml}</tbody>
+          </table>
+  
+          <!-- PIE DE PÁGINA (Resumen + Obs + Términos) -->
+          <div class="print-footer-container">
+            <div class="summary-box">
+              <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+                <span>Total Base:</span>
+                <strong>$${Number(nota.total_base_usd || 0).toFixed(2)}</strong>
+              </div>
+              <div style="display: flex; justify-content: space-between; margin-bottom: 6px; color: #D97706;">
+                <span>Descuento Aplicado (${discountPct}%):</span>
+                <strong>-$${Number(nota.discount_amount_usd || 0).toFixed(
+                  2
+                )}</strong>
+              </div>
+              <div style="display: flex; justify-content: space-between; border-top: 1px solid #ccc; padding-top: 6px; font-weight: bold; font-size: 14px; color: #DC2626;">
+                <span>Precio Final:</span>
+                <span>$${Number(nota.final_price_usd || 0).toFixed(2)}</span>
+              </div>                                
+            </div>
+  
+            ${
+              nota.observation
+                ? `<div class="obs-box"><strong>Observación:</strong> ${nota.observation}</div>`
+                : ''
+            }
+            
+            <div class="terms-box">
+              <strong>Términos y condiciones:</strong> ${globalTerms}
+            </div>
+          </div>
+        </body>
+        </html>
+      `;
+
+      // 4. ESCRIBIR EN EL IFRAME Y DISPARAR IMPRESIÓN
+      const doc = printFrame.contentWindow.document;
+      doc.open();
+      doc.write(printContent);
+      doc.close();
+
+      // Pequeño delay para asegurar que el DOM del iframe esté listo
+      setTimeout(() => {
+        printFrame.contentWindow.focus();
+        printFrame.contentWindow.print();
+        setLoading(false);
+      }, 500);
+    } catch (err) {
+      alert('Error al preparar la impresión: ' + err.message);
+      setLoading(false);
+    }
+  };
   const handleClearNoteGPS = async (note) => {
     if (
       !window.confirm(
@@ -5943,6 +6158,23 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                                   <Edit size={12} /> Ver N.E
                                 </button>
                                 <button
+                                  onClick={() => handlePrintNE(note)}
+                                  disabled={loading}
+                                  className="admin-action-btn-mobile"
+                                  style={{
+                                    padding: '5px 8px',
+                                    backgroundColor: '#475569',
+                                    color: '#ffffff',
+                                    border: 'none',
+                                    borderRadius: '4px',
+                                    fontSize: '10px',
+                                    fontWeight: 'bold',
+                                    cursor: 'pointer',
+                                  }}
+                                >
+                                  🖨️ Imprimir
+                                </button>
+                                <button
                                   onClick={() => handleDownloadPDF(note)}
                                   disabled={loading}
                                   style={{
@@ -6206,6 +6438,23 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                               }}
                             >
                               Ver N.E
+                            </button>
+                            <button
+                              onClick={() => handlePrintNE(note)}
+                              disabled={loading}
+                              className="admin-action-btn-mobile"
+                              style={{
+                                padding: '5px 8px',
+                                backgroundColor: '#475569',
+                                color: '#ffffff',
+                                border: 'none',
+                                borderRadius: '4px',
+                                fontSize: '10px',
+                                fontWeight: 'bold',
+                                cursor: 'pointer',
+                              }}
+                            >
+                              🖨️ Imprimir
                             </button>
                             <button
                               onClick={() => handleDownloadPDF(note)}
