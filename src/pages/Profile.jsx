@@ -301,7 +301,7 @@ export default function Profile() {
                 }}
               >
                 <span style={{ fontSize: '10px', color: '#d4af37', fontWeight: '700', letterSpacing: '1px', textTransform: 'uppercase' }}>
-                  FENIXAUTO.COM | {city.toUpperCase()}
+                  FENIXAUTOPARTES.COM | {city.toUpperCase()}
                 </span>
 
                 <button
