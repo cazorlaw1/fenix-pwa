@@ -1241,18 +1241,35 @@ export default function SalesModule() {
     if (!neSelectedProdId) return;
     const prod = products.find((p) => p.id === neSelectedProdId);
     if (!prod) return;
+
     const qty = Number(neQuantity);
     if (qty <= 0) return alert('Cantidad debe ser mayor a 0');
 
-    // B. RECÁLCULO DINÁMICO AL AGREGAR
-    const inCart = neCart.find((item) => item.product_id === prod.id);
-    const currentQty = inCart ? inCart.quantity : 0;
-    if (currentQty + qty > prod.stock_current) {
-      alert(`Stock insuficiente. Disponible: ${prod.stock_current}`);
-      return;
+    // --- VALIDACIÓN DE STOCK ROBUSTA ---
+    const currentStock = Number(prod.stock_current || 0);
+
+    // 1. Verificar si hay stock disponible
+    if (currentStock <= 0) {
+      return alert(
+        `El producto "${prod.description}" no tiene stock disponible.`
+      );
     }
+
+    // 2. Verificar stock considerando lo que YA está en el carrito
+    const inCart = neCart.find((item) => item.product_id === prod.id);
+    const currentInCart = inCart ? inCart.quantity : 0;
+
+    if (currentInCart + qty > currentStock) {
+      return alert(
+        `Stock insuficiente.\nDisponible: ${currentStock}\nEn carrito: ${currentInCart}\nSolicitado: ${qty}`
+      );
+    }
+    // ------------------------------------
+
+    // B. RECÁLCULO DINÁMICO AL AGREGAR
     const valorUnitario = prod.price_usd;
     const vuConDescuento = valorUnitario * (1 - porcentajeDescuento / 100);
+
     if (inCart) {
       setNeCart(
         neCart.map((item) =>
@@ -7290,7 +7307,7 @@ export default function SalesModule() {
                           p.price_usd * (1 - porcentajeDescuento / 100);
                         return {
                           value: p.id,
-                          label: `${p.description} | Stock: ${
+                          label: `[${p.code}] ${p.description} | Stock: ${
                             p.stock_current
                           } | Base: $${p.price_usd.toFixed(
                             2

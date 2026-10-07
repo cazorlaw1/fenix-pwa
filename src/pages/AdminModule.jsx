@@ -571,10 +571,33 @@ export default function AdminModule() {
     if (!neSelectedProdId) return;
     const prod = allProductsList.find((p) => p.id === neSelectedProdId);
     if (!prod) return;
+
     const qty = Number(neQuantity);
     if (qty <= 0) return alert('Cantidad debe ser mayor a 0');
+
+    // --- NUEVA VALIDACIÓN DE STOCK ---
+    const currentStock = Number(prod.stock_current || 0);
+
+    // Verificar si hay stock disponible
+    if (currentStock <= 0) {
+      return alert(
+        `El producto "${prod.description}" no tiene stock disponible.`
+      );
+    }
+
+    // Verificar si la cantidad excede el stock (considerando lo que ya está en el carrito)
     const inCart = neCart.find((item) => item.product_id === prod.id);
+    const currentInCart = inCart ? inCart.quantity : 0;
+
+    if (currentInCart + qty > currentStock) {
+      return alert(
+        `Stock insuficiente. Disponible: ${currentStock}, En carrito: ${currentInCart}.`
+      );
+    }
+    // ---------------------------------
+
     const vuConDescuento = prod.price_usd * (1 - porcentajeDescuentoNe / 100);
+
     if (inCart) {
       setNeCart(
         neCart.map((item) =>
@@ -4237,7 +4260,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                       p.price_usd * (1 - porcentajeDescuentoNe / 100);
                     return {
                       value: p.id,
-                      label: `${p.description} | Stock: ${
+                      label: `[${p.code}] ${p.description} | Stock: ${
                         p.stock_current
                       } | Base: $${Number(p.price_usd).toFixed(
                         2
