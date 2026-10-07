@@ -385,7 +385,13 @@ export default function AdminModule() {
       }
     }
   }, [activeTab]);
-
+  // --- EFECTO: LIMPIEZA AUTOMÁTICA EN SEGUNDO PLANO ---
+  // Se ejecuta silenciosamente al estar en la pestaña de quincena, sin importar la sub-vista
+  useEffect(() => {
+    if (activeTab === 'quincena' && liquidatedNotesList.length > 0) {
+      cleanupFullyLiquidatedNotes(liquidatedNotesList);
+    }
+  }, [activeTab, liquidatedNotesList]);
   // --- A. FETCH GLOBAL SETTINGS (DINÁMICO) ---
   const fetchGlobalSettings = async () => {
     try {
@@ -1630,10 +1636,53 @@ export default function AdminModule() {
 
     return pendingNames;
   };
+  // --- FUNCIÓN DE LIMPIEZA AUTOMÁTICA DE NOTAS "LISTAS" ---
+  const cleanupFullyLiquidatedNotes = async (notesToCheck = []) => {
+    try {
+      const notesToDelete = [];
 
+      for (const note of notesToCheck) {
+        const pending = await getPendingHierarchicalBeneficiaries(note.id);
+        if (pending.length === 0) {
+          notesToDelete.push(note);
+        }
+      }
+
+      if (notesToDelete.length === 0) return;
+
+      console.log(
+        `🧹 Limpieza automática: ${notesToDelete.length} nota(s) lista(s) para eliminar.`
+      );
+
+      for (const note of notesToDelete) {
+        // Barrido en cascada silencioso (sin confirmación)
+        await supabase.from('order_items').delete().eq('order_id', note.id);
+        await supabase.from('order_payments').delete().eq('order_id', note.id);
+        await supabase
+          .from('seller_payment_notifications')
+          .delete()
+          .eq('order_id', note.id);
+        await supabase.from('vales').delete().eq('order_id', note.id);
+        await supabase.from('penalties').delete().eq('order_id', note.id);
+        await supabase
+          .from('hierarchy_settlement_backups')
+          .delete()
+          .eq('subordinate_order_id', note.id);
+        await supabase.from('sales_orders').delete().eq('id', note.id);
+      }
+
+      showToastSuccess(
+        `${notesToDelete.length} nota(s) liquidada(s) completamente eliminada(s) automáticamente.`
+      );
+      await fetchTabData(); // Refrescar la lista
+    } catch (err) {
+      console.error('Error en limpieza automática:', err);
+    }
+  };
   // --- B. EL DETONANTE CENTRAL: handlePayAndLiquidate MODIFICADO ---
   const handlePayAndLiquidate = async () => {
     if (!settlementModalData) return;
+
     const confirmMsg = `ALERTA CRÍTICA: Se deducirán $${settlementModalData.totalPenaltiesUsd.toFixed(
       2
     )} por penalizaciones, se generarán respaldos jerárquicos y se procesará la factura. ¿Continuar?`;
@@ -1644,6 +1693,7 @@ export default function AdminModule() {
       const invCode = 'LIQ-' + Date.now().toString().slice(-6);
       const { data: authData } = await supabase.auth.getUser();
 
+      // 1. Capturar HTML de la factura (Limpio de elementos interactivos)
       const modalDOMEl = document.getElementById(
         'settlement-invoice-modal-content'
       );
@@ -1676,7 +1726,7 @@ export default function AdminModule() {
         capturedHTMLContent = clonedNode.innerHTML;
       }
 
-      // 1. Procesar Penalizaciones como Abonos
+      // 2. Procesar Penalizaciones como Abonos
       for (const pen of settlementModalData.penalties) {
         const penAmt = Number(pen.amount || 0);
         if (pen.order_id && penAmt > 0) {
@@ -1690,7 +1740,6 @@ export default function AdminModule() {
               created_by: authData?.user?.id,
             },
           ]);
-          // Actualizar estado de la orden si es necesario (aunque ya esté cerrada)
         }
         await supabase
           .from('penalties')
@@ -1698,8 +1747,7 @@ export default function AdminModule() {
           .eq('id', pen.id);
       }
 
-      // 2. Generación del Respaldo Jerárquico (Snapshot Contable)
-      // ANTES de borrar nada, guardamos los datos de las órdenes evaluadas en la jerarquía
+      // 3. Generación del Respaldo Jerárquico (Snapshot Contable)
       const hierarchyBackups =
         settlementModalData.hierarchyData.evaluatedOrders.map((eo) => ({
           parent_user_id: settlementModalData.user.id,
@@ -1710,7 +1758,6 @@ export default function AdminModule() {
           cycle: selectedCycle,
           month: selectedMonth,
           year: selectedYear,
-          // Guardamos también datos clave de la orden por si se borra
           order_final_price: eo.order.final_price_usd,
           order_transaction_number: eo.order.transaction_number,
           order_seller_id: eo.order.seller_id || eo.order.seller?.id,
@@ -1724,7 +1771,7 @@ export default function AdminModule() {
           console.warn('Error guardando backups jerárquicos:', backupErr);
       }
 
-      // 3. Insertar Factura
+      // 4. Insertar Factura Histórica
       const { data: insertedInv, error: invErr } = await supabase
         .from('settlement_invoices')
         .insert([
@@ -1754,17 +1801,17 @@ export default function AdminModule() {
         .single();
       if (invErr) throw invErr;
 
-      // 4. Limpieza y Depuración (Borrado Condicional)
+      // 5. Limpieza y Depuración (Borrado Condicional Automático en Cascada)
       const noteIdsToProcess = settlementModalData.notes.map((n) => n.id);
 
       if (noteIdsToProcess.length > 0) {
-        // Para cada nota, verificamos si es el último beneficiario
         for (const noteId of noteIdsToProcess) {
+          // Verificamos si aún quedan beneficiarios por liquidar esta nota específica
           const pendingBeneficiaries =
             await getPendingHierarchicalBeneficiaries(noteId);
 
           if (pendingBeneficiaries.length === 0) {
-            // ES EL ÚLTIMO: Eliminar completamente
+            // ✅ ES EL ÚLTIMO BENEFICIARIO: Eliminar completamente la nota y sus dependencias
             await supabase.from('order_items').delete().eq('order_id', noteId);
             await supabase
               .from('order_payments')
@@ -1774,9 +1821,17 @@ export default function AdminModule() {
               .from('seller_payment_notifications')
               .delete()
               .eq('order_id', noteId);
+            await supabase.from('vales').delete().eq('order_id', noteId);
+            await supabase.from('penalties').delete().eq('order_id', noteId);
+            // Limpiamos los respaldos de esta nota específica (opcional, pero mantiene la BD limpia)
+            await supabase
+              .from('hierarchy_settlement_backups')
+              .delete()
+              .eq('subordinate_order_id', noteId);
+            // Finalmente, eliminamos la orden
             await supabase.from('sales_orders').delete().eq('id', noteId);
           } else {
-            // NO ES EL ÚLTIMO: Cambiar estado a 'liquidada' para mantenerla visible en la pestaña especial
+            // ⚠️ NO ES EL ÚLTIMO: Cambiar estado a 'liquidada' para que aparezca en la pestaña "N.E. Jerárquicas Pendientes"
             await supabase
               .from('sales_orders')
               .update({ status: 'liquidada', updated_at: new Date() })
@@ -1785,7 +1840,7 @@ export default function AdminModule() {
         }
       }
 
-      // VALES INDEPENDIENTES: Borrar vales usados en este ciclo para este usuario
+      // 6. Limpieza de Vales y Penalizaciones del usuario actual
       const valeIdsToDelete = settlementModalData.vales.map((v) => v.id);
       if (valeIdsToDelete.length > 0) {
         await supabase.from('vales').delete().in('id', valeIdsToDelete);
@@ -1796,12 +1851,7 @@ export default function AdminModule() {
         await supabase.from('penalties').delete().in('id', penIdsToDelete);
       }
 
-      // Limpiar penalizaciones huérfanas de órdenes borradas (si las hubiera)
-      if (noteIdsToProcess.length > 0) {
-        // Nota: Las penalizaciones ya se marcaron como 'cobrada' arriba, pero si queremos borrarlas físicamente:
-        // await supabase.from('penalties').delete().in('order_id', noteIdsToProcess);
-      }
-
+      // 7. Notificación al usuario
       try {
         await supabase.functions.invoke('send-notification', {
           body: {
@@ -1821,12 +1871,15 @@ export default function AdminModule() {
       }
 
       showToastSuccess(
-        `Factura ${invCode} generada, respaldos jerárquicos creados y ciclo liquidado.`
+        `Factura ${invCode} generada, respaldos creados y notas procesadas automáticamente.`
       );
       setSettlementModalData(null);
+
+      // Recargar datos: esto actualiza la lista y renderiza correctamente las tarjetas móviles
       await fetchTabData();
-      setQuincenaSubView('historial');
+      setQuincenaSubView('liquidar');
     } catch (err) {
+      console.error('Error en liquidación:', err);
       setErrorMsg('Error al guardar y liquidar: ' + err.message);
     } finally {
       setLoading(false);
