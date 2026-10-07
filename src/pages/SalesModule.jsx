@@ -1868,7 +1868,7 @@ export default function SalesModule() {
     }
   };
 
-  // C. Lógica de Vale Independiente (CORREGIDA)
+  // C. Lógica de Vale Independiente
   const handleSolicitarValeIndependiente = async (e) => {
     e.preventDefault();
 
@@ -1884,25 +1884,19 @@ export default function SalesModule() {
 
     setLoading(true);
     try {
-      // CORRECCIÓN: Solo insertamos las columnas que existen en la tabla 'vales'
-      // order_id: null (para hacerlo independiente)
-      // seller_id: usuario actual
-      // requested_amount_usd: el monto ingresado
-      // status: pendiente para aprobación
       const { error } = await supabase.from('vales').insert([
         {
           order_id: null,
           seller_id: user?.id,
-          estimated_commission_usd: 0, // Opcional, pero suele existir para cálculos
+          estimated_commission_usd: 0,
           requested_amount_usd: Number(independentValeForm.monto),
           status: 'pendiente',
-          // NOTA: Se eliminó 'reason' y 'motivo' porque no existen en la tabla
         },
       ]);
 
       if (error) throw error;
 
-      // Notificación opcional al admin (si tienes configurada la función edge)
+      // Notificación opcional al admin
       try {
         await supabase.functions.invoke('send-notification', {
           body: {
@@ -1924,9 +1918,10 @@ export default function SalesModule() {
         text: 'Solicitud de vale independiente enviada correctamente.',
       });
 
-      // Limpiar formulario y recargar datos
+      // Limpiar formulario, recargar comisiones y actualizar el historial al instante
       setIndependentValeForm({ monto: '', motivo: '' });
       fetchComisionesYVales();
+      fetchIndependentValesHistory(); // <-- ESTA LÍNEA ACTUALIZA EL HISTORIAL AUTOMÁTICAMENTE
     } catch (err) {
       console.error(err);
       setMessage({ type: 'error', text: err.message });
