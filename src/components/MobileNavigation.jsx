@@ -46,13 +46,13 @@ export default function MobileNavigation({ isOpen, onClose }) {
       to: '/usuarios',
       label: 'Usuarios',
       icon: UsersIcon,
-      roles: ['administrador', 'gerente', 'tecnico'],
+      roles: ['administrador', 'tecnico'],
     },
     {
       to: '/administrativo',
       label: 'Administrativo',
       icon: FileText,
-      roles: ['administrador', 'gerente', 'tecnico'],
+      roles: ['administrador', 'tecnico'],
     },
     {
       to: '/vendedores',
