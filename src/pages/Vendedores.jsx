@@ -36,7 +36,7 @@ export default function Vendedores({ currentUser }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [teamClients, setTeamClients] = useState([]);
   const [teamPotentials, setTeamPotentials] = useState([]);
-
+  
   // Estado para el Menú Dropdown en Móvil
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const mobileMenuRef = useRef(null);
@@ -47,10 +47,11 @@ export default function Vendedores({ currentUser }) {
     orders: [],
   });
 
-  // Nuevo estado para el modal de visualización de detalles de N.E.
+  // Nuevo estado para el modal de visualización de detalles de N.E. (Solo Lectura)
   const [neDetailModal, setNeDetailModal] = useState({
     open: false,
     order: null,
+    items: [], // Para guardar los productos de la orden
   });
 
   const [imageModal, setImageModal] = useState({
@@ -318,7 +319,7 @@ export default function Vendedores({ currentUser }) {
       // A. Modificación: Seleccionar explícitamente el campo 'city' de profiles
       const { data: allProfiles, error: profilesError } = await supabase
         .from('profiles')
-        .select('*')
+        .select('*') 
         .not('role', 'is', null)
         .neq('role', 'pendiente')
         .neq('role', 'stock');
@@ -506,35 +507,66 @@ export default function Vendedores({ currentUser }) {
     }
   };
 
+  // Helper para obtener el porcentaje basado en SalesModule.jsx
+  const getDiscountPercentFromType = (type) => {
+    // Valores por defecto si no se cargan de la BD, pero idealmente deberían venir de global_settings
+    // Aquí usamos los valores estándar mencionados en SalesModule
+    switch (String(type)) {
+      case '53.38': return 53.38;
+      case '23.08': return 23.08;
+      case '10': return 10;
+      case '0': return 0;
+      default: return 53.38;
+    }
+  };
+
   const openHistoryModal = async (seller) => {
     try {
       setLoading(true);
-      // B. Modificación: Traer datos adicionales para calcular descuento y mostrar detalles
+      // B. Modificación: Traer datos completos para calcular descuento y mostrar detalles
       const { data } = await supabase
         .from('sales_orders')
         .select('*, clients(name)')
         .eq('seller_id', seller.id)
         .order('created_at', { ascending: false });
 
-      // Procesar órdenes para añadir porcentaje de descuento si es necesario
-      // Nota: Si el cálculo del descuento depende de campos no traídos aquí,
-      // se asume que discount_percent existe o se calcula.
-      // Para este ejemplo, asumimos que podemos calcularlo o viene en los datos.
-      // Si no viene en la BD, habría que traer list_items.
-      // Por simplicidad y siguiendo la instrucción de "mostrar", añadiremos un placeholder
-      // o cálculo si los datos brutos lo permiten.
-      // Dado que no tenemos list_items aquí, usaremos un valor simulado o 0 si no existe.
-      // En una implementación real, necesitarías join con order_items.
-
-      const processedOrders = (data || []).map((order) => ({
-        ...order,
-        // Cálculo dummy si no existe en BD, reemplazar con lógica real si tienes access a subtotal vs final
-        discount_percent: order.discount_percent || 0,
-      }));
+      // Procesar órdenes para añadir porcentaje de descuento legible
+      const processedOrders = (data || []).map(order => {
+        const discountPct = getDiscountPercentFromType(order.payment_discount);
+        return {
+          ...order,
+          discount_percent: discountPct
+        };
+      });
 
       setHistoryModal({ open: true, seller, orders: processedOrders });
     } catch (err) {
       alert('Error cargando historial: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Función para abrir el modal de solo lectura (Ver N.E.)
+  const openViewNeModal = async (order) => {
+    try {
+      setLoading(true);
+      // Obtener los items de la orden para mostrarlos en el detalle
+      const { data: items, error } = await supabase
+        .from('order_items')
+        .select('*, products(code, description)')
+        .eq('order_id', order.id);
+      
+      if (error) throw error;
+
+      setNeDetailModal({
+        open: true,
+        order: order,
+        items: items || []
+      });
+    } catch (err) {
+      console.error(err);
+      alert('Error cargando detalles de la N.E.');
     } finally {
       setLoading(false);
     }
@@ -576,7 +608,7 @@ export default function Vendedores({ currentUser }) {
     },
   ];
 
-  if (loading && activeTab !== 'visitas' && !historyModal.open) {
+  if (loading && activeTab !== 'visitas' && !historyModal.open && !neDetailModal.open) {
     return <div style={{ padding: '24px' }}>Cargando módulo...</div>;
   }
 
@@ -1784,7 +1816,7 @@ export default function Vendedores({ currentUser }) {
                           <Eye size={10} /> Historial
                         </button>
                       </div>
-
+                      
                       {/* C. Adaptación Responsiva: Campo Ciudad en Móvil */}
                       <div
                         style={{
@@ -2380,9 +2412,7 @@ export default function Vendedores({ currentUser }) {
                             color: '#4b5563',
                           }}
                         >
-                          {nota.discount_percent
-                            ? `${nota.discount_percent}%`
-                            : '-'}
+                          {nota.discount_percent ? `${nota.discount_percent}%` : '-'}
                         </td>
                         {/* B. Botón Ver Escritorio */}
                         <td
@@ -2390,9 +2420,7 @@ export default function Vendedores({ currentUser }) {
                           style={{ padding: '8px', textAlign: 'center' }}
                         >
                           <button
-                            onClick={() =>
-                              setNeDetailModal({ open: true, order: nota })
-                            }
+                            onClick={() => openViewNeModal(nota)}
                             style={{
                               backgroundColor: '#eff6ff',
                               color: '#1d4ed8',
@@ -2542,9 +2570,7 @@ export default function Vendedores({ currentUser }) {
                               Descuento:
                             </span>
                             <span style={{ color: '#4b5563' }}>
-                              {nota.discount_percent
-                                ? `${nota.discount_percent}%`
-                                : '-'}
+                              {nota.discount_percent ? `${nota.discount_percent}%` : '-'}
                             </span>
                           </div>
                           {/* C. Adaptación Responsiva: Botón Ver en Móvil */}
@@ -2556,9 +2582,7 @@ export default function Vendedores({ currentUser }) {
                             }}
                           >
                             <button
-                              onClick={() =>
-                                setNeDetailModal({ open: true, order: nota })
-                              }
+                              onClick={() => openViewNeModal(nota)}
                               style={{
                                 backgroundColor: '#eff6ff',
                                 color: '#1d4ed8',
@@ -2587,7 +2611,7 @@ export default function Vendedores({ currentUser }) {
         </div>
       )}
 
-      {/* ============ MODAL DETALLE N.E. (Solo Lectura) ============ */}
+      {/* ============ MODAL DETALLE N.E. (Solo Lectura - Estilo Editar pero sin editar) ============ */}
       {neDetailModal.open && neDetailModal.order && (
         <div
           style={{
@@ -2600,14 +2624,14 @@ export default function Vendedores({ currentUser }) {
             zIndex: 3000,
             padding: '16px',
           }}
-          onClick={() => setNeDetailModal({ open: false, order: null })}
+          onClick={() => setNeDetailModal({ open: false, order: null, items: [] })}
         >
           <div
             style={{
               backgroundColor: '#fff',
               borderRadius: '12px',
               width: '100%',
-              maxWidth: '600px',
+              maxWidth: '850px',
               maxHeight: '90vh',
               overflowY: 'auto',
               padding: '24px',
@@ -2617,219 +2641,262 @@ export default function Vendedores({ currentUser }) {
             onClick={(e) => e.stopPropagation()}
           >
             <button
-              onClick={() => setNeDetailModal({ open: false, order: null })}
+              onClick={() => setNeDetailModal({ open: false, order: null, items: [] })}
               style={{
                 position: 'absolute',
                 top: '16px',
                 right: '16px',
-                background: 'none',
+                background: '#111827',
+                color: '#fff',
                 border: 'none',
+                padding: '6px 12px',
+                borderRadius: '6px',
                 cursor: 'pointer',
-                color: '#4b5563',
+                fontSize: '12px',
+                fontWeight: 'bold',
               }}
             >
-              <X size={20} />
+              Cerrar Panel
             </button>
 
-            <h3
+            <div
               style={{
-                margin: '0 0 16px 0',
-                fontSize: '18px',
-                fontWeight: '800',
-                color: '#111827',
-                paddingRight: '24px',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '16px',
+                borderBottom: '2px solid #111827',
+                paddingBottom: '12px',
               }}
             >
-              Detalle de N.E. #
-              {neDetailModal.order.transaction_number ||
-                neDetailModal.order.id.substring(0, 6)}
-            </h3>
+              <div>
+                <h2 style={{ fontSize: '18px', fontWeight: '900', margin: 0 }}>
+                  Visualización - Nota de Entrega #{neDetailModal.order.transaction_number || neDetailModal.order.id.substring(0, 6)}
+                </h2>
+              </div>
+            </div>
 
-            <div
-              style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}
-            >
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              {/* Cabecera de la Orden */}
               <div
                 style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  borderBottom: '1px solid #f3f4f6',
-                  paddingBottom: '8px',
+                  backgroundColor: '#ffffff',
+                  padding: '16px',
+                  borderRadius: '12px',
+                  border: '1px solid #E5E7EB',
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+                  gap: '12px',
                 }}
               >
-                <span style={{ color: '#6b7280', fontSize: '13px' }}>
-                  Cliente:
-                </span>
-                <span
-                  style={{
-                    fontWeight: '600',
-                    color: '#111827',
-                    fontSize: '13px',
-                  }}
-                >
-                  {neDetailModal.order.clients?.name || 'N/A'}
-                </span>
+                <div>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', marginBottom: '4px' }}>
+                    Cliente
+                  </label>
+                  <div style={{ padding: '10px 12px', fontSize: '14px', border: '1px solid #D1D5DB', borderRadius: '6px', backgroundColor: '#F9FAFB' }}>
+                    {neDetailModal.order.clients?.name || 'N/A'}
+                  </div>
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', marginBottom: '4px' }}>
+                    Categoría
+                  </label>
+                  <div style={{ padding: '10px 12px', fontSize: '14px', border: '1px solid #D1D5DB', borderRadius: '6px', backgroundColor: '#F9FAFB' }}>
+                    {neDetailModal.order.category || 'General'}
+                  </div>
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', marginBottom: '4px' }}>
+                    Modalidad de Pago
+                  </label>
+                  <div style={{ padding: '10px 12px', fontSize: '14px', border: '1px solid #F59E0B', borderRadius: '6px', backgroundColor: '#FEF3C7', color: '#78350F', fontWeight: '700' }}>
+                    {getDiscountPercentFromType(neDetailModal.order.payment_discount)}% 
+                    {String(neDetailModal.order.payment_discount) === '53.38' ? ' ($)' : 
+                     String(neDetailModal.order.payment_discount) === '23.08' ? ' (Bs)' : 
+                     String(neDetailModal.order.payment_discount) === '10' ? ' (Esp)' : ' (0)'}
+                  </div>
+                </div>
               </div>
 
+              {/* Tabla de Productos (Estilo Solo Lectura) */}
               <div
                 style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  borderBottom: '1px solid #f3f4f6',
-                  paddingBottom: '8px',
+                  backgroundColor: '#ffffff',
+                  border: '2px solid #111827',
+                  borderRadius: '12px',
+                  padding: '16px',
                 }}
               >
-                <span style={{ color: '#6b7280', fontSize: '13px' }}>
-                  Fecha:
-                </span>
-                <span style={{ color: '#111827', fontSize: '13px' }}>
-                  {new Date(
-                    neDetailModal.order.created_at
-                  ).toLocaleDateString()}
-                </span>
-              </div>
-
-              <div
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  borderBottom: '1px solid #f3f4f6',
-                  paddingBottom: '8px',
-                }}
-              >
-                <span style={{ color: '#6b7280', fontSize: '13px' }}>
-                  Estado:
-                </span>
-                <span
-                  style={{
-                    padding: '2px 8px',
-                    borderRadius: '12px',
-                    fontSize: '11px',
-                    fontWeight: '700',
-                    backgroundColor:
-                      neDetailModal.order.payment_status === 'cerrada'
-                        ? '#DCFCE7'
-                        : '#FEF3C7',
-                    color:
-                      neDetailModal.order.payment_status === 'cerrada'
-                        ? '#15803D'
-                        : '#B45309',
-                  }}
-                >
-                  {neDetailModal.order.payment_status?.toUpperCase()}
-                </span>
-              </div>
-
-              <div
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  borderBottom: '1px solid #f3f4f6',
-                  paddingBottom: '8px',
-                }}
-              >
-                <span style={{ color: '#6b7280', fontSize: '13px' }}>
-                  Total Final:
-                </span>
-                <span
-                  style={{
-                    fontWeight: '700',
-                    color: '#111827',
-                    fontSize: '13px',
-                  }}
-                >
-                  ${Number(neDetailModal.order.final_price_usd).toFixed(2)}
-                </span>
-              </div>
-
-              <div
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  borderBottom: '1px solid #f3f4f6',
-                  paddingBottom: '8px',
-                }}
-              >
-                <span style={{ color: '#6b7280', fontSize: '13px' }}>
-                  Saldo Pendiente:
-                </span>
-                <span
-                  style={{
-                    fontWeight: '700',
-                    color: '#dc2626',
-                    fontSize: '13px',
-                  }}
-                >
-                  ${Number(neDetailModal.order.balance_due_usd).toFixed(2)}
-                </span>
-              </div>
-
-              {neDetailModal.order.discount_percent > 0 && (
                 <div
                   style={{
                     display: 'flex',
                     justifyContent: 'space-between',
-                    borderBottom: '1px solid #f3f4f6',
-                    paddingBottom: '8px',
+                    borderBottom: '1px solid #E5E7EB',
+                    paddingBottom: '12px',
+                    marginBottom: '12px',
+                    fontSize: '12px',
+                    flexWrap: 'wrap',
+                    gap: '12px',
                   }}
                 >
-                  <span style={{ color: '#6b7280', fontSize: '13px' }}>
-                    Descuento Aplicado:
-                  </span>
-                  <span
+                  <div>
+                    <h2 style={{ fontSize: '15px', fontWeight: '900', margin: 0 }}>
+                      FENIX AUTO PART C.A
+                    </h2>
+                    <p style={{ fontWeight: '700', margin: '2px 0' }}>
+                      RIF: J-50261925-2
+                    </p>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <p style={{ margin: 0 }}>
+                      <strong>Fecha/Hora: </strong>{' '}
+                      {new Date(neDetailModal.order.created_at).toLocaleString()}
+                    </p>
+                    <p style={{ margin: '2px 0' }}>
+                      <strong>N° Transacción: </strong> #
+                      {neDetailModal.order.transaction_number || neDetailModal.order.id.substring(0, 6)}
+                    </p>
+                  </div>
+                </div>
+
+                <div style={{ width: '100%', overflowX: 'auto' }}>
+                  <table
                     style={{
-                      fontWeight: '600',
-                      color: '#4b5563',
-                      fontSize: '13px',
+                      width: '100%',
+                      minWidth: '700px',
+                      borderCollapse: 'collapse',
+                      textAlign: 'left',
+                      fontSize: '12px',
+                      marginBottom: '12px',
                     }}
                   >
-                    {neDetailModal.order.discount_percent}%
-                  </span>
+                    <thead>
+                      <tr
+                        style={{
+                          backgroundColor: '#F3F4F6',
+                          borderBottom: '1px solid #D1D5DB',
+                          fontWeight: '700',
+                        }}
+                      >
+                        <th style={{ padding: '8px' }}>Código</th>
+                        <th style={{ padding: '8px' }}>Descripción</th>
+                        <th style={{ padding: '8px', textAlign: 'center' }}>Cantidad</th>
+                        <th style={{ padding: '8px', textAlign: 'right' }}>Valor Unitario</th>
+                        <th style={{ padding: '8px', textAlign: 'right' }}>V. U. con descuento</th>
+                        <th style={{ padding: '8px', textAlign: 'right' }}>Valor Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {neDetailModal.items.length === 0 ? (
+                        <tr>
+                          <td
+                            colSpan="6"
+                            style={{
+                              padding: '16px',
+                              textAlign: 'center',
+                              color: '#9CA3AF',
+                              fontStyle: 'italic',
+                            }}
+                          >
+                            No hay productos registrados en esta nota.
+                          </td>
+                        </tr>
+                      ) : (
+                        neDetailModal.items.map((item) => (
+                          <tr
+                            key={item.id}
+                            style={{ borderBottom: '1px solid #E5E7EB' }}
+                          >
+                            <td style={{ padding: '8px', fontFamily: 'monospace' }}>
+                              {item.products?.code || 'S/C'}
+                            </td>
+                            <td style={{ padding: '8px', fontWeight: '600' }}>
+                              {item.products?.description || 'Producto'}
+                            </td>
+                            <td style={{ padding: '8px', textAlign: 'center' }}>
+                              {item.quantity}
+                            </td>
+                            <td style={{ padding: '8px', textAlign: 'right' }}>
+                              ${Number(item.unit_price_usd).toFixed(2)}
+                            </td>
+                            <td style={{ padding: '8px', textAlign: 'right', color: '#B45309' }}>
+                              ${Number(item.discounted_unit_price_usd).toFixed(2)}
+                            </td>
+                            <td style={{ padding: '8px', textAlign: 'right', fontWeight: '700' }}>
+                              ${Number(item.total_line_usd).toFixed(2)}
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
                 </div>
-              )}
 
-              <div style={{ marginTop: '8px' }}>
-                <span
-                  style={{
-                    color: '#6b7280',
-                    fontSize: '13px',
-                    display: 'block',
-                    marginBottom: '4px',
-                  }}
-                >
-                  Observaciones:
-                </span>
+                {/* Totales */}
                 <div
                   style={{
-                    backgroundColor: '#f9fafb',
-                    padding: '12px',
-                    borderRadius: '8px',
+                    display: 'flex',
+                    justifyContent: 'flex-end',
+                    marginBottom: '12px',
                     fontSize: '12px',
-                    color: '#4b5563',
-                    minHeight: '60px',
                   }}
                 >
-                  {neDetailModal.order.notes ||
-                    'Sin observaciones registradas.'}
+                  <div
+                    style={{
+                      width: '300px',
+                      backgroundColor: '#F9FAFB',
+                      padding: '10px',
+                      borderRadius: '8px',
+                      border: '1px solid #E5E7EB',
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                      <span>Total sin Descuento:</span>
+                      <strong>${Number(neDetailModal.order.total_base_usd || 0).toFixed(2)}</strong>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', color: '#B45309' }}>
+                      <span>Descuento Aplicado:</span>
+                      <strong>-${Number(neDetailModal.order.discount_amount_usd || 0).toFixed(2)}</strong>
+                    </div>
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        borderTop: '1px solid #D1D5DB',
+                        paddingTop: '4px',
+                        fontSize: '13px',
+                        fontWeight: '900',
+                      }}
+                    >
+                      <span>Precio Final:</span>
+                      <span style={{ color: '#059669' }}>
+                        ${Number(neDetailModal.order.final_price_usd || 0).toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Observaciones */}
+                <div style={{ marginBottom: '12px' }}>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', marginBottom: '4px' }}>
+                    Observación:
+                  </label>
+                  <div
+                    style={{
+                      width: '100%',
+                      padding: '6px 8px',
+                      fontSize: '12px',
+                      border: '1px solid #D1D5DB',
+                      borderRadius: '6px',
+                      boxSizing: 'border-box',
+                      backgroundColor: '#F9FAFB',
+                      minHeight: '40px',
+                    }}
+                  >
+                    {neDetailModal.order.observation || 'Sin observaciones.'}
+                  </div>
                 </div>
               </div>
-            </div>
-
-            <div style={{ marginTop: '24px', textAlign: 'right' }}>
-              <button
-                onClick={() => setNeDetailModal({ open: false, order: null })}
-                style={{
-                  backgroundColor: '#111827',
-                  color: '#fff',
-                  border: 'none',
-                  padding: '8px 16px',
-                  borderRadius: '6px',
-                  fontWeight: '600',
-                  fontSize: '13px',
-                  cursor: 'pointer',
-                }}
-              >
-                Cerrar
-              </button>
             </div>
           </div>
         </div>
