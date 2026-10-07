@@ -185,6 +185,7 @@ export default function Vendedores({ currentUser }) {
     switch (key) {
       case 'full_name':
         return row.full_name || '';
+      // CORRECCIÓN: Agregado el caso 'city' para evitar errores al ordenar/buscar
       case 'city':
         return row.city || '';
       case 'sales_goal_usd':
@@ -304,11 +305,13 @@ export default function Vendedores({ currentUser }) {
     [historyModal.orders, sortConfig.historial]
   );
 
+  // CORRECCIÓN: Actualizado el filtro para incluir búsqueda por ciudad
   const filteredVendedores = useMemo(() => {
     return vendedores.filter((v) => {
+      const term = searchTerm.toLowerCase();
       return (
-        v.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        v.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        v.full_name?.toLowerCase().includes(term) ||
+        v.email?.toLowerCase().includes(term) ||
         v.city?.toLowerCase().includes(term)
       );
     });
@@ -624,7 +627,7 @@ export default function Vendedores({ currentUser }) {
         fontFamily: 'system-ui',
       }}
     >
-            <div
+      <div
         style={{
           display: 'flex',
           justifyContent: 'space-between',
@@ -647,6 +650,7 @@ export default function Vendedores({ currentUser }) {
             Gestión de Vendedores
           </h2>
         </div>
+        {/* BUSCADOR ACTUALIZADO */}
         <div style={{ position: 'relative' }}>
           <Search
             size={16}
