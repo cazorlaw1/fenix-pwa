@@ -4253,7 +4253,9 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                 alignItems: 'flex-end',
               }}
             >
-              <div style={{ flex: '1 1 300px' }}>
+              <div
+                style={{ flex: '1 1 300px', minWidth: '0', maxWidth: '100%' }}
+              >
                 <SearchableDropdown
                   options={filteredCreateNeProducts.map((p) => {
                     const desc =

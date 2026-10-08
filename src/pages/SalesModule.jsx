@@ -7300,7 +7300,13 @@ export default function SalesModule() {
                     alignItems: 'flex-end',
                   }}
                 >
-                  <div style={{ flex: '1 1 300px' }}>
+                  <div
+                    style={{
+                      flex: '1 1 300px',
+                      minWidth: '0',
+                      maxWidth: '100%',
+                    }}
+                  >
                     <SearchableDropdown
                       options={filteredProducts.map((p) => {
                         const desc =
