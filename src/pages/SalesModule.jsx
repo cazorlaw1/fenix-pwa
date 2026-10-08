@@ -7606,7 +7606,7 @@ export default function SalesModule() {
                         color: '#B45309',
                       }}
                     >
-                      <span>% de descuento aplicado:</span>
+                      <span>{porcentajeDescuento}% de descuento aplicado:</span>
                       <strong>-${montoAhorrado.toFixed(2)}</strong>
                     </div>
                     <div
