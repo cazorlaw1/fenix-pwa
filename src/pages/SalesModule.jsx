@@ -2345,7 +2345,7 @@ export default function SalesModule() {
         boxSizing: 'border-box',
       }}
     >
-      <style>{`@media (max-width: 768px) { .desktop-tabs { display: none !important; } .mobile-menu-container { display: block !important; } .desktop-table { display: none !important; } .desktop-cards-grid { display: none !important; } .mobile-cards-container { display: flex !important; flex-direction: column; gap: 12px; } .action-buttons-wrapper { display: flex !important; flex-wrap: nowrap !important; justify-content: stretch !important; align-items: stretch !important; gap: 4px !important; margin-top: 6px !important; padding-top: 8px !important; border-top: 1px solid #E5E7EB !important; } .action-buttons-wrapper button { display: inline-flex !important; align-items: center !important; justify-content: center !important; padding: 8px 4px !important; font-size: 9px !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; border-radius: 6px !important; line-height: 1.2 !important; height: auto !important; box-sizing: border-box !important; min-height: 36px !important; width: auto !important; margin-top: 0 !important; } .action-buttons-wrapper button:not(:last-child) { flex: 1 !important; min-width: 0 !important; } .action-buttons-wrapper button:last-child { flex: 0 0 auto !important; width: 36px !important; min-width: 36px !important; max-width: 36px !important; padding: 8px 0 !important; } } @media (min-width: 769px) { .desktop-tabs { display: flex !important; } .mobile-menu-container { display: none !important; } .desktop-table { display: none !important; } .desktop-cards-grid { display: grid !important; } .mobile-cards-container { display: none !important; } }`}</style>
+      <style>{`@media (max-width: 768px) { .desktop-tabs { display: none !important; } .mobile-menu-container { display: block !important; } .desktop-table { display: none !important; } .desktop-cards-grid { display: none !important; } .mobile-cards-container { display: flex !important; flex-direction: column; gap: 12px; } .action-buttons-wrapper { display: flex !important; flex-wrap: nowrap !important; justify-content: stretch !important; align-items: stretch !important; gap: 4px !important; margin-top: 6px !important; padding-top: 8px !important; border-top: 1px solid #E5E7EB !important; } .action-buttons-wrapper button { display: inline-flex !important; align-items: center !important; justify-content: center !important; padding: 8px 4px !important; font-size: 9px !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; border-radius: 6px !important; line-height: 1.2 !important; height: auto !important; box-sizing: border-box !important; min-height: 36px !important; width: auto !important; margin-top: 0 !important; } .action-buttons-wrapper button:not(:last-child) { flex: 1 !important; min-width: 0 !important; } .action-buttons-wrapper button:last-child { /* Sin restricciones fijas para permitir flex */ }} } @media (min-width: 769px) { .desktop-tabs { display: flex !important; } .mobile-menu-container { display: none !important; } .desktop-table { display: none !important; } .desktop-cards-grid { display: grid !important; } .mobile-cards-container { display: none !important; } }`}</style>
       <div
         style={{
           display: 'flex',
@@ -3277,6 +3277,8 @@ export default function SalesModule() {
                             onClick={() => handleOpenEditClient(c)}
                             style={{
                               flex: 1,
+                              minWidth: '0', // Importante para evitar desbordamiento
+                              width: '100%',
                               padding: '8px',
                               backgroundColor: '#F3F4F6',
                               color: '#1F2937',
@@ -3308,6 +3310,8 @@ export default function SalesModule() {
                             }}
                             style={{
                               flex: 1,
+                              minWidth: '0',
+                              width: '100%',
                               padding: '8px',
                               backgroundColor: '#E0E7FF',
                               color: '#3730A3',
@@ -3326,19 +3330,6 @@ export default function SalesModule() {
                               style={{ width: '13px', height: '13px' }}
                             />{' '}
                             N.E.
-                          </button>
-                          <button
-                            onClick={() => handleDeleteClient(c.id, c.name)}
-                            style={{
-                              padding: '8px 12px',
-                              backgroundColor: '#FEF2F2',
-                              color: '#DC2626',
-                              border: '1px solid #FECACA',
-                              borderRadius: '6px',
-                              cursor: 'pointer',
-                            }}
-                          >
-                            <Trash2 style={{ width: '14px', height: '14px' }} />
                           </button>
                         </div>
                       </div>
@@ -3943,6 +3934,8 @@ export default function SalesModule() {
                             onClick={() => handleOpenEditClient(c)}
                             style={{
                               flex: 1,
+                              minWidth: '0',
+                              width: '100%',
                               padding: '6px',
                               backgroundColor: '#F3F4F6',
                               color: '#1F2937',
@@ -3974,6 +3967,8 @@ export default function SalesModule() {
                             }}
                             style={{
                               flex: 1,
+                              minWidth: '0',
+                              width: '100%',
                               padding: '6px',
                               backgroundColor: '#E0E7FF',
                               color: '#3730A3',
@@ -3992,19 +3987,6 @@ export default function SalesModule() {
                               style={{ width: '13px', height: '13px' }}
                             />{' '}
                             N.E.
-                          </button>
-                          <button
-                            onClick={() => handleDeleteClient(c.id, c.name)}
-                            style={{
-                              padding: '6px 10px',
-                              backgroundColor: '#FEF2F2',
-                              color: '#DC2626',
-                              border: '1px solid #FECACA',
-                              borderRadius: '6px',
-                              cursor: 'pointer',
-                            }}
-                          >
-                            <Trash2 style={{ width: '14px', height: '14px' }} />
                           </button>
                         </div>
                       </div>
@@ -6022,6 +6004,8 @@ export default function SalesModule() {
                           onClick={() => handleSaveVisita(c.id, false)}
                           style={{
                             flex: 1,
+                            minWidth: '0',
+                            width: '100%',
                             padding: '6px',
                             backgroundColor: '#111827',
                             color: '#FFFFFF',
@@ -6033,19 +6017,6 @@ export default function SalesModule() {
                           }}
                         >
                           Registrar Visita
-                        </button>
-                        <button
-                          onClick={() => handleDeleteClient(c.id, c.name)}
-                          style={{
-                            padding: '6px 10px',
-                            backgroundColor: '#FEF2F2',
-                            color: '#DC2626',
-                            border: '1px solid #FECACA',
-                            borderRadius: '6px',
-                            cursor: 'pointer',
-                          }}
-                        >
-                          <Trash2 style={{ width: '14px', height: '14px' }} />
                         </button>
                       </div>
                     </div>
@@ -6496,6 +6467,8 @@ export default function SalesModule() {
                           onClick={() => handleSaveVisita(c.id, false)}
                           style={{
                             flex: 1,
+                            minWidth: '0',
+                            width: '100%',
                             padding: '6px',
                             backgroundColor: '#111827',
                             color: '#FFFFFF',
@@ -6507,19 +6480,6 @@ export default function SalesModule() {
                           }}
                         >
                           Registrar Visita
-                        </button>
-                        <button
-                          onClick={() => handleDeleteClient(c.id, c.name)}
-                          style={{
-                            padding: '6px 10px',
-                            backgroundColor: '#FEF2F2',
-                            color: '#DC2626',
-                            border: '1px solid #FECACA',
-                            borderRadius: '6px',
-                            cursor: 'pointer',
-                          }}
-                        >
-                          <Trash2 style={{ width: '14px', height: '14px' }} />
                         </button>
                       </div>
                     </div>

@@ -20,10 +20,8 @@ export default function Users() {
       const urlParams = new URLSearchParams(window.location.search);
       const tabParam = urlParams.get('tab');
       if (tabParam) return tabParam;
-
       const hashParam = window.location.hash.replace('#', '');
       if (hashParam) return hashParam;
-
       const savedTab = localStorage.getItem('users_active_tab');
       if (savedTab) return savedTab;
     }
@@ -87,6 +85,22 @@ export default function Users() {
   const clientCiInputRef = useRef(null);
   const clientRifInputRef = useRef(null);
   const clientDocInputRef = useRef(null);
+
+  // --- NUEVOS ESTADOS PARA CREACIÓN DE CLIENTE ---
+  const [newClientData, setNewClientData] = useState({
+    name: '',
+    rif_number: '',
+    ci_number: '',
+    phone: '',
+    address: '',
+    is_potential: false, // false = Oficial, true = Potencial
+  });
+  const [creatingClient, setCreatingClient] = useState(false);
+
+  // --- NUEVO ESTADO PARA EDICIÓN DE ASIGNACIÓN EN TABLA ---
+  const [editingAssignmentId, setEditingAssignmentId] = useState(null);
+  const [tempAssignmentUserId, setTempAssignmentUserId] = useState('');
+  const [savingAssignment, setSavingAssignment] = useState(false);
 
   useEffect(() => {
     fetchUsersAndAssignments();
@@ -172,11 +186,7 @@ export default function Users() {
       const { data, error } = await supabase
         .from('clients')
         .select(
-          `
-          *,
-          profiles:assigned_seller_id(full_name, email, role),
-          sales_orders(id, payment_status, balance_due_usd, seller_id)
-        `
+          `*, profiles:assigned_seller_id(full_name, email, role), sales_orders(id, payment_status, balance_due_usd, seller_id)`
         )
         .order('created_at', { ascending: false });
 
@@ -343,7 +353,6 @@ export default function Users() {
   };
 
   // --- Lógica para Pestaña PERFILES ---
-
   const startEditingProfile = (user) => {
     setEditingProfileId(user.id);
     setProfileFormData({
@@ -369,7 +378,6 @@ export default function Users() {
   const handleProfileFileChange = async (e, field, bucket, allowedTypes) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     if (!allowedTypes.includes(file.type)) {
       alert(`Formato no permitido. Aceptados: ${allowedTypes.join(', ')}`);
       return;
@@ -378,23 +386,18 @@ export default function Users() {
       alert('El archivo supera el tamaño máximo de 5MB.');
       return;
     }
-
     try {
       const fileExt = file.name.split('.').pop();
       const fileName = `${Date.now()}-${Math.random()
         .toString(36)
         .substring(2, 8)}.${fileExt}`;
       const filePath = `${editingProfileId}/${fileName}`;
-
       const { error: uploadError } = await supabase.storage
         .from(bucket)
         .upload(filePath, file, { upsert: false });
-
       if (uploadError) throw uploadError;
-
       const { data } = supabase.storage.from(bucket).getPublicUrl(filePath);
       const newUrl = data.publicUrl;
-
       setProfileFormData((prev) => ({ ...prev, [field]: newUrl }));
     } catch (err) {
       alert('Error subiendo archivo: ' + err.message);
@@ -405,7 +408,6 @@ export default function Users() {
     setSavingProfile(true);
     try {
       const { _old_avatar_url, _old_ci_url, ...updates } = profileFormData;
-
       // Eliminar archivos antiguos si cambiaron
       if (_old_avatar_url && _old_avatar_url !== updates.avatar_url) {
         await deleteOldFile(_old_avatar_url, 'avatars');
@@ -413,14 +415,11 @@ export default function Users() {
       if (_old_ci_url && _old_ci_url !== updates.ci_url) {
         await deleteOldFile(_old_ci_url, 'documents');
       }
-
       const { error } = await supabase
         .from('profiles')
         .update(updates)
         .eq('id', userId);
-
       if (error) throw error;
-
       alert('Perfil actualizado correctamente.');
       setEditingProfileId(null);
       fetchUsersAndAssignments(); // Recargar lista
@@ -432,6 +431,98 @@ export default function Users() {
   };
 
   // --- Lógica para Pestaña CLIENTES ---
+
+  // --- NUEVA FUNCIÓN: Crear Cliente ---
+  const handleCreateClient = async () => {
+    if (!newClientData.name) {
+      alert('El nombre del cliente es obligatorio.');
+      return;
+    }
+    setCreatingClient(true);
+    try {
+      const { error } = await supabase.from('clients').insert({
+        name: newClientData.name,
+        rif_number: newClientData.rif_number || null,
+        ci_number: newClientData.ci_number || null,
+        phone: newClientData.phone || null,
+        address: newClientData.address || null,
+        is_potential: newClientData.is_potential,
+        assigned_seller_id: null, // Sin asignación inicial
+      });
+      if (error) throw error;
+      alert('Cliente creado exitosamente.');
+      setNewClientData({
+        name: '',
+        rif_number: '',
+        ci_number: '',
+        phone: '',
+        address: '',
+        is_potential: false,
+      });
+      fetchAllClients();
+    } catch (err) {
+      alert('Error creando cliente: ' + err.message);
+    } finally {
+      setCreatingClient(false);
+    }
+  };
+
+  // --- NUEVA FUNCIÓN: Actualizar Asignación desde Tabla ---
+  const startEditingAssignment = (clientId, currentSellerId) => {
+    setEditingAssignmentId(clientId);
+    setTempAssignmentUserId(currentSellerId || '');
+  };
+
+  const saveAssignmentChange = async (clientId) => {
+    setSavingAssignment(true);
+    try {
+      const { error } = await supabase
+        .from('clients')
+        .update({ assigned_seller_id: tempAssignmentUserId || null })
+        .eq('id', clientId);
+
+      if (error) throw error;
+      alert('Asignación actualizada correctamente.');
+      setEditingAssignmentId(null);
+      fetchAllClients();
+    } catch (err) {
+      alert('Error actualizando asignación: ' + err.message);
+    } finally {
+      setSavingAssignment(false);
+    }
+  };
+
+  // --- NUEVA FUNCIÓN: Eliminar Cliente con Validación ---
+  const handleDeleteClient = async (client) => {
+    // Validar si tiene Notas de Entrega
+    const hasOrders = client.sales_orders && client.sales_orders.length > 0;
+
+    if (hasOrders) {
+      alert(
+        'No se puede eliminar: Este cliente tiene Notas de Entrega asociadas.'
+      );
+      return;
+    }
+
+    if (
+      window.confirm(
+        `¿Estás seguro de que deseas eliminar al cliente "${client.name}"? Esta acción no se puede deshacer.`
+      )
+    ) {
+      try {
+        const { error } = await supabase
+          .from('clients')
+          .delete()
+          .eq('id', client.id);
+
+        if (error) throw error;
+        alert('Cliente eliminado correctamente.');
+        fetchAllClients();
+      } catch (err) {
+        alert('Error eliminando cliente: ' + err.message);
+      }
+    }
+  };
 
   const openClientEditModal = (client) => {
     setClientEditModal({
@@ -465,7 +556,6 @@ export default function Users() {
   const handleClientFileUpload = async (e, field, bucket) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     setUploadingClientFile(true);
     try {
       const fileExt = file.name.split('.').pop();
@@ -473,15 +563,11 @@ export default function Users() {
         .toString(36)
         .substring(2, 8)}.${fileExt}`;
       const filePath = `${clientEditModal.client.id}/${fileName}`;
-
       const { error: uploadError } = await supabase.storage
         .from(bucket)
         .upload(filePath, file, { upsert: false });
-
       if (uploadError) throw uploadError;
-
       const { data } = supabase.storage.from(bucket).getPublicUrl(filePath);
-
       setClientEditModal((prev) => ({
         ...prev,
         formData: { ...prev.formData, [field]: data.publicUrl },
@@ -499,7 +585,6 @@ export default function Users() {
     try {
       const { _old_ci_photo, _old_rif_photo, _old_additional_doc, ...updates } =
         clientEditModal.formData;
-
       // Eliminar archivos antiguos si cambiaron
       if (_old_ci_photo && _old_ci_photo !== updates.ci_photo_url) {
         await deleteOldFile(_old_ci_photo, 'documents');
@@ -513,14 +598,11 @@ export default function Users() {
       ) {
         await deleteOldFile(_old_additional_doc, 'documents');
       }
-
       const { error } = await supabase
         .from('clients')
         .update(updates)
         .eq('id', clientEditModal.client.id);
-
       if (error) throw error;
-
       alert('Cliente actualizado correctamente.');
       closeClientEditModal();
       fetchAllClients(); // Recargar lista
@@ -538,7 +620,6 @@ export default function Users() {
     const idx = url.indexOf(pattern);
     if (idx === -1) return;
     const path = url.substring(idx + pattern.length);
-
     try {
       const { error } = await supabase.storage.from(bucket).remove([path]);
       if (error)
@@ -697,7 +778,10 @@ export default function Users() {
         }}
       >
         {/* Pestañas de Escritorio */}
-        <div className="desktop-tabs-container" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+        <div
+          className="desktop-tabs-container"
+          style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}
+        >
           {tabsList.map((tab) => (
             <button
               key={tab.key}
@@ -749,7 +833,8 @@ export default function Users() {
             }}
           >
             <span>
-              {tabsList.find((t) => t.key === activeTab)?.label || 'Seleccionar...'}
+              {tabsList.find((t) => t.key === activeTab)?.label ||
+                'Seleccionar...'}
             </span>
             <ChevronDown
               size={18}
@@ -759,7 +844,6 @@ export default function Users() {
               }}
             />
           </button>
-
           {isMobileMenuOpen && (
             <div
               style={{
@@ -802,7 +886,9 @@ export default function Users() {
                     }}
                   >
                     <span>{tab.label}</span>
-                    {isActive && <Check size={18} style={{ color: '#dc2626' }} />}
+                    {isActive && (
+                      <Check size={18} style={{ color: '#dc2626' }} />
+                    )}
                   </button>
                 );
               })}
@@ -1472,7 +1558,6 @@ export default function Users() {
                               />{' '}
                               %
                             </td>
-
                             {/* Mobile Card View for Specific Targets */}
                             <td colSpan="2" className="mobile-cell-stacked">
                               <div
@@ -1682,7 +1767,6 @@ export default function Users() {
               <tbody>
                 {allUsers.map((user) => {
                   const isEditing = editingProfileId === user.id;
-
                   if (isEditing) {
                     return (
                       <tr
@@ -1703,14 +1787,18 @@ export default function Users() {
                               borderRadius: '50%',
                               overflow: 'hidden',
                               border: '1px solid #ddd',
-                              cursor: profileFormData.avatar_url ? 'pointer' : 'default',
+                              cursor: profileFormData.avatar_url
+                                ? 'pointer'
+                                : 'default',
                             }}
                             onClick={() => {
                               if (profileFormData.avatar_url) {
                                 setImageModal({
                                   open: true,
                                   url: profileFormData.avatar_url,
-                                  title: `Avatar de ${profileFormData.full_name || 'Usuario'}`,
+                                  title: `Avatar de ${
+                                    profileFormData.full_name || 'Usuario'
+                                  }`,
                                 });
                               }
                             }}
@@ -1847,7 +1935,9 @@ export default function Users() {
                                   setImageModal({
                                     open: true,
                                     url: profileFormData.ci_url,
-                                    title: `Documento C.I. de ${profileFormData.full_name || 'Usuario'}`,
+                                    title: `Documento C.I. de ${
+                                      profileFormData.full_name || 'Usuario'
+                                    }`,
                                   })
                                 }
                                 style={{
@@ -1942,7 +2032,6 @@ export default function Users() {
                             <X size={12} />
                           </button>
                         </td>
-
                         {/* Mobile View for Editing Profile */}
                         <td colSpan="2" className="mobile-cell-stacked">
                           <div
@@ -1967,14 +2056,18 @@ export default function Users() {
                                   borderRadius: '50%',
                                   overflow: 'hidden',
                                   border: '1px solid #ddd',
-                                  cursor: profileFormData.avatar_url ? 'pointer' : 'default',
+                                  cursor: profileFormData.avatar_url
+                                    ? 'pointer'
+                                    : 'default',
                                 }}
                                 onClick={() => {
                                   if (profileFormData.avatar_url) {
                                     setImageModal({
                                       open: true,
                                       url: profileFormData.avatar_url,
-                                      title: `Avatar de ${profileFormData.full_name || 'Usuario'}`,
+                                      title: `Avatar de ${
+                                        profileFormData.full_name || 'Usuario'
+                                      }`,
                                     });
                                   }
                                 }}
@@ -2085,7 +2178,9 @@ export default function Users() {
                                     setImageModal({
                                       open: true,
                                       url: profileFormData.ci_url,
-                                      title: `Documento C.I. de ${profileFormData.full_name || 'Usuario'}`,
+                                      title: `Documento C.I. de ${
+                                        profileFormData.full_name || 'Usuario'
+                                      }`,
                                     })
                                   }
                                   style={{
@@ -2102,7 +2197,9 @@ export default function Users() {
                                   Ver Doc. CI ✓
                                 </button>
                               ) : (
-                                <span style={{ fontSize: '12px' }}>Doc. CI: No</span>
+                                <span style={{ fontSize: '12px' }}>
+                                  Doc. CI: No
+                                </span>
                               )}
                               <button
                                 onClick={() =>
@@ -2174,7 +2271,6 @@ export default function Users() {
                       </tr>
                     );
                   }
-
                   return (
                     <tr
                       key={user.id}
@@ -2198,7 +2294,9 @@ export default function Users() {
                               setImageModal({
                                 open: true,
                                 url: user.avatar_url,
-                                title: `Avatar de ${user.full_name || 'Usuario'}`,
+                                title: `Avatar de ${
+                                  user.full_name || 'Usuario'
+                                }`,
                               });
                             }
                           }}
@@ -2268,7 +2366,9 @@ export default function Users() {
                               setImageModal({
                                 open: true,
                                 url: user.ci_url,
-                                title: `Documento C.I. de ${user.full_name || 'Usuario'}`,
+                                title: `Documento C.I. de ${
+                                  user.full_name || 'Usuario'
+                                }`,
                               })
                             }
                             style={{
@@ -2310,7 +2410,6 @@ export default function Users() {
                           Editar
                         </button>
                       </td>
-
                       {/* Mobile View for Normal Row */}
                       <td colSpan="2" className="mobile-cell-stacked">
                         <div
@@ -2342,7 +2441,9 @@ export default function Users() {
                                   setImageModal({
                                     open: true,
                                     url: user.avatar_url,
-                                    title: `Avatar de ${user.full_name || 'Usuario'}`,
+                                    title: `Avatar de ${
+                                      user.full_name || 'Usuario'
+                                    }`,
                                   });
                                 }
                               }}
@@ -2411,7 +2512,9 @@ export default function Users() {
                                     setImageModal({
                                       open: true,
                                       url: user.ci_url,
-                                      title: `Documento C.I. de ${user.full_name || 'Usuario'}`,
+                                      title: `Documento C.I. de ${
+                                        user.full_name || 'Usuario'
+                                      }`,
                                     })
                                   }
                                   style={{
@@ -2480,6 +2583,191 @@ export default function Users() {
             Base de Datos de Clientes (Oficiales y Potenciales)
           </h3>
 
+          {/* --- SECCIÓN A: CREAR CLIENTE --- */}
+          <div
+            style={{
+              marginBottom: '24px',
+              padding: '16px',
+              backgroundColor: '#f9fafb',
+              borderRadius: '8px',
+              border: '1px solid #e5e7eb',
+            }}
+          >
+            <h4
+              style={{
+                fontSize: '13px',
+                fontWeight: '700',
+                marginBottom: '12px',
+                color: '#111827',
+              }}
+            >
+              Crear Nuevo Cliente
+            </h4>
+            <div
+              style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}
+            >
+              {/* Selector Tipo */}
+              <div
+                style={{ display: 'flex', gap: '16px', alignItems: 'center' }}
+              >
+                <label
+                  style={{
+                    fontSize: '12px',
+                    fontWeight: '600',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <input
+                    type="radio"
+                    name="clientType"
+                    checked={!newClientData.is_potential}
+                    onChange={() =>
+                      setNewClientData({
+                        ...newClientData,
+                        is_potential: false,
+                      })
+                    }
+                  />
+                  Cliente Oficial
+                </label>
+                <label
+                  style={{
+                    fontSize: '12px',
+                    fontWeight: '600',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <input
+                    type="radio"
+                    name="clientType"
+                    checked={newClientData.is_potential}
+                    onChange={() =>
+                      setNewClientData({ ...newClientData, is_potential: true })
+                    }
+                  />
+                  Cliente Potencial
+                </label>
+              </div>
+
+              {/* Campos Básicos */}
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                  gap: '12px',
+                }}
+              >
+                <input
+                  type="text"
+                  placeholder="Nombre Completo *"
+                  value={newClientData.name}
+                  onChange={(e) =>
+                    setNewClientData({ ...newClientData, name: e.target.value })
+                  }
+                  style={{
+                    padding: '8px',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '6px',
+                    fontSize: '13px',
+                  }}
+                />
+                <input
+                  type="text"
+                  placeholder="RIF"
+                  value={newClientData.rif_number}
+                  onChange={(e) =>
+                    setNewClientData({
+                      ...newClientData,
+                      rif_number: e.target.value,
+                    })
+                  }
+                  style={{
+                    padding: '8px',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '6px',
+                    fontSize: '13px',
+                  }}
+                />
+                <input
+                  type="text"
+                  placeholder="C.I."
+                  value={newClientData.ci_number}
+                  onChange={(e) =>
+                    setNewClientData({
+                      ...newClientData,
+                      ci_number: e.target.value,
+                    })
+                  }
+                  style={{
+                    padding: '8px',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '6px',
+                    fontSize: '13px',
+                  }}
+                />
+                <input
+                  type="text"
+                  placeholder="Teléfono"
+                  value={newClientData.phone}
+                  onChange={(e) =>
+                    setNewClientData({
+                      ...newClientData,
+                      phone: e.target.value,
+                    })
+                  }
+                  style={{
+                    padding: '8px',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '6px',
+                    fontSize: '13px',
+                  }}
+                />
+                <input
+                  type="text"
+                  placeholder="Dirección"
+                  value={newClientData.address}
+                  onChange={(e) =>
+                    setNewClientData({
+                      ...newClientData,
+                      address: e.target.value,
+                    })
+                  }
+                  style={{
+                    padding: '8px',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '6px',
+                    fontSize: '13px',
+                    gridColumn: '1 / -1',
+                  }}
+                />
+              </div>
+
+              <button
+                onClick={handleCreateClient}
+                disabled={creatingClient}
+                style={{
+                  alignSelf: 'flex-start',
+                  backgroundColor: '#000',
+                  color: '#D4AF37',
+                  border: 'none',
+                  padding: '8px 16px',
+                  borderRadius: '6px',
+                  fontWeight: '700',
+                  fontSize: '12px',
+                  cursor: 'pointer',
+                }}
+              >
+                {creatingClient ? 'Creando...' : 'Guardar Cliente'}
+              </button>
+            </div>
+          </div>
+
           {loadingClients ? (
             <div
               style={{ padding: '20px', textAlign: 'center', color: '#6b7280' }}
@@ -2546,6 +2834,10 @@ export default function Users() {
                       const neCerradas = (client.sales_orders || []).filter(
                         (o) => o.payment_status === 'cerrada'
                       ).length;
+
+                      // Validación para botón eliminar
+                      const hasOrders =
+                        client.sales_orders && client.sales_orders.length > 0;
 
                       return (
                         <tr
@@ -2616,7 +2908,9 @@ export default function Users() {
                                   label="CI"
                                   url={client.ci_photo_url}
                                   title={`C.I. de ${client.name}`}
-                                  onOpenModal={(url, title) => setImageModal({ open: true, url, title })}
+                                  onOpenModal={(url, title) =>
+                                    setImageModal({ open: true, url, title })
+                                  }
                                 />
                               )}
                               {!isPotential && client.rif_photo_url && (
@@ -2624,7 +2918,9 @@ export default function Users() {
                                   label="RIF"
                                   url={client.rif_photo_url}
                                   title={`RIF de ${client.name}`}
-                                  onOpenModal={(url, title) => setImageModal({ open: true, url, title })}
+                                  onOpenModal={(url, title) =>
+                                    setImageModal({ open: true, url, title })
+                                  }
                                 />
                               )}
                               {client.additional_doc_url && (
@@ -2632,7 +2928,9 @@ export default function Users() {
                                   label="Adic."
                                   url={client.additional_doc_url}
                                   title={`Doc. Adic. de ${client.name}`}
-                                  onOpenModal={(url, title) => setImageModal({ open: true, url, title })}
+                                  onOpenModal={(url, title) =>
+                                    setImageModal({ open: true, url, title })
+                                  }
                                 />
                               )}
                               {client.last_visit_photo_url && (
@@ -2640,17 +2938,111 @@ export default function Users() {
                                   label="Foto"
                                   url={client.last_visit_photo_url}
                                   title={`Visita a ${client.name}`}
-                                  onOpenModal={(url, title) => setImageModal({ open: true, url, title })}
+                                  onOpenModal={(url, title) =>
+                                    setImageModal({ open: true, url, title })
+                                  }
                                 />
                               )}
                             </div>
                           </td>
+
+                          {/* --- MODIFICACIÓN B: DROPDOWN EDITABLE PARA ASIGNACIÓN --- */}
                           <td
                             className="desktop-cell-normal"
                             style={{ padding: '10px', fontSize: '12px' }}
                           >
-                            {client.profiles?.full_name || 'N/A'}
+                            {editingAssignmentId === client.id ? (
+                              <div
+                                style={{
+                                  display: 'flex',
+                                  gap: '4px',
+                                  alignItems: 'center',
+                                }}
+                              >
+                                <select
+                                  value={tempAssignmentUserId}
+                                  onChange={(e) =>
+                                    setTempAssignmentUserId(e.target.value)
+                                  }
+                                  style={{
+                                    padding: '4px',
+                                    borderRadius: '4px',
+                                    border: '1px solid #d1d5db',
+                                    fontSize: '11px',
+                                    maxWidth: '150px',
+                                  }}
+                                >
+                                  <option value="">Sin Asignar</option>
+                                  {allUsers
+                                    .filter((u) => u.role === 'vendedor')
+                                    .map((u) => (
+                                      <option key={u.id} value={u.id}>
+                                        {u.full_name}
+                                      </option>
+                                    ))}
+                                </select>
+                                <button
+                                  onClick={() =>
+                                    saveAssignmentChange(client.id)
+                                  }
+                                  disabled={savingAssignment}
+                                  style={{
+                                    backgroundColor: '#10B981',
+                                    color: 'white',
+                                    border: 'none',
+                                    borderRadius: '4px',
+                                    padding: '4px',
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                  }}
+                                  title="Guardar Asignación"
+                                >
+                                  <Check size={14} />
+                                </button>
+                                <button
+                                  onClick={() => setEditingAssignmentId(null)}
+                                  style={{
+                                    backgroundColor: '#EF4444',
+                                    color: 'white',
+                                    border: 'none',
+                                    borderRadius: '4px',
+                                    padding: '4px',
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                  }}
+                                  title="Cancelar"
+                                >
+                                  <X size={14} />
+                                </button>
+                              </div>
+                            ) : (
+                              <div
+                                onClick={() =>
+                                  startEditingAssignment(
+                                    client.id,
+                                    client.assigned_seller_id
+                                  )
+                                }
+                                style={{
+                                  cursor: 'pointer',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                }}
+                                title="Click para editar asignación"
+                              >
+                                <span>
+                                  {client.profiles?.full_name || 'Sin Asignar'}
+                                </span>
+                                <ChevronDown size={12} color="#9CA3AF" />
+                              </div>
+                            )}
                           </td>
+
                           <td
                             className="desktop-cell-normal"
                             style={{
@@ -2687,26 +3079,62 @@ export default function Users() {
                             className="desktop-cell-normal"
                             style={{ padding: '10px' }}
                           >
-                            <button
-                              onClick={() => openClientEditModal(client)}
+                            <div
                               style={{
-                                backgroundColor: '#000',
-                                color: '#D4AF37',
-                                border: 'none',
-                                padding: '6px 10px',
-                                borderRadius: '6px',
-                                fontWeight: '700',
-                                fontSize: '11px',
-                                cursor: 'pointer',
                                 display: 'flex',
-                                alignItems: 'center',
+                                flexDirection: 'column',
                                 gap: '4px',
                               }}
                             >
-                              Editar
-                            </button>
-                          </td>
+                              <button
+                                onClick={() => openClientEditModal(client)}
+                                style={{
+                                  backgroundColor: '#000',
+                                  color: '#D4AF37',
+                                  border: 'none',
+                                  padding: '6px 10px',
+                                  borderRadius: '6px',
+                                  fontWeight: '700',
+                                  fontSize: '11px',
+                                  cursor: 'pointer',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                }}
+                              >
+                                Editar
+                              </button>
 
+                              {/* --- MODIFICACIÓN C: BOTÓN ELIMINAR CON VALIDACIÓN --- */}
+                              <button
+                                onClick={() => handleDeleteClient(client)}
+                                disabled={hasOrders}
+                                style={{
+                                  backgroundColor: hasOrders
+                                    ? '#F3F4F6'
+                                    : '#DC2626',
+                                  color: hasOrders ? '#9CA3AF' : '#FFFFFF',
+                                  border: 'none',
+                                  padding: '6px 10px',
+                                  borderRadius: '6px',
+                                  fontWeight: '700',
+                                  fontSize: '11px',
+                                  cursor: hasOrders ? 'not-allowed' : 'pointer',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                  opacity: hasOrders ? 0.6 : 1,
+                                }}
+                                title={
+                                  hasOrders
+                                    ? 'No se puede eliminar: Tiene Notas de Entrega'
+                                    : 'Eliminar Cliente'
+                                }
+                              >
+                                <Trash2 size={12} /> Eliminar
+                              </button>
+                            </div>
+                          </td>
                           {/* Mobile View for Client Row */}
                           <td colSpan="2" className="mobile-cell-stacked">
                             <div
@@ -2755,21 +3183,111 @@ export default function Users() {
                                   </span>
                                 )}
                               </div>
-                              <div style={{ fontSize: '11px', color: '#6b7280' }}>
+                              <div
+                                style={{ fontSize: '11px', color: '#6b7280' }}
+                              >
                                 CI: {client.ci_number || 'N/A'} | RIF:{' '}
                                 {client.rif_number || 'N/A'}
                               </div>
+
+                              {/* Mobile Assignment Editor */}
+                              <div style={{ marginTop: '4px' }}>
+                                <span
+                                  style={{
+                                    fontSize: '10px',
+                                    fontWeight: '700',
+                                    color: '#6b7280',
+                                    display: 'block',
+                                  }}
+                                >
+                                  Asignado a:
+                                </span>
+                                {editingAssignmentId === client.id ? (
+                                  <div
+                                    style={{
+                                      display: 'flex',
+                                      gap: '4px',
+                                      alignItems: 'center',
+                                      marginTop: '4px',
+                                    }}
+                                  >
+                                    <select
+                                      value={tempAssignmentUserId}
+                                      onChange={(e) =>
+                                        setTempAssignmentUserId(e.target.value)
+                                      }
+                                      style={{
+                                        padding: '4px',
+                                        borderRadius: '4px',
+                                        border: '1px solid #d1d5db',
+                                        fontSize: '11px',
+                                        flex: 1,
+                                      }}
+                                    >
+                                      <option value="">Sin Asignar</option>
+                                      {allUsers
+                                        .filter((u) => u.role === 'vendedor')
+                                        .map((u) => (
+                                          <option key={u.id} value={u.id}>
+                                            {u.full_name}
+                                          </option>
+                                        ))}
+                                    </select>
+                                    <button
+                                      onClick={() =>
+                                        saveAssignmentChange(client.id)
+                                      }
+                                      disabled={savingAssignment}
+                                      style={{
+                                        backgroundColor: '#10B981',
+                                        color: 'white',
+                                        border: 'none',
+                                        borderRadius: '4px',
+                                        padding: '4px 8px',
+                                        cursor: 'pointer',
+                                      }}
+                                    >
+                                      <Check size={12} />
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <div
+                                    onClick={() =>
+                                      startEditingAssignment(
+                                        client.id,
+                                        client.assigned_seller_id
+                                      )
+                                    }
+                                    style={{
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'space-between',
+                                      padding: '4px 8px',
+                                      backgroundColor: '#f9fafb',
+                                      borderRadius: '4px',
+                                      border: '1px dashed #d1d5db',
+                                      cursor: 'pointer',
+                                      marginTop: '4px',
+                                    }}
+                                  >
+                                    <span style={{ fontSize: '12px' }}>
+                                      {client.profiles?.full_name ||
+                                        'Sin Asignar'}
+                                    </span>
+                                    <ChevronDown size={12} color="#9CA3AF" />
+                                  </div>
+                                )}
+                              </div>
+
                               <div
                                 style={{
                                   display: 'grid',
                                   gridTemplateColumns: '1fr 1fr',
                                   gap: '4px',
                                   fontSize: '11px',
+                                  marginTop: '8px',
                                 }}
                               >
-                                <div>
-                                  Reg: {client.profiles?.full_name || 'N/A'}
-                                </div>
                                 <div>N.E. Pend: {nePendientes}</div>
                                 <div>N.E. Cerr: {neCerradas}</div>
                                 <div>
@@ -2786,6 +3304,7 @@ export default function Users() {
                                   display: 'flex',
                                   gap: '6px',
                                   flexWrap: 'wrap',
+                                  marginTop: '8px',
                                 }}
                               >
                                 {!isPotential && client.ci_photo_url && (
@@ -2793,7 +3312,9 @@ export default function Users() {
                                     label="CI"
                                     url={client.ci_photo_url}
                                     title={`C.I. de ${client.name}`}
-                                    onOpenModal={(url, title) => setImageModal({ open: true, url, title })}
+                                    onOpenModal={(url, title) =>
+                                      setImageModal({ open: true, url, title })
+                                    }
                                   />
                                 )}
                                 {!isPotential && client.rif_photo_url && (
@@ -2801,7 +3322,9 @@ export default function Users() {
                                     label="RIF"
                                     url={client.rif_photo_url}
                                     title={`RIF de ${client.name}`}
-                                    onOpenModal={(url, title) => setImageModal({ open: true, url, title })}
+                                    onOpenModal={(url, title) =>
+                                      setImageModal({ open: true, url, title })
+                                    }
                                   />
                                 )}
                                 {client.additional_doc_url && (
@@ -2809,7 +3332,9 @@ export default function Users() {
                                     label="Adic."
                                     url={client.additional_doc_url}
                                     title={`Doc. Adic. de ${client.name}`}
-                                    onOpenModal={(url, title) => setImageModal({ open: true, url, title })}
+                                    onOpenModal={(url, title) =>
+                                      setImageModal({ open: true, url, title })
+                                    }
                                   />
                                 )}
                                 {client.last_visit_photo_url && (
@@ -2817,26 +3342,65 @@ export default function Users() {
                                     label="Foto"
                                     url={client.last_visit_photo_url}
                                     title={`Visita a ${client.name}`}
-                                    onOpenModal={(url, title) => setImageModal({ open: true, url, title })}
+                                    onOpenModal={(url, title) =>
+                                      setImageModal({ open: true, url, title })
+                                    }
                                   />
                                 )}
                               </div>
-                              <button
-                                onClick={() => openClientEditModal(client)}
+
+                              {/* Mobile Actions */}
+                              <div
                                 style={{
-                                  backgroundColor: '#000',
-                                  color: '#D4AF37',
-                                  border: 'none',
-                                  padding: '8px',
-                                  borderRadius: '6px',
-                                  fontWeight: '700',
-                                  fontSize: '11px',
-                                  cursor: 'pointer',
-                                  width: '100%',
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  gap: '8px',
+                                  marginTop: '8px',
                                 }}
                               >
-                                Editar Cliente
-                              </button>
+                                <button
+                                  onClick={() => openClientEditModal(client)}
+                                  style={{
+                                    backgroundColor: '#000',
+                                    color: '#D4AF37',
+                                    border: 'none',
+                                    padding: '8px',
+                                    borderRadius: '6px',
+                                    fontWeight: '700',
+                                    fontSize: '11px',
+                                    cursor: 'pointer',
+                                    width: '100%',
+                                  }}
+                                >
+                                  Editar Cliente
+                                </button>
+
+                                {/* Mobile Delete Button */}
+                                <button
+                                  onClick={() => handleDeleteClient(client)}
+                                  disabled={hasOrders}
+                                  style={{
+                                    backgroundColor: hasOrders
+                                      ? '#F3F4F6'
+                                      : '#DC2626',
+                                    color: hasOrders ? '#9CA3AF' : '#FFFFFF',
+                                    border: 'none',
+                                    padding: '8px',
+                                    borderRadius: '6px',
+                                    fontWeight: '700',
+                                    fontSize: '11px',
+                                    cursor: hasOrders
+                                      ? 'not-allowed'
+                                      : 'pointer',
+                                    width: '100%',
+                                    opacity: hasOrders ? 0.6 : 1,
+                                  }}
+                                >
+                                  {hasOrders
+                                    ? 'No Eliminar (Tiene N.E.)'
+                                    : 'Eliminar Cliente'}
+                                </button>
+                              </div>
                             </div>
                           </td>
                         </tr>
@@ -2900,7 +3464,9 @@ export default function Users() {
                 {imageModal.title}
               </h4>
               <button
-                onClick={() => setImageModal({ open: false, url: '', title: '' })}
+                onClick={() =>
+                  setImageModal({ open: false, url: '', title: '' })
+                }
                 style={{
                   background: 'none',
                   border: 'none',
@@ -2999,7 +3565,6 @@ export default function Users() {
                 <X size={20} />
               </button>
             </div>
-
             <div
               style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}
             >
@@ -3030,7 +3595,6 @@ export default function Users() {
                   }}
                 />
               </div>
-
               {/* CI y RIF Textos */}
               <div
                 style={{
@@ -3092,7 +3656,6 @@ export default function Users() {
                   />
                 </div>
               </div>
-
               {/* Archivos Adjuntos */}
               <div
                 style={{
@@ -3112,7 +3675,6 @@ export default function Users() {
                 >
                   Documentos Adjuntos
                 </h4>
-
                 <div
                   style={{
                     display: 'flex',
@@ -3151,7 +3713,9 @@ export default function Users() {
                             setImageModal({
                               open: true,
                               url: clientEditModal.formData.ci_photo_url,
-                              title: `Foto C.I. de ${clientEditModal.formData.name || 'Cliente'}`,
+                              title: `Foto C.I. de ${
+                                clientEditModal.formData.name || 'Cliente'
+                              }`,
                             })
                           }
                           style={{
@@ -3193,7 +3757,6 @@ export default function Users() {
                       />
                     </div>
                   </div>
-
                   {/* RIF Photo */}
                   <div
                     style={{
@@ -3225,7 +3788,9 @@ export default function Users() {
                             setImageModal({
                               open: true,
                               url: clientEditModal.formData.rif_photo_url,
-                              title: `Foto RIF de ${clientEditModal.formData.name || 'Cliente'}`,
+                              title: `Foto RIF de ${
+                                clientEditModal.formData.name || 'Cliente'
+                              }`,
                             })
                           }
                           style={{
@@ -3271,7 +3836,6 @@ export default function Users() {
                       />
                     </div>
                   </div>
-
                   {/* Additional Doc */}
                   <div
                     style={{
@@ -3303,7 +3867,9 @@ export default function Users() {
                             setImageModal({
                               open: true,
                               url: clientEditModal.formData.additional_doc_url,
-                              title: `Doc. Adicional de ${clientEditModal.formData.name || 'Cliente'}`,
+                              title: `Doc. Adicional de ${
+                                clientEditModal.formData.name || 'Cliente'
+                              }`,
                             })
                           }
                           style={{
@@ -3351,7 +3917,6 @@ export default function Users() {
                   </div>
                 </div>
               </div>
-
               <div
                 style={{
                   display: 'flex',
@@ -3396,112 +3961,110 @@ export default function Users() {
 
       {/* CSS para diseño responsivo, tarjetas móviles y campos informativos */}
       <style>{`
-        .summary-cards-grid {
-          display: grid;
-          grid-template-columns: repeat(3, 1fr);
-          gap: 12px;
-        }
-        .users-table-container {
-          width: 100%;
-          overflow-x: auto;
-        }
-        .custom-responsive-table {
-          width: 100%;
-          border-collapse: collapse;
-          font-size: 13px;
-          text-align: left;
-        }
-        .mobile-thead {
-          display: none;
-        }
-        .mobile-cell-stacked {
-          display: none;
-        }
-        .desktop-cell-normal {
-          display: table-cell;
-        }
-
-        @media (max-width: 768px) {
-          .desktop-tabs-container {
-            display: none !important;
-          }
-          .mobile-dropdown-container {
-            display: block !important;
-          }
-          .summary-cards-grid {
-            grid-template-columns: repeat(3, 1fr) !important;
-            gap: 8px !important;
-          }
-          .summary-card-item {
-            padding: 10px 6px !important;
-            text-align: center !important;
-          }
-          .summary-card-item div:nth-child(1) {
-            font-size: 9px !important;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-          }
-          .summary-card-item div:nth-child(2) {
-            font-size: 18px !important;
-            margin-top: 2px !important;
-          }
-          .summary-card-item div:nth-child(3) {
-            font-size: 9px !important;
-            margin-top: 1px !important;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-          }
-          .users-table-container.mobile-cards {
-            overflow-x: hidden !important;
-            background: transparent !important;
-            border: none !important;
-            padding: 0 !important;
-          }
-          .custom-responsive-table {
-            display: block !important;
-          }
-          .desktop-thead {
-            display: none !important;
-          }
-          .mobile-thead {
-            display: none !important;
-          }
-          .custom-responsive-table tbody {
-            display: flex !important;
-            flex-direction: column !important;
-            gap: 12px !important;
-          }
-          .custom-responsive-table tr {
-            display: flex !important;
-            flex-direction: column !important;
-            background-color: #ffffff !important;
-            border: 1px solid #d1d5db !important;
-            border-radius: 8px !important;
-            padding: 14px !important;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-          }
-          .desktop-cell-normal {
-            display: none !important;
-          }
-          .mobile-cell-stacked {
-            display: flex !important;
-            flex-direction: column;
-            gap: 8px;
-            padding: 0 !important;
-          }
-        }
-
-        @media (min-width: 769px) {
-          .desktop-tabs-container {
-            display: flex !important;
-          }
-          .mobile-dropdown-container {
-            display: none !important;
-          }
-        }
-      `}</style>
+     .summary-cards-grid {
+       display: grid;
+       grid-template-columns: repeat(3, 1fr);
+       gap: 12px;
+     }
+     .users-table-container {
+       width: 100%;
+       overflow-x: auto;
+     }
+     .custom-responsive-table {
+       width: 100%;
+       border-collapse: collapse;
+       font-size: 13px;
+       text-align: left;
+     }
+     .mobile-thead {
+       display: none;
+     }
+     .mobile-cell-stacked {
+       display: none;
+     }
+     .desktop-cell-normal {
+       display: table-cell;
+     }
+     @media (max-width: 768px) {
+       .desktop-tabs-container {
+         display: none !important;
+       }
+       .mobile-dropdown-container {
+         display: block !important;
+       }
+       .summary-cards-grid {
+         grid-template-columns: repeat(3, 1fr) !important;
+         gap: 8px !important;
+       }
+       .summary-card-item {
+         padding: 10px 6px !important;
+         text-align: center !important;
+       }
+       .summary-card-item div:nth-child(1) {
+         font-size: 9px !important;
+         white-space: nowrap;
+         overflow: hidden;
+         text-overflow: ellipsis;
+       }
+       .summary-card-item div:nth-child(2) {
+         font-size: 18px !important;
+         margin-top: 2px !important;
+       }
+       .summary-card-item div:nth-child(3) {
+         font-size: 9px !important;
+         margin-top: 1px !important;
+         white-space: nowrap;
+         overflow: hidden;
+         text-overflow: ellipsis;
+       }
+       .users-table-container.mobile-cards {
+         overflow-x: hidden !important;
+         background: transparent !important;
+         border: none !important;
+         padding: 0 !important;
+       }
+       .custom-responsive-table {
+         display: block !important;
+       }
+       .desktop-thead {
+         display: none !important;
+       }
+       .mobile-thead {
+         display: none !important;
+       }
+       .custom-responsive-table tbody {
+         display: flex !important;
+         flex-direction: column !important;
+         gap: 12px !important;
+       }
+       .custom-responsive-table tr {
+         display: flex !important;
+         flex-direction: column !important;
+         background-color: #ffffff !important;
+         border: 1px solid #d1d5db !important;
+         border-radius: 8px !important;
+         padding: 14px !important;
+         box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+       }
+       .desktop-cell-normal {
+         display: none !important;
+       }
+       .mobile-cell-stacked {
+         display: flex !important;
+         flex-direction: column;
+         gap: 8px;
+         padding: 0 !important;
+       }
+     }
+     @media (min-width: 769px) {
+       .desktop-tabs-container {
+         display: flex !important;
+       }
+       .mobile-dropdown-container {
+         display: none !important;
+       }
+     }
+   `}</style>
     </div>
   );
 }
@@ -3526,8 +4089,8 @@ function DocBadge({ label, url, title, onOpenModal }) {
       }}
       title={`Ver ${title}`}
     >
-      <span>{label}</span>
-      <span style={{ color: '#10B981' }}>✓</span>
+      <span>{label} </span>
+      <span style={{ color: '#10B981' }}>✓ </span>
     </button>
   );
 }
@@ -3593,7 +4156,6 @@ function StructureUserRow({ user, onSelect }) {
           Configurar
         </button>
       </td>
-
       {/* VISTA MÓVIL: Tarjeta Apilada */}
       <td
         colSpan="2"
@@ -3701,6 +4263,7 @@ function UserRow({ user, onSave }) {
   const [pctFluidos, setPctFluidos] = useState(user.pct_fluidos || 0);
   const [sueldoFijo, setSueldoFijo] = useState(user.sueldo_fijo_usd || 0);
   const isStockRole = role === 'stock';
+
   const handleSave = () => {
     onSave(user.id, {
       role,
@@ -3709,6 +4272,7 @@ function UserRow({ user, onSave }) {
       sueldo_fijo_usd: Number(sueldoFijo),
     });
   };
+
   return (
     <tr style={{ borderBottom: '1px solid #f3f4f6' }}>
       {/* VISTA ESCRITORIO: Nombre */}
