@@ -254,6 +254,9 @@ export default function AdminModule() {
     useState('53.38');
   const [editNoteObservation, setEditNoteObservation] = useState('');
   const [editNoteItems, setEditNoteItems] = useState([]);
+  const [editNoteClientId, setEditNoteClientId] = useState('');
+  const [editNoteTargetUserId, setEditNoteTargetUserId] = useState('');
+  const [editNoteFecha, setEditNoteFecha] = useState('');
   const [editNoteProductsList, setEditNoteProductsList] = useState([]);
   const [editNoteSelectedProdId, setEditNoteSelectedProdId] = useState('');
   const [editNoteQuantity, setEditNoteQuantity] = useState(1);
@@ -2930,6 +2933,13 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
       setEditNotePaymentDiscount(String(note.payment_discount || '53.38'));
       setEditNoteObservation(note.observation || '');
       setEditNoteItems(mappedItems);
+      setEditNoteClientId(note.client_id || '');
+      setEditNoteTargetUserId(note.seller_id || '');
+      setEditNoteFecha(
+        note.created_at
+          ? note.created_at.split('T')[0]
+          : new Date().toISOString().split('T')[0]
+      );
     } catch (err) {
       console.error(err);
       setErrorMsg('No se pudo cargar la nota de entrega para edición.');
@@ -3043,6 +3053,9 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
           balance_due_usd: finalPrice - Number(note.total_paid_usd || 0),
           observation: editNoteObservation,
           updated_at: new Date(),
+          client_id: editNoteClientId,
+          seller_id: editNoteTargetUserId,
+          created_at: new Date(editNoteFecha).toISOString(),
         })
         .eq('id', note.id);
       if (updateErr) throw updateErr;
@@ -6994,6 +7007,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                     gap: '16px',
                   }}
                 >
+                  {/* ➕ SECCIÓN DE INPUTS SUPERIORES ACTUALIZADA */}
                   <div
                     style={{
                       backgroundColor: '#ffffff',
@@ -7006,6 +7020,72 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                       gap: '12px',
                     }}
                   >
+                    {/* FECHA DE EMISIÓN */}
+                    <div>
+                      <label
+                        style={{
+                          display: 'block',
+                          fontSize: '12px',
+                          fontWeight: '700',
+                          marginBottom: '4px',
+                        }}
+                      >
+                        Fecha de Emisión
+                      </label>
+                      <input
+                        type="date"
+                        value={editNoteFecha}
+                        max={new Date().toISOString().split('T')[0]}
+                        onChange={(e) => setEditNoteFecha(e.target.value)}
+                        style={{
+                          width: '100%',
+                          padding: '10px 12px',
+                          fontSize: '14px',
+                          border: '1px solid #D1D5DB',
+                          borderRadius: '6px',
+                          boxSizing: 'border-box',
+                        }}
+                      />
+                    </div>
+
+                    {/* ASIGNAR N.E. A USUARIO (REASIGNACIÓN) */}
+                    <div>
+                      <label
+                        style={{
+                          display: 'block',
+                          fontSize: '12px',
+                          fontWeight: '700',
+                          marginBottom: '4px',
+                        }}
+                      >
+                        Asignar N.E. a Usuario
+                      </label>
+                      <select
+                        value={editNoteTargetUserId}
+                        onChange={(e) =>
+                          setEditNoteTargetUserId(e.target.value)
+                        }
+                        style={{
+                          width: '100%',
+                          padding: '10px 12px',
+                          fontSize: '14px',
+                          border: '1px solid #D1D5DB',
+                          borderRadius: '6px',
+                          backgroundColor: '#FFFBEB',
+                          fontWeight: '700',
+                          boxSizing: 'border-box',
+                        }}
+                      >
+                        <option value="">Seleccionar usuario...</option>
+                        {sellersList.map((s) => (
+                          <option key={s.id} value={s.id}>
+                            {s.full_name} ({s.role})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* CLIENTE EDITABLE */}
                     <div>
                       <label
                         style={{
@@ -7017,21 +7097,22 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                       >
                         Cliente
                       </label>
-                      <input
-                        type="text"
-                        disabled
-                        value={editNoteClientName}
-                        style={{
-                          width: '100%',
-                          padding: '6px 8px',
-                          fontSize: '12px',
-                          border: '1px solid #D1D5DB',
-                          borderRadius: '6px',
-                          backgroundColor: '#F3F4F6',
-                          boxSizing: 'border-box',
-                        }}
+                      <SearchableDropdown
+                        options={allClientsList.map((c) => ({
+                          value: c.id,
+                          label: `${c.name} ${
+                            c.profiles?.full_name
+                              ? `[Asig. Orig: ${c.profiles.full_name}]`
+                              : ''
+                          }`,
+                        }))}
+                        value={editNoteClientId}
+                        onChange={setEditNoteClientId}
+                        placeholder="-- Buscar / Seleccionar cliente --"
                       />
                     </div>
+
+                    {/* CATEGORÍA */}
                     <div>
                       <label
                         style={{
@@ -7060,6 +7141,8 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                         <option value="fluidos">Fluidos</option>
                       </select>
                     </div>
+
+                    {/* % DESCUENTO */}
                     <div>
                       <label
                         style={{
@@ -7104,6 +7187,8 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                       </select>
                     </div>
                   </div>
+
+                  {/* SECCIÓN DE AGREGAR PRODUCTOS (IGUAL QUE CREAR N.E.) */}
                   <div
                     style={{
                       backgroundColor: '#ffffff',
@@ -7198,6 +7283,8 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                       </button>
                     </div>
                   </div>
+
+                  {/* TABLA DE PRODUCTOS Y RESUMEN */}
                   <div
                     style={{
                       backgroundColor: '#ffffff',
@@ -7232,13 +7319,17 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                           RIF: J-50261925-2
                         </p>
                         <p style={{ margin: '6px 0 0 0' }}>
-                          <strong>Cliente: </strong> {editNoteClientName}
+                          <strong>Cliente: </strong>{' '}
+                          {allClientsList.find((c) => c.id === editNoteClientId)
+                            ?.name || editNoteClientName}
                         </p>
                       </div>
                       <div style={{ textAlign: 'right' }}>
                         <p style={{ margin: 0 }}>
                           <strong>Fecha/Hora: </strong>{' '}
-                          {new Date(editingNote.created_at).toLocaleString()}
+                          {editNoteFecha
+                            ? new Date(editNoteFecha).toLocaleDateString()
+                            : new Date(editingNote.created_at).toLocaleString()}
                         </p>
                         <p style={{ margin: '2px 0' }}>
                           <strong>N° Transacción: </strong> #
@@ -7246,6 +7337,8 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                         </p>
                       </div>
                     </div>
+
+                    {/* Tabla Desktop */}
                     <div
                       style={{ width: '100%', overflowX: 'auto' }}
                       className="admin-table-desktop"
@@ -7382,6 +7475,8 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                         </tbody>
                       </table>
                     </div>
+
+                    {/* Cards Mobile */}
                     <div className="admin-mobile-cards">
                       {editNoteItems.length === 0 ? (
                         <div
@@ -7401,6 +7496,8 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                         )
                       )}
                     </div>
+
+                    {/* Resumen de Precios */}
                     <div
                       style={{
                         display: 'flex',
@@ -7459,6 +7556,8 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                         </div>
                       </div>
                     </div>
+
+                    {/* Observación y Términos */}
                     <div style={{ marginBottom: '12px' }}>
                       <label
                         style={{
@@ -7498,6 +7597,8 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                     >
                       <strong>Términos y condiciones: </strong> {globalTerms}
                     </div>
+
+                    {/* Botones de Acción */}
                     <div
                       style={{
                         display: 'flex',
