@@ -11,6 +11,7 @@ import {
   Trash2,
   ChevronDown,
   Check,
+  Search,
 } from 'lucide-react';
 
 export default function Users() {
@@ -28,13 +29,18 @@ export default function Users() {
     return 'admitir';
   };
 
-  const [activeTab, setActiveTab] = useState(getInitialTab); // 'admitir' | 'comisiones' | 'estructura' | 'perfiles' | 'clientes'
+  const [activeTab, setActiveTab] = useState(getInitialTab);
   const [loading, setLoading] = useState(true);
   const [allUsers, setAllUsers] = useState([]);
   const [assignmentsCountMap, setAssignmentsCountMap] = useState({});
   const [exceptionsCountMap, setExceptionsCountMap] = useState({});
   const [hierarchyConfigMap, setHierarchyConfigMap] = useState({});
-  const [searchQuery, setSearchQuery] = useState('');
+
+  // Estados de búsqueda
+  const [searchQuery, setSearchQuery] = useState(''); // Para Comisiones
+  const [structureSearch, setStructureSearch] = useState(''); // Para Estructura
+  const [profileSearch, setProfileSearch] = useState(''); // Para Perfiles
+  const [clientSearch, setClientSearch] = useState(''); // Para Clientes
 
   // Estado para el Modal de Visualización de Imágenes / Documentos Adjuntos
   const [imageModal, setImageModal] = useState({
@@ -86,18 +92,18 @@ export default function Users() {
   const clientRifInputRef = useRef(null);
   const clientDocInputRef = useRef(null);
 
-  // --- NUEVOS ESTADOS PARA CREACIÓN DE CLIENTE ---
+  // --- ESTADOS PARA CREACIÓN DE CLIENTE ---
   const [newClientData, setNewClientData] = useState({
     name: '',
     rif_number: '',
     ci_number: '',
     phone: '',
     address: '',
-    is_potential: false, // false = Oficial, true = Potencial
+    is_potential: false,
   });
   const [creatingClient, setCreatingClient] = useState(false);
 
-  // --- NUEVO ESTADO PARA EDICIÓN DE ASIGNACIÓN EN TABLA ---
+  // --- ESTADO PARA EDICIÓN DE ASIGNACIÓN EN TABLA ---
   const [editingAssignmentId, setEditingAssignmentId] = useState(null);
   const [tempAssignmentUserId, setTempAssignmentUserId] = useState('');
   const [savingAssignment, setSavingAssignment] = useState(false);
@@ -318,17 +324,26 @@ export default function Users() {
   const pendingUsers = allUsers.filter(
     (u) => u.role === 'pendiente' || !u.role
   );
-  const activeUsers = allUsers.filter(
-    (u) => u.role && u.role !== 'pendiente' && u.role !== 'tecnico'
-  );
-  const structureUsers = activeUsers.filter((u) =>
+
+  // Lógica de ordenamiento para Comisiones: Priorizar porcentajes en 0
+  const activeUsersSorted = [...allUsers]
+    .filter((u) => u.role && u.role !== 'pendiente' && u.role !== 'tecnico')
+    .sort((a, b) => {
+      const aIsZero =
+        Number(a.pct_bombillos) === 0 && Number(a.pct_fluidos) === 0 ? 1 : 0;
+      const bIsZero =
+        Number(b.pct_bombillos) === 0 && Number(b.pct_fluidos) === 0 ? 1 : 0;
+      return bIsZero - aIsZero; // Los que tienen 0 van primero
+    });
+
+  const structureUsers = activeUsersSorted.filter((u) =>
     ['administrador', 'gerente', 'supervisor'].includes(u.role?.toLowerCase())
   );
 
   // Contadores
-  const totalUsuarios = activeUsers.length + pendingUsers.length;
+  const totalUsuarios = activeUsersSorted.length + pendingUsers.length;
   const sinRolAsignado = pendingUsers.length;
-  const asignadosCount = activeUsers.length;
+  const asignadosCount = activeUsersSorted.length;
 
   const handleUpdateUser = async (userId, updateData) => {
     if (!updateData.role || updateData.role === '') {
@@ -408,7 +423,6 @@ export default function Users() {
     setSavingProfile(true);
     try {
       const { _old_avatar_url, _old_ci_url, ...updates } = profileFormData;
-      // Eliminar archivos antiguos si cambiaron
       if (_old_avatar_url && _old_avatar_url !== updates.avatar_url) {
         await deleteOldFile(_old_avatar_url, 'avatars');
       }
@@ -422,7 +436,7 @@ export default function Users() {
       if (error) throw error;
       alert('Perfil actualizado correctamente.');
       setEditingProfileId(null);
-      fetchUsersAndAssignments(); // Recargar lista
+      fetchUsersAndAssignments();
     } catch (err) {
       alert('Error guardando perfil: ' + err.message);
     } finally {
@@ -431,8 +445,6 @@ export default function Users() {
   };
 
   // --- Lógica para Pestaña CLIENTES ---
-
-  // --- NUEVA FUNCIÓN: Crear Cliente ---
   const handleCreateClient = async () => {
     if (!newClientData.name) {
       alert('El nombre del cliente es obligatorio.');
@@ -447,7 +459,7 @@ export default function Users() {
         phone: newClientData.phone || null,
         address: newClientData.address || null,
         is_potential: newClientData.is_potential,
-        assigned_seller_id: null, // Sin asignación inicial
+        assigned_seller_id: null,
       });
       if (error) throw error;
       alert('Cliente creado exitosamente.');
@@ -467,7 +479,6 @@ export default function Users() {
     }
   };
 
-  // --- NUEVA FUNCIÓN: Actualizar Asignación desde Tabla ---
   const startEditingAssignment = (clientId, currentSellerId) => {
     setEditingAssignmentId(clientId);
     setTempAssignmentUserId(currentSellerId || '');
@@ -492,18 +503,14 @@ export default function Users() {
     }
   };
 
-  // --- NUEVA FUNCIÓN: Eliminar Cliente con Validación ---
   const handleDeleteClient = async (client) => {
-    // Validar si tiene Notas de Entrega
     const hasOrders = client.sales_orders && client.sales_orders.length > 0;
-
     if (hasOrders) {
       alert(
         'No se puede eliminar: Este cliente tiene Notas de Entrega asociadas.'
       );
       return;
     }
-
     if (
       window.confirm(
         `¿Estás seguro de que deseas eliminar al cliente "${client.name}"? Esta acción no se puede deshacer.`
@@ -514,7 +521,6 @@ export default function Users() {
           .from('clients')
           .delete()
           .eq('id', client.id);
-
         if (error) throw error;
         alert('Cliente eliminado correctamente.');
         fetchAllClients();
@@ -585,7 +591,6 @@ export default function Users() {
     try {
       const { _old_ci_photo, _old_rif_photo, _old_additional_doc, ...updates } =
         clientEditModal.formData;
-      // Eliminar archivos antiguos si cambiaron
       if (_old_ci_photo && _old_ci_photo !== updates.ci_photo_url) {
         await deleteOldFile(_old_ci_photo, 'documents');
       }
@@ -605,7 +610,7 @@ export default function Users() {
       if (error) throw error;
       alert('Cliente actualizado correctamente.');
       closeClientEditModal();
-      fetchAllClients(); // Recargar lista
+      fetchAllClients();
     } catch (err) {
       alert('Error guardando cliente: ' + err.message);
     } finally {
@@ -613,7 +618,6 @@ export default function Users() {
     }
   };
 
-  // Helper para eliminar archivos
   const deleteOldFile = async (url, bucket) => {
     if (!url) return;
     const pattern = `/${bucket}/`;
@@ -777,7 +781,6 @@ export default function Users() {
           marginBottom: '24px',
         }}
       >
-        {/* Pestañas de Escritorio */}
         <div
           className="desktop-tabs-container"
           style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}
@@ -808,7 +811,6 @@ export default function Users() {
           ))}
         </div>
 
-        {/* Menú Dropdown Elegante para Móvil */}
         <div
           className="mobile-dropdown-container"
           ref={mobileMenuRef}
@@ -1050,7 +1052,7 @@ export default function Users() {
                 </tr>
               </thead>
               <tbody>
-                {activeUsers
+                {activeUsersSorted
                   .filter(
                     (u) =>
                       u.full_name
@@ -1077,16 +1079,41 @@ export default function Users() {
             padding: '16px',
           }}
         >
-          <h3
+          <div
             style={{
-              fontSize: '14px',
-              fontWeight: '700',
-              color: '#111827',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
               marginBottom: '16px',
+              flexWrap: 'wrap',
+              gap: '10px',
             }}
           >
-            Estructura Jerárquica de Comisiones (Admin, Gerentes, Supervisores)
-          </h3>
+            <h3
+              style={{
+                fontSize: '14px',
+                fontWeight: '700',
+                color: '#111827',
+                margin: 0,
+              }}
+            >
+              Estructura Jerárquica de Comisiones
+            </h3>
+            <input
+              type="text"
+              placeholder="Buscar supervisor/gerente..."
+              value={structureSearch}
+              onChange={(e) => setStructureSearch(e.target.value)}
+              style={{
+                padding: '6px 12px',
+                borderRadius: '6px',
+                border: '1px solid #d1d5db',
+                fontSize: '12px',
+                width: '100%',
+                maxWidth: '240px',
+              }}
+            />
+          </div>
           <div className="users-table-container mobile-cards">
             <table className="custom-responsive-table">
               <thead className="desktop-thead">
@@ -1118,23 +1145,33 @@ export default function Users() {
                 </tr>
               </thead>
               <tbody>
-                {structureUsers.map((u) => {
-                  const cfg = hierarchyConfigMap[u.id];
-                  const enrichedUser = {
-                    ...u,
-                    is_global: cfg?.is_global || false,
-                    has_exceptions: cfg?.has_exceptions || false,
-                    assigned_count: assignmentsCountMap[u.id] || 0,
-                    exception_count: exceptionsCountMap[u.id] || 0,
-                  };
-                  return (
-                    <StructureUserRow
-                      key={u.id}
-                      user={enrichedUser}
-                      onSelect={() => handleSelectParentUser(u)}
-                    />
-                  );
-                })}
+                {structureUsers
+                  .filter(
+                    (u) =>
+                      u.full_name
+                        ?.toLowerCase()
+                        .includes(structureSearch.toLowerCase()) ||
+                      u.email
+                        ?.toLowerCase()
+                        .includes(structureSearch.toLowerCase())
+                  )
+                  .map((u) => {
+                    const cfg = hierarchyConfigMap[u.id];
+                    const enrichedUser = {
+                      ...u,
+                      is_global: cfg?.is_global || false,
+                      has_exceptions: cfg?.has_exceptions || false,
+                      assigned_count: assignmentsCountMap[u.id] || 0,
+                      exception_count: exceptionsCountMap[u.id] || 0,
+                    };
+                    return (
+                      <StructureUserRow
+                        key={u.id}
+                        user={enrichedUser}
+                        onSelect={() => handleSelectParentUser(u)}
+                      />
+                    );
+                  })}
               </tbody>
             </table>
           </div>
@@ -1337,7 +1374,7 @@ export default function Users() {
                       gap: '6px',
                     }}
                   >
-                    {activeUsers
+                    {activeUsersSorted
                       .filter(
                         (u) =>
                           u.id !== selectedParentUser.id &&
@@ -1448,7 +1485,7 @@ export default function Users() {
                     </tr>
                   </thead>
                   <tbody>
-                    {activeUsers
+                    {activeUsersSorted
                       .filter(
                         (u) =>
                           u.id !== selectedParentUser.id &&
@@ -1723,16 +1760,41 @@ export default function Users() {
             padding: '16px',
           }}
         >
-          <h3
+          <div
             style={{
-              fontSize: '14px',
-              fontWeight: '700',
-              color: '#111827',
-              marginBottom: '12px',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '16px',
+              flexWrap: 'wrap',
+              gap: '10px',
             }}
           >
-            Gestión de Perfiles de Usuario
-          </h3>
+            <h3
+              style={{
+                fontSize: '14px',
+                fontWeight: '700',
+                color: '#111827',
+                margin: 0,
+              }}
+            >
+              Gestión de Perfiles de Usuario
+            </h3>
+            <input
+              type="text"
+              placeholder="Buscar por nombre o CI..."
+              value={profileSearch}
+              onChange={(e) => setProfileSearch(e.target.value)}
+              style={{
+                padding: '6px 12px',
+                borderRadius: '6px',
+                border: '1px solid #d1d5db',
+                fontSize: '12px',
+                width: '100%',
+                maxWidth: '240px',
+              }}
+            />
+          </div>
           <div className="users-table-container mobile-cards">
             <table className="custom-responsive-table">
               <thead className="desktop-thead">
@@ -1765,220 +1827,100 @@ export default function Users() {
                 </tr>
               </thead>
               <tbody>
-                {allUsers.map((user) => {
-                  const isEditing = editingProfileId === user.id;
-                  if (isEditing) {
-                    return (
-                      <tr
-                        key={user.id}
-                        style={{
-                          borderBottom: '1px solid #f3f4f6',
-                          backgroundColor: '#fffbeb',
-                        }}
-                      >
-                        <td
-                          className="desktop-cell-normal"
-                          style={{ padding: '10px' }}
+                {allUsers
+                  .filter(
+                    (u) =>
+                      u.full_name
+                        ?.toLowerCase()
+                        .includes(profileSearch.toLowerCase()) ||
+                      u.ci?.toLowerCase().includes(profileSearch.toLowerCase())
+                  )
+                  .map((user) => {
+                    const isEditing = editingProfileId === user.id;
+                    if (isEditing) {
+                      return (
+                        <tr
+                          key={user.id}
+                          style={{
+                            borderBottom: '1px solid #f3f4f6',
+                            backgroundColor: '#fffbeb',
+                          }}
                         >
-                          <div
-                            style={{
-                              width: '50px',
-                              height: '50px',
-                              borderRadius: '50%',
-                              overflow: 'hidden',
-                              border: '1px solid #ddd',
-                              cursor: profileFormData.avatar_url
-                                ? 'pointer'
-                                : 'default',
-                            }}
-                            onClick={() => {
-                              if (profileFormData.avatar_url) {
-                                setImageModal({
-                                  open: true,
-                                  url: profileFormData.avatar_url,
-                                  title: `Avatar de ${
-                                    profileFormData.full_name || 'Usuario'
-                                  }`,
-                                });
-                              }
-                            }}
+                          <td
+                            className="desktop-cell-normal"
+                            style={{ padding: '10px' }}
                           >
-                            {profileFormData.avatar_url ? (
-                              <img
-                                src={profileFormData.avatar_url}
-                                alt="Avatar"
-                                style={{
-                                  width: '100%',
-                                  height: '100%',
-                                  objectFit: 'cover',
-                                }}
-                              />
-                            ) : (
-                              <div
-                                style={{
-                                  width: '100%',
-                                  height: '100%',
-                                  backgroundColor: '#eee',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                }}
-                              >
-                                ?
-                              </div>
-                            )}
-                          </div>
-                          <input
-                            type="file"
-                            ref={(el) =>
-                              (avatarInputRefs.current[user.id] = el)
-                            }
-                            style={{ display: 'none' }}
-                            accept="image/*"
-                            onChange={(e) =>
-                              handleProfileFileChange(
-                                e,
-                                'avatar_url',
-                                'avatars',
-                                ['image/jpeg', 'image/png', 'image/webp']
-                              )
-                            }
-                          />
-                          <button
-                            onClick={() =>
-                              avatarInputRefs.current[user.id]?.click()
-                            }
-                            style={{
-                              fontSize: '10px',
-                              marginTop: '4px',
-                              cursor: 'pointer',
-                              textDecoration: 'underline',
-                              border: 'none',
-                              background: 'none',
-                              color: '#2563eb',
-                            }}
-                          >
-                            Cambiar
-                          </button>
-                        </td>
-                        <td
-                          className="desktop-cell-normal"
-                          style={{ padding: '10px' }}
-                        >
-                          <input
-                            type="text"
-                            value={profileFormData.full_name}
-                            onChange={(e) =>
-                              handleProfileFieldChange(
-                                'full_name',
-                                e.target.value
-                              )
-                            }
-                            style={{
-                              width: '100%',
-                              padding: '4px',
-                              border: '1px solid #ccc',
-                              borderRadius: '4px',
-                            }}
-                          />
-                        </td>
-                        <td
-                          className="desktop-cell-normal"
-                          style={{ padding: '10px' }}
-                        >
-                          <input
-                            type="text"
-                            value={profileFormData.ci}
-                            onChange={(e) =>
-                              handleProfileFieldChange('ci', e.target.value)
-                            }
-                            style={{
-                              width: '100%',
-                              padding: '4px',
-                              border: '1px solid #ccc',
-                              borderRadius: '4px',
-                            }}
-                          />
-                        </td>
-                        <td
-                          className="desktop-cell-normal"
-                          style={{ padding: '10px' }}
-                        >
-                          <input
-                            type="text"
-                            value={profileFormData.city}
-                            onChange={(e) =>
-                              handleProfileFieldChange('city', e.target.value)
-                            }
-                            style={{
-                              width: '100%',
-                              padding: '4px',
-                              border: '1px solid #ccc',
-                              borderRadius: '4px',
-                            }}
-                          />
-                        </td>
-                        <td
-                          className="desktop-cell-normal"
-                          style={{ padding: '10px' }}
-                        >
-                          <div
-                            style={{
-                              display: 'flex',
-                              flexDirection: 'column',
-                              gap: '4px',
-                            }}
-                          >
-                            {profileFormData.ci_url ? (
-                              <button
-                                onClick={() =>
+                            <div
+                              style={{
+                                width: '50px',
+                                height: '50px',
+                                borderRadius: '50%',
+                                overflow: 'hidden',
+                                border: '1px solid #ddd',
+                                cursor: profileFormData.avatar_url
+                                  ? 'pointer'
+                                  : 'default',
+                              }}
+                              onClick={() => {
+                                if (profileFormData.avatar_url) {
                                   setImageModal({
                                     open: true,
-                                    url: profileFormData.ci_url,
-                                    title: `Documento C.I. de ${
+                                    url: profileFormData.avatar_url,
+                                    title: `Avatar de ${
                                       profileFormData.full_name || 'Usuario'
                                     }`,
-                                  })
+                                  });
                                 }
-                                style={{
-                                  fontSize: '11px',
-                                  color: '#10B981',
-                                  background: 'none',
-                                  border: 'none',
-                                  cursor: 'pointer',
-                                  fontWeight: '600',
-                                  textAlign: 'left',
-                                  padding: 0,
-                                  textDecoration: 'underline',
-                                }}
-                              >
-                                Ver Adjunto ✓
-                              </button>
-                            ) : (
-                              <span style={{ fontSize: '11px', color: '#999' }}>
-                                Sin doc
-                              </span>
-                            )}
+                              }}
+                            >
+                              {profileFormData.avatar_url ? (
+                                <img
+                                  src={profileFormData.avatar_url}
+                                  alt="Avatar"
+                                  style={{
+                                    width: '100%',
+                                    height: '100%',
+                                    objectFit: 'cover',
+                                  }}
+                                />
+                              ) : (
+                                <div
+                                  style={{
+                                    width: '100%',
+                                    height: '100%',
+                                    backgroundColor: '#eee',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                  }}
+                                >
+                                  ?
+                                </div>
+                              )}
+                            </div>
                             <input
                               type="file"
-                              ref={(el) => (ciInputRefs.current[user.id] = el)}
+                              ref={(el) =>
+                                (avatarInputRefs.current[user.id] = el)
+                              }
                               style={{ display: 'none' }}
-                              accept=".pdf,image/*"
+                              accept="image/*"
                               onChange={(e) =>
                                 handleProfileFileChange(
                                   e,
-                                  'ci_url',
-                                  'documents',
-                                  ['application/pdf', 'image/jpeg', 'image/png']
+                                  'avatar_url',
+                                  'avatars',
+                                  ['image/jpeg', 'image/png', 'image/webp']
                                 )
                               }
                             />
                             <button
                               onClick={() =>
-                                ciInputRefs.current[user.id]?.click()
+                                avatarInputRefs.current[user.id]?.click()
                               }
                               style={{
                                 fontSize: '10px',
+                                marginTop: '4px',
                                 cursor: 'pointer',
                                 textDecoration: 'underline',
                                 border: 'none',
@@ -1986,146 +1928,15 @@ export default function Users() {
                                 color: '#2563eb',
                               }}
                             >
-                              {profileFormData.ci_url
-                                ? 'Cambiar Doc'
-                                : 'Subir Doc'}
+                              Cambiar
                             </button>
-                          </div>
-                        </td>
-                        <td
-                          className="desktop-cell-normal"
-                          style={{
-                            padding: '10px',
-                            display: 'flex',
-                            gap: '8px',
-                          }}
-                        >
-                          <button
-                            onClick={() => saveProfileChanges(user.id)}
-                            disabled={savingProfile}
-                            style={{
-                              backgroundColor: '#000',
-                              color: '#D4AF37',
-                              border: 'none',
-                              padding: '6px 12px',
-                              borderRadius: '6px',
-                              fontWeight: '700',
-                              fontSize: '11px',
-                              cursor: 'pointer',
-                            }}
+                          </td>
+                          <td
+                            className="desktop-cell-normal"
+                            style={{ padding: '10px' }}
                           >
-                            {savingProfile ? '...' : <Save size={12} />}
-                          </button>
-                          <button
-                            onClick={cancelEditingProfile}
-                            style={{
-                              backgroundColor: '#eee',
-                              color: '#333',
-                              border: 'none',
-                              padding: '6px 12px',
-                              borderRadius: '6px',
-                              fontWeight: '700',
-                              fontSize: '11px',
-                              cursor: 'pointer',
-                            }}
-                          >
-                            <X size={12} />
-                          </button>
-                        </td>
-                        {/* Mobile View for Editing Profile */}
-                        <td colSpan="2" className="mobile-cell-stacked">
-                          <div
-                            style={{
-                              display: 'flex',
-                              flexDirection: 'column',
-                              gap: '10px',
-                              width: '100%',
-                            }}
-                          >
-                            <div
-                              style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '10px',
-                              }}
-                            >
-                              <div
-                                style={{
-                                  width: '60px',
-                                  height: '60px',
-                                  borderRadius: '50%',
-                                  overflow: 'hidden',
-                                  border: '1px solid #ddd',
-                                  cursor: profileFormData.avatar_url
-                                    ? 'pointer'
-                                    : 'default',
-                                }}
-                                onClick={() => {
-                                  if (profileFormData.avatar_url) {
-                                    setImageModal({
-                                      open: true,
-                                      url: profileFormData.avatar_url,
-                                      title: `Avatar de ${
-                                        profileFormData.full_name || 'Usuario'
-                                      }`,
-                                    });
-                                  }
-                                }}
-                              >
-                                {profileFormData.avatar_url ? (
-                                  <img
-                                    src={profileFormData.avatar_url}
-                                    alt="Avatar"
-                                    style={{
-                                      width: '100%',
-                                      height: '100%',
-                                      objectFit: 'cover',
-                                    }}
-                                  />
-                                ) : (
-                                  <div
-                                    style={{
-                                      width: '100%',
-                                      height: '100%',
-                                      backgroundColor: '#eee',
-                                    }}
-                                  ></div>
-                                )}
-                              </div>
-                              <button
-                                onClick={() =>
-                                  avatarInputRefs.current[user.id]?.click()
-                                }
-                                style={{
-                                  fontSize: '11px',
-                                  color: '#2563eb',
-                                  background: 'none',
-                                  border: 'none',
-                                  textDecoration: 'underline',
-                                }}
-                              >
-                                Cambiar Foto
-                              </button>
-                              <input
-                                type="file"
-                                ref={(el) =>
-                                  (avatarInputRefs.current[user.id] = el)
-                                }
-                                style={{ display: 'none' }}
-                                accept="image/*"
-                                onChange={(e) =>
-                                  handleProfileFileChange(
-                                    e,
-                                    'avatar_url',
-                                    'avatars',
-                                    ['image/jpeg', 'image/png', 'image/webp']
-                                  )
-                                }
-                              />
-                            </div>
                             <input
                               type="text"
-                              placeholder="Nombre"
                               value={profileFormData.full_name}
                               onChange={(e) =>
                                 handleProfileFieldChange(
@@ -2134,42 +1945,58 @@ export default function Users() {
                                 )
                               }
                               style={{
-                                padding: '8px',
+                                width: '100%',
+                                padding: '4px',
                                 border: '1px solid #ccc',
                                 borderRadius: '4px',
                               }}
                             />
+                          </td>
+                          <td
+                            className="desktop-cell-normal"
+                            style={{ padding: '10px' }}
+                          >
                             <input
                               type="text"
-                              placeholder="C.I."
                               value={profileFormData.ci}
                               onChange={(e) =>
                                 handleProfileFieldChange('ci', e.target.value)
                               }
                               style={{
-                                padding: '8px',
+                                width: '100%',
+                                padding: '4px',
                                 border: '1px solid #ccc',
                                 borderRadius: '4px',
                               }}
                             />
+                          </td>
+                          <td
+                            className="desktop-cell-normal"
+                            style={{ padding: '10px' }}
+                          >
                             <input
                               type="text"
-                              placeholder="Ciudad"
                               value={profileFormData.city}
                               onChange={(e) =>
                                 handleProfileFieldChange('city', e.target.value)
                               }
                               style={{
-                                padding: '8px',
+                                width: '100%',
+                                padding: '4px',
                                 border: '1px solid #ccc',
                                 borderRadius: '4px',
                               }}
                             />
+                          </td>
+                          <td
+                            className="desktop-cell-normal"
+                            style={{ padding: '10px' }}
+                          >
                             <div
                               style={{
                                 display: 'flex',
-                                justifyContent: 'space-between',
-                                alignItems: 'center',
+                                flexDirection: 'column',
+                                gap: '4px',
                               }}
                             >
                               {profileFormData.ci_url ? (
@@ -2184,37 +2011,26 @@ export default function Users() {
                                     })
                                   }
                                   style={{
-                                    fontSize: '12px',
+                                    fontSize: '11px',
                                     color: '#10B981',
                                     background: 'none',
                                     border: 'none',
                                     cursor: 'pointer',
                                     fontWeight: '600',
+                                    textAlign: 'left',
                                     padding: 0,
                                     textDecoration: 'underline',
                                   }}
                                 >
-                                  Ver Doc. CI ✓
+                                  Ver Adjunto ✓
                                 </button>
                               ) : (
-                                <span style={{ fontSize: '12px' }}>
-                                  Doc. CI: No
+                                <span
+                                  style={{ fontSize: '11px', color: '#999' }}
+                                >
+                                  Sin doc
                                 </span>
                               )}
-                              <button
-                                onClick={() =>
-                                  ciInputRefs.current[user.id]?.click()
-                                }
-                                style={{
-                                  fontSize: '11px',
-                                  color: '#2563eb',
-                                  background: 'none',
-                                  border: 'none',
-                                  textDecoration: 'underline',
-                                }}
-                              >
-                                Subir/Cambiar
-                              </button>
                               <input
                                 type="file"
                                 ref={(el) =>
@@ -2235,327 +2051,596 @@ export default function Users() {
                                   )
                                 }
                               />
-                            </div>
-                            <div style={{ display: 'flex', gap: '10px' }}>
                               <button
-                                onClick={() => saveProfileChanges(user.id)}
-                                disabled={savingProfile}
-                                style={{
-                                  flex: 1,
-                                  backgroundColor: '#000',
-                                  color: '#D4AF37',
-                                  border: 'none',
-                                  padding: '8px',
-                                  borderRadius: '6px',
-                                  fontWeight: '700',
-                                }}
-                              >
-                                Guardar
-                              </button>
-                              <button
-                                onClick={cancelEditingProfile}
-                                style={{
-                                  flex: 1,
-                                  backgroundColor: '#eee',
-                                  border: 'none',
-                                  padding: '8px',
-                                  borderRadius: '6px',
-                                  fontWeight: '700',
-                                }}
-                              >
-                                Cancelar
-                              </button>
-                            </div>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  }
-                  return (
-                    <tr
-                      key={user.id}
-                      style={{ borderBottom: '1px solid #f3f4f6' }}
-                    >
-                      <td
-                        className="desktop-cell-normal"
-                        style={{ padding: '10px' }}
-                      >
-                        <div
-                          style={{
-                            width: '40px',
-                            height: '40px',
-                            borderRadius: '50%',
-                            overflow: 'hidden',
-                            backgroundColor: '#f3f4f6',
-                            cursor: user.avatar_url ? 'pointer' : 'default',
-                          }}
-                          onClick={() => {
-                            if (user.avatar_url) {
-                              setImageModal({
-                                open: true,
-                                url: user.avatar_url,
-                                title: `Avatar de ${
-                                  user.full_name || 'Usuario'
-                                }`,
-                              });
-                            }
-                          }}
-                        >
-                          {user.avatar_url ? (
-                            <img
-                              src={user.avatar_url}
-                              alt="Avatar"
-                              style={{
-                                width: '100%',
-                                height: '100%',
-                                objectFit: 'cover',
-                              }}
-                            />
-                          ) : (
-                            <div
-                              style={{
-                                width: '100%',
-                                height: '100%',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                color: '#9ca3af',
-                              }}
-                            >
-                              <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                width="20"
-                                height="20"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="2"
-                              >
-                                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                                <circle cx="12" cy="7" r="4" />
-                              </svg>
-                            </div>
-                          )}
-                        </div>
-                      </td>
-                      <td
-                        className="desktop-cell-normal"
-                        style={{ padding: '10px', fontWeight: '600' }}
-                      >
-                        {user.full_name || 'Sin Nombre'}
-                      </td>
-                      <td
-                        className="desktop-cell-normal"
-                        style={{ padding: '10px' }}
-                      >
-                        {user.ci || '-'}
-                      </td>
-                      <td
-                        className="desktop-cell-normal"
-                        style={{ padding: '10px' }}
-                      >
-                        {user.city || '-'}
-                      </td>
-                      <td
-                        className="desktop-cell-normal"
-                        style={{ padding: '10px' }}
-                      >
-                        {user.ci_url ? (
-                          <button
-                            onClick={() =>
-                              setImageModal({
-                                open: true,
-                                url: user.ci_url,
-                                title: `Documento C.I. de ${
-                                  user.full_name || 'Usuario'
-                                }`,
-                              })
-                            }
-                            style={{
-                              fontSize: '11px',
-                              color: '#10B981',
-                              fontWeight: '600',
-                              background: 'none',
-                              border: 'none',
-                              cursor: 'pointer',
-                              padding: 0,
-                              textDecoration: 'underline',
-                            }}
-                          >
-                            Adjunto ✓
-                          </button>
-                        ) : (
-                          <span style={{ fontSize: '11px', color: '#9CA3AF' }}>
-                            N/A
-                          </span>
-                        )}
-                      </td>
-                      <td
-                        className="desktop-cell-normal"
-                        style={{ padding: '10px' }}
-                      >
-                        <button
-                          onClick={() => startEditingProfile(user)}
-                          style={{
-                            backgroundColor: '#000',
-                            color: '#D4AF37',
-                            border: 'none',
-                            padding: '6px 12px',
-                            borderRadius: '6px',
-                            fontWeight: '700',
-                            fontSize: '11px',
-                            cursor: 'pointer',
-                          }}
-                        >
-                          Editar
-                        </button>
-                      </td>
-                      {/* Mobile View for Normal Row */}
-                      <td colSpan="2" className="mobile-cell-stacked">
-                        <div
-                          style={{
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: '6px',
-                            width: '100%',
-                          }}
-                        >
-                          <div
-                            style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '10px',
-                            }}
-                          >
-                            <div
-                              style={{
-                                width: '40px',
-                                height: '40px',
-                                borderRadius: '50%',
-                                overflow: 'hidden',
-                                backgroundColor: '#f3f4f6',
-                                cursor: user.avatar_url ? 'pointer' : 'default',
-                              }}
-                              onClick={() => {
-                                if (user.avatar_url) {
-                                  setImageModal({
-                                    open: true,
-                                    url: user.avatar_url,
-                                    title: `Avatar de ${
-                                      user.full_name || 'Usuario'
-                                    }`,
-                                  });
+                                onClick={() =>
+                                  ciInputRefs.current[user.id]?.click()
                                 }
+                                style={{
+                                  fontSize: '10px',
+                                  cursor: 'pointer',
+                                  textDecoration: 'underline',
+                                  border: 'none',
+                                  background: 'none',
+                                  color: '#2563eb',
+                                }}
+                              >
+                                {profileFormData.ci_url
+                                  ? 'Cambiar Doc'
+                                  : 'Subir Doc'}
+                              </button>
+                            </div>
+                          </td>
+                          <td
+                            className="desktop-cell-normal"
+                            style={{
+                              padding: '10px',
+                              display: 'flex',
+                              gap: '8px',
+                            }}
+                          >
+                            <button
+                              onClick={() => saveProfileChanges(user.id)}
+                              disabled={savingProfile}
+                              style={{
+                                backgroundColor: '#000',
+                                color: '#D4AF37',
+                                border: 'none',
+                                padding: '6px 12px',
+                                borderRadius: '6px',
+                                fontWeight: '700',
+                                fontSize: '11px',
+                                cursor: 'pointer',
                               }}
                             >
-                              {user.avatar_url ? (
-                                <img
-                                  src={user.avatar_url}
-                                  alt="Avatar"
-                                  style={{
-                                    width: '100%',
-                                    height: '100%',
-                                    objectFit: 'cover',
-                                  }}
-                                />
-                              ) : (
+                              {savingProfile ? '...' : <Save size={12} />}
+                            </button>
+                            <button
+                              onClick={cancelEditingProfile}
+                              style={{
+                                backgroundColor: '#eee',
+                                color: '#333',
+                                border: 'none',
+                                padding: '6px 12px',
+                                borderRadius: '6px',
+                                fontWeight: '700',
+                                fontSize: '11px',
+                                cursor: 'pointer',
+                              }}
+                            >
+                              <X size={12} />
+                            </button>
+                          </td>
+                          {/* Mobile View for Editing Profile */}
+                          <td colSpan="2" className="mobile-cell-stacked">
+                            <div
+                              style={{
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '10px',
+                                width: '100%',
+                              }}
+                            >
+                              <div
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '10px',
+                                }}
+                              >
                                 <div
                                   style={{
-                                    width: '100%',
-                                    height: '100%',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
+                                    width: '60px',
+                                    height: '60px',
+                                    borderRadius: '50%',
+                                    overflow: 'hidden',
+                                    border: '1px solid #ddd',
+                                    cursor: profileFormData.avatar_url
+                                      ? 'pointer'
+                                      : 'default',
+                                  }}
+                                  onClick={() => {
+                                    if (profileFormData.avatar_url) {
+                                      setImageModal({
+                                        open: true,
+                                        url: profileFormData.avatar_url,
+                                        title: `Avatar de ${
+                                          profileFormData.full_name || 'Usuario'
+                                        }`,
+                                      });
+                                    }
                                   }}
                                 >
-                                  <svg
-                                    xmlns="http://www.w3.org/2000/svg"
-                                    width="20"
-                                    height="20"
-                                    viewBox="0 0 24 24"
-                                    fill="none"
-                                    stroke="#9ca3af"
-                                    strokeWidth="2"
-                                  >
-                                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                                    <circle cx="12" cy="7" r="4" />
-                                  </svg>
+                                  {profileFormData.avatar_url ? (
+                                    <img
+                                      src={profileFormData.avatar_url}
+                                      alt="Avatar"
+                                      style={{
+                                        width: '100%',
+                                        height: '100%',
+                                        objectFit: 'cover',
+                                      }}
+                                    />
+                                  ) : (
+                                    <div
+                                      style={{
+                                        width: '100%',
+                                        height: '100%',
+                                        backgroundColor: '#eee',
+                                      }}
+                                    ></div>
+                                  )}
                                 </div>
-                              )}
-                            </div>
-                            <div>
-                              <div style={{ fontWeight: '600' }}>
-                                {user.full_name || 'Sin Nombre'}
-                              </div>
-                              <div
-                                style={{ fontSize: '11px', color: '#6b7280' }}
-                              >
-                                {user.email}
-                              </div>
-                            </div>
-                          </div>
-                          <div
-                            style={{
-                              display: 'grid',
-                              gridTemplateColumns: '1fr 1fr',
-                              gap: '8px',
-                              fontSize: '12px',
-                            }}
-                          >
-                            <div>CI: {user.ci || '-'}</div>
-                            <div>Ciudad: {user.city || '-'}</div>
-                            <div>
-                              Doc:{' '}
-                              {user.ci_url ? (
                                 <button
                                   onClick={() =>
-                                    setImageModal({
-                                      open: true,
-                                      url: user.ci_url,
-                                      title: `Documento C.I. de ${
-                                        user.full_name || 'Usuario'
-                                      }`,
-                                    })
+                                    avatarInputRefs.current[user.id]?.click()
                                   }
                                   style={{
-                                    fontSize: '12px',
-                                    color: '#10B981',
-                                    fontWeight: '600',
+                                    fontSize: '11px',
+                                    color: '#2563eb',
                                     background: 'none',
                                     border: 'none',
-                                    cursor: 'pointer',
-                                    padding: 0,
                                     textDecoration: 'underline',
                                   }}
                                 >
-                                  Sí (Ver)
+                                  Cambiar Foto
                                 </button>
-                              ) : (
-                                'No'
-                              )}
+                                <input
+                                  type="file"
+                                  ref={(el) =>
+                                    (avatarInputRefs.current[user.id] = el)
+                                  }
+                                  style={{ display: 'none' }}
+                                  accept="image/*"
+                                  onChange={(e) =>
+                                    handleProfileFileChange(
+                                      e,
+                                      'avatar_url',
+                                      'avatars',
+                                      ['image/jpeg', 'image/png', 'image/webp']
+                                    )
+                                  }
+                                />
+                              </div>
+                              <input
+                                type="text"
+                                placeholder="Nombre"
+                                value={profileFormData.full_name}
+                                onChange={(e) =>
+                                  handleProfileFieldChange(
+                                    'full_name',
+                                    e.target.value
+                                  )
+                                }
+                                style={{
+                                  padding: '8px',
+                                  border: '1px solid #ccc',
+                                  borderRadius: '4px',
+                                }}
+                              />
+                              <input
+                                type="text"
+                                placeholder="C.I."
+                                value={profileFormData.ci}
+                                onChange={(e) =>
+                                  handleProfileFieldChange('ci', e.target.value)
+                                }
+                                style={{
+                                  padding: '8px',
+                                  border: '1px solid #ccc',
+                                  borderRadius: '4px',
+                                }}
+                              />
+                              <input
+                                type="text"
+                                placeholder="Ciudad"
+                                value={profileFormData.city}
+                                onChange={(e) =>
+                                  handleProfileFieldChange(
+                                    'city',
+                                    e.target.value
+                                  )
+                                }
+                                style={{
+                                  padding: '8px',
+                                  border: '1px solid #ccc',
+                                  borderRadius: '4px',
+                                }}
+                              />
+                              <div
+                                style={{
+                                  display: 'flex',
+                                  justifyContent: 'space-between',
+                                  alignItems: 'center',
+                                }}
+                              >
+                                {profileFormData.ci_url ? (
+                                  <button
+                                    onClick={() =>
+                                      setImageModal({
+                                        open: true,
+                                        url: profileFormData.ci_url,
+                                        title: `Documento C.I. de ${
+                                          profileFormData.full_name || 'Usuario'
+                                        }`,
+                                      })
+                                    }
+                                    style={{
+                                      fontSize: '12px',
+                                      color: '#10B981',
+                                      background: 'none',
+                                      border: 'none',
+                                      cursor: 'pointer',
+                                      fontWeight: '600',
+                                      padding: 0,
+                                      textDecoration: 'underline',
+                                    }}
+                                  >
+                                    Ver Doc. CI ✓
+                                  </button>
+                                ) : (
+                                  <span style={{ fontSize: '12px' }}>
+                                    Doc. CI: No
+                                  </span>
+                                )}
+                                <button
+                                  onClick={() =>
+                                    ciInputRefs.current[user.id]?.click()
+                                  }
+                                  style={{
+                                    fontSize: '11px',
+                                    color: '#2563eb',
+                                    background: 'none',
+                                    border: 'none',
+                                    textDecoration: 'underline',
+                                  }}
+                                >
+                                  Subir/Cambiar
+                                </button>
+                                <input
+                                  type="file"
+                                  ref={(el) =>
+                                    (ciInputRefs.current[user.id] = el)
+                                  }
+                                  style={{ display: 'none' }}
+                                  accept=".pdf,image/*"
+                                  onChange={(e) =>
+                                    handleProfileFileChange(
+                                      e,
+                                      'ci_url',
+                                      'documents',
+                                      [
+                                        'application/pdf',
+                                        'image/jpeg',
+                                        'image/png',
+                                      ]
+                                    )
+                                  }
+                                />
+                              </div>
+                              <div style={{ display: 'flex', gap: '10px' }}>
+                                <button
+                                  onClick={() => saveProfileChanges(user.id)}
+                                  disabled={savingProfile}
+                                  style={{
+                                    flex: 1,
+                                    backgroundColor: '#000',
+                                    color: '#D4AF37',
+                                    border: 'none',
+                                    padding: '8px',
+                                    borderRadius: '6px',
+                                    fontWeight: '700',
+                                  }}
+                                >
+                                  Guardar
+                                </button>
+                                <button
+                                  onClick={cancelEditingProfile}
+                                  style={{
+                                    flex: 1,
+                                    backgroundColor: '#eee',
+                                    border: 'none',
+                                    padding: '8px',
+                                    borderRadius: '6px',
+                                    fontWeight: '700',
+                                  }}
+                                >
+                                  Cancelar
+                                </button>
+                              </div>
                             </div>
+                          </td>
+                        </tr>
+                      );
+                    }
+                    return (
+                      <tr
+                        key={user.id}
+                        style={{ borderBottom: '1px solid #f3f4f6' }}
+                      >
+                        <td
+                          className="desktop-cell-normal"
+                          style={{ padding: '10px' }}
+                        >
+                          <div
+                            style={{
+                              width: '40px',
+                              height: '40px',
+                              borderRadius: '50%',
+                              overflow: 'hidden',
+                              backgroundColor: '#f3f4f6',
+                              cursor: user.avatar_url ? 'pointer' : 'default',
+                            }}
+                            onClick={() => {
+                              if (user.avatar_url) {
+                                setImageModal({
+                                  open: true,
+                                  url: user.avatar_url,
+                                  title: `Avatar de ${
+                                    user.full_name || 'Usuario'
+                                  }`,
+                                });
+                              }
+                            }}
+                          >
+                            {user.avatar_url ? (
+                              <img
+                                src={user.avatar_url}
+                                alt="Avatar"
+                                style={{
+                                  width: '100%',
+                                  height: '100%',
+                                  objectFit: 'cover',
+                                }}
+                              />
+                            ) : (
+                              <div
+                                style={{
+                                  width: '100%',
+                                  height: '100%',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  color: '#9ca3af',
+                                }}
+                              >
+                                <svg
+                                  xmlns="http://www.w3.org/2000/svg"
+                                  width="20"
+                                  height="20"
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="2"
+                                >
+                                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                                  <circle cx="12" cy="7" r="4" />
+                                </svg>
+                              </div>
+                            )}
                           </div>
+                        </td>
+                        <td
+                          className="desktop-cell-normal"
+                          style={{ padding: '10px', fontWeight: '600' }}
+                        >
+                          {user.full_name || 'Sin Nombre'}
+                        </td>
+                        <td
+                          className="desktop-cell-normal"
+                          style={{ padding: '10px' }}
+                        >
+                          {user.ci || '-'}
+                        </td>
+                        <td
+                          className="desktop-cell-normal"
+                          style={{ padding: '10px' }}
+                        >
+                          {user.city || '-'}
+                        </td>
+                        <td
+                          className="desktop-cell-normal"
+                          style={{ padding: '10px' }}
+                        >
+                          {user.ci_url ? (
+                            <button
+                              onClick={() =>
+                                setImageModal({
+                                  open: true,
+                                  url: user.ci_url,
+                                  title: `Documento C.I. de ${
+                                    user.full_name || 'Usuario'
+                                  }`,
+                                })
+                              }
+                              style={{
+                                fontSize: '11px',
+                                color: '#10B981',
+                                fontWeight: '600',
+                                background: 'none',
+                                border: 'none',
+                                cursor: 'pointer',
+                                padding: 0,
+                                textDecoration: 'underline',
+                              }}
+                            >
+                              Adjunto ✓
+                            </button>
+                          ) : (
+                            <span
+                              style={{ fontSize: '11px', color: '#9CA3AF' }}
+                            >
+                              N/A
+                            </span>
+                          )}
+                        </td>
+                        <td
+                          className="desktop-cell-normal"
+                          style={{ padding: '10px' }}
+                        >
                           <button
                             onClick={() => startEditingProfile(user)}
                             style={{
                               backgroundColor: '#000',
                               color: '#D4AF37',
                               border: 'none',
-                              padding: '8px',
+                              padding: '6px 12px',
                               borderRadius: '6px',
                               fontWeight: '700',
                               fontSize: '11px',
                               cursor: 'pointer',
+                            }}
+                          >
+                            Editar
+                          </button>
+                        </td>
+                        {/* Mobile View for Normal Row */}
+                        <td colSpan="2" className="mobile-cell-stacked">
+                          <div
+                            style={{
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '6px',
                               width: '100%',
                             }}
                           >
-                            Editar Perfil
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
+                            <div
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '10px',
+                              }}
+                            >
+                              <div
+                                style={{
+                                  width: '40px',
+                                  height: '40px',
+                                  borderRadius: '50%',
+                                  overflow: 'hidden',
+                                  backgroundColor: '#f3f4f6',
+                                  cursor: user.avatar_url
+                                    ? 'pointer'
+                                    : 'default',
+                                }}
+                                onClick={() => {
+                                  if (user.avatar_url) {
+                                    setImageModal({
+                                      open: true,
+                                      url: user.avatar_url,
+                                      title: `Avatar de ${
+                                        user.full_name || 'Usuario'
+                                      }`,
+                                    });
+                                  }
+                                }}
+                              >
+                                {user.avatar_url ? (
+                                  <img
+                                    src={user.avatar_url}
+                                    alt="Avatar"
+                                    style={{
+                                      width: '100%',
+                                      height: '100%',
+                                      objectFit: 'cover',
+                                    }}
+                                  />
+                                ) : (
+                                  <div
+                                    style={{
+                                      width: '100%',
+                                      height: '100%',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                    }}
+                                  >
+                                    <svg
+                                      xmlns="http://www.w3.org/2000/svg"
+                                      width="20"
+                                      height="20"
+                                      viewBox="0 0 24 24"
+                                      fill="none"
+                                      stroke="#9ca3af"
+                                      strokeWidth="2"
+                                    >
+                                      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                                      <circle cx="12" cy="7" r="4" />
+                                    </svg>
+                                  </div>
+                                )}
+                              </div>
+                              <div>
+                                <div style={{ fontWeight: '600' }}>
+                                  {user.full_name || 'Sin Nombre'}
+                                </div>
+                                <div
+                                  style={{ fontSize: '11px', color: '#6b7280' }}
+                                >
+                                  {user.email}
+                                </div>
+                              </div>
+                            </div>
+                            <div
+                              style={{
+                                display: 'grid',
+                                gridTemplateColumns: '1fr 1fr',
+                                gap: '8px',
+                                fontSize: '12px',
+                              }}
+                            >
+                              <div>CI: {user.ci || '-'}</div>
+                              <div>Ciudad: {user.city || '-'}</div>
+                              <div>
+                                Doc:{' '}
+                                {user.ci_url ? (
+                                  <button
+                                    onClick={() =>
+                                      setImageModal({
+                                        open: true,
+                                        url: user.ci_url,
+                                        title: `Documento C.I. de ${
+                                          user.full_name || 'Usuario'
+                                        }`,
+                                      })
+                                    }
+                                    style={{
+                                      fontSize: '12px',
+                                      color: '#10B981',
+                                      fontWeight: '600',
+                                      background: 'none',
+                                      border: 'none',
+                                      cursor: 'pointer',
+                                      padding: 0,
+                                      textDecoration: 'underline',
+                                    }}
+                                  >
+                                    Sí (Ver)
+                                  </button>
+                                ) : (
+                                  'No'
+                                )}
+                              </div>
+                            </div>
+                            <button
+                              onClick={() => startEditingProfile(user)}
+                              style={{
+                                backgroundColor: '#000',
+                                color: '#D4AF37',
+                                border: 'none',
+                                padding: '8px',
+                                borderRadius: '6px',
+                                fontWeight: '700',
+                                fontSize: '11px',
+                                cursor: 'pointer',
+                                width: '100%',
+                              }}
+                            >
+                              Editar Perfil
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
               </tbody>
             </table>
           </div>
@@ -2572,16 +2657,41 @@ export default function Users() {
             padding: '16px',
           }}
         >
-          <h3
+          <div
             style={{
-              fontSize: '14px',
-              fontWeight: '700',
-              color: '#111827',
-              marginBottom: '12px',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '16px',
+              flexWrap: 'wrap',
+              gap: '10px',
             }}
           >
-            Base de Datos de Clientes (Oficiales y Potenciales)
-          </h3>
+            <h3
+              style={{
+                fontSize: '14px',
+                fontWeight: '700',
+                color: '#111827',
+                margin: 0,
+              }}
+            >
+              Base de Datos de Clientes
+            </h3>
+            <input
+              type="text"
+              placeholder="Buscar cliente..."
+              value={clientSearch}
+              onChange={(e) => setClientSearch(e.target.value)}
+              style={{
+                padding: '6px 12px',
+                borderRadius: '6px',
+                border: '1px solid #d1d5db',
+                fontSize: '12px',
+                width: '100%',
+                maxWidth: '240px',
+              }}
+            />
+          </div>
 
           {/* --- SECCIÓN A: CREAR CLIENTE --- */}
           <div
@@ -2606,7 +2716,6 @@ export default function Users() {
             <div
               style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}
             >
-              {/* Selector Tipo */}
               <div
                 style={{ display: 'flex', gap: '16px', alignItems: 'center' }}
               >
@@ -2655,7 +2764,6 @@ export default function Users() {
                 </label>
               </div>
 
-              {/* Campos Básicos */}
               <div
                 style={{
                   display: 'grid',
@@ -2812,21 +2920,20 @@ export default function Users() {
                   </tr>
                 </thead>
                 <tbody>
-                  {clientsList.length === 0 ? (
-                    <tr>
-                      <td
-                        colSpan="7"
-                        style={{
-                          padding: '24px',
-                          textAlign: 'center',
-                          color: '#6b7280',
-                        }}
-                      >
-                        No hay clientes registrados.
-                      </td>
-                    </tr>
-                  ) : (
-                    clientsList.map((client) => {
+                  {clientsList
+                    .filter(
+                      (c) =>
+                        c.name
+                          ?.toLowerCase()
+                          .includes(clientSearch.toLowerCase()) ||
+                        c.ci_number
+                          ?.toLowerCase()
+                          .includes(clientSearch.toLowerCase()) ||
+                        c.rif_number
+                          ?.toLowerCase()
+                          .includes(clientSearch.toLowerCase())
+                    )
+                    .map((client) => {
                       const isPotential = client.is_potential;
                       const nePendientes = (client.sales_orders || []).filter(
                         (o) => o.payment_status !== 'cerrada'
@@ -2834,8 +2941,6 @@ export default function Users() {
                       const neCerradas = (client.sales_orders || []).filter(
                         (o) => o.payment_status === 'cerrada'
                       ).length;
-
-                      // Validación para botón eliminar
                       const hasOrders =
                         client.sales_orders && client.sales_orders.length > 0;
 
@@ -2946,7 +3051,6 @@ export default function Users() {
                             </div>
                           </td>
 
-                          {/* --- MODIFICACIÓN B: DROPDOWN EDITABLE PARA ASIGNACIÓN --- */}
                           <td
                             className="desktop-cell-normal"
                             style={{ padding: '10px', fontSize: '12px' }}
@@ -3104,8 +3208,6 @@ export default function Users() {
                               >
                                 Editar
                               </button>
-
-                              {/* --- MODIFICACIÓN C: BOTÓN ELIMINAR CON VALIDACIÓN --- */}
                               <button
                                 onClick={() => handleDeleteClient(client)}
                                 disabled={hasOrders}
@@ -3190,7 +3292,6 @@ export default function Users() {
                                 {client.rif_number || 'N/A'}
                               </div>
 
-                              {/* Mobile Assignment Editor */}
                               <div style={{ marginTop: '4px' }}>
                                 <span
                                   style={{
@@ -3349,7 +3450,6 @@ export default function Users() {
                                 )}
                               </div>
 
-                              {/* Mobile Actions */}
                               <div
                                 style={{
                                   display: 'flex',
@@ -3374,8 +3474,6 @@ export default function Users() {
                                 >
                                   Editar Cliente
                                 </button>
-
-                                {/* Mobile Delete Button */}
                                 <button
                                   onClick={() => handleDeleteClient(client)}
                                   disabled={hasOrders}
@@ -3405,8 +3503,7 @@ export default function Users() {
                           </td>
                         </tr>
                       );
-                    })
-                  )}
+                    })}
                 </tbody>
               </table>
             </div>
@@ -3568,7 +3665,6 @@ export default function Users() {
             <div
               style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}
             >
-              {/* Nombre */}
               <div>
                 <label
                   style={{
@@ -3595,7 +3691,6 @@ export default function Users() {
                   }}
                 />
               </div>
-              {/* CI y RIF Textos */}
               <div
                 style={{
                   display: 'grid',
@@ -3656,7 +3751,6 @@ export default function Users() {
                   />
                 </div>
               </div>
-              {/* Archivos Adjuntos */}
               <div
                 style={{
                   backgroundColor: '#f9fafb',
@@ -3682,7 +3776,6 @@ export default function Users() {
                     gap: '12px',
                   }}
                 >
-                  {/* CI Photo */}
                   <div
                     style={{
                       display: 'flex',
@@ -3757,7 +3850,6 @@ export default function Users() {
                       />
                     </div>
                   </div>
-                  {/* RIF Photo */}
                   <div
                     style={{
                       display: 'flex',
@@ -3836,7 +3928,6 @@ export default function Users() {
                       />
                     </div>
                   </div>
-                  {/* Additional Doc */}
                   <div
                     style={{
                       display: 'flex',
@@ -3959,7 +4050,6 @@ export default function Users() {
         </div>
       )}
 
-      {/* CSS para diseño responsivo, tarjetas móviles y campos informativos */}
       <style>{`
      .summary-cards-grid {
        display: grid;
@@ -4069,7 +4159,6 @@ export default function Users() {
   );
 }
 
-// Componente Auxiliar para Miniaturas de Documentos (si se usa en clientes)
 function DocBadge({ label, url, title, onOpenModal }) {
   return (
     <button
@@ -4098,21 +4187,18 @@ function DocBadge({ label, url, title, onOpenModal }) {
 function StructureUserRow({ user, onSelect }) {
   return (
     <tr style={{ borderBottom: '1px solid #f3f4f6' }}>
-      {/* VISTA ESCRITORIO: Nombre */}
       <td
         className="desktop-cell-normal"
         style={{ padding: '10px', fontWeight: '600' }}
       >
         {user.full_name || 'Sin Nombre'}
       </td>
-      {/* VISTA ESCRITORIO: Correo */}
       <td
         className="desktop-cell-normal"
         style={{ padding: '10px', color: '#6b7280' }}
       >
         {user.email}
       </td>
-      {/* VISTA ESCRITORIO: Rol */}
       <td className="desktop-cell-normal" style={{ padding: '10px' }}>
         <span
           style={{
@@ -4126,7 +4212,6 @@ function StructureUserRow({ user, onSelect }) {
           {user.role}
         </span>
       </td>
-      {/* VISTA ESCRITORIO: Vendedores Asignados */}
       <td className="desktop-cell-normal" style={{ padding: '10px' }}>
         {user.is_global ? (
           <span style={{ color: '#10b981', fontWeight: '600' }}>
@@ -4138,7 +4223,6 @@ function StructureUserRow({ user, onSelect }) {
           </span>
         )}
       </td>
-      {/* VISTA ESCRITORIO: Acción */}
       <td className="desktop-cell-normal" style={{ padding: '10px' }}>
         <button
           onClick={onSelect}
@@ -4156,7 +4240,6 @@ function StructureUserRow({ user, onSelect }) {
           Configurar
         </button>
       </td>
-      {/* VISTA MÓVIL: Tarjeta Apilada */}
       <td
         colSpan="2"
         className="mobile-cell-stacked"
@@ -4275,21 +4358,18 @@ function UserRow({ user, onSave }) {
 
   return (
     <tr style={{ borderBottom: '1px solid #f3f4f6' }}>
-      {/* VISTA ESCRITORIO: Nombre */}
       <td
         className="desktop-cell-normal"
         style={{ padding: '10px', fontWeight: '600' }}
       >
         {user.full_name || 'Sin Nombre'}
       </td>
-      {/* VISTA ESCRITORIO: Correo */}
       <td
         className="desktop-cell-normal"
         style={{ padding: '10px', color: '#6b7280' }}
       >
         {user.email}
       </td>
-      {/* VISTA ESCRITORIO: Rol */}
       <td className="desktop-cell-normal" style={{ padding: '10px' }}>
         <select
           value={role}
@@ -4312,7 +4392,6 @@ function UserRow({ user, onSave }) {
           <option value="suspendido">Suspendido</option>
         </select>
       </td>
-      {/* VISTA ESCRITORIO: % Bombillos */}
       <td className="desktop-cell-normal" style={{ padding: '10px' }}>
         <input
           type="number"
@@ -4330,7 +4409,6 @@ function UserRow({ user, onSave }) {
         />{' '}
         %
       </td>
-      {/* VISTA ESCRITORIO: % Fluidos */}
       <td className="desktop-cell-normal" style={{ padding: '10px' }}>
         <input
           type="number"
@@ -4348,7 +4426,6 @@ function UserRow({ user, onSave }) {
         />{' '}
         %
       </td>
-      {/* VISTA ESCRITORIO: Sueldo F. */}
       <td className="desktop-cell-normal" style={{ padding: '10px' }}>
         $
         <input
@@ -4363,7 +4440,6 @@ function UserRow({ user, onSave }) {
           }}
         />
       </td>
-      {/* VISTA ESCRITORIO: Acción */}
       <td className="desktop-cell-normal" style={{ padding: '10px' }}>
         <button
           onClick={handleSave}
@@ -4381,7 +4457,6 @@ function UserRow({ user, onSave }) {
           Guardar
         </button>
       </td>
-      {/* VISTA MÓVIL: Fila única combinada (colSpan=2) que abarca todo el ancho */}
       <td
         colSpan="2"
         className="mobile-cell-stacked"
