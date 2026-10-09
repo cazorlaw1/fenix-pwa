@@ -36,11 +36,10 @@ export default function Sidebar() {
           Dashboard
         </NavLink>
 
-        {/* 3.2 Inventario */}
+        {/* 3.2 Inventario - Disponible para todos */}
         <NavLink to="/inventario" style={linkStyle}>
-  Inventario
-</NavLink>
-        )}
+          Inventario
+        </NavLink>
 
         {/* 3.3 Usuarios */}
         {isTechOrAdmin && (
