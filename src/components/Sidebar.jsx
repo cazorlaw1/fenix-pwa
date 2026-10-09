@@ -37,10 +37,9 @@ export default function Sidebar() {
         </NavLink>
 
         {/* 3.2 Inventario */}
-        {(isTechOrAdmin || isStock) && (
-          <NavLink to="/inventario" style={linkStyle}>
-            Inventario
-          </NavLink>
+        <NavLink to="/inventario" style={linkStyle}>
+  Inventario
+</NavLink>
         )}
 
         {/* 3.3 Usuarios */}
