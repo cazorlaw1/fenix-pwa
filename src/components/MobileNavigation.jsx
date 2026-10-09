@@ -40,7 +40,7 @@ export default function MobileNavigation({ isOpen, onClose }) {
       to: '/inventario',
       label: 'Inventario',
       icon: Package,
-      roles: ['administrador', 'stock', 'tecnico'],
+      roles: ['administrador', 'gerente', 'supervisor', 'vendedor', 'tecnico'],
     },
     {
       to: '/usuarios',

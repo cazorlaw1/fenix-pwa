@@ -468,7 +468,7 @@ export default function App() {
               path="/inventario"
               element={
                 <>
-                  <RoleProtectedRoute allowedRoles={['administrador', 'tecnico', 'stock']} />
+                  <RoleProtectedRoute allowedRoles={['administrador', 'tecnico', 'gerente', 'supervisor', 'vendedor', 'stock']} />
                   <Layout><Inventory /></Layout>
                 </>
               }

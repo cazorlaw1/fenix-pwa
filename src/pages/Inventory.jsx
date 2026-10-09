@@ -27,7 +27,10 @@ export default function Inventory() {
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
-  
+
+  // Estado para el rol del usuario actual
+  const [userRole, setUserRole] = useState(null);
+
   // Estado para el menú dropdown en móvil
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const mobileMenuRef = useRef(null);
@@ -37,7 +40,7 @@ export default function Inventory() {
   const [editingProduct, setEditingProduct] = useState(null);
   const [adjustingStockProduct, setAdjustingStockProduct] = useState(null);
   const [selectedImageModal, setSelectedImageModal] = useState(null);
-  
+
   // Modales de Importación/Exportación
   const [showExportModal, setShowExportModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
@@ -45,7 +48,7 @@ export default function Inventory() {
   const [importWithImages, setImportWithImages] = useState(false);
   const [exportProcessing, setExportProcessing] = useState(false);
   const [importProcessing, setImportProcessing] = useState(false);
-  
+
   // Formulario de Registro / Edición de Producto
   const [formCode, setFormCode] = useState('');
   const [formDescription, setFormDescription] = useState('');
@@ -54,20 +57,58 @@ export default function Inventory() {
   const [formStock, setFormStock] = useState('');
   const [formImageFile, setFormImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState('');
-  
+
   // Formulario de Ajuste Rápido de Stock
   const [stockAdjustmentValue, setStockAdjustmentValue] = useState('');
   const [stockAdjustmentType, setStockAdjustmentType] = useState('add');
 
+  // Obtener el rol del usuario autenticado
+  useEffect(() => {
+    async function fetchUserRole() {
+      try {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        if (user) {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', user.id)
+            .single();
+          if (profile) {
+            setUserRole(profile.role);
+          }
+        }
+      } catch (err) {
+        console.error('Error al obtener el rol del usuario:', err);
+      }
+    }
+    fetchUserRole();
+  }, []);
+
+  // Verificar si el usuario tiene permiso de gestión (administrador o stock)
+  const canManage = userRole === 'administrador' || userRole === 'stock';
+
+  // Si no tiene permisos y está en la pestaña restringida, redirigir al inventario
+  useEffect(() => {
+    if (activeMainTab === 'import_export' && userRole !== null && !canManage) {
+      setActiveMainTab('inventory');
+      setActiveCategory('bombillos');
+    }
+  }, [userRole, activeMainTab]);
+
   // Cerrar dropdown al hacer clic fuera
   useEffect(() => {
     function handleClickOutside(event) {
-      if (mobileMenuRef.current && !mobileMenuRef.current.contains(event.target)) {
+      if (
+        mobileMenuRef.current &&
+        !mobileMenuRef.current.contains(event.target)
+      ) {
         setIsMobileMenuOpen(false);
       }
     }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   useEffect(() => {
@@ -149,12 +190,18 @@ export default function Inventory() {
       fetchProducts();
     } catch (err) {
       console.error('Error al guardar producto:', err);
-      setErrorMsg(err.message || 'Error al guardar el producto. Verifique los datos.');
+      setErrorMsg(
+        err.message || 'Error al guardar el producto. Verifique los datos.'
+      );
     }
   };
 
   const handleDeleteProduct = async (product) => {
-    if (!window.confirm(`¿Estás seguro de que deseas eliminar el producto "${product.description}"?\n\nADVERTENCIA: Esto también eliminará el producto de cualquier nota de entrega (N.E.) donde haya sido utilizado.`)) {
+    if (
+      !window.confirm(
+        `¿Estás seguro de que deseas eliminar el producto "${product.description}"?\n\nADVERTENCIA: Esto también eliminará el producto de cualquier nota de entrega (N.E.) donde haya sido utilizado.`
+      )
+    ) {
       return;
     }
     setErrorMsg('');
@@ -186,7 +233,9 @@ export default function Inventory() {
         .delete()
         .eq('id', product.id);
       if (error) throw error;
-      setSuccessMsg(`Producto "${product.description}" eliminado exitosamente (incluyendo referencias en N.E.).`);
+      setSuccessMsg(
+        `Producto "${product.description}" eliminado exitosamente (incluyendo referencias en N.E.).`
+      );
       fetchProducts();
     } catch (err) {
       console.error('Error al eliminar producto:', err);
@@ -278,7 +327,14 @@ export default function Inventory() {
         return;
       }
 
-      const csvHeaders = ['code', 'description', 'category', 'price_usd', 'stock_current', 'image_url'];
+      const csvHeaders = [
+        'code',
+        'description',
+        'category',
+        'price_usd',
+        'stock_current',
+        'image_url',
+      ];
       const csvRows = allProducts.map((p) => [
         p.code || '',
         p.description || '',
@@ -289,15 +345,21 @@ export default function Inventory() {
       ]);
 
       const csvContent = [csvHeaders, ...csvRows]
-        .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+        .map((row) =>
+          row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(',')
+        )
         .join('\n');
 
       if (!withImages) {
-        const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
+        const blob = new Blob(['\ufeff' + csvContent], {
+          type: 'text/csv;charset=utf-8;',
+        });
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
-        link.download = `inventario_${new Date().toISOString().split('T')[0]}.csv`;
+        link.download = `inventario_${
+          new Date().toISOString().split('T')[0]
+        }.csv`;
         link.click();
         URL.revokeObjectURL(url);
         setSuccessMsg('Inventario exportado exitosamente (sin imágenes).');
@@ -316,7 +378,10 @@ export default function Inventory() {
               const safeName = fileName || `producto_${p.code}.jpg`;
               imageFolder.file(safeName, blob);
             } catch (err) {
-              console.warn(`No se pudo descargar la imagen: ${p.image_url}`, err);
+              console.warn(
+                `No se pudo descargar la imagen: ${p.image_url}`,
+                err
+              );
             }
           });
         await Promise.all(imagePromises);
@@ -324,7 +389,9 @@ export default function Inventory() {
         const url = URL.createObjectURL(zipBlob);
         const link = document.createElement('a');
         link.href = url;
-        link.download = `inventario_completo_${new Date().toISOString().split('T')[0]}.zip`;
+        link.download = `inventario_completo_${
+          new Date().toISOString().split('T')[0]
+        }.zip`;
         link.click();
         URL.revokeObjectURL(url);
         setSuccessMsg('Inventario exportado exitosamente (con imágenes).');
@@ -343,15 +410,22 @@ export default function Inventory() {
     setErrorMsg('');
     setSuccessMsg('');
     try {
-      const lines = csvContent.split('\n').map((line) => line.replace(/\r$/, '')).filter((line) => line.trim());
+      const lines = csvContent
+        .split('\n')
+        .map((line) => line.replace(/\r$/, ''))
+        .filter((line) => line.trim());
       if (lines.length < 2) {
         throw new Error('El archivo CSV está vacío o no tiene datos válidos.');
       }
 
-      const headers = lines[0].split(',').map((h) => h.replace(/^"|"$/g, '').trim());
+      const headers = lines[0]
+        .split(',')
+        .map((h) => h.replace(/^"|"$/g, '').trim());
       const productsToImport = [];
       for (let i = 1; i < lines.length; i++) {
-        const values = lines[i].split(',').map((v) => v.replace(/^"|"$/g, '').trim());
+        const values = lines[i]
+          .split(',')
+          .map((v) => v.replace(/^"|"$/g, '').trim());
         const product = {};
         headers.forEach((header, index) => {
           product[header] = values[index] || '';
@@ -372,10 +446,16 @@ export default function Inventory() {
               if (imageFile) {
                 const imageBlob = await imageFile.async('blob');
                 const fileExt = fileName.split('.').pop() || 'jpg';
-                const newFileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
-                const { error: uploadError } = await supabase.storage.from('products').upload(newFileName, imageBlob);
+                const newFileName = `${Date.now()}_${Math.random()
+                  .toString(36)
+                  .substring(7)}.${fileExt}`;
+                const { error: uploadError } = await supabase.storage
+                  .from('products')
+                  .upload(newFileName, imageBlob);
                 if (!uploadError) {
-                  const { data: publicUrlData } = supabase.storage.from('products').getPublicUrl(newFileName);
+                  const { data: publicUrlData } = supabase.storage
+                    .from('products')
+                    .getPublicUrl(newFileName);
                   product.image_url = publicUrlData.publicUrl;
                 }
               }
@@ -387,7 +467,11 @@ export default function Inventory() {
       let importedCount = 0;
       let updatedCount = 0;
       for (const product of productsToImport) {
-        const { data: existingProduct } = await supabase.from('products').select('id').eq('code', product.code).single();
+        const { data: existingProduct } = await supabase
+          .from('products')
+          .select('id')
+          .eq('code', product.code)
+          .single();
         if (existingProduct) {
           const { error } = await supabase
             .from('products')
@@ -424,7 +508,11 @@ export default function Inventory() {
         }
       }
 
-      setSuccessMsg(`Importación completada: ${importedCount} productos nuevos creados, ${updatedCount} productos actualizados${withImages ? ' (con imágenes)' : ''}.`);
+      setSuccessMsg(
+        `Importación completada: ${importedCount} productos nuevos creados, ${updatedCount} productos actualizados${
+          withImages ? ' (con imágenes)' : ''
+        }.`
+      );
       setShowImportModal(false);
       setImportFile(null);
       setImportWithImages(false);
@@ -446,18 +534,24 @@ export default function Inventory() {
     try {
       if (importWithImages) {
         if (!importFile.name.toLowerCase().endsWith('.zip')) {
-          throw new Error('Para importar con imágenes debe seleccionar un archivo ZIP.');
+          throw new Error(
+            'Para importar con imágenes debe seleccionar un archivo ZIP.'
+          );
         }
         const zip = await JSZip.loadAsync(importFile);
         const csvFile = zip.file('inventario.csv');
         if (!csvFile) {
-          throw new Error('El archivo ZIP no contiene un archivo "inventario.csv". Asegúrese de que el ZIP fue generado por este sistema.');
+          throw new Error(
+            'El archivo ZIP no contiene un archivo "inventario.csv". Asegúrese de que el ZIP fue generado por este sistema.'
+          );
         }
         const csvContent = await csvFile.async('string');
         await importFromCSV(csvContent, true, importFile);
       } else {
         if (!importFile.name.toLowerCase().endsWith('.csv')) {
-          throw new Error('Para importar sin imágenes debe seleccionar un archivo CSV.');
+          throw new Error(
+            'Para importar sin imágenes debe seleccionar un archivo CSV.'
+          );
         }
         const csvContent = await importFile.text();
         await importFromCSV(csvContent, false);
@@ -468,11 +562,19 @@ export default function Inventory() {
     }
   };
 
-  // Opciones del menú
+  // Opciones del menú (Restringir "Importación/Exportación" si no es admin o stock)
   const menuOptions = [
     { id: 'bombillos', label: 'Bombillos', icon: Package },
     { id: 'fluidos', label: 'Fluidos', icon: Package },
-    { id: 'import_export', label: 'Importación/Exportación', icon: Archive },
+    ...(canManage
+      ? [
+          {
+            id: 'import_export',
+            label: 'Importación/Exportación',
+            icon: Archive,
+          },
+        ]
+      : []),
   ];
 
   return (
@@ -551,15 +653,51 @@ export default function Inventory() {
       `}</style>
 
       {/* Encabezado del Módulo */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: '24px',
+          flexWrap: 'wrap',
+          gap: '16px',
+        }}
+      >
         <div>
-          <h1 style={{ fontSize: '24px', fontWeight: 'bold', color: '#111827', display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <h1
+            style={{
+              fontSize: '24px',
+              fontWeight: 'bold',
+              color: '#111827',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+            }}
+          >
             <Package color="#dc2626" size={28} /> Gestión de Inventario
           </h1>
-          <p style={{ color: '#6b7280', fontSize: '14px' }}>Visualice y administre productos en tiempo real.</p>
+          <p style={{ color: '#6b7280', fontSize: '14px' }}>
+            Visualice y administre productos en tiempo real.
+          </p>
         </div>
-        {activeMainTab === 'inventory' && (
-          <button onClick={openNewModal} style={{ backgroundColor: '#000000', color: '#ffffff', padding: '10px 20px', borderRadius: '8px', border: 'none', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}>
+        {/* Botón de Registrar Producto restringido a administrador y stock */}
+        {canManage && activeMainTab === 'inventory' && (
+          <button
+            onClick={openNewModal}
+            style={{
+              backgroundColor: '#000000',
+              color: '#ffffff',
+              padding: '10px 20px',
+              borderRadius: '8px',
+              border: 'none',
+              fontWeight: '600',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              cursor: 'pointer',
+              boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+            }}
+          >
             <Plus size={18} /> Registrar Producto
           </button>
         )}
@@ -567,12 +705,34 @@ export default function Inventory() {
 
       {/* Alertas de Feedback */}
       {errorMsg && (
-        <div style={{ padding: '12px', backgroundColor: '#fee2e2', color: '#b91c1c', borderRadius: '6px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <div
+          style={{
+            padding: '12px',
+            backgroundColor: '#fee2e2',
+            color: '#b91c1c',
+            borderRadius: '6px',
+            marginBottom: '16px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+          }}
+        >
           <AlertCircle size={18} /> {errorMsg}
         </div>
       )}
       {successMsg && (
-        <div style={{ padding: '12px', backgroundColor: '#d1fae5', color: '#065f46', borderRadius: '6px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <div
+          style={{
+            padding: '12px',
+            backgroundColor: '#d1fae5',
+            color: '#065f46',
+            borderRadius: '6px',
+            marginBottom: '16px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+          }}
+        >
           <Check size={18} /> {successMsg}
         </div>
       )}
@@ -580,14 +740,23 @@ export default function Inventory() {
       {/* ========================================== */}
       {/* MENÚ DE NAVEGACIÓN RESPONSIVO                */}
       {/* ========================================== */}
-      
+
       {/* Versión Escritorio: Pestañas Horizontales */}
-      <div className="desktop-tabs" style={{ gap: '8px', borderBottom: '2px solid #e5e7eb', marginBottom: '24px', overflowX: 'auto' }}>
+      <div
+        className="desktop-tabs"
+        style={{
+          gap: '8px',
+          borderBottom: '2px solid #e5e7eb',
+          marginBottom: '24px',
+          overflowX: 'auto',
+        }}
+      >
         {menuOptions.map((tab) => {
           const Icon = tab.icon;
-          const isActive = tab.id === 'import_export' 
-            ? activeMainTab === 'import_export' 
-            : activeMainTab === 'inventory' && activeCategory === tab.id;
+          const isActive =
+            tab.id === 'import_export'
+              ? activeMainTab === 'import_export'
+              : activeMainTab === 'inventory' && activeCategory === tab.id;
           return (
             <button
               key={tab.id}
@@ -605,7 +774,9 @@ export default function Inventory() {
                 gap: '8px',
                 padding: '12px 18px',
                 border: 'none',
-                borderBottom: isActive ? '3px solid #dc2626' : '3px solid transparent',
+                borderBottom: isActive
+                  ? '3px solid #dc2626'
+                  : '3px solid transparent',
                 backgroundColor: 'transparent',
                 color: isActive ? '#dc2626' : '#4b5563',
                 fontWeight: isActive ? 'bold' : '500',
@@ -622,77 +793,104 @@ export default function Inventory() {
       </div>
 
       {/* Versión Móvil: Dropdown Compacto */}
-      <div className="mobile-dropdown" ref={mobileMenuRef} style={{ position: 'relative', marginBottom: '24px' }}>
-        <button 
+      <div
+        className="mobile-dropdown"
+        ref={mobileMenuRef}
+        style={{ position: 'relative', marginBottom: '24px' }}
+      >
+        <button
           onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-          style={{ 
-            width: '100%', 
-            padding: '12px 16px', 
-            backgroundColor: '#ffffff', 
-            border: '1px solid #d1d5db', 
-            borderRadius: '8px', 
-            display: 'flex', 
-            justifyContent: 'space-between', 
-            alignItems: 'center', 
-            fontSize: '15px', 
-            fontWeight: '600', 
+          style={{
+            width: '100%',
+            padding: '12px 16px',
+            backgroundColor: '#ffffff',
+            border: '1px solid #d1d5db',
+            borderRadius: '8px',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            fontSize: '15px',
+            fontWeight: '600',
             color: '#111827',
-            boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+            boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
           }}
         >
           <span style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            {activeMainTab === 'import_export' ? <Archive size={18} color="#dc2626"/> : <Package size={18} color="#dc2626"/>}
-            {activeMainTab === 'import_export' ? 'Importación/Exportación' : 
-             activeCategory === 'bombillos' ? 'Bombillos' : 'Fluidos'}
+            {activeMainTab === 'import_export' ? (
+              <Archive size={18} color="#dc2626" />
+            ) : (
+              <Package size={18} color="#dc2626" />
+            )}
+            {activeMainTab === 'import_export'
+              ? 'Importación/Exportación'
+              : activeCategory === 'bombillos'
+              ? 'Bombillos'
+              : 'Fluidos'}
           </span>
-          <ChevronDown size={18} color="#6b7280" style={{ transform: isMobileMenuOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }} />
+          <ChevronDown
+            size={18}
+            color="#6b7280"
+            style={{
+              transform: isMobileMenuOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+              transition: 'transform 0.2s',
+            }}
+          />
         </button>
 
         {isMobileMenuOpen && (
-          <div style={{ 
-            position: 'absolute', 
-            top: '100%', 
-            left: 0, 
-            right: 0, 
-            marginTop: '4px', 
-            backgroundColor: '#ffffff', 
-            border: '1px solid #e5e7eb', 
-            borderRadius: '8px', 
-            boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)', 
-            zIndex: 50, 
-            overflow: 'hidden' 
-          }}>
+          <div
+            style={{
+              position: 'absolute',
+              top: '100%',
+              left: 0,
+              right: 0,
+              marginTop: '4px',
+              backgroundColor: '#ffffff',
+              border: '1px solid #e5e7eb',
+              borderRadius: '8px',
+              boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)',
+              zIndex: 50,
+              overflow: 'hidden',
+            }}
+          >
             {menuOptions.map((tab) => {
               const Icon = tab.icon;
-              const isActive = tab.id === 'import_export' 
-                ? activeMainTab === 'import_export' 
-                : activeMainTab === 'inventory' && activeCategory === tab.id;
+              const isActive =
+                tab.id === 'import_export'
+                  ? activeMainTab === 'import_export'
+                  : activeMainTab === 'inventory' && activeCategory === tab.id;
               return (
-                <button 
-                  key={tab.id} 
-                  onClick={() => { 
-                    if (tab.id === 'import_export') setActiveMainTab('import_export'); 
-                    else { setActiveMainTab('inventory'); setActiveCategory(tab.id); }
+                <button
+                  key={tab.id}
+                  onClick={() => {
+                    if (tab.id === 'import_export')
+                      setActiveMainTab('import_export');
+                    else {
+                      setActiveMainTab('inventory');
+                      setActiveCategory(tab.id);
+                    }
                     setIsMobileMenuOpen(false);
-                  }} 
-                  style={{ 
-                    width: '100%', 
-                    padding: '14px 16px', 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    gap: '12px', 
-                    border: 'none', 
-                    backgroundColor: isActive ? '#fef2f2' : 'transparent', 
-                    color: isActive ? '#dc2626' : '#374151', 
-                    fontWeight: isActive ? '600' : '500', 
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '14px 16px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    border: 'none',
+                    backgroundColor: isActive ? '#fef2f2' : 'transparent',
+                    color: isActive ? '#dc2626' : '#374151',
+                    fontWeight: isActive ? '600' : '500',
                     textAlign: 'left',
                     borderBottom: '1px solid #f3f4f6',
-                    cursor: 'pointer'
+                    cursor: 'pointer',
                   }}
                 >
-                  <Icon size={18} color={isActive ? '#dc2626' : '#9ca3af'} /> 
+                  <Icon size={18} color={isActive ? '#dc2626' : '#9ca3af'} />
                   {tab.label}
-                  {isActive && <Check size={16} style={{ marginLeft: 'auto' }} />}
+                  {isActive && (
+                    <Check size={16} style={{ marginLeft: 'auto' }} />
+                  )}
                 </button>
               );
             })}
@@ -707,67 +905,236 @@ export default function Inventory() {
         <>
           {/* Barra de Búsqueda */}
           <div style={{ position: 'relative', marginBottom: '20px' }}>
-            <Search style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#9ca3af' }} size={20} />
-            <input 
-              type="text" 
-              placeholder="Buscar por código o descripción..." 
-              value={searchQuery} 
-              onChange={(e) => setSearchQuery(e.target.value)} 
-              style={{ width: '100%', padding: '10px 12px 10px 40px', borderRadius: '8px', border: '1px solid #d1d5db', outline: 'none', fontSize: '14px', backgroundColor: '#ffffff' }} 
+            <Search
+              style={{
+                position: 'absolute',
+                left: '12px',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                color: '#9ca3af',
+              }}
+              size={20}
+            />
+            <input
+              type="text"
+              placeholder="Buscar por código o descripción..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '10px 12px 10px 40px',
+                borderRadius: '8px',
+                border: '1px solid #d1d5db',
+                outline: 'none',
+                fontSize: '14px',
+                backgroundColor: '#ffffff',
+              }}
             />
           </div>
 
           {/* Tabla de Escritorio */}
-          <div className="desktop-table" style={{ backgroundColor: '#ffffff', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '14px' }}>
+          <div
+            className="desktop-table"
+            style={{
+              backgroundColor: '#ffffff',
+              borderRadius: '8px',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+              overflowX: 'auto',
+            }}
+          >
+            <table
+              style={{
+                width: '100%',
+                borderCollapse: 'collapse',
+                textAlign: 'left',
+                fontSize: '14px',
+              }}
+            >
               <thead>
-                <tr style={{ backgroundColor: '#f3f4f6', color: '#374151', borderBottom: '1px solid #e5e7eb' }}>
+                <tr
+                  style={{
+                    backgroundColor: '#f3f4f6',
+                    color: '#374151',
+                    borderBottom: '1px solid #e5e7eb',
+                  }}
+                >
                   <th style={{ padding: '12px 16px' }}>Foto</th>
                   <th style={{ padding: '12px 16px' }}>Código</th>
                   <th style={{ padding: '12px 16px' }}>Descripción</th>
                   <th style={{ padding: '12px 16px' }}>Categoría</th>
                   <th style={{ padding: '12px 16px' }}>Precio ($)</th>
                   <th style={{ padding: '12px 16px' }}>Stock Actual</th>
-                  <th style={{ padding: '12px 16px', textAlign: 'center' }}>Acciones</th>
+                  {canManage && (
+                    <th style={{ padding: '12px 16px', textAlign: 'center' }}>
+                      Acciones
+                    </th>
+                  )}
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
-                  <tr><td colSpan="7" style={{ textAlign: 'center', padding: '24px', color: '#6b7280' }}>Cargando inventario...</td></tr>
+                  <tr>
+                    <td
+                      colSpan={canManage ? '7' : '6'}
+                      style={{
+                        textAlign: 'center',
+                        padding: '24px',
+                        color: '#6b7280',
+                      }}
+                    >
+                      Cargando inventario...
+                    </td>
+                  </tr>
                 ) : filteredProducts.length === 0 ? (
-                  <tr><td colSpan="7" style={{ textAlign: 'center', padding: '24px', color: '#6b7280' }}>No se encontraron productos registrados en esta categoría.</td></tr>
+                  <tr>
+                    <td
+                      colSpan={canManage ? '7' : '6'}
+                      style={{
+                        textAlign: 'center',
+                        padding: '24px',
+                        color: '#6b7280',
+                      }}
+                    >
+                      No se encontraron productos registrados en esta categoría.
+                    </td>
+                  </tr>
                 ) : (
                   filteredProducts.map((p) => (
-                    <tr key={p.id} style={{ borderBottom: '1px solid #e5e7eb' }}>
+                    <tr
+                      key={p.id}
+                      style={{ borderBottom: '1px solid #e5e7eb' }}
+                    >
                       <td style={{ padding: '12px 16px' }}>
                         {p.image_url ? (
-                          <img src={p.image_url} alt={p.code} style={{ width: '40px', height: '40px', objectFit: 'cover', borderRadius: '6px', cursor: 'pointer' }} onClick={() => setSelectedImageModal(p.image_url)} />
+                          <img
+                            src={p.image_url}
+                            alt={p.code}
+                            style={{
+                              width: '40px',
+                              height: '40px',
+                              objectFit: 'cover',
+                              borderRadius: '6px',
+                              cursor: 'pointer',
+                            }}
+                            onClick={() => setSelectedImageModal(p.image_url)}
+                          />
                         ) : (
-                          <div style={{ width: '40px', height: '40px', backgroundColor: '#e5e7eb', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9ca3af' }}>
+                          <div
+                            style={{
+                              width: '40px',
+                              height: '40px',
+                              backgroundColor: '#e5e7eb',
+                              borderRadius: '6px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              color: '#9ca3af',
+                            }}
+                          >
                             <ImageIcon size={20} />
                           </div>
                         )}
                       </td>
-                      <td style={{ padding: '12px 16px', fontWeight: '600', color: '#111827' }}>{p.code}</td>
-                      <td style={{ padding: '12px 16px', color: '#374151' }}>{p.description}</td>
-                      <td style={{ padding: '12px 16px', textTransform: 'capitalize', color: '#4b5563' }}>{p.category}</td>
-                      <td style={{ padding: '12px 16px', fontWeight: 'bold', color: '#059669' }}>${Number(p.price_usd).toFixed(2)}</td>
+                      <td
+                        style={{
+                          padding: '12px 16px',
+                          fontWeight: '600',
+                          color: '#111827',
+                        }}
+                      >
+                        {p.code}
+                      </td>
+                      <td style={{ padding: '12px 16px', color: '#374151' }}>
+                        {p.description}
+                      </td>
+                      <td
+                        style={{
+                          padding: '12px 16px',
+                          textTransform: 'capitalize',
+                          color: '#4b5563',
+                        }}
+                      >
+                        {p.category}
+                      </td>
+                      <td
+                        style={{
+                          padding: '12px 16px',
+                          fontWeight: 'bold',
+                          color: '#059669',
+                        }}
+                      >
+                        ${Number(p.price_usd).toFixed(2)}
+                      </td>
                       <td style={{ padding: '12px 16px' }}>
-                        <span style={{ padding: '4px 8px', borderRadius: '4px', backgroundColor: p.stock_current > 5 ? '#d1fae5' : '#fee2e2', color: p.stock_current > 5 ? '#065f46' : '#b91c1c', fontWeight: '600' }}>{p.stock_current} un.</span>
+                        <span
+                          style={{
+                            padding: '4px 8px',
+                            borderRadius: '4px',
+                            backgroundColor:
+                              p.stock_current > 5 ? '#d1fae5' : '#fee2e2',
+                            color: p.stock_current > 5 ? '#065f46' : '#b91c1c',
+                            fontWeight: '600',
+                          }}
+                        >
+                          {p.stock_current} un.
+                        </span>
                       </td>
-                      <td style={{ padding: '12px 16px', textAlign: 'center' }}>
-                        <div style={{ display: 'flex', justifyContent: 'center', gap: '8px' }}>
-                          <button type="button" onClick={() => openEditModal(p)} title="Editar Producto" style={{ padding: '6px', backgroundColor: '#f3f4f6', border: '1px solid #d1d5db', borderRadius: '4px', cursor: 'pointer' }}>
-                            <Edit3 size={16} color="#374151" />
-                          </button>
-                          <button type="button" onClick={() => setAdjustingStockProduct(p)} title="Ajuste de Inventario" style={{ padding: '6px', backgroundColor: '#fef3c7', border: '1px solid #f59e0b', borderRadius: '4px', cursor: 'pointer' }}>
-                            <Sliders size={16} color="#d97706" />
-                          </button>
-                          <button type="button" onClick={() => handleDeleteProduct(p)} title="Eliminar Producto" style={{ padding: '6px', backgroundColor: '#fee2e2', border: '1px solid #ef4444', borderRadius: '4px', cursor: 'pointer' }}>
-                            <Trash2 size={16} color="#dc2626" />
-                          </button>
-                        </div>
-                      </td>
+                      {canManage && (
+                        <td
+                          style={{ padding: '12px 16px', textAlign: 'center' }}
+                        >
+                          <div
+                            style={{
+                              display: 'flex',
+                              justifyContent: 'center',
+                              gap: '8px',
+                            }}
+                          >
+                            <button
+                              type="button"
+                              onClick={() => openEditModal(p)}
+                              title="Editar Producto"
+                              style={{
+                                padding: '6px',
+                                backgroundColor: '#f3f4f6',
+                                border: '1px solid #d1d5db',
+                                borderRadius: '4px',
+                                cursor: 'pointer',
+                              }}
+                            >
+                              <Edit3 size={16} color="#374151" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setAdjustingStockProduct(p)}
+                              title="Ajuste de Inventario"
+                              style={{
+                                padding: '6px',
+                                backgroundColor: '#fef3c7',
+                                border: '1px solid #f59e0b',
+                                borderRadius: '4px',
+                                cursor: 'pointer',
+                              }}
+                            >
+                              <Sliders size={16} color="#d97706" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteProduct(p)}
+                              title="Eliminar Producto"
+                              style={{
+                                padding: '6px',
+                                backgroundColor: '#fee2e2',
+                                border: '1px solid #ef4444',
+                                borderRadius: '4px',
+                                cursor: 'pointer',
+                              }}
+                            >
+                              <Trash2 size={16} color="#dc2626" />
+                            </button>
+                          </div>
+                        </td>
+                      )}
                     </tr>
                   ))
                 )}
@@ -778,48 +1145,145 @@ export default function Inventory() {
           {/* Tarjetas para Móvil */}
           <div className="mobile-cards">
             {loading ? (
-              <div style={{ textAlign: 'center', padding: '24px', color: '#6b7280' }}>Cargando inventario...</div>
+              <div
+                style={{
+                  textAlign: 'center',
+                  padding: '24px',
+                  color: '#6b7280',
+                }}
+              >
+                Cargando inventario...
+              </div>
             ) : filteredProducts.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '24px', color: '#6b7280' }}>No se encontraron productos registrados en esta categoría.</div>
+              <div
+                style={{
+                  textAlign: 'center',
+                  padding: '24px',
+                  color: '#6b7280',
+                }}
+              >
+                No se encontraron productos registrados en esta categoría.
+              </div>
             ) : (
               filteredProducts.map((p) => (
                 <div key={p.id} className="mobile-card">
                   <div className="mobile-card-header">
                     {p.image_url ? (
-                      <img src={p.image_url} alt={p.code} style={{ width: '50px', height: '50px', objectFit: 'cover', borderRadius: '6px', cursor: 'pointer' }} onClick={() => setSelectedImageModal(p.image_url)} />
+                      <img
+                        src={p.image_url}
+                        alt={p.code}
+                        style={{
+                          width: '50px',
+                          height: '50px',
+                          objectFit: 'cover',
+                          borderRadius: '6px',
+                          cursor: 'pointer',
+                        }}
+                        onClick={() => setSelectedImageModal(p.image_url)}
+                      />
                     ) : (
-                      <div style={{ width: '50px', height: '50px', backgroundColor: '#e5e7eb', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9ca3af' }}>
+                      <div
+                        style={{
+                          width: '50px',
+                          height: '50px',
+                          backgroundColor: '#e5e7eb',
+                          borderRadius: '6px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: '#9ca3af',
+                        }}
+                      >
                         <ImageIcon size={24} />
                       </div>
                     )}
                     <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: '700', fontSize: '16px', color: '#111827', marginBottom: '4px' }}>{p.code}</div>
-                      <div style={{ fontSize: '13px', color: '#6b7280' }}>{p.description}</div>
+                      <div
+                        style={{
+                          fontWeight: '700',
+                          fontSize: '16px',
+                          color: '#111827',
+                          marginBottom: '4px',
+                        }}
+                      >
+                        {p.code}
+                      </div>
+                      <div style={{ fontSize: '13px', color: '#6b7280' }}>
+                        {p.description}
+                      </div>
                     </div>
                   </div>
                   <div className="mobile-card-field">
                     <span className="mobile-card-label">Categoría</span>
-                    <span className="mobile-card-value" style={{ textTransform: 'capitalize' }}>{p.category}</span>
+                    <span
+                      className="mobile-card-value"
+                      style={{ textTransform: 'capitalize' }}
+                    >
+                      {p.category}
+                    </span>
                   </div>
                   <div className="mobile-card-field">
                     <span className="mobile-card-label">Precio</span>
-                    <span className="mobile-card-value" style={{ color: '#059669', fontWeight: '700' }}>${Number(p.price_usd).toFixed(2)}</span>
+                    <span
+                      className="mobile-card-value"
+                      style={{ color: '#059669', fontWeight: '700' }}
+                    >
+                      ${Number(p.price_usd).toFixed(2)}
+                    </span>
                   </div>
                   <div className="mobile-card-field">
                     <span className="mobile-card-label">Stock</span>
-                    <span style={{ padding: '4px 8px', borderRadius: '4px', backgroundColor: p.stock_current > 5 ? '#d1fae5' : '#fee2e2', color: p.stock_current > 5 ? '#065f46' : '#b91c1c', fontWeight: '600', fontSize: '13px' }}>{p.stock_current} un.</span>
+                    <span
+                      style={{
+                        padding: '4px 8px',
+                        borderRadius: '4px',
+                        backgroundColor:
+                          p.stock_current > 5 ? '#d1fae5' : '#fee2e2',
+                        color: p.stock_current > 5 ? '#065f46' : '#b91c1c',
+                        fontWeight: '600',
+                        fontSize: '13px',
+                      }}
+                    >
+                      {p.stock_current} un.
+                    </span>
                   </div>
-                  <div className="mobile-card-actions">
-                    <button type="button" onClick={() => openEditModal(p)} style={{ backgroundColor: '#f3f4f6', borderColor: '#d1d5db', color: '#374151' }}>
-                      <Edit3 size={14} /> Editar
-                    </button>
-                    <button type="button" onClick={() => setAdjustingStockProduct(p)} style={{ backgroundColor: '#fef3c7', borderColor: '#f59e0b', color: '#d97706' }}>
-                      <Sliders size={14} /> Stock
-                    </button>
-                    <button type="button" onClick={() => handleDeleteProduct(p)} style={{ backgroundColor: '#fee2e2', borderColor: '#ef4444', color: '#dc2626' }}>
-                      <Trash2 size={14} /> Eliminar
-                    </button>
-                  </div>
+                  {canManage && (
+                    <div className="mobile-card-actions">
+                      <button
+                        type="button"
+                        onClick={() => openEditModal(p)}
+                        style={{
+                          backgroundColor: '#f3f4f6',
+                          borderColor: '#d1d5db',
+                          color: '#374151',
+                        }}
+                      >
+                        <Edit3 size={14} /> Editar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setAdjustingStockProduct(p)}
+                        style={{
+                          backgroundColor: '#fef3c7',
+                          borderColor: '#f59e0b',
+                          color: '#d97706',
+                        }}
+                      >
+                        <Sliders size={14} /> Stock
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteProduct(p)}
+                        style={{
+                          backgroundColor: '#fee2e2',
+                          borderColor: '#ef4444',
+                          color: '#dc2626',
+                        }}
+                      >
+                        <Trash2 size={14} /> Eliminar
+                      </button>
+                    </div>
+                  )}
                 </div>
               ))
             )}
@@ -830,43 +1294,179 @@ export default function Inventory() {
       {/* ========================================== */}
       {/* CONTENIDO DE IMPORTACIÓN/EXPORTACIÓN       */}
       {/* ========================================== */}
-      {activeMainTab === 'import_export' && (
-        <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', padding: '24px' }}>
+      {activeMainTab === 'import_export' && canManage && (
+        <div
+          style={{
+            backgroundColor: '#ffffff',
+            borderRadius: '8px',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+            padding: '24px',
+          }}
+        >
           <div style={{ marginBottom: '24px' }}>
-            <h2 style={{ fontSize: '20px', fontWeight: 'bold', color: '#111827', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <Archive size={24} color="#dc2626" /> Importación y Exportación de Inventario
+            <h2
+              style={{
+                fontSize: '20px',
+                fontWeight: 'bold',
+                color: '#111827',
+                marginBottom: '8px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+              }}
+            >
+              <Archive size={24} color="#dc2626" /> Importación y Exportación de
+              Inventario
             </h2>
-            <p style={{ color: '#6b7280', fontSize: '14px' }}>Gestione la importación y exportación de datos del inventario con o sin imágenes.</p>
+            <p style={{ color: '#6b7280', fontSize: '14px' }}>
+              Gestione la importación y exportación de datos del inventario con
+              o sin imágenes.
+            </p>
           </div>
-          
+
           {/* Grid Responsivo Corregido: Nunca se desbordará */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '20px', marginBottom: '24px', width: '100%' }}>
-            
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+              gap: '20px',
+              marginBottom: '24px',
+              width: '100%',
+            }}
+          >
             {/* Tarjeta de Exportación */}
-            <div style={{ backgroundColor: '#f0fdf4', border: '2px solid #bbf7d0', borderRadius: '12px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px', width: '100%', boxSizing: 'border-box' }}>
+            <div
+              style={{
+                backgroundColor: '#f0fdf4',
+                border: '2px solid #bbf7d0',
+                borderRadius: '12px',
+                padding: '24px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '16px',
+                width: '100%',
+                boxSizing: 'border-box',
+              }}
+            >
               <div>
-                <h3 style={{ fontSize: '18px', fontWeight: 'bold', color: '#166534', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <h3
+                  style={{
+                    fontSize: '18px',
+                    fontWeight: 'bold',
+                    color: '#166534',
+                    marginBottom: '8px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                  }}
+                >
                   <Download size={20} /> Exportar Inventario
                 </h3>
-                <p style={{ color: '#15803d', fontSize: '14px', marginBottom: '16px' }}>Descargue todos los datos del inventario en formato CSV o ZIP con imágenes.</p>
+                <p
+                  style={{
+                    color: '#15803d',
+                    fontSize: '14px',
+                    marginBottom: '16px',
+                  }}
+                >
+                  Descargue todos los datos del inventario en formato CSV o ZIP
+                  con imágenes.
+                </p>
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                <button onClick={() => setShowExportModal(true)} style={{ padding: '12px 20px', backgroundColor: '#059669', color: '#ffffff', border: 'none', borderRadius: '8px', fontWeight: '600', fontSize: '14px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', transition: 'all 0.2s' }}>
+              <div
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '12px',
+                }}
+              >
+                <button
+                  onClick={() => setShowExportModal(true)}
+                  style={{
+                    padding: '12px 20px',
+                    backgroundColor: '#059669',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '8px',
+                    fontWeight: '600',
+                    fontSize: '14px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    transition: 'all 0.2s',
+                  }}
+                >
                   <Download size={18} /> Exportar Datos
                 </button>
               </div>
             </div>
 
             {/* Tarjeta de Importación */}
-            <div style={{ backgroundColor: '#eff6ff', border: '2px solid #bfdbfe', borderRadius: '12px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px', width: '100%', boxSizing: 'border-box' }}>
+            <div
+              style={{
+                backgroundColor: '#eff6ff',
+                border: '2px solid #bfdbfe',
+                borderRadius: '12px',
+                padding: '24px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '16px',
+                width: '100%',
+                boxSizing: 'border-box',
+              }}
+            >
               <div>
-                <h3 style={{ fontSize: '18px', fontWeight: 'bold', color: '#1e40af', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <h3
+                  style={{
+                    fontSize: '18px',
+                    fontWeight: 'bold',
+                    color: '#1e40af',
+                    marginBottom: '8px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                  }}
+                >
                   <Upload size={20} /> Importar Inventario
                 </h3>
-                <p style={{ color: '#1d4ed8', fontSize: '14px', marginBottom: '16px' }}>Cargue datos del inventario desde un archivo CSV o ZIP con imágenes.</p>
+                <p
+                  style={{
+                    color: '#1d4ed8',
+                    fontSize: '14px',
+                    marginBottom: '16px',
+                  }}
+                >
+                  Cargue datos del inventario desde un archivo CSV o ZIP con
+                  imágenes.
+                </p>
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                <button onClick={() => setShowImportModal(true)} style={{ padding: '12px 20px', backgroundColor: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '8px', fontWeight: '600', fontSize: '14px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', transition: 'all 0.2s' }}>
+              <div
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '12px',
+                }}
+              >
+                <button
+                  onClick={() => setShowImportModal(true)}
+                  style={{
+                    padding: '12px 20px',
+                    backgroundColor: '#2563eb',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '8px',
+                    fontWeight: '600',
+                    fontSize: '14px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    transition: 'all 0.2s',
+                  }}
+                >
                   <Upload size={18} /> Importar Datos
                 </button>
               </div>
@@ -874,14 +1474,52 @@ export default function Inventory() {
           </div>
 
           {/* Información Adicional */}
-          <div style={{ padding: '16px', backgroundColor: '#f9fafb', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
-            <h4 style={{ fontSize: '14px', fontWeight: 'bold', color: '#374151', marginBottom: '12px' }}>Información Importante:</h4>
-            <ul style={{ color: '#6b7280', fontSize: '13px', lineHeight: '1.6', paddingLeft: '20px', margin: 0 }}>
-              <li>Al exportar sin imágenes, se genera un archivo CSV con todos los datos del inventario.</li>
-              <li>Al exportar con imágenes, se genera un archivo ZIP que contiene el CSV y todas las imágenes.</li>
-              <li>Al importar sin imágenes, se actualizan o crean productos desde un archivo CSV.</li>
-              <li>Al importar con imágenes, se procesa un archivo ZIP que contiene el CSV y las imágenes asociadas.</li>
-              <li>Los productos existentes se actualizan según su código único.</li>
+          <div
+            style={{
+              padding: '16px',
+              backgroundColor: '#f9fafb',
+              borderRadius: '8px',
+              border: '1px solid #e5e7eb',
+            }}
+          >
+            <h4
+              style={{
+                fontSize: '14px',
+                fontWeight: 'bold',
+                color: '#374151',
+                marginBottom: '12px',
+              }}
+            >
+              Información Importante:
+            </h4>
+            <ul
+              style={{
+                color: '#6b7280',
+                fontSize: '13px',
+                lineHeight: '1.6',
+                paddingLeft: '20px',
+                margin: 0,
+              }}
+            >
+              <li>
+                Al exportar sin imágenes, se genera un archivo CSV con todos los
+                datos del inventario.
+              </li>
+              <li>
+                Al exportar con imágenes, se genera un archivo ZIP que contiene
+                el CSV y todas las imágenes.
+              </li>
+              <li>
+                Al importar sin imágenes, se actualizan o crean productos desde
+                un archivo CSV.
+              </li>
+              <li>
+                Al importar con imágenes, se procesa un archivo ZIP que contiene
+                el CSV y las imágenes asociadas.
+              </li>
+              <li>
+                Los productos existentes se actualizan según su código único.
+              </li>
               <li>Los productos nuevos se crean automáticamente.</li>
             </ul>
           </div>
@@ -891,135 +1529,743 @@ export default function Inventory() {
       {/* ========================================== */}
       {/* MODALES (Exportación, Importación, etc.)   */}
       {/* ========================================== */}
-      
+
       {/* Modal de Exportación */}
-      {showExportModal && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '16px' }}>
-          <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', width: '100%', maxWidth: '450px', padding: '24px', boxShadow: '0 10px 25px rgba(0,0,0,0.15)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <h2 style={{ fontSize: '18px', fontWeight: 'bold', color: '#111827', display: 'flex', alignItems: 'center', gap: '8px' }}>
+      {showExportModal && canManage && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            padding: '16px',
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: '#ffffff',
+              borderRadius: '12px',
+              width: '100%',
+              maxWidth: '450px',
+              padding: '24px',
+              boxShadow: '0 10px 25px rgba(0,0,0,0.15)',
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '20px',
+              }}
+            >
+              <h2
+                style={{
+                  fontSize: '18px',
+                  fontWeight: 'bold',
+                  color: '#111827',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                }}
+              >
                 <Download size={20} color="#059669" /> Exportar Inventario
               </h2>
-              <button type="button" onClick={() => setShowExportModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
+              <button
+                type="button"
+                onClick={() => setShowExportModal(false)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                }}
+              >
                 <X size={20} color="#6b7280" />
               </button>
             </div>
-            <p style={{ fontSize: '14px', color: '#374151', marginBottom: '20px', textAlign: 'center', fontWeight: '600' }}>¿Desea exportar con imágenes o sin imágenes?</p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <button onClick={() => exportToCSV(false)} disabled={exportProcessing} style={{ padding: '14px 20px', backgroundColor: '#f0fdf4', color: '#166534', border: '2px solid #bbf7d0', borderRadius: '8px', fontWeight: '600', fontSize: '14px', cursor: exportProcessing ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', transition: 'all 0.2s' }}>
-                <FileText size={18} /> {exportProcessing ? 'Procesando...' : 'Sin Imágenes (CSV)'}
+            <p
+              style={{
+                fontSize: '14px',
+                color: '#374151',
+                marginBottom: '20px',
+                textAlign: 'center',
+                fontWeight: '600',
+              }}
+            >
+              ¿Desea exportar con imágenes o sin imágenes?
+            </p>
+            <div
+              style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}
+            >
+              <button
+                onClick={() => exportToCSV(false)}
+                disabled={exportProcessing}
+                style={{
+                  padding: '14px 20px',
+                  backgroundColor: '#f0fdf4',
+                  color: '#166534',
+                  border: '2px solid #bbf7d0',
+                  borderRadius: '8px',
+                  fontWeight: '600',
+                  fontSize: '14px',
+                  cursor: exportProcessing ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '10px',
+                  transition: 'all 0.2s',
+                }}
+              >
+                <FileText size={18} />{' '}
+                {exportProcessing ? 'Procesando...' : 'Sin Imágenes (CSV)'}
               </button>
-              <button onClick={() => exportToCSV(true)} disabled={exportProcessing} style={{ padding: '14px 20px', backgroundColor: '#eff6ff', color: '#1e40af', border: '2px solid #bfdbfe', borderRadius: '8px', fontWeight: '600', fontSize: '14px', cursor: exportProcessing ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', transition: 'all 0.2s' }}>
-                <Archive size={18} /> {exportProcessing ? 'Procesando...' : 'Con Imágenes (ZIP)'}
+              <button
+                onClick={() => exportToCSV(true)}
+                disabled={exportProcessing}
+                style={{
+                  padding: '14px 20px',
+                  backgroundColor: '#eff6ff',
+                  color: '#1e40af',
+                  border: '2px solid #bfdbfe',
+                  borderRadius: '8px',
+                  fontWeight: '600',
+                  fontSize: '14px',
+                  cursor: exportProcessing ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '10px',
+                  transition: 'all 0.2s',
+                }}
+              >
+                <Archive size={18} />{' '}
+                {exportProcessing ? 'Procesando...' : 'Con Imágenes (ZIP)'}
               </button>
             </div>
-            <div style={{ marginTop: '20px', padding: '12px', backgroundColor: '#f9fafb', borderRadius: '6px', fontSize: '12px', color: '#6b7280' }}>
-              <strong>Nota:</strong> La exportación con imágenes puede tardar más tiempo dependiendo de la cantidad de productos.
+            <div
+              style={{
+                marginTop: '20px',
+                padding: '12px',
+                backgroundColor: '#f9fafb',
+                borderRadius: '6px',
+                fontSize: '12px',
+                color: '#6b7280',
+              }}
+            >
+              <strong>Nota:</strong> La exportación con imágenes puede tardar
+              más tiempo dependiendo de la cantidad de productos.
             </div>
           </div>
         </div>
       )}
 
       {/* Modal de Importación */}
-      {showImportModal && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '16px' }}>
-          <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', width: '100%', maxWidth: '500px', padding: '24px', boxShadow: '0 10px 25px rgba(0,0,0,0.15)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <h2 style={{ fontSize: '18px', fontWeight: 'bold', color: '#111827', display: 'flex', alignItems: 'center', gap: '8px' }}>
+      {showImportModal && canManage && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            padding: '16px',
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: '#ffffff',
+              borderRadius: '12px',
+              width: '100%',
+              maxWidth: '500px',
+              padding: '24px',
+              boxShadow: '0 10px 25px rgba(0,0,0,0.15)',
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '20px',
+              }}
+            >
+              <h2
+                style={{
+                  fontSize: '18px',
+                  fontWeight: 'bold',
+                  color: '#111827',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                }}
+              >
                 <Upload size={20} color="#2563eb" /> Importar Inventario
               </h2>
-              <button type="button" onClick={() => { setShowImportModal(false); setImportFile(null); setImportWithImages(false); }} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowImportModal(false);
+                  setImportFile(null);
+                  setImportWithImages(false);
+                }}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                }}
+              >
                 <X size={20} color="#6b7280" />
               </button>
             </div>
-            <p style={{ fontSize: '14px', color: '#374151', marginBottom: '20px', textAlign: 'center', fontWeight: '600' }}>¿Desea importar con imágenes o sin imágenes?</p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '20px' }}>
-              <button onClick={() => { setImportWithImages(false); document.getElementById('import-file-input').click(); }} disabled={importProcessing} style={{ padding: '14px 20px', backgroundColor: importWithImages === false && importFile ? '#f0fdf4' : '#f9fafb', color: importWithImages === false && importFile ? '#166534' : '#374151', border: importWithImages === false && importFile ? '2px solid #bbf7d0' : '2px solid #e5e7eb', borderRadius: '8px', fontWeight: '600', fontSize: '14px', cursor: importProcessing ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', transition: 'all 0.2s' }}>
+            <p
+              style={{
+                fontSize: '14px',
+                color: '#374151',
+                marginBottom: '20px',
+                textAlign: 'center',
+                fontWeight: '600',
+              }}
+            >
+              ¿Desea importar con imágenes o sin imágenes?
+            </p>
+            <div
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '12px',
+                marginBottom: '20px',
+              }}
+            >
+              <button
+                onClick={() => {
+                  setImportWithImages(false);
+                  document.getElementById('import-file-input').click();
+                }}
+                disabled={importProcessing}
+                style={{
+                  padding: '14px 20px',
+                  backgroundColor:
+                    importWithImages === false && importFile
+                      ? '#f0fdf4'
+                      : '#f9fafb',
+                  color:
+                    importWithImages === false && importFile
+                      ? '#166534'
+                      : '#374151',
+                  border:
+                    importWithImages === false && importFile
+                      ? '2px solid #bbf7d0'
+                      : '2px solid #e5e7eb',
+                  borderRadius: '8px',
+                  fontWeight: '600',
+                  fontSize: '14px',
+                  cursor: importProcessing ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '10px',
+                  transition: 'all 0.2s',
+                }}
+              >
                 <FileText size={18} /> Sin Imágenes (CSV)
               </button>
-              <button onClick={() => { setImportWithImages(true); document.getElementById('import-file-input').click(); }} disabled={importProcessing} style={{ padding: '14px 20px', backgroundColor: importWithImages === true && importFile ? '#eff6ff' : '#f9fafb', color: importWithImages === true && importFile ? '#1e40af' : '#374151', border: importWithImages === true && importFile ? '2px solid #bfdbfe' : '2px solid #e5e7eb', borderRadius: '8px', fontWeight: '600', fontSize: '14px', cursor: importProcessing ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', transition: 'all 0.2s' }}>
+              <button
+                onClick={() => {
+                  setImportWithImages(true);
+                  document.getElementById('import-file-input').click();
+                }}
+                disabled={importProcessing}
+                style={{
+                  padding: '14px 20px',
+                  backgroundColor:
+                    importWithImages === true && importFile
+                      ? '#eff6ff'
+                      : '#f9fafb',
+                  color:
+                    importWithImages === true && importFile
+                      ? '#1e40af'
+                      : '#374151',
+                  border:
+                    importWithImages === true && importFile
+                      ? '2px solid #bfdbfe'
+                      : '2px solid #e5e7eb',
+                  borderRadius: '8px',
+                  fontWeight: '600',
+                  fontSize: '14px',
+                  cursor: importProcessing ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '10px',
+                  transition: 'all 0.2s',
+                }}
+              >
                 <Archive size={18} /> Con Imágenes (ZIP)
               </button>
             </div>
-            <input type="file" id="import-file-input" accept={importWithImages ? '.zip' : '.csv'} onChange={(e) => { if (e.target.files && e.target.files[0]) { setImportFile(e.target.files[0]); } }} style={{ display: 'none' }} />
+            <input
+              type="file"
+              id="import-file-input"
+              accept={importWithImages ? '.zip' : '.csv'}
+              onChange={(e) => {
+                if (e.target.files && e.target.files[0]) {
+                  setImportFile(e.target.files[0]);
+                }
+              }}
+              style={{ display: 'none' }}
+            />
             {importFile && (
-              <div style={{ padding: '12px', backgroundColor: '#f0fdf4', borderRadius: '6px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div
+                style={{
+                  padding: '12px',
+                  backgroundColor: '#f0fdf4',
+                  borderRadius: '6px',
+                  marginBottom: '16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                }}
+              >
                 <Check size={16} color="#059669" />
-                <span style={{ fontSize: '13px', color: '#166534', fontWeight: '600' }}>Archivo seleccionado: {importFile.name}</span>
+                <span
+                  style={{
+                    fontSize: '13px',
+                    color: '#166534',
+                    fontWeight: '600',
+                  }}
+                >
+                  Archivo seleccionado: {importFile.name}
+                </span>
               </div>
             )}
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
-              <button type="button" onClick={() => { setShowImportModal(false); setImportFile(null); setImportWithImages(false); }} style={{ padding: '10px 16px', backgroundColor: '#f3f4f6', color: '#374151', border: 'none', borderRadius: '6px', fontWeight: '600', cursor: 'pointer' }}>Cancelar</button>
-              <button type="button" onClick={handleImportFile} disabled={importProcessing || !importFile} style={{ padding: '10px 20px', backgroundColor: importProcessing || !importFile ? '#9ca3af' : '#2563eb', color: '#ffffff', border: 'none', borderRadius: '6px', fontWeight: '600', cursor: importProcessing || !importFile ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'flex-end',
+                gap: '10px',
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => {
+                  setShowImportModal(false);
+                  setImportFile(null);
+                  setImportWithImages(false);
+                }}
+                style={{
+                  padding: '10px 16px',
+                  backgroundColor: '#f3f4f6',
+                  color: '#374151',
+                  border: 'none',
+                  borderRadius: '6px',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                }}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleImportFile}
+                disabled={importProcessing || !importFile}
+                style={{
+                  padding: '10px 20px',
+                  backgroundColor:
+                    importProcessing || !importFile ? '#9ca3af' : '#2563eb',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '6px',
+                  fontWeight: '600',
+                  cursor:
+                    importProcessing || !importFile ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                }}
+              >
                 {importProcessing ? 'Procesando...' : 'Importar'}
               </button>
             </div>
-            <div style={{ marginTop: '16px', padding: '12px', backgroundColor: '#fef2f2', borderRadius: '6px', fontSize: '12px', color: '#991b1b' }}>
-              <strong>Advertencia:</strong> La importación actualizará los productos existentes según su código único y creará los nuevos.
+            <div
+              style={{
+                marginTop: '16px',
+                padding: '12px',
+                backgroundColor: '#fef2f2',
+                borderRadius: '6px',
+                fontSize: '12px',
+                color: '#991b1b',
+              }}
+            >
+              <strong>Advertencia:</strong> La importación actualizará los
+              productos existentes según su código único y creará los nuevos.
             </div>
           </div>
         </div>
       )}
 
       {/* Modal de Registro / Edición */}
-      {showAddModal && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '16px' }}>
-          <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', width: '100%', maxWidth: '500px', padding: '24px', boxShadow: '0 10px 25px rgba(0,0,0,0.15)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <h2 style={{ fontSize: '18px', fontWeight: 'bold', color: '#111827' }}>{editingProduct ? 'Editar Producto' : 'Registrar Nuevo Producto'}</h2>
-              <button type="button" onClick={closeModals} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
+      {showAddModal && canManage && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            padding: '16px',
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: '#ffffff',
+              borderRadius: '12px',
+              width: '100%',
+              maxWidth: '500px',
+              padding: '24px',
+              boxShadow: '0 10px 25px rgba(0,0,0,0.15)',
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '20px',
+              }}
+            >
+              <h2
+                style={{
+                  fontSize: '18px',
+                  fontWeight: 'bold',
+                  color: '#111827',
+                }}
+              >
+                {editingProduct
+                  ? 'Editar Producto'
+                  : 'Registrar Nuevo Producto'}
+              </h2>
+              <button
+                type="button"
+                onClick={closeModals}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                }}
+              >
                 <X size={20} color="#6b7280" />
               </button>
             </div>
-            <form onSubmit={handleSaveProduct} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <form
+              onSubmit={handleSaveProduct}
+              style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}
+            >
               <div>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', marginBottom: '6px', color: '#374151' }}>Categoría</label>
-                <select value={formCategory} onChange={(e) => setFormCategory(e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #d1d5db', backgroundColor: '#fff' }}>
+                <label
+                  style={{
+                    display: 'block',
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    marginBottom: '6px',
+                    color: '#374151',
+                  }}
+                >
+                  Categoría
+                </label>
+                <select
+                  value={formCategory}
+                  onChange={(e) => setFormCategory(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '10px',
+                    borderRadius: '6px',
+                    border: '1px solid #d1d5db',
+                    backgroundColor: '#fff',
+                  }}
+                >
                   <option value="bombillos">Bombillos</option>
                   <option value="fluidos">Fluidos</option>
                 </select>
               </div>
               <div>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', marginBottom: '6px', color: '#374151' }}>Código Único</label>
-                <input type="text" required placeholder="Ej. BOM-001" value={formCode} onChange={(e) => setFormCode(e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #d1d5db', boxSizing: 'border-box' }} />
+                <label
+                  style={{
+                    display: 'block',
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    marginBottom: '6px',
+                    color: '#374151',
+                  }}
+                >
+                  Código Único
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Ej. BOM-001"
+                  value={formCode}
+                  onChange={(e) => setFormCode(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '10px',
+                    borderRadius: '6px',
+                    border: '1px solid #d1d5db',
+                    boxSizing: 'border-box',
+                  }}
+                />
               </div>
               <div>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', marginBottom: '6px', color: '#374151' }}>Descripción y Especificaciones</label>
-                <textarea required rows={2} placeholder="Nombre y detalles del producto..." value={formDescription} onChange={(e) => setFormDescription(e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #d1d5db', boxSizing: 'border-box' }} />
+                <label
+                  style={{
+                    display: 'block',
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    marginBottom: '6px',
+                    color: '#374151',
+                  }}
+                >
+                  Descripción y Especificaciones
+                </label>
+                <textarea
+                  required
+                  rows={2}
+                  placeholder="Nombre y detalles del producto..."
+                  value={formDescription}
+                  onChange={(e) => setFormDescription(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '10px',
+                    borderRadius: '6px',
+                    border: '1px solid #d1d5db',
+                    boxSizing: 'border-box',
+                  }}
+                />
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1fr 1fr',
+                  gap: '12px',
+                }}
+              >
                 <div>
-                  <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', marginBottom: '6px', color: '#374151' }}>Precio ($)</label>
-                  <input type="number" step="0.01" min="0" required placeholder="0.00" value={formPrice} onChange={(e) => setFormPrice(e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #d1d5db', boxSizing: 'border-box' }} />
+                  <label
+                    style={{
+                      display: 'block',
+                      fontSize: '13px',
+                      fontWeight: '600',
+                      marginBottom: '6px',
+                      color: '#374151',
+                    }}
+                  >
+                    Precio ($)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    required
+                    placeholder="0.00"
+                    value={formPrice}
+                    onChange={(e) => setFormPrice(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '10px',
+                      borderRadius: '6px',
+                      border: '1px solid #d1d5db',
+                      boxSizing: 'border-box',
+                    }}
+                  />
                 </div>
                 {!editingProduct && (
                   <div>
-                    <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', marginBottom: '6px', color: '#374151' }}>Stock Inicial</label>
-                    <input type="number" min="0" required placeholder="0" value={formStock} onChange={(e) => setFormStock(e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #d1d5db', boxSizing: 'border-box' }} />
+                    <label
+                      style={{
+                        display: 'block',
+                        fontSize: '13px',
+                        fontWeight: '600',
+                        marginBottom: '6px',
+                        color: '#374151',
+                      }}
+                    >
+                      Stock Inicial
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      required
+                      placeholder="0"
+                      value={formStock}
+                      onChange={(e) => setFormStock(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '10px',
+                        borderRadius: '6px',
+                        border: '1px solid #d1d5db',
+                        boxSizing: 'border-box',
+                      }}
+                    />
                   </div>
                 )}
               </div>
               <div>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', marginBottom: '6px', color: '#374151' }}>Foto del Producto (Única)</label>
+                <label
+                  style={{
+                    display: 'block',
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    marginBottom: '6px',
+                    color: '#374151',
+                  }}
+                >
+                  Foto del Producto (Única)
+                </label>
                 {!imagePreview ? (
-                  <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', padding: '12px 16px', backgroundColor: '#f8fafc', color: '#111827', border: '2px dashed #d1d5db', borderRadius: '8px', cursor: 'pointer', fontWeight: '600', fontSize: '14px', transition: 'all 0.2s', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}>
+                  <label
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '10px',
+                      padding: '12px 16px',
+                      backgroundColor: '#f8fafc',
+                      color: '#111827',
+                      border: '2px dashed #d1d5db',
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      fontWeight: '600',
+                      fontSize: '14px',
+                      transition: 'all 0.2s',
+                      boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                    }}
+                  >
                     <Upload size={18} color="#dc2626" />
                     <span>Seleccionar Imagen...</span>
-                    <input type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => { if (e.target.files && e.target.files[0]) { const file = e.target.files[0]; setFormImageFile(file); setImagePreview(URL.createObjectURL(file)); e.target.value = null; } }} />
+                    <input
+                      type="file"
+                      accept="image/*"
+                      style={{ display: 'none' }}
+                      onChange={(e) => {
+                        if (e.target.files && e.target.files[0]) {
+                          const file = e.target.files[0];
+                          setFormImageFile(file);
+                          setImagePreview(URL.createObjectURL(file));
+                          e.target.value = null;
+                        }
+                      }}
+                    />
                   </label>
                 ) : (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '8px', border: '1px solid #e5e7eb', borderRadius: '8px', backgroundColor: '#f9fafb' }}>
-                    <img src={imagePreview} alt="Vista previa" style={{ width: '60px', height: '60px', objectFit: 'cover', borderRadius: '6px', border: '1px solid #e5e7eb' }} />
-                    <div style={{ flex: 1, fontSize: '13px', color: '#374151', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{formImageFile ? formImageFile.name : 'Imagen actual del producto'}</div>
-                    <button type="button" onClick={() => { setFormImageFile(null); setImagePreview(''); if (editingProduct) { setEditingProduct({ ...editingProduct, image_url: null }); } }} style={{ background: '#fee2e2', border: 'none', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#b91c1c' }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '12px',
+                      padding: '8px',
+                      border: '1px solid #e5e7eb',
+                      borderRadius: '8px',
+                      backgroundColor: '#f9fafb',
+                    }}
+                  >
+                    <img
+                      src={imagePreview}
+                      alt="Vista previa"
+                      style={{
+                        width: '60px',
+                        height: '60px',
+                        objectFit: 'cover',
+                        borderRadius: '6px',
+                        border: '1px solid #e5e7eb',
+                      }}
+                    />
+                    <div
+                      style={{
+                        flex: 1,
+                        fontSize: '13px',
+                        color: '#374151',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {formImageFile
+                        ? formImageFile.name
+                        : 'Imagen actual del producto'}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFormImageFile(null);
+                        setImagePreview('');
+                        if (editingProduct) {
+                          setEditingProduct({
+                            ...editingProduct,
+                            image_url: null,
+                          });
+                        }
+                      }}
+                      style={{
+                        background: '#fee2e2',
+                        border: 'none',
+                        borderRadius: '50%',
+                        width: '32px',
+                        height: '32px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer',
+                        color: '#b91c1c',
+                      }}
+                    >
                       <X size={18} />
                     </button>
                   </div>
                 )}
               </div>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '10px' }}>
-                <button type="button" onClick={closeModals} style={{ padding: '10px 16px', backgroundColor: '#f3f4f6', color: '#374151', border: 'none', borderRadius: '6px', fontWeight: '600', cursor: 'pointer' }}>Cancelar</button>
-                <button type="submit" style={{ padding: '10px 20px', backgroundColor: '#dc2626', color: '#ffffff', border: 'none', borderRadius: '6px', fontWeight: '600', cursor: 'pointer' }}>Guardar Producto</button>
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'flex-end',
+                  gap: '12px',
+                  marginTop: '10px',
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={closeModals}
+                  style={{
+                    padding: '10px 16px',
+                    backgroundColor: '#f3f4f6',
+                    color: '#374151',
+                    border: 'none',
+                    borderRadius: '6px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  style={{
+                    padding: '10px 20px',
+                    backgroundColor: '#dc2626',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '6px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Guardar Producto
+                </button>
               </div>
             </form>
           </div>
@@ -1027,36 +2273,168 @@ export default function Inventory() {
       )}
 
       {/* Modal de Ajuste de Stock */}
-      {adjustingStockProduct && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '16px' }}>
-          <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', width: '100%', maxWidth: '400px', padding: '24px', boxShadow: '0 10px 25px rgba(0,0,0,0.15)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <h2 style={{ fontSize: '16px', fontWeight: 'bold', color: '#111827' }}>Ajuste de Inventario</h2>
-              <button type="button" onClick={closeModals} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
+      {adjustingStockProduct && canManage && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            padding: '16px',
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: '#ffffff',
+              borderRadius: '12px',
+              width: '100%',
+              maxWidth: '400px',
+              padding: '24px',
+              boxShadow: '0 10px 25px rgba(0,0,0,0.15)',
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '16px',
+              }}
+            >
+              <h2
+                style={{
+                  fontSize: '16px',
+                  fontWeight: 'bold',
+                  color: '#111827',
+                }}
+              >
+                Ajuste de Inventario
+              </h2>
+              <button
+                type="button"
+                onClick={closeModals}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                }}
+              >
                 <X size={20} color="#6b7280" />
               </button>
             </div>
-            <p style={{ fontSize: '13px', color: '#6b7280', marginBottom: '16px' }}>
+            <p
+              style={{
+                fontSize: '13px',
+                color: '#6b7280',
+                marginBottom: '16px',
+              }}
+            >
               Producto: <strong>{adjustingStockProduct.description}</strong>
               <br />
-              Stock Actual: <span style={{ color: '#059669', fontWeight: 'bold' }}>{adjustingStockProduct.stock_current} unidades</span>
+              Stock Actual:{' '}
+              <span style={{ color: '#059669', fontWeight: 'bold' }}>
+                {adjustingStockProduct.stock_current} unidades
+              </span>
             </p>
-            <form onSubmit={handleQuickStockAdjustment} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            <form
+              onSubmit={handleQuickStockAdjustment}
+              style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}
+            >
               <div>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', marginBottom: '6px', color: '#374151' }}>Tipo de Ajuste</label>
-                <select value={stockAdjustmentType} onChange={(e) => setStockAdjustmentType(e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #d1d5db' }}>
+                <label
+                  style={{
+                    display: 'block',
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    marginBottom: '6px',
+                    color: '#374151',
+                  }}
+                >
+                  Tipo de Ajuste
+                </label>
+                <select
+                  value={stockAdjustmentType}
+                  onChange={(e) => setStockAdjustmentType(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '10px',
+                    borderRadius: '6px',
+                    border: '1px solid #d1d5db',
+                  }}
+                >
                   <option value="add">Incrementar Stock (+)</option>
                   <option value="subtract">Decrementar Stock (-)</option>
                   <option value="set">Establecer Cantidad Exacta</option>
                 </select>
               </div>
               <div>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', marginBottom: '6px', color: '#374151' }}>Cantidad</label>
-                <input type="number" min="0" required placeholder="Ingrese cantidad" value={stockAdjustmentValue} onChange={(e) => setStockAdjustmentValue(e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #d1d5db', boxSizing: 'border-box' }} />
+                <label
+                  style={{
+                    display: 'block',
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    marginBottom: '6px',
+                    color: '#374151',
+                  }}
+                >
+                  Cantidad
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  required
+                  placeholder="Ingrese cantidad"
+                  value={stockAdjustmentValue}
+                  onChange={(e) => setStockAdjustmentValue(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '10px',
+                    borderRadius: '6px',
+                    border: '1px solid #d1d5db',
+                    boxSizing: 'border-box',
+                  }}
+                />
               </div>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '10px' }}>
-                <button type="button" onClick={closeModals} style={{ padding: '8px 14px', backgroundColor: '#f3f4f6', color: '#374151', border: 'none', borderRadius: '6px', fontWeight: '600', cursor: 'pointer' }}>Cancelar</button>
-                <button type="submit" style={{ padding: '8px 16px', backgroundColor: '#f59e0b', color: '#ffffff', border: 'none', borderRadius: '6px', fontWeight: '600', cursor: 'pointer' }}>Aplicar Ajuste</button>
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'flex-end',
+                  gap: '10px',
+                  marginTop: '10px',
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={closeModals}
+                  style={{
+                    padding: '8px 14px',
+                    backgroundColor: '#f3f4f6',
+                    color: '#374151',
+                    border: 'none',
+                    borderRadius: '6px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  style={{
+                    padding: '8px 16px',
+                    backgroundColor: '#f59e0b',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '6px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Aplicar Ajuste
+                </button>
               </div>
             </form>
           </div>
@@ -1065,12 +2443,47 @@ export default function Inventory() {
 
       {/* Modal para Ampliar Imagen */}
       {selectedImageModal && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, padding: '16px' }} onClick={() => setSelectedImageModal(null)}>
-          <div style={{ position: 'relative', maxWidth: '90%', maxHeight: '90%' }}>
-            <button type="button" onClick={() => setSelectedImageModal(null)} style={{ position: 'absolute', top: '-40px', right: '0', background: 'none', border: 'none', color: '#fff', cursor: 'pointer' }}>
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0,0,0,0.8)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1100,
+            padding: '16px',
+          }}
+          onClick={() => setSelectedImageModal(null)}
+        >
+          <div
+            style={{ position: 'relative', maxWidth: '90%', maxHeight: '90%' }}
+          >
+            <button
+              type="button"
+              onClick={() => setSelectedImageModal(null)}
+              style={{
+                position: 'absolute',
+                top: '-40px',
+                right: '0',
+                background: 'none',
+                border: 'none',
+                color: '#fff',
+                cursor: 'pointer',
+              }}
+            >
               <X size={28} />
             </button>
-            <img src={selectedImageModal} alt="Ampliada" style={{ maxWidth: '100%', maxHeight: '80vh', borderRadius: '8px', objectFit: 'contain' }} />
+            <img
+              src={selectedImageModal}
+              alt="Ampliada"
+              style={{
+                maxWidth: '100%',
+                maxHeight: '80vh',
+                borderRadius: '8px',
+                objectFit: 'contain',
+              }}
+            />
           </div>
         </div>
       )}
