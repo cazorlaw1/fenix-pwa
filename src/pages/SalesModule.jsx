@@ -39,7 +39,7 @@ const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-// --- COMPONENTE SEARCHABLE DROPDOWN (ESTILO ADMINMODULE - GRANDE) ---
+// --- COMPONENTE SEARCHABLE DROPDOWN (ACTUALIZADO CON MINIATURA) ---
 function SearchableDropdown({
   options,
   value,
@@ -47,6 +47,7 @@ function SearchableDropdown({
   placeholder,
   labelKey = 'label',
   valueKey = 'value',
+  imageKey = 'image_url',
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState('');
@@ -80,7 +81,7 @@ function SearchableDropdown({
         onClick={() => setIsOpen(!isOpen)}
         style={{
           width: '100%',
-          padding: '10px 12px',
+          padding: '8px 12px',
           fontSize: '14px',
           border: '1px solid #D1D5DB',
           borderRadius: '6px',
@@ -91,18 +92,43 @@ function SearchableDropdown({
           justifyContent: 'space-between',
           alignItems: 'center',
           minHeight: '42px',
+          gap: '8px',
         }}
       >
-        <span
+        <div
           style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
             overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
           }}
         >
-          {selectedOption ? selectedOption[labelKey] : placeholder}
+          {selectedOption && selectedOption[imageKey] ? (
+            <img
+              src={selectedOption[imageKey]}
+              alt="Miniatura"
+              style={{
+                width: '28px',
+                height: '28px',
+                objectFit: 'cover',
+                borderRadius: '4px',
+                flexShrink: 0,
+              }}
+            />
+          ) : null}
+          <span
+            style={{
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {selectedOption ? selectedOption[labelKey] : placeholder}
+          </span>
+        </div>
+        <span style={{ fontSize: '12px', color: '#6b7280', flexShrink: 0 }}>
+          ▼
         </span>
-        <span style={{ fontSize: '12px', color: '#6b7280' }}>▼</span>
       </div>
       {isOpen && (
         <div
@@ -171,16 +197,51 @@ function SearchableDropdown({
                         : 'transparent')
                   }
                   style={{
-                    padding: '10px 12px',
+                    padding: '8px 12px',
                     fontSize: '14px',
                     cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
                     backgroundColor:
                       String(value) === String(opt[valueKey])
                         ? '#eff6ff'
                         : 'transparent',
                   }}
                 >
-                  {opt[labelKey]}
+                  {opt[imageKey] ? (
+                    <img
+                      src={opt[imageKey]}
+                      alt=""
+                      style={{
+                        width: '32px',
+                        height: '32px',
+                        objectFit: 'cover',
+                        borderRadius: '4px',
+                        flexShrink: 0,
+                        border: '1px solid #e5e7eb',
+                      }}
+                    />
+                  ) : (
+                    <div
+                      style={{
+                        width: '32px',
+                        height: '32px',
+                        backgroundColor: '#e5e7eb',
+                        borderRadius: '4px',
+                        flexShrink: 0,
+                      }}
+                    />
+                  )}
+                  <span
+                    style={{
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {opt[labelKey]}
+                  </span>
                 </div>
               ))
             )}
@@ -190,7 +251,6 @@ function SearchableDropdown({
     </div>
   );
 }
-
 // ---------------------------------------------------------------
 export default function SalesModule() {
   const { user, role } = useAuth();
@@ -4056,6 +4116,7 @@ export default function SalesModule() {
                   href={imageModal.url}
                   target="_blank"
                   rel="noreferrer"
+                  download
                   style={{
                     fontSize: '11px',
                     fontWeight: '700',
@@ -4064,39 +4125,49 @@ export default function SalesModule() {
                     display: 'flex',
                     alignItems: 'center',
                     gap: '4px',
+                    backgroundColor: '#EFF6FF',
+                    padding: '4px 8px',
+                    borderRadius: '4px',
+                    border: '1px solid #BFDBFE',
                   }}
                 >
                   <Download style={{ width: '14px', height: '14px' }} />{' '}
                   Descargar
                 </a>
-                <label
-                  style={{
-                    fontSize: '11px',
-                    fontWeight: '700',
-                    color: '#16A34A',
-                    textDecoration: 'none',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                    cursor: 'pointer',
-                    backgroundColor: '#F0FDF4',
-                    padding: '4px 8px',
-                    borderRadius: '4px',
-                    border: '1px solid #BBF7D0',
-                  }}
-                >
-                  <Upload style={{ width: '14px', height: '14px' }} /> Sustituir
-                  <input
-                    type="file"
-                    accept="image/*"
-                    style={{ display: 'none' }}
-                    onChange={(e) => {
-                      if (e.target.files && e.target.files[0]) {
-                        handleReplaceImageFromModal(e.target.files[0]);
-                      }
+
+                {/* Ocultamos el botón "Sustituir" si proviene de la selección de inventario de productos */}
+                {!imageModal.isReadOnlyProduct && (
+                  <label
+                    style={{
+                      fontSize: '11px',
+                      fontWeight: '700',
+                      color: '#16A34A',
+                      textDecoration: 'none',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      cursor: 'pointer',
+                      backgroundColor: '#F0FDF4',
+                      padding: '4px 8px',
+                      borderRadius: '4px',
+                      border: '1px solid #BBF7D0',
                     }}
-                  />
-                </label>
+                  >
+                    <Upload style={{ width: '14px', height: '14px' }} />{' '}
+                    Sustituir
+                    <input
+                      type="file"
+                      accept="image/*"
+                      style={{ display: 'none' }}
+                      onChange={(e) => {
+                        if (e.target.files && e.target.files[0]) {
+                          handleReplaceImageFromModal(e.target.files[0]);
+                        }
+                      }}
+                    />
+                  </label>
+                )}
+
                 <button
                   onClick={() =>
                     setImageModal({
@@ -4105,6 +4176,7 @@ export default function SalesModule() {
                       title: '',
                       clientId: null,
                       fieldName: null,
+                      isReadOnlyProduct: false,
                     })
                   }
                   style={{
@@ -7234,12 +7306,16 @@ export default function SalesModule() {
                 </div>
               </div>
 
+              {/* Sección de Selección de Producto con Imagen Arriba y Descripción */}
               <div
                 style={{
                   backgroundColor: '#ffffff',
                   padding: '16px',
                   borderRadius: '12px',
                   border: '1px solid #E5E7EB',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '12px',
                 }}
               >
                 <h3
@@ -7247,45 +7323,133 @@ export default function SalesModule() {
                     fontSize: '13px',
                     fontWeight: '900',
                     textTransform: 'uppercase',
-                    marginBottom: '8px',
+                    margin: 0,
                   }}
                 >
                   Agregar Productos
                 </h3>
+
+                {/* Selector desplegable arriba */}
+                <div style={{ width: '100%' }}>
+                  <SearchableDropdown
+                    options={filteredProducts.map((p) => {
+                      const desc =
+                        p.price_usd * (1 - porcentajeDescuento / 100);
+                      return {
+                        value: p.id,
+                        label: `[${p.code}] ${p.description} | Stock: ${
+                          p.stock_current
+                        } | Base: $${p.price_usd.toFixed(
+                          2
+                        )} | Desc: $${desc.toFixed(2)}`,
+                        image_url: p.image_url,
+                      };
+                    })}
+                    value={neSelectedProdId}
+                    onChange={setNeSelectedProdId}
+                    placeholder="-- Seleccionar producto --"
+                    imageKey="image_url"
+                  />
+                </div>
+
+                {/* Visualización de la imagen y breve descripción debajo del selector */}
+                {neSelectedProdId &&
+                  (() => {
+                    const selectedProd = products.find(
+                      (p) => p.id === neSelectedProdId
+                    );
+                    if (!selectedProd) return null;
+                    return (
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '12px',
+                          padding: '10px',
+                          backgroundColor: '#f8fafc',
+                          borderRadius: '8px',
+                          border: '1px solid #e2e8f0',
+                        }}
+                      >
+                        {selectedProd.image_url ? (
+                          <img
+                            src={selectedProd.image_url}
+                            alt="Producto"
+                            title="Haz clic para ver imagen en grande"
+                            onClick={() =>
+                              setImageModal({
+                                open: true,
+                                url: selectedProd.image_url,
+                                title: `Imagen de ${selectedProd.description}`,
+                                clientId: null,
+                                fieldName: null,
+                                isReadOnlyProduct: true,
+                              })
+                            }
+                            style={{
+                              width: '60px',
+                              height: '60px',
+                              objectFit: 'cover',
+                              borderRadius: '6px',
+                              border: '1px solid #cbd5e1',
+                              cursor: 'pointer',
+                              flexShrink: 0,
+                            }}
+                          />
+                        ) : (
+                          <div
+                            style={{
+                              width: '60px',
+                              height: '60px',
+                              backgroundColor: '#e2e8f0',
+                              borderRadius: '6px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: '10px',
+                              color: '#64748b',
+                              flexShrink: 0,
+                            }}
+                          >
+                            Sin Foto
+                          </div>
+                        )}
+                        <div style={{ flex: 1, minWidth: '0' }}>
+                          <div
+                            style={{
+                              fontSize: '12px',
+                              fontWeight: '700',
+                              color: '#1e293b',
+                              marginBottom: '2px',
+                            }}
+                          >
+                            {selectedProd.code} - {selectedProd.description}
+                          </div>
+                          <div style={{ fontSize: '11px', color: '#64748b' }}>
+                            Stock disponible:{' '}
+                            <strong style={{ color: '#0f172a' }}>
+                              {selectedProd.stock_current} un.
+                            </strong>{' '}
+                            | Precio Base:{' '}
+                            <strong style={{ color: '#059669' }}>
+                              ${Number(selectedProd.price_usd).toFixed(2)}
+                            </strong>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                {/* Controles de cantidad y botón de agregar */}
                 <div
                   style={{
                     display: 'flex',
-                    flexWrap: 'wrap',
                     gap: '10px',
                     alignItems: 'flex-end',
+                    justifyContent: 'flex-end',
                   }}
                 >
-                  <div
-                    style={{
-                      flex: '1 1 300px',
-                      minWidth: '0',
-                      maxWidth: '100%',
-                    }}
-                  >
-                    <SearchableDropdown
-                      options={filteredProducts.map((p) => {
-                        const desc =
-                          p.price_usd * (1 - porcentajeDescuento / 100);
-                        return {
-                          value: p.id,
-                          label: `[${p.code}] ${p.description} | Stock: ${
-                            p.stock_current
-                          } | Base: $${p.price_usd.toFixed(
-                            2
-                          )} | Desc: $${desc.toFixed(2)}`,
-                        };
-                      })}
-                      value={neSelectedProdId}
-                      onChange={setNeSelectedProdId}
-                      placeholder="-- Seleccionar producto --"
-                    />
-                  </div>
-                  <div style={{ width: '100px' }}>
+                  <div style={{ width: '120px' }}>
                     <label
                       style={{
                         display: 'block',
@@ -7326,7 +7490,7 @@ export default function SalesModule() {
                       height: '42px',
                     }}
                   >
-                    Agregar
+                    Agregar al Carrito
                   </button>
                 </div>
               </div>
@@ -10298,12 +10462,16 @@ export default function SalesModule() {
                 </div>
               </div>
 
+              {/* Sección de Selección de Producto con Imagen Arriba y Descripción (Panel Editable / Editar N.E.) */}
               <div
                 style={{
                   backgroundColor: '#ffffff',
                   padding: '16px',
                   borderRadius: '12px',
                   border: '1px solid #E5E7EB',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '12px',
                 }}
               >
                 <h3
@@ -10311,49 +10479,142 @@ export default function SalesModule() {
                     fontSize: '13px',
                     fontWeight: '900',
                     textTransform: 'uppercase',
-                    marginBottom: '8px',
+                    margin: 0,
                   }}
                 >
                   Agregar Productos
                 </h3>
+
+                {/* Selector desplegable arriba */}
+                <div style={{ width: '100%' }}>
+                  <SearchableDropdown
+                    options={products
+                      .filter(
+                        (p) =>
+                          !p.category ||
+                          p.category.toLowerCase() ===
+                            editNeForm.category.toLowerCase()
+                      )
+                      .map((p) => {
+                        const descPct = getDiscountPercent(
+                          editNeForm.payment_discount
+                        );
+                        const desc = p.price_usd * (1 - descPct / 100);
+                        return {
+                          value: p.id,
+                          label: `[${p.code}] ${p.description} | Stock: ${
+                            p.stock_current
+                          } | Base: $${p.price_usd.toFixed(
+                            2
+                          )} | Desc: $${desc.toFixed(2)}`,
+                          image_url: p.image_url,
+                        };
+                      })}
+                    value={editNeSelectedProdId}
+                    onChange={setEditNeSelectedProdId}
+                    placeholder="-- Seleccionar producto --"
+                    imageKey="image_url"
+                  />
+                </div>
+
+                {/* Visualización de la imagen y breve descripción debajo del selector */}
+                {editNeSelectedProdId &&
+                  (() => {
+                    const selectedProd = products.find(
+                      (p) => p.id === editNeSelectedProdId
+                    );
+                    if (!selectedProd) return null;
+                    return (
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '12px',
+                          padding: '10px',
+                          backgroundColor: '#f8fafc',
+                          borderRadius: '8px',
+                          border: '1px solid #e2e8f0',
+                        }}
+                      >
+                        {selectedProd.image_url ? (
+                          <img
+                            src={selectedProd.image_url}
+                            alt="Producto"
+                            title="Haz clic para ver imagen en grande"
+                            onClick={() =>
+                              setImageModal({
+                                open: true,
+                                url: selectedProd.image_url,
+                                title: `Imagen de ${selectedProd.description}`,
+                                clientId: null,
+                                fieldName: null,
+                                isReadOnlyProduct: true,
+                              })
+                            }
+                            style={{
+                              width: '60px',
+                              height: '60px',
+                              objectFit: 'cover',
+                              borderRadius: '6px',
+                              border: '1px solid #cbd5e1',
+                              cursor: 'pointer',
+                              flexShrink: 0,
+                            }}
+                          />
+                        ) : (
+                          <div
+                            style={{
+                              width: '60px',
+                              height: '60px',
+                              backgroundColor: '#e2e8f0',
+                              borderRadius: '6px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: '10px',
+                              color: '#64748b',
+                              flexShrink: 0,
+                            }}
+                          >
+                            Sin Foto
+                          </div>
+                        )}
+                        <div style={{ flex: 1, minWidth: '0' }}>
+                          <div
+                            style={{
+                              fontSize: '12px',
+                              fontWeight: '700',
+                              color: '#1e293b',
+                              marginBottom: '2px',
+                            }}
+                          >
+                            {selectedProd.code} - {selectedProd.description}
+                          </div>
+                          <div style={{ fontSize: '11px', color: '#64748b' }}>
+                            Stock disponible:{' '}
+                            <strong style={{ color: '#0f172a' }}>
+                              {selectedProd.stock_current} un.
+                            </strong>{' '}
+                            | Precio Base:{' '}
+                            <strong style={{ color: '#059669' }}>
+                              ${Number(selectedProd.price_usd).toFixed(2)}
+                            </strong>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                {/* Controles de cantidad y botón de agregar */}
                 <div
                   style={{
                     display: 'flex',
-                    flexWrap: 'wrap',
                     gap: '10px',
                     alignItems: 'flex-end',
+                    justifyContent: 'flex-end',
                   }}
                 >
-                  <div style={{ flex: '1 1 300px' }}>
-                    <SearchableDropdown
-                      options={products
-                        .filter(
-                          (p) =>
-                            !p.category ||
-                            p.category.toLowerCase() ===
-                              editNeForm.category.toLowerCase()
-                        )
-                        .map((p) => {
-                          const descPct = getDiscountPercent(
-                            editNeForm.payment_discount
-                          );
-                          const desc =
-                            Number(p.price_usd) * (1 - descPct / 100);
-                          return {
-                            value: p.id,
-                            label: `${p.description} | Stock: ${
-                              p.stock_current
-                            } | Base: $${Number(p.price_usd).toFixed(
-                              2
-                            )} | Desc: $${desc.toFixed(2)}`,
-                          };
-                        })}
-                      value={editNeSelectedProdId}
-                      onChange={setEditNeSelectedProdId}
-                      placeholder="Seleccionar del catálogo..."
-                    />
-                  </div>
-                  <div style={{ width: '100px' }}>
+                  <div style={{ width: '120px' }}>
                     <label
                       style={{
                         display: 'block',
@@ -10381,11 +10642,10 @@ export default function SalesModule() {
                     />
                   </div>
                   <button
-                    type="button"
                     onClick={handleEditNeAddProduct}
                     style={{
                       padding: '10px 20px',
-                      backgroundColor: '#059669',
+                      backgroundColor: '#DC2626',
                       color: '#FFFFFF',
                       border: 'none',
                       borderRadius: '6px',
