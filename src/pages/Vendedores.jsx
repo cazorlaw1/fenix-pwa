@@ -36,7 +36,7 @@ export default function Vendedores({ currentUser }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [teamClients, setTeamClients] = useState([]);
   const [teamPotentials, setTeamPotentials] = useState([]);
-  
+
   // Estado para el Menú Dropdown en Móvil
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const mobileMenuRef = useRef(null);
@@ -165,6 +165,7 @@ export default function Vendedores({ currentUser }) {
     const neCerradas = (row.sales_orders || []).filter(
       (o) => o.payment_status === 'cerrada'
     ).length;
+
     switch (key) {
       case 'name':
         return row.name || '';
@@ -253,13 +254,50 @@ export default function Vendedores({ currentUser }) {
     [teamClients, teamPotentials]
   );
 
+  // MODIFICACIÓN A: Filtrado de Visitas basado en searchTerm
   const filteredVisits = useMemo(() => {
     return allVisits.filter((c) => {
+      // 1. Filtro por tipo (Oficial/Potencial)
       if (c.is_potential && !visitFilters.potential) return false;
       if (!c.is_potential && !visitFilters.official) return false;
+
+      // 2. Filtro por búsqueda de texto
+      if (searchTerm) {
+        const term = searchTerm.toLowerCase();
+
+        // Campos a buscar
+        const clientName = c.name?.toLowerCase() || '';
+        const ciNumber = c.ci_number?.toLowerCase() || '';
+        const rifNumber = c.rif_number?.toLowerCase() || '';
+        const sellerName = c.profiles?.full_name?.toLowerCase() || '';
+
+        // Formatear fecha para búsqueda
+        let visitDateStr = '';
+        if (c.last_visit_at) {
+          try {
+            visitDateStr = new Date(c.last_visit_at)
+              .toLocaleDateString()
+              .toLowerCase();
+          } catch (e) {
+            visitDateStr = '';
+          }
+        }
+
+        // Verificar coincidencia
+        if (
+          !clientName.includes(term) &&
+          !ciNumber.includes(term) &&
+          !rifNumber.includes(term) &&
+          !sellerName.includes(term) &&
+          !visitDateStr.includes(term)
+        ) {
+          return false;
+        }
+      }
+
       return true;
     });
-  }, [allVisits, visitFilters]);
+  }, [allVisits, visitFilters, searchTerm]);
 
   const sortedVisits = useMemo(
     () =>
@@ -323,7 +361,7 @@ export default function Vendedores({ currentUser }) {
       // A. Modificación: Seleccionar explícitamente el campo 'city' de profiles
       const { data: allProfiles, error: profilesError } = await supabase
         .from('profiles')
-        .select('*') 
+        .select('*')
         .not('role', 'is', null)
         .neq('role', 'pendiente')
         .neq('role', 'stock');
@@ -332,6 +370,7 @@ export default function Vendedores({ currentUser }) {
 
       let globalConfig = null;
       let assignments = [];
+
       if (currentUser?.id) {
         const { data: cfg } = await supabase
           .from('hierarchy_config')
@@ -352,6 +391,7 @@ export default function Vendedores({ currentUser }) {
         .select(
           'id, seller_id, balance_due_usd, closed_at, payment_status, final_price_usd, category'
         );
+
       if (ordersError)
         console.warn('Error cargando ordenes:', ordersError.message);
 
@@ -516,11 +556,16 @@ export default function Vendedores({ currentUser }) {
     // Valores por defecto si no se cargan de la BD, pero idealmente deberían venir de global_settings
     // Aquí usamos los valores estándar mencionados en SalesModule
     switch (String(type)) {
-      case '53.38': return 53.38;
-      case '23.08': return 23.08;
-      case '10': return 10;
-      case '0': return 0;
-      default: return 53.38;
+      case '53.38':
+        return 53.38;
+      case '23.08':
+        return 23.08;
+      case '10':
+        return 10;
+      case '0':
+        return 0;
+      default:
+        return 53.38;
     }
   };
 
@@ -535,11 +580,11 @@ export default function Vendedores({ currentUser }) {
         .order('created_at', { ascending: false });
 
       // Procesar órdenes para añadir porcentaje de descuento legible
-      const processedOrders = (data || []).map(order => {
+      const processedOrders = (data || []).map((order) => {
         const discountPct = getDiscountPercentFromType(order.payment_discount);
         return {
           ...order,
-          discount_percent: discountPct
+          discount_percent: discountPct,
         };
       });
 
@@ -560,13 +605,12 @@ export default function Vendedores({ currentUser }) {
         .from('order_items')
         .select('*, products(code, description)')
         .eq('order_id', order.id);
-      
-      if (error) throw error;
 
+      if (error) throw error;
       setNeDetailModal({
         open: true,
         order: order,
-        items: items || []
+        items: items || [],
       });
     } catch (err) {
       console.error(err);
@@ -612,7 +656,12 @@ export default function Vendedores({ currentUser }) {
     },
   ];
 
-  if (loading && activeTab !== 'visitas' && !historyModal.open && !neDetailModal.open) {
+  if (
+    loading &&
+    activeTab !== 'visitas' &&
+    !historyModal.open &&
+    !neDetailModal.open
+  ) {
     return <div style={{ padding: '24px' }}>Cargando módulo...</div>;
   }
 
@@ -650,6 +699,7 @@ export default function Vendedores({ currentUser }) {
             Gestión de Vendedores
           </h2>
         </div>
+
         {/* BUSCADOR ACTUALIZADO */}
         <div style={{ position: 'relative' }}>
           <Search
@@ -664,7 +714,7 @@ export default function Vendedores({ currentUser }) {
           />
           <input
             type="text"
-            placeholder="Buscar vendedor o ciudad..."
+            placeholder="Buscar vendedor, ciudad o visita..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             style={{
@@ -1014,7 +1064,6 @@ export default function Vendedores({ currentUser }) {
                 {sortedVisits.length} de {allVisits.length}
               </span>
             </div>
-
             <table
               className="custom-responsive-table"
               style={{
@@ -1103,7 +1152,6 @@ export default function Vendedores({ currentUser }) {
                           `${client.last_gps_location.lat},${client.last_gps_location.lng}`
                         )}`
                       : null;
-
                     return (
                       <tr
                         key={client.id}
@@ -1300,7 +1348,6 @@ export default function Vendedores({ currentUser }) {
                               ).toLocaleDateString()
                             : 'Sin registro'}
                         </td>
-
                         {/* Móvil: Tarjeta Apilada */}
                         <td
                           className="mobile-cell-stacked"
@@ -1778,7 +1825,6 @@ export default function Vendedores({ currentUser }) {
                         <Eye size={12} /> Ver Historial
                       </button>
                     </td>
-
                     {/* Móvil: Tarjeta Apilada */}
                     <td
                       className="mobile-cell-stacked"
@@ -1821,7 +1867,6 @@ export default function Vendedores({ currentUser }) {
                           <Eye size={10} /> Historial
                         </button>
                       </div>
-                      
                       {/* C. Adaptación Responsiva: Campo Ciudad en Móvil */}
                       <div
                         style={{
@@ -1837,7 +1882,6 @@ export default function Vendedores({ currentUser }) {
                           {v.city || 'N/A'}
                         </span>
                       </div>
-
                       <div
                         style={{
                           display: 'flex',
@@ -2076,7 +2120,6 @@ export default function Vendedores({ currentUser }) {
                     >
                       ${v.comisionTotalUSD.toFixed(2)}
                     </td>
-
                     {/* Móvil: Tarjeta Apilada */}
                     <td
                       className="mobile-cell-stacked"
@@ -2417,7 +2460,9 @@ export default function Vendedores({ currentUser }) {
                             color: '#4b5563',
                           }}
                         >
-                          {nota.discount_percent ? `${nota.discount_percent}%` : '-'}
+                          {nota.discount_percent
+                            ? `${nota.discount_percent}%`
+                            : '-'}
                         </td>
                         {/* B. Botón Ver Escritorio */}
                         <td
@@ -2443,7 +2488,6 @@ export default function Vendedores({ currentUser }) {
                             <Eye size={10} /> Ver
                           </button>
                         </td>
-
                         {/* Móvil: Tarjeta Apilada */}
                         <td
                           className="mobile-cell-stacked"
@@ -2575,7 +2619,9 @@ export default function Vendedores({ currentUser }) {
                               Descuento:
                             </span>
                             <span style={{ color: '#4b5563' }}>
-                              {nota.discount_percent ? `${nota.discount_percent}%` : '-'}
+                              {nota.discount_percent
+                                ? `${nota.discount_percent}%`
+                                : '-'}
                             </span>
                           </div>
                           {/* C. Adaptación Responsiva: Botón Ver en Móvil */}
@@ -2629,7 +2675,9 @@ export default function Vendedores({ currentUser }) {
             zIndex: 3000,
             padding: '16px',
           }}
-          onClick={() => setNeDetailModal({ open: false, order: null, items: [] })}
+          onClick={() =>
+            setNeDetailModal({ open: false, order: null, items: [] })
+          }
         >
           <div
             style={{
@@ -2646,7 +2694,9 @@ export default function Vendedores({ currentUser }) {
             onClick={(e) => e.stopPropagation()}
           >
             <button
-              onClick={() => setNeDetailModal({ open: false, order: null, items: [] })}
+              onClick={() =>
+                setNeDetailModal({ open: false, order: null, items: [] })
+              }
               style={{
                 position: 'absolute',
                 top: '16px',
@@ -2663,7 +2713,6 @@ export default function Vendedores({ currentUser }) {
             >
               Cerrar Panel
             </button>
-
             <div
               style={{
                 display: 'flex',
@@ -2676,12 +2725,15 @@ export default function Vendedores({ currentUser }) {
             >
               <div>
                 <h2 style={{ fontSize: '18px', fontWeight: '900', margin: 0 }}>
-                  Visualización - Nota de Entrega #{neDetailModal.order.transaction_number || neDetailModal.order.id.substring(0, 6)}
+                  Visualización - Nota de Entrega #
+                  {neDetailModal.order.transaction_number ||
+                    neDetailModal.order.id.substring(0, 6)}
                 </h2>
               </div>
             </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div
+              style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}
+            >
               {/* Cabecera de la Orden */}
               <div
                 style={{
@@ -2695,34 +2747,87 @@ export default function Vendedores({ currentUser }) {
                 }}
               >
                 <div>
-                  <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', marginBottom: '4px' }}>
+                  <label
+                    style={{
+                      display: 'block',
+                      fontSize: '12px',
+                      fontWeight: '700',
+                      marginBottom: '4px',
+                    }}
+                  >
                     Cliente
                   </label>
-                  <div style={{ padding: '10px 12px', fontSize: '14px', border: '1px solid #D1D5DB', borderRadius: '6px', backgroundColor: '#F9FAFB' }}>
+                  <div
+                    style={{
+                      padding: '10px 12px',
+                      fontSize: '14px',
+                      border: '1px solid #D1D5DB',
+                      borderRadius: '6px',
+                      backgroundColor: '#F9FAFB',
+                    }}
+                  >
                     {neDetailModal.order.clients?.name || 'N/A'}
                   </div>
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', marginBottom: '4px' }}>
+                  <label
+                    style={{
+                      display: 'block',
+                      fontSize: '12px',
+                      fontWeight: '700',
+                      marginBottom: '4px',
+                    }}
+                  >
                     Categoría
                   </label>
-                  <div style={{ padding: '10px 12px', fontSize: '14px', border: '1px solid #D1D5DB', borderRadius: '6px', backgroundColor: '#F9FAFB' }}>
+                  <div
+                    style={{
+                      padding: '10px 12px',
+                      fontSize: '14px',
+                      border: '1px solid #D1D5DB',
+                      borderRadius: '6px',
+                      backgroundColor: '#F9FAFB',
+                    }}
+                  >
                     {neDetailModal.order.category || 'General'}
                   </div>
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', marginBottom: '4px' }}>
+                  <label
+                    style={{
+                      display: 'block',
+                      fontSize: '12px',
+                      fontWeight: '700',
+                      marginBottom: '4px',
+                    }}
+                  >
                     Modalidad de Pago
                   </label>
-                  <div style={{ padding: '10px 12px', fontSize: '14px', border: '1px solid #F59E0B', borderRadius: '6px', backgroundColor: '#FEF3C7', color: '#78350F', fontWeight: '700' }}>
-                    {getDiscountPercentFromType(neDetailModal.order.payment_discount)}% 
-                    {String(neDetailModal.order.payment_discount) === '53.38' ? ' ($)' : 
-                     String(neDetailModal.order.payment_discount) === '23.08' ? ' (Bs)' : 
-                     String(neDetailModal.order.payment_discount) === '10' ? ' (Esp)' : ' (0)'}
+                  <div
+                    style={{
+                      padding: '10px 12px',
+                      fontSize: '14px',
+                      border: '1px solid #F59E0B',
+                      borderRadius: '6px',
+                      backgroundColor: '#FEF3C7',
+                      color: '#78350F',
+                      fontWeight: '700',
+                    }}
+                  >
+                    {getDiscountPercentFromType(
+                      neDetailModal.order.payment_discount
+                    )}
+                    %
+                    {String(neDetailModal.order.payment_discount) === '53.38'
+                      ? ' ($)'
+                      : String(neDetailModal.order.payment_discount) === '23.08'
+                      ? ' (Bs)'
+                      : String(neDetailModal.order.payment_discount) === '10'
+                      ? ' (Esp)'
+                      : ' (0)'}
                   </div>
                 </div>
               </div>
-
               {/* Tabla de Productos (Estilo Solo Lectura) */}
               <div
                 style={{
@@ -2745,7 +2850,9 @@ export default function Vendedores({ currentUser }) {
                   }}
                 >
                   <div>
-                    <h2 style={{ fontSize: '15px', fontWeight: '900', margin: 0 }}>
+                    <h2
+                      style={{ fontSize: '15px', fontWeight: '900', margin: 0 }}
+                    >
                       FENIX AUTO PART C.A
                     </h2>
                     <p style={{ fontWeight: '700', margin: '2px 0' }}>
@@ -2755,15 +2862,17 @@ export default function Vendedores({ currentUser }) {
                   <div style={{ textAlign: 'right' }}>
                     <p style={{ margin: 0 }}>
                       <strong>Fecha/Hora: </strong>{' '}
-                      {new Date(neDetailModal.order.created_at).toLocaleString()}
+                      {new Date(
+                        neDetailModal.order.created_at
+                      ).toLocaleString()}
                     </p>
                     <p style={{ margin: '2px 0' }}>
                       <strong>N° Transacción: </strong> #
-                      {neDetailModal.order.transaction_number || neDetailModal.order.id.substring(0, 6)}
+                      {neDetailModal.order.transaction_number ||
+                        neDetailModal.order.id.substring(0, 6)}
                     </p>
                   </div>
                 </div>
-
                 <div style={{ width: '100%', overflowX: 'auto' }}>
                   <table
                     style={{
@@ -2785,10 +2894,18 @@ export default function Vendedores({ currentUser }) {
                       >
                         <th style={{ padding: '8px' }}>Código</th>
                         <th style={{ padding: '8px' }}>Descripción</th>
-                        <th style={{ padding: '8px', textAlign: 'center' }}>Cantidad</th>
-                        <th style={{ padding: '8px', textAlign: 'right' }}>Valor Unitario</th>
-                        <th style={{ padding: '8px', textAlign: 'right' }}>V. U. con descuento</th>
-                        <th style={{ padding: '8px', textAlign: 'right' }}>Valor Total</th>
+                        <th style={{ padding: '8px', textAlign: 'center' }}>
+                          Cantidad
+                        </th>
+                        <th style={{ padding: '8px', textAlign: 'right' }}>
+                          Valor Unitario
+                        </th>
+                        <th style={{ padding: '8px', textAlign: 'right' }}>
+                          V. U. con descuento
+                        </th>
+                        <th style={{ padding: '8px', textAlign: 'right' }}>
+                          Valor Total
+                        </th>
                       </tr>
                     </thead>
                     <tbody>
@@ -2812,7 +2929,12 @@ export default function Vendedores({ currentUser }) {
                             key={item.id}
                             style={{ borderBottom: '1px solid #E5E7EB' }}
                           >
-                            <td style={{ padding: '8px', fontFamily: 'monospace' }}>
+                            <td
+                              style={{
+                                padding: '8px',
+                                fontFamily: 'monospace',
+                              }}
+                            >
                               {item.products?.code || 'S/C'}
                             </td>
                             <td style={{ padding: '8px', fontWeight: '600' }}>
@@ -2824,10 +2946,25 @@ export default function Vendedores({ currentUser }) {
                             <td style={{ padding: '8px', textAlign: 'right' }}>
                               ${Number(item.unit_price_usd).toFixed(2)}
                             </td>
-                            <td style={{ padding: '8px', textAlign: 'right', color: '#B45309' }}>
-                              ${Number(item.discounted_unit_price_usd).toFixed(2)}
+                            <td
+                              style={{
+                                padding: '8px',
+                                textAlign: 'right',
+                                color: '#B45309',
+                              }}
+                            >
+                              $
+                              {Number(item.discounted_unit_price_usd).toFixed(
+                                2
+                              )}
                             </td>
-                            <td style={{ padding: '8px', textAlign: 'right', fontWeight: '700' }}>
+                            <td
+                              style={{
+                                padding: '8px',
+                                textAlign: 'right',
+                                fontWeight: '700',
+                              }}
+                            >
                               ${Number(item.total_line_usd).toFixed(2)}
                             </td>
                           </tr>
@@ -2836,7 +2973,6 @@ export default function Vendedores({ currentUser }) {
                     </tbody>
                   </table>
                 </div>
-
                 {/* Totales */}
                 <div
                   style={{
@@ -2855,13 +2991,36 @@ export default function Vendedores({ currentUser }) {
                       border: '1px solid #E5E7EB',
                     }}
                   >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        marginBottom: '4px',
+                      }}
+                    >
                       <span>Total sin Descuento:</span>
-                      <strong>${Number(neDetailModal.order.total_base_usd || 0).toFixed(2)}</strong>
+                      <strong>
+                        $
+                        {Number(
+                          neDetailModal.order.total_base_usd || 0
+                        ).toFixed(2)}
+                      </strong>
                     </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', color: '#B45309' }}>
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        marginBottom: '4px',
+                        color: '#B45309',
+                      }}
+                    >
                       <span>Descuento Aplicado:</span>
-                      <strong>-${Number(neDetailModal.order.discount_amount_usd || 0).toFixed(2)}</strong>
+                      <strong>
+                        -$
+                        {Number(
+                          neDetailModal.order.discount_amount_usd || 0
+                        ).toFixed(2)}
+                      </strong>
                     </div>
                     <div
                       style={{
@@ -2875,15 +3034,24 @@ export default function Vendedores({ currentUser }) {
                     >
                       <span>Precio Final:</span>
                       <span style={{ color: '#059669' }}>
-                        ${Number(neDetailModal.order.final_price_usd || 0).toFixed(2)}
+                        $
+                        {Number(
+                          neDetailModal.order.final_price_usd || 0
+                        ).toFixed(2)}
                       </span>
                     </div>
                   </div>
                 </div>
-
                 {/* Observaciones */}
                 <div style={{ marginBottom: '12px' }}>
-                  <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', marginBottom: '4px' }}>
+                  <label
+                    style={{
+                      display: 'block',
+                      fontSize: '12px',
+                      fontWeight: '700',
+                      marginBottom: '4px',
+                    }}
+                  >
                     Observación:
                   </label>
                   <div
@@ -2996,45 +3164,44 @@ export default function Vendedores({ currentUser }) {
           </div>
         </div>
       )}
-
       <style>{`
-     .users-table-container { width: 100%; overflow-x: auto; }
-     .custom-responsive-table { width: 100%; border-collapse: collapse; font-size: 13px; text-align: left; }
-     .mobile-thead { display: none; }
-     .mobile-cell-stacked { display: none; }
-     .desktop-cell-normal { display: table-cell; }
-     .sortable-header { cursor: pointer; user-select: none; transition: background-color 0.15s; }
-     .sortable-header:hover { background-color: #f3f4f6 !important; }
-     /* Media queries para pantallas móviles (Breakpoint: 768px) */
-     @media (max-width: 768px) {
-       body {
-         max-height: 100vh;
-         overflow-y: auto !important;
-       }
-       .desktop-tabs { display: none !important; }
-       .mobile-dropdown-menu { display: block !important; }
-       .users-table-container { overflow-x: hidden !important; }
-       .desktop-thead { display: none !important; }
-       .mobile-thead { display: table-header-group !important; }
-       .desktop-cell-normal { display: none !important; }
-       .mobile-cell-stacked { display: flex !important; flex-direction: column; gap: 6px; padding: 12px !important; }
-       /* Paneles informativos superiores cuadrados y limitados al 20% máx de altura en móvil */
-       .kpi-card, .kpi-card-responsive {
-         height: auto !important;
-         max-height: 20vh !important;
-         padding: 8px !important;
-         text-align: center !important;
-         display: flex !important;
-         flex-direction: column !important;
-         justify-content: center !important;
-         align-items: center !important;
-         overflow: hidden !important;
-       }
-       .kpi-card div, .kpi-card-responsive div {
-         text-align: center !important;
-       }
-     }
-   `}</style>
+  .users-table-container { width: 100%; overflow-x: auto; }
+  .custom-responsive-table { width: 100%; border-collapse: collapse; font-size: 13px; text-align: left; }
+  .mobile-thead { display: none; }
+  .mobile-cell-stacked { display: none; }
+  .desktop-cell-normal { display: table-cell; }
+  .sortable-header { cursor: pointer; user-select: none; transition: background-color 0.15s; }
+  .sortable-header:hover { background-color: #f3f4f6 !important; }
+  /* Media queries para pantallas móviles (Breakpoint: 768px) */
+  @media (max-width: 768px) {
+    body {
+      max-height: 100vh;
+      overflow-y: auto !important;
+    }
+    .desktop-tabs { display: none !important; }
+    .mobile-dropdown-menu { display: block !important; }
+    .users-table-container { overflow-x: hidden !important; }
+    .desktop-thead { display: none !important; }
+    .mobile-thead { display: table-header-group !important; }
+    .desktop-cell-normal { display: none !important; }
+    .mobile-cell-stacked { display: flex !important; flex-direction: column; gap: 6px; padding: 12px !important; }
+    /* Paneles informativos superiores cuadrados y limitados al 20% máx de altura en móvil */
+    .kpi-card, .kpi-card-responsive {
+      height: auto !important;
+      max-height: 20vh !important;
+      padding: 8px !important;
+      text-align: center !important;
+      display: flex !important;
+      flex-direction: column !important;
+      justify-content: center !important;
+      align-items: center !important;
+      overflow: hidden !important;
+    }
+    .kpi-card div, .kpi-card-responsive div {
+      text-align: center !important;
+    }
+  }
+`}</style>
     </div>
   );
 }
@@ -3050,7 +3217,6 @@ function SortableHeader({
 }) {
   const isActive = sortConfig.key === sortKey;
   const direction = isActive ? sortConfig.direction : null;
-
   let Icon = ChevronsUpDown;
   let iconColor = '#9ca3af';
 
