@@ -98,9 +98,9 @@ export default function Users() {
   rif_number: '',
   ci_number: '',
   phone: '',
-  city: '',
-  state: '',
-  address_detail: '',
+  city: '',        // 👈 Obligatorio por la base de datos
+  state: '',       // 👈 Obligatorio o recomendado según esquema
+  address_detail: '', // 👈 Para la dirección
   is_potential: false,
 });
   const [creatingClient, setCreatingClient] = useState(false);
@@ -459,8 +459,8 @@ export default function Users() {
   rif_number: newClientData.rif_number || null,
   ci_number: newClientData.ci_number || null,
   phone: newClientData.phone || null,
-  city: newClientData.city || null,
-  state: newClientData.state || null,
+  city: newClientData.city || 'N/A', // 👈 Evita el error de null constraint
+  state: newClientData.state || 'N/A',
   address_detail: newClientData.address_detail || null,
   is_potential: newClientData.is_potential,
   assigned_seller_id: null,
