@@ -27,20 +27,16 @@ export default function Inventory() {
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
-
   // Estado para el rol del usuario actual
   const [userRole, setUserRole] = useState(null);
-
   // Estado para el menú dropdown en móvil
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const mobileMenuRef = useRef(null);
-
   // Modales
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
   const [adjustingStockProduct, setAdjustingStockProduct] = useState(null);
   const [selectedImageModal, setSelectedImageModal] = useState(null);
-
   // Modales de Importación/Exportación
   const [showExportModal, setShowExportModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
@@ -48,16 +44,15 @@ export default function Inventory() {
   const [importWithImages, setImportWithImages] = useState(false);
   const [exportProcessing, setExportProcessing] = useState(false);
   const [importProcessing, setImportProcessing] = useState(false);
-
   // Formulario de Registro / Edición de Producto
   const [formCode, setFormCode] = useState('');
   const [formDescription, setFormDescription] = useState('');
   const [formCategory, setFormCategory] = useState('bombillos');
-  const [formPrice, setFormPrice] = useState('');
+  const [formPrice, setFormPrice] = useState(''); // Precio Full
+  const [formBasePrice, setFormBasePrice] = useState(''); // Precio Base (Nuevo)
   const [formStock, setFormStock] = useState('');
   const [formImageFile, setFormImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState('');
-
   // Formulario de Ajuste Rápido de Stock
   const [stockAdjustmentValue, setStockAdjustmentValue] = useState('');
   const [stockAdjustmentType, setStockAdjustmentType] = useState('add');
@@ -159,30 +154,42 @@ export default function Inventory() {
       }
 
       if (editingProduct) {
+        const updateData = {
+          code: formCode,
+          description: formDescription,
+          category: formCategory,
+          price_usd: parseFloat(formPrice),
+          image_url: imageUrl,
+          updated_at: new Date(),
+        };
+
+        // Solo agregar base_price si el usuario tiene permisos
+        if (canManage) {
+          updateData.base_price = parseFloat(formBasePrice || 0);
+        }
+
         const { error } = await supabase
           .from('products')
-          .update({
-            code: formCode,
-            description: formDescription,
-            category: formCategory,
-            price_usd: parseFloat(formPrice),
-            image_url: imageUrl,
-            updated_at: new Date(),
-          })
+          .update(updateData)
           .eq('id', editingProduct.id);
         if (error) throw error;
         setSuccessMsg('Producto actualizado exitosamente.');
       } else {
-        const { error } = await supabase.from('products').insert([
-          {
-            code: formCode,
-            description: formDescription,
-            category: formCategory,
-            price_usd: parseFloat(formPrice),
-            stock_current: parseInt(formStock || 0),
-            image_url: imageUrl,
-          },
-        ]);
+        const insertData = {
+          code: formCode,
+          description: formDescription,
+          category: formCategory,
+          price_usd: parseFloat(formPrice),
+          stock_current: parseInt(formStock || 0),
+          image_url: imageUrl,
+        };
+
+        // Solo agregar base_price si el usuario tiene permisos
+        if (canManage) {
+          insertData.base_price = parseFloat(formBasePrice || 0);
+        }
+
+        const { error } = await supabase.from('products').insert([insertData]);
         if (error) throw error;
         setSuccessMsg('Producto registrado exitosamente.');
       }
@@ -227,7 +234,6 @@ export default function Inventory() {
       if (itemsError) {
         console.warn('Error al eliminar order_items relacionados:', itemsError);
       }
-
       const { error } = await supabase
         .from('products')
         .delete()
@@ -279,6 +285,7 @@ export default function Inventory() {
     setFormDescription(product.description);
     setFormCategory(product.category);
     setFormPrice(product.price_usd);
+    setFormBasePrice(product.base_price || ''); // Cargar precio base
     setFormStock(product.stock_current);
     setImagePreview(product.image_url || '');
     setFormImageFile(null);
@@ -291,6 +298,7 @@ export default function Inventory() {
     setFormDescription('');
     setFormCategory(activeCategory);
     setFormPrice('');
+    setFormBasePrice(''); // Resetear precio base
     setFormStock('');
     setImagePreview('');
     setFormImageFile(null);
@@ -332,6 +340,7 @@ export default function Inventory() {
         'description',
         'category',
         'price_usd',
+        'base_price', // Nueva columna
         'stock_current',
         'image_url',
       ];
@@ -340,16 +349,15 @@ export default function Inventory() {
         p.description || '',
         p.category || '',
         p.price_usd || 0,
+        p.base_price || 0, // Nuevo valor
         p.stock_current || 0,
         p.image_url || '',
       ]);
-
       const csvContent = [csvHeaders, ...csvRows]
         .map((row) =>
           row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(',')
         )
         .join('\n');
-
       if (!withImages) {
         const blob = new Blob(['\ufeff' + csvContent], {
           type: 'text/csv;charset=utf-8;',
@@ -434,7 +442,6 @@ export default function Inventory() {
           productsToImport.push(product);
         }
       }
-
       if (withImages && zipFile) {
         const zip = await JSZip.loadAsync(zipFile);
         const imageFolder = zip.folder('imagenes');
@@ -463,7 +470,6 @@ export default function Inventory() {
           }
         }
       }
-
       let importedCount = 0;
       let updatedCount = 0;
       for (const product of productsToImport) {
@@ -473,16 +479,23 @@ export default function Inventory() {
           .eq('code', product.code)
           .single();
         if (existingProduct) {
+          const updateData = {
+            description: product.description,
+            category: product.category,
+            price_usd: parseFloat(product.price_usd) || 0,
+            stock_current: parseInt(product.stock_current) || 0,
+            image_url: product.image_url || null,
+            updated_at: new Date(),
+          };
+
+          // Importar base_price si existe en el CSV
+          if (product.base_price !== undefined) {
+            updateData.base_price = parseFloat(product.base_price) || 0;
+          }
+
           const { error } = await supabase
             .from('products')
-            .update({
-              description: product.description,
-              category: product.category,
-              price_usd: parseFloat(product.price_usd) || 0,
-              stock_current: parseInt(product.stock_current) || 0,
-              image_url: product.image_url || null,
-              updated_at: new Date(),
-            })
+            .update(updateData)
             .eq('id', existingProduct.id);
           if (error) {
             console.warn('Error al actualizar producto:', error);
@@ -490,16 +503,23 @@ export default function Inventory() {
             updatedCount++;
           }
         } else {
-          const { error } = await supabase.from('products').insert([
-            {
-              code: product.code,
-              description: product.description,
-              category: product.category || 'bombillos',
-              price_usd: parseFloat(product.price_usd) || 0,
-              stock_current: parseInt(product.stock_current) || 0,
-              image_url: product.image_url || null,
-            },
-          ]);
+          const insertData = {
+            code: product.code,
+            description: product.description,
+            category: product.category || 'bombillos',
+            price_usd: parseFloat(product.price_usd) || 0,
+            stock_current: parseInt(product.stock_current) || 0,
+            image_url: product.image_url || null,
+          };
+
+          // Importar base_price si existe en el CSV
+          if (product.base_price !== undefined) {
+            insertData.base_price = parseFloat(product.base_price) || 0;
+          }
+
+          const { error } = await supabase
+            .from('products')
+            .insert([insertData]);
           if (error) {
             console.warn('Error al insertar producto:', error);
           } else {
@@ -507,7 +527,6 @@ export default function Inventory() {
           }
         }
       }
-
       setSuccessMsg(
         `Importación completada: ${importedCount} productos nuevos creados, ${updatedCount} productos actualizados${
           withImages ? ' (con imágenes)' : ''
@@ -581,77 +600,75 @@ export default function Inventory() {
     <div style={{ padding: '24px', maxWidth: '1200px', margin: '0 auto' }}>
       {/* Estilos CSS para responsividad */}
       <style>{`
-        @media (max-width: 768px) {
-          .desktop-tabs { display: none !important; }
-          .mobile-dropdown { display: block !important; }
-          .desktop-table { display: none !important; }
-          .mobile-cards { display: block !important; }
-        }
-        @media (min-width: 769px) {
-          .desktop-tabs { display: flex !important; }
-          .mobile-dropdown { display: none !important; }
-          .desktop-table { display: block !important; }
-          .mobile-cards { display: none !important; }
-        }
-        
-        /* Estilos para tarjetas móviles */
-        .mobile-card {
-          background-color: #ffffff;
-          border-radius: 8px;
-          box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-          padding: 16px;
-          margin-bottom: 12px;
-          border: 1px solid #e5e7eb;
-        }
-        .mobile-card-header {
-          display: flex;
-          align-items: center;
-          gap: 12px;
-          margin-bottom: 12px;
-          padding-bottom: 12px;
-          border-bottom: 1px solid #e5e7eb;
-        }
-        .mobile-card-field {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          padding: 8px 0;
-          border-bottom: 1px solid #f3f4f6;
-        }
-        .mobile-card-field:last-child { border-bottom: none; }
-        .mobile-card-label {
-          font-size: 12px;
-          font-weight: 600;
-          color: #6b7280;
-          text-transform: uppercase;
-        }
-        .mobile-card-value {
-          font-size: 14px;
-          color: #111827;
-          font-weight: 500;
-        }
-        .mobile-card-actions {
-          display: flex;
-          gap: 8px;
-          margin-top: 12px;
-          padding-top: 12px;
-          border-top: 1px solid #e5e7eb;
-        }
-        .mobile-card-actions button {
-          flex: 1;
-          padding: 8px;
-          border-radius: 6px;
-          border: 1px solid;
-          cursor: pointer;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 6px;
-          font-size: 12px;
-          font-weight: 600;
-        }
-      `}</style>
-
+@media (max-width: 768px) {
+.desktop-tabs { display: none !important; }
+.mobile-dropdown { display: block !important; }
+.desktop-table { display: none !important; }
+.mobile-cards { display: block !important; }
+}
+@media (min-width: 769px) {
+.desktop-tabs { display: flex !important; }
+.mobile-dropdown { display: none !important; }
+.desktop-table { display: block !important; }
+.mobile-cards { display: none !important; }
+}
+    /* Estilos para tarjetas móviles */
+     .mobile-card {
+       background-color: #ffffff;
+       border-radius: 8px;
+       box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+       padding: 16px;
+       margin-bottom: 12px;
+       border: 1px solid #e5e7eb;
+     }
+     .mobile-card-header {
+       display: flex;
+       align-items: center;
+       gap: 12px;
+       margin-bottom: 12px;
+       padding-bottom: 12px;
+       border-bottom: 1px solid #e5e7eb;
+     }
+     .mobile-card-field {
+       display: flex;
+       justify-content: space-between;
+       align-items: center;
+       padding: 8px 0;
+       border-bottom: 1px solid #f3f4f6;
+     }
+     .mobile-card-field:last-child { border-bottom: none; }
+     .mobile-card-label {
+       font-size: 12px;
+       font-weight: 600;
+       color: #6b7280;
+       text-transform: uppercase;
+     }
+     .mobile-card-value {
+       font-size: 14px;
+       color: #111827;
+       font-weight: 500;
+     }
+     .mobile-card-actions {
+       display: flex;
+       gap: 8px;
+       margin-top: 12px;
+       padding-top: 12px;
+       border-top: 1px solid #e5e7eb;
+     }
+     .mobile-card-actions button {
+       flex: 1;
+       padding: 8px;
+       border-radius: 6px;
+       border: 1px solid;
+       cursor: pointer;
+       display: flex;
+       align-items: center;
+       justify-content: center;
+       gap: 6px;
+       font-size: 12px;
+       font-weight: 600;
+     }
+   `}</style>
       {/* Encabezado del Módulo */}
       <div
         style={{
@@ -702,7 +719,6 @@ export default function Inventory() {
           </button>
         )}
       </div>
-
       {/* Alertas de Feedback */}
       {errorMsg && (
         <div
@@ -736,11 +752,9 @@ export default function Inventory() {
           <Check size={18} /> {successMsg}
         </div>
       )}
-
       {/* ========================================== */}
       {/* MENÚ DE NAVEGACIÓN RESPONSIVO                */}
       {/* ========================================== */}
-
       {/* Versión Escritorio: Pestañas Horizontales */}
       <div
         className="desktop-tabs"
@@ -791,7 +805,6 @@ export default function Inventory() {
           );
         })}
       </div>
-
       {/* Versión Móvil: Dropdown Compacto */}
       <div
         className="mobile-dropdown"
@@ -836,7 +849,6 @@ export default function Inventory() {
             }}
           />
         </button>
-
         {isMobileMenuOpen && (
           <div
             style={{
@@ -897,7 +909,6 @@ export default function Inventory() {
           </div>
         )}
       </div>
-
       {/* ========================================== */}
       {/* CONTENIDO DE LA PESTAÑA DE INVENTARIO      */}
       {/* ========================================== */}
@@ -931,7 +942,6 @@ export default function Inventory() {
               }}
             />
           </div>
-
           {/* Tabla de Escritorio */}
           <div
             className="desktop-table"
@@ -962,7 +972,10 @@ export default function Inventory() {
                   <th style={{ padding: '12px 16px' }}>Código</th>
                   <th style={{ padding: '12px 16px' }}>Descripción</th>
                   <th style={{ padding: '12px 16px' }}>Categoría</th>
-                  <th style={{ padding: '12px 16px' }}>Precio ($)</th>
+                  <th style={{ padding: '12px 16px' }}>Precio Full</th>
+                  {canManage && (
+                    <th style={{ padding: '12px 16px' }}>Precio Base</th>
+                  )}
                   <th style={{ padding: '12px 16px' }}>Stock Actual</th>
                   {canManage && (
                     <th style={{ padding: '12px 16px', textAlign: 'center' }}>
@@ -975,7 +988,7 @@ export default function Inventory() {
                 {loading ? (
                   <tr>
                     <td
-                      colSpan={canManage ? '7' : '6'}
+                      colSpan={canManage ? '8' : '7'}
                       style={{
                         textAlign: 'center',
                         padding: '24px',
@@ -988,7 +1001,7 @@ export default function Inventory() {
                 ) : filteredProducts.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={canManage ? '7' : '6'}
+                      colSpan={canManage ? '8' : '7'}
                       style={{
                         textAlign: 'center',
                         padding: '24px',
@@ -1065,6 +1078,17 @@ export default function Inventory() {
                       >
                         ${Number(p.price_usd).toFixed(2)}
                       </td>
+                      {canManage && (
+                        <td
+                          style={{
+                            padding: '12px 16px',
+                            fontWeight: '600',
+                            color: '#374151',
+                          }}
+                        >
+                          ${Number(p.base_price || 0).toFixed(2)}
+                        </td>
+                      )}
                       <td style={{ padding: '12px 16px' }}>
                         <span
                           style={{
@@ -1141,7 +1165,6 @@ export default function Inventory() {
               </tbody>
             </table>
           </div>
-
           {/* Tarjetas para Móvil */}
           <div className="mobile-cards">
             {loading ? (
@@ -1223,7 +1246,7 @@ export default function Inventory() {
                     </span>
                   </div>
                   <div className="mobile-card-field">
-                    <span className="mobile-card-label">Precio</span>
+                    <span className="mobile-card-label">Precio Full</span>
                     <span
                       className="mobile-card-value"
                       style={{ color: '#059669', fontWeight: '700' }}
@@ -1231,6 +1254,17 @@ export default function Inventory() {
                       ${Number(p.price_usd).toFixed(2)}
                     </span>
                   </div>
+                  {canManage && (
+                    <div className="mobile-card-field">
+                      <span className="mobile-card-label">Precio Base</span>
+                      <span
+                        className="mobile-card-value"
+                        style={{ color: '#374151', fontWeight: '600' }}
+                      >
+                        ${Number(p.base_price || 0).toFixed(2)}
+                      </span>
+                    </div>
+                  )}
                   <div className="mobile-card-field">
                     <span className="mobile-card-label">Stock</span>
                     <span
@@ -1290,7 +1324,6 @@ export default function Inventory() {
           </div>
         </>
       )}
-
       {/* ========================================== */}
       {/* CONTENIDO DE IMPORTACIÓN/EXPORTACIÓN       */}
       {/* ========================================== */}
@@ -1323,7 +1356,6 @@ export default function Inventory() {
               o sin imágenes.
             </p>
           </div>
-
           {/* Grid Responsivo Corregido: Nunca se desbordará */}
           <div
             style={{
@@ -1402,7 +1434,6 @@ export default function Inventory() {
                 </button>
               </div>
             </div>
-
             {/* Tarjeta de Importación */}
             <div
               style={{
@@ -1472,7 +1503,6 @@ export default function Inventory() {
               </div>
             </div>
           </div>
-
           {/* Información Adicional */}
           <div
             style={{
@@ -1525,11 +1555,9 @@ export default function Inventory() {
           </div>
         </div>
       )}
-
       {/* ========================================== */}
       {/* MODALES (Exportación, Importación, etc.)   */}
       {/* ========================================== */}
-
       {/* Modal de Exportación */}
       {showExportModal && canManage && (
         <div
@@ -1661,7 +1689,6 @@ export default function Inventory() {
           </div>
         </div>
       )}
-
       {/* Modal de Importación */}
       {showImportModal && canManage && (
         <div
@@ -1907,7 +1934,6 @@ export default function Inventory() {
           </div>
         </div>
       )}
-
       {/* Modal de Registro / Edición */}
       {showAddModal && canManage && (
         <div
@@ -2065,7 +2091,7 @@ export default function Inventory() {
                       color: '#374151',
                     }}
                   >
-                    Precio ($)
+                    Precio Full ($)
                   </label>
                   <input
                     type="number"
@@ -2084,37 +2110,65 @@ export default function Inventory() {
                     }}
                   />
                 </div>
-                {!editingProduct && (
-                  <div>
-                    <label
-                      style={{
-                        display: 'block',
-                        fontSize: '13px',
-                        fontWeight: '600',
-                        marginBottom: '6px',
-                        color: '#374151',
-                      }}
-                    >
-                      Stock Inicial
-                    </label>
-                    <input
-                      type="number"
-                      min="0"
-                      required
-                      placeholder="0"
-                      value={formStock}
-                      onChange={(e) => setFormStock(e.target.value)}
-                      style={{
-                        width: '100%',
-                        padding: '10px',
-                        borderRadius: '6px',
-                        border: '1px solid #d1d5db',
-                        boxSizing: 'border-box',
-                      }}
-                    />
-                  </div>
-                )}
+                <div>
+                  <label
+                    style={{
+                      display: 'block',
+                      fontSize: '13px',
+                      fontWeight: '600',
+                      marginBottom: '6px',
+                      color: '#374151',
+                    }}
+                  >
+                    Precio Base ($)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder="0.00"
+                    value={formBasePrice}
+                    onChange={(e) => setFormBasePrice(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '10px',
+                      borderRadius: '6px',
+                      border: '1px solid #d1d5db',
+                      boxSizing: 'border-box',
+                    }}
+                  />
+                </div>
               </div>
+              {!editingProduct && (
+                <div>
+                  <label
+                    style={{
+                      display: 'block',
+                      fontSize: '13px',
+                      fontWeight: '600',
+                      marginBottom: '6px',
+                      color: '#374151',
+                    }}
+                  >
+                    Stock Inicial
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    required
+                    placeholder="0"
+                    value={formStock}
+                    onChange={(e) => setFormStock(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '10px',
+                      borderRadius: '6px',
+                      border: '1px solid #d1d5db',
+                      boxSizing: 'border-box',
+                    }}
+                  />
+                </div>
+              )}
               <div>
                 <label
                   style={{
@@ -2271,7 +2325,6 @@ export default function Inventory() {
           </div>
         </div>
       )}
-
       {/* Modal de Ajuste de Stock */}
       {adjustingStockProduct && canManage && (
         <div
@@ -2440,7 +2493,6 @@ export default function Inventory() {
           </div>
         </div>
       )}
-
       {/* Modal para Ampliar Imagen */}
       {selectedImageModal && (
         <div
