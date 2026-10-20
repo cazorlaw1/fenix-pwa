@@ -448,40 +448,42 @@ export default function Users() {
 
   // --- Lógica para Pestaña CLIENTES ---
   const handleCreateClient = async () => {
-    if (!newClientData.name) {
-      alert('El nombre del cliente es obligatorio.');
-      return;
-    }
-    setCreatingClient(true);
-    try {
-      const { error } = await supabase.from('clients').insert({
-  name: newClientData.name,
-  rif_number: newClientData.rif_number || null,
-  ci_number: newClientData.ci_number || null,
-  phone: newClientData.phone || null,
-  city: newClientData.city || 'N/A', // 👈 Evita el error de null constraint
-  state: newClientData.state || 'N/A',
-  address_detail: newClientData.address_detail || null,
-  is_potential: newClientData.is_potential,
-  assigned_seller_id: null,
-});
-      if (error) throw error;
-      alert('Cliente creado exitosamente.');
-      setNewClientData({
-        name: '',
-        rif_number: '',
-        ci_number: '',
-        phone: '',
-        address: '',
-        is_potential: false,
-      });
-      fetchAllClients();
-    } catch (err) {
-      alert('Error creando cliente: ' + err.message);
-    } finally {
-      setCreatingClient(false);
-    }
-  };
+  if (!newClientData.name) {
+    alert('El nombre del cliente es obligatorio.');
+    return;
+  }
+  setCreatingClient(true);
+  try {
+    const { error } = await supabase.from('clients').insert({
+      name: newClientData.name,
+      rif_number: newClientData.rif_number || null,
+      ci_number: newClientData.ci_number || null,
+      phone: newClientData.phone || null,
+      city: newClientData.city || null,         // Opcional
+      state: newClientData.state || null,       // Opcional
+      address_detail: newClientData.address_detail || null, // Opcional
+      is_potential: newClientData.is_potential,
+      assigned_seller_id: null,
+    });
+    if (error) throw error;
+    alert('Cliente creado exitosamente.');
+    setNewClientData({
+      name: '',
+      rif_number: '',
+      ci_number: '',
+      phone: '',
+      city: '',
+      state: '',
+      address_detail: '',
+      is_potential: false,
+    });
+    fetchAllClients();
+  } catch (err) {
+    alert('Error creando cliente: ' + err.message);
+  } finally {
+    setCreatingClient(false);
+  }
+};
 
   const startEditingAssignment = (clientId, currentSellerId) => {
     setEditingAssignmentId(clientId);
