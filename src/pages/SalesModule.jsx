@@ -8359,584 +8359,383 @@ export default function SalesModule() {
               overflow: 'hidden',
             }}
           >
-            {/* GRID DE TARJETAS ESCRITORIO */}
-            <div
-              className="desktop-cards-grid"
-              style={{
-                display: 'none',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))',
-                gap: '16px',
-                padding: '12px',
-              }}
-            >
-              {filteredSettlementHistory.length === 0 ? (
-                <div
-                  style={{
-                    padding: '16px',
-                    textAlign: 'center',
-                    color: '#6B7280',
-                    gridColumn: '1/-1',
-                  }}
-                >
-                  No hay historial de facturación registrado para ti.
-                </div>
-              ) : (
-                filteredSettlementHistory.map((item) => (
-                  <div
-                    key={item.id}
-                    style={{
-                      backgroundColor: '#FFFFFF',
-                      border: '1px solid #E5E7EB',
-                      borderRadius: '12px',
-                      padding: '16px',
-                      boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '12px',
-                    }}
-                  >
-                    {/* Header */}
-                    <div
-                      style={{
-                        borderBottom: '1px solid #E5E7EB',
-                        paddingBottom: '8px',
-                        marginBottom: '4px',
-                      }}
-                    >
-                      <span
-                        style={{
-                          fontSize: '10px',
-                          fontWeight: '700',
-                          color: '#6B7280',
-                          textTransform: 'uppercase',
-                          display: 'block',
-                        }}
-                      >
-                        ID Liquidación
-                      </span>
-                      <span
-                        style={{
-                          fontSize: '16px',
-                          fontWeight: '900',
-                          color: '#111827',
-                        }}
-                      >
-                        {item.id}
-                      </span>
-                    </div>
-                    {/* Info Grid */}
-                    <div
-                      style={{
-                        display: 'grid',
-                        gridTemplateColumns: '1fr 1fr',
-                        gap: '8px',
-                        fontSize: '12px',
-                      }}
-                    >
-                      <div>
-                        <span style={{ fontWeight: '700', color: '#4B5563' }}>
-                          Fecha Pago:
-                        </span>{' '}
-                        {item.datePaid}
-                      </div>
-                      <div>
-                        <span style={{ fontWeight: '700', color: '#4B5563' }}>
-                          Periodo:
-                        </span>{' '}
-                        Ciclo #{item.cycle} ({item.month}/{item.year})
-                      </div>
-                      <div>
-                        <span style={{ fontWeight: '700', color: '#4B5563' }}>
-                          Tasa BCV:
-                        </span>{' '}
-                        {Number(item.bcvRate).toFixed(2)}
-                      </div>
-                      <div>
-                        <span style={{ fontWeight: '700', color: '#4B5563' }}>
-                          Total N.E.:
-                        </span>{' '}
-                        ${item.totalNeAmount.toFixed(2)}
-                      </div>
-                    </div>
-                    {/* Montos Destacados */}
-                    <div
-                      style={{
-                        backgroundColor: '#F9FAFB',
-                        padding: '10px',
-                        borderRadius: '8px',
-                        border: '1px solid #F3F4F6',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '6px',
-                      }}
-                    >
-                      <div
-                        style={{
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          fontSize: '12px',
-                        }}
-                      >
-                        <span style={{ color: '#059669', fontWeight: '700' }}>
-                          Neto 53.38%:
-                        </span>
-                        <span style={{ color: '#059669', fontWeight: '900' }}>
-                          ${item.comm53Net.toFixed(2)}
-                        </span>
-                      </div>
-                      <div
-                        style={{
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          fontSize: '12px',
-                        }}
-                      >
-                        <span style={{ color: '#0369a1', fontWeight: '700' }}>
-                          Neto 23.08%:
-                        </span>
-                        <span style={{ color: '#0369a1', fontWeight: '900' }}>
-                          ${item.comm23Net.toFixed(2)}
-                        </span>
-                      </div>
-                      <div
-                        style={{
-                          borderTop: '1px solid #E5E7EB',
-                          paddingTop: '6px',
-                          marginTop: '4px',
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          fontSize: '14px',
-                        }}
-                      >
-                        <span style={{ fontWeight: '900', color: '#111827' }}>
-                          Total Equivalente:
-                        </span>
-                        <span style={{ fontWeight: '900', color: '#111827' }}>
-                          ${item.totalEquivalentUsd.toFixed(2)}
-                        </span>
-                      </div>
-                    </div>
-                    {/* Acciones */}
-                    <div
-                      className="action-buttons-wrapper"
-                      style={{
-                        display: 'flex',
-                        gap: '8px',
-                        marginTop: '8px',
-                        borderTop: '1px solid #E5E7EB',
-                        paddingTop: '12px',
-                        justifyContent: 'space-between',
-                      }}
-                    >
-                      <button
-                        onClick={() => {
-                          const modal = document.getElementById(
-                            'captured-history-modal'
-                          );
-                          if (modal) {
-                            modal.querySelector(
-                              '#captured-html-content'
-                            ).innerHTML =
-                              item.capturedHTML || '<p>Sin contenido.</p>';
-                            modal.style.display = 'flex';
-                          }
-                        }}
-                        style={{
-                          flex: 1,
-                          padding: '6px',
-                          backgroundColor: '#1e40af',
-                          color: '#ffffff',
-                          border: 'none',
-                          borderRadius: '6px',
-                          fontSize: '11px',
-                          fontWeight: 'bold',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          justifyContent: 'center',
-                          alignItems: 'center',
-                          gap: '4px',
-                        }}
-                      >
-                        <Eye size={13} /> Ver Factura
-                      </button>
-                      <button
-                        onClick={() => handlePrintCapturedInvoicePDF(item)}
-                        style={{
-                          flex: 1,
-                          padding: '6px',
-                          backgroundColor: '#881337',
-                          color: '#ffffff',
-                          border: 'none',
-                          borderRadius: '6px',
-                          fontSize: '11px',
-                          fontWeight: 'bold',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          justifyContent: 'center',
-                          alignItems: 'center',
-                          gap: '4px',
-                        }}
-                      >
-                        <Download size={13} /> PDF
-                      </button>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-
-            {/* --- TABLA DESKTOP --- */}
-            <div
-              className="desktop-table"
-              style={{
-                width: '100%',
-                overflowX: 'auto',
-                WebkitOverflowScrolling: 'touch',
-              }}
-            >
-              <table
+            {filteredSettlementHistory.length === 0 ? (
+              <div
                 style={{
-                  width: '100%',
-                  minWidth: '900px',
-                  borderCollapse: 'collapse',
-                  textAlign: 'left',
-                  fontSize: '13px',
+                  padding: '16px',
+                  textAlign: 'center',
+                  color: '#6B7280',
                 }}
               >
-                <thead>
-                  <tr
-                    style={{
-                      backgroundColor: '#f3f4f6',
-                      color: '#374151',
-                      borderBottom: '1px solid #e5e7eb',
-                    }}
-                  >
-                    <th style={{ padding: '12px 14px' }}>ID Liquidación</th>
-                    <th style={{ padding: '12px 14px' }}>Fecha Pago</th>
-                    <th style={{ padding: '12px 14px' }}>Periodo</th>
-                    <th style={{ padding: '12px 14px' }}>Tasa BCV</th>
-                    <th style={{ padding: '12px 14px' }}>Total N.E. ($)</th>
-                    <th style={{ padding: '12px 14px' }}>
-                      Neto 53.38% Net ($)
-                    </th>
-                    <th style={{ padding: '12px 14px' }}>
-                      Neto 23.08% Net ($)
-                    </th>
-                    <th style={{ padding: '12px 14px' }}>
-                      Total Equivalente ($)
-                    </th>
-                    <th style={{ padding: '12px 14px', textAlign: 'center' }}>
-                      Acciones
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredSettlementHistory.length === 0 ? (
-                    <tr>
-                      <td
-                        colSpan="9"
-                        style={{
-                          padding: '24px',
-                          textAlign: 'center',
-                          color: '#6b7280',
-                        }}
-                      >
-                        No hay historial de facturación registrado para ti.
-                      </td>
-                    </tr>
-                  ) : (
-                    filteredSettlementHistory.map((item) => (
-                      <tr
-                        key={item.id}
-                        style={{ borderBottom: '1px solid #e5e7eb' }}
-                      >
-                        <td
-                          style={{ padding: '12px 14px', fontWeight: 'bold' }}
-                        >
-                          {item.id}
-                        </td>
-                        <td style={{ padding: '12px 14px' }}>
-                          {item.datePaid}
-                        </td>
-                        <td style={{ padding: '12px 14px' }}>
-                          Ciclo #{item.cycle} ({item.month}/{item.year})
-                        </td>
-                        <td style={{ padding: '12px 14px' }}>
-                          {Number(item.bcvRate).toFixed(2)}
-                        </td>
-                        <td style={{ padding: '12px 14px' }}>
-                          ${item.totalNeAmount.toFixed(2)}
-                        </td>
-                        <td
-                          style={{
-                            padding: '12px 14px',
-                            color: '#059669',
-                            fontWeight: 'bold',
-                          }}
-                        >
-                          ${item.comm53Net.toFixed(2)}
-                        </td>
-                        <td
-                          style={{
-                            padding: '12px 14px',
-                            color: '#0369a1',
-                            fontWeight: 'bold',
-                          }}
-                        >
-                          ${item.comm23Net.toFixed(2)}
-                        </td>
-                        <td
-                          style={{
-                            padding: '12px 14px',
-                            color: '#111827',
-                            fontWeight: 'bold',
-                          }}
-                        >
-                          ${item.totalEquivalentUsd.toFixed(2)}
-                        </td>
-                        <td
-                          style={{ padding: '12px 14px', textAlign: 'center' }}
-                        >
-                          <div
-                            className="action-buttons-wrapper"
-                            style={{
-                              display: 'flex',
-                              gap: '6px',
-                              justifyContent: 'center',
-                              flexWrap: 'wrap',
-                            }}
-                          >
-                            <button
-                              onClick={() => {
-                                const modal = document.getElementById(
-                                  'captured-history-modal'
-                                );
-                                if (modal) {
-                                  modal.querySelector(
-                                    '#captured-html-content'
-                                  ).innerHTML =
-                                    item.capturedHTML ||
-                                    '<p>Sin contenido.</p>';
-                                  modal.style.display = 'flex';
-                                }
-                              }}
-                              style={{
-                                padding: '6px 10px',
-                                backgroundColor: '#1e40af',
-                                color: '#ffffff',
-                                border: 'none',
-                                borderRadius: '4px',
-                                fontSize: '11px',
-                                fontWeight: 'bold',
-                                cursor: 'pointer',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '4px',
-                              }}
-                            >
-                              <Eye size={13} /> Ver Factura
-                            </button>
-                            <button
-                              onClick={() =>
-                                handlePrintCapturedInvoicePDF(item)
-                              }
-                              style={{
-                                padding: '6px 10px',
-                                backgroundColor: '#881337',
-                                color: '#ffffff',
-                                border: 'none',
-                                borderRadius: '4px',
-                                fontSize: '11px',
-                                fontWeight: 'bold',
-                                cursor: 'pointer',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '4px',
-                              }}
-                            >
-                              <Download size={13} /> PDF
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-
-            {/* --- TARJETAS MÓVIL --- */}
-            <div className="mobile-cards-container" style={{ padding: '12px' }}>
-              {filteredSettlementHistory.length === 0 ? (
+                No hay historial de facturación registrado para ti.
+              </div>
+            ) : (
+              <>
+                {/* 1. TABLA DESKTOP (Se muestra únicamente en versión escritorio) */}
                 <div
+                  className="desktop-table"
                   style={{
-                    padding: '16px',
-                    textAlign: 'center',
-                    color: '#6B7280',
+                    width: '100%',
+                    overflowX: 'auto',
+                    WebkitOverflowScrolling: 'touch',
                   }}
                 >
-                  No hay historial de facturación registrado para ti.
-                </div>
-              ) : (
-                filteredSettlementHistory.map((item) => (
-                  <div
-                    key={item.id}
+                  <table
                     style={{
-                      backgroundColor: '#F9FAFB',
-                      border: '1px solid #E5E7EB',
-                      borderRadius: '8px',
-                      padding: '12px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '8px',
-                      marginBottom: '8px',
+                      width: '100%',
+                      minWidth: '900px',
+                      borderCollapse: 'collapse',
+                      textAlign: 'left',
+                      fontSize: '12px',
                     }}
                   >
-                    {/* Encabezado de la Tarjeta */}
-                    <div
-                      style={{
-                        borderBottom: '1px solid #E5E7EB',
-                        paddingBottom: '8px',
-                        marginBottom: '4px',
-                      }}
-                    >
-                      <span
+                    <thead>
+                      <tr
                         style={{
-                          fontSize: '10px',
+                          backgroundColor: '#F3F4F6',
+                          borderBottom: '1px solid #E5E7EB',
                           fontWeight: '700',
-                          color: '#6B7280',
-                          textTransform: 'uppercase',
-                          display: 'block',
                         }}
                       >
-                        ID Liquidación
-                      </span>
-                      <span
-                        style={{
-                          fontSize: '16px',
-                          fontWeight: '900',
-                          color: '#111827',
-                        }}
-                      >
-                        {item.id}
-                      </span>
-                    </div>
-                    {/* Campos Verticales */}
-                    <div style={{ fontSize: '12px' }}>
-                      <span style={{ fontWeight: '700', color: '#4B5563' }}>
-                        Fecha de Pago:
-                      </span>{' '}
-                      {item.datePaid}
-                    </div>
-                    <div style={{ fontSize: '12px' }}>
-                      <span style={{ fontWeight: '700', color: '#4B5563' }}>
-                        Periodo:
-                      </span>{' '}
-                      Ciclo #{item.cycle} ({item.month}/{item.year})
-                    </div>
-                    <div style={{ fontSize: '12px' }}>
-                      <span style={{ fontWeight: '700', color: '#4B5563' }}>
-                        Tasa BCV:
-                      </span>{' '}
-                      {Number(item.bcvRate).toFixed(2)}
-                    </div>
-                    <div style={{ fontSize: '12px' }}>
-                      <span style={{ fontWeight: '700', color: '#4B5563' }}>
-                        Total N.E.:
-                      </span>{' '}
-                      ${item.totalNeAmount.toFixed(2)}
-                    </div>
-                    <div style={{ fontSize: '12px', color: '#059669' }}>
-                      <span style={{ fontWeight: '700', color: '#059669' }}>
-                        Neto 53.38%:
-                      </span>{' '}
-                      ${item.comm53Net.toFixed(2)}
-                    </div>
-                    <div style={{ fontSize: '12px', color: '#0369a1' }}>
-                      <span style={{ fontWeight: '700', color: '#0369a1' }}>
-                        Neto 23.08%:
-                      </span>{' '}
-                      ${item.comm23Net.toFixed(2)}
-                    </div>
+                        <th style={{ padding: '10px 12px' }}>ID Liquidación</th>
+                        <th style={{ padding: '10px 12px' }}>Fecha Pago</th>
+                        <th style={{ padding: '10px 12px' }}>Periodo</th>
+                        <th style={{ padding: '10px 12px' }}>Tasa BCV</th>
+                        <th style={{ padding: '10px 12px' }}>Neto 53.38%</th>
+                        <th style={{ padding: '10px 12px' }}>Neto 23.08%</th>
+                        <th style={{ padding: '10px 12px' }}>
+                          Total Equiv. ($)
+                        </th>
+                        <th
+                          style={{ padding: '10px 12px', textAlign: 'center' }}
+                        >
+                          Acciones
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredSettlementHistory.map((item) => (
+                        <tr
+                          key={item.id}
+                          style={{ borderBottom: '1px solid #E5E7EB' }}
+                        >
+                          <td
+                            style={{ padding: '10px 12px', fontWeight: '800' }}
+                          >
+                            {item.id}
+                          </td>
+                          <td style={{ padding: '10px 12px' }}>
+                            {item.datePaid}
+                          </td>
+                          <td style={{ padding: '10px 12px' }}>
+                            Ciclo #{item.cycle} ({item.month}/{item.year})
+                          </td>
+                          <td style={{ padding: '10px 12px' }}>
+                            {Number(item.bcvRate).toFixed(2)}
+                          </td>
+                          <td
+                            style={{
+                              padding: '10px 12px',
+                              color: '#059669',
+                              fontWeight: '700',
+                            }}
+                          >
+                            ${item.comm53Net.toFixed(2)}
+                          </td>
+                          <td
+                            style={{
+                              padding: '10px 12px',
+                              color: '#0369a1',
+                              fontWeight: '700',
+                            }}
+                          >
+                            ${item.comm23Net.toFixed(2)}
+                          </td>
+                          <td
+                            style={{ padding: '10px 12px', fontWeight: '900' }}
+                          >
+                            ${item.totalEquivalentUsd.toFixed(2)}
+                          </td>
+                          <td
+                            style={{
+                              padding: '10px 12px',
+                              textAlign: 'center',
+                            }}
+                          >
+                            <div
+                              style={{
+                                display: 'flex',
+                                gap: '6px',
+                                justifyContent: 'center',
+                              }}
+                            >
+                              <button
+                                onClick={() => {
+                                  const modal = document.getElementById(
+                                    'captured-history-modal'
+                                  );
+                                  if (modal) {
+                                    modal.querySelector(
+                                      '#captured-html-content'
+                                    ).innerHTML =
+                                      item.capturedHTML ||
+                                      '<p>Sin contenido.</p>';
+                                    modal.style.display = 'flex';
+                                  }
+                                }}
+                                style={{
+                                  padding: '5px 10px',
+                                  backgroundColor: '#1e40af',
+                                  color: '#ffffff',
+                                  border: 'none',
+                                  borderRadius: '6px',
+                                  fontSize: '11px',
+                                  fontWeight: 'bold',
+                                  cursor: 'pointer',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                }}
+                              >
+                                <Eye size={13} /> Ver Factura
+                              </button>
+                              <button
+                                onClick={() =>
+                                  handlePrintCapturedInvoicePDF(item)
+                                }
+                                style={{
+                                  padding: '5px 10px',
+                                  backgroundColor: '#111827',
+                                  color: '#ffffff',
+                                  border: 'none',
+                                  borderRadius: '6px',
+                                  fontSize: '11px',
+                                  fontWeight: 'bold',
+                                  cursor: 'pointer',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                }}
+                              >
+                                <Download size={13} /> PDF
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* 2. TARJETAS MÓVIL (Se muestran únicamente en versión móvil) */}
+                <div
+                  className="mobile-cards-container"
+                  style={{ padding: '12px' }}
+                >
+                  {filteredSettlementHistory.map((item) => (
                     <div
+                      key={item.id}
                       style={{
-                        fontSize: '14px',
-                        fontWeight: '900',
-                        color: '#111827',
-                        marginTop: '4px',
-                      }}
-                    >
-                      Total Equivalente: ${item.totalEquivalentUsd.toFixed(2)}
-                    </div>
-                    {/* Botones de Acción */}
-                    <div
-                      className="action-buttons-wrapper"
-                      style={{
+                        backgroundColor: '#FFFFFF',
+                        border: '1px solid #E5E7EB',
+                        borderRadius: '12px',
+                        padding: '16px',
+                        boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
                         display: 'flex',
-                        gap: '8px',
-                        marginTop: '6px',
-                        flexWrap: 'wrap',
-                        borderTop: '1px solid #E5E7EB',
-                        paddingTop: '8px',
-                        justifyContent: 'space-between',
+                        flexDirection: 'column',
+                        gap: '12px',
                       }}
                     >
-                      <button
-                        onClick={() => {
-                          const modal = document.getElementById(
-                            'captured-history-modal'
-                          );
-                          if (modal) {
-                            modal.querySelector(
-                              '#captured-html-content'
-                            ).innerHTML =
-                              item.capturedHTML || '<p>Sin contenido.</p>';
-                            modal.style.display = 'flex';
-                          }
-                        }}
+                      {/* Header */}
+                      <div
                         style={{
-                          flex: 1,
-                          padding: '6px',
-                          backgroundColor: '#1e40af',
-                          color: '#ffffff',
-                          border: 'none',
-                          borderRadius: '6px',
-                          fontSize: '11px',
-                          fontWeight: 'bold',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          justifyContent: 'center',
-                          alignItems: 'center',
-                          gap: '4px',
+                          borderBottom: '1px solid #E5E7EB',
+                          paddingBottom: '8px',
+                          marginBottom: '4px',
                         }}
                       >
-                        <Eye size={13} /> Ver Factura
-                      </button>
-                      <button
-                        onClick={() => handlePrintCapturedInvoicePDF(item)}
+                        <span
+                          style={{
+                            fontSize: '10px',
+                            fontWeight: '700',
+                            color: '#6B7280',
+                            textTransform: 'uppercase',
+                            display: 'block',
+                          }}
+                        >
+                          ID Liquidación
+                        </span>
+                        <span
+                          style={{
+                            fontSize: '16px',
+                            fontWeight: '900',
+                            color: '#111827',
+                          }}
+                        >
+                          {item.id}
+                        </span>
+                      </div>
+                      {/* Info Grid */}
+                      <div
                         style={{
-                          flex: 1,
-                          padding: '6px',
-                          backgroundColor: '#881337',
-                          color: '#ffffff',
-                          border: 'none',
-                          borderRadius: '6px',
-                          fontSize: '11px',
-                          fontWeight: 'bold',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          justifyContent: 'center',
-                          alignItems: 'center',
-                          gap: '4px',
+                          display: 'grid',
+                          gridTemplateColumns: '1fr 1fr',
+                          gap: '8px',
+                          fontSize: '12px',
                         }}
                       >
-                        <Download size={13} /> PDF
-                      </button>
+                        <div>
+                          <span style={{ fontWeight: '700', color: '#4B5563' }}>
+                            Fecha Pago:
+                          </span>{' '}
+                          {item.datePaid}
+                        </div>
+                        <div>
+                          <span style={{ fontWeight: '700', color: '#4B5563' }}>
+                            Periodo:
+                          </span>{' '}
+                          Ciclo #{item.cycle} ({item.month}/{item.year})
+                        </div>
+                        <div>
+                          <span style={{ fontWeight: '700', color: '#4B5563' }}>
+                            Tasa BCV:
+                          </span>{' '}
+                          {Number(item.bcvRate).toFixed(2)}
+                        </div>
+                        <div>
+                          <span style={{ fontWeight: '700', color: '#4B5563' }}>
+                            Total N.E.:
+                          </span>{' '}
+                          ${item.totalNeAmount.toFixed(2)}
+                        </div>
+                      </div>
+                      {/* Montos Destacados */}
+                      <div
+                        style={{
+                          backgroundColor: '#F9FAFB',
+                          padding: '10px',
+                          borderRadius: '8px',
+                          border: '1px solid #F3F4F6',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '6px',
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            fontSize: '12px',
+                          }}
+                        >
+                          <span style={{ color: '#059669', fontWeight: '700' }}>
+                            Neto 53.38%:
+                          </span>
+                          <span style={{ color: '#059669', fontWeight: '900' }}>
+                            ${item.comm53Net.toFixed(2)}
+                          </span>
+                        </div>
+                        <div
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            fontSize: '12px',
+                          }}
+                        >
+                          <span style={{ color: '#0369a1', fontWeight: '700' }}>
+                            Neto 23.08%:
+                          </span>
+                          <span style={{ color: '#0369a1', fontWeight: '900' }}>
+                            ${item.comm23Net.toFixed(2)}
+                          </span>
+                        </div>
+                        <div
+                          style={{
+                            borderTop: '1px solid #E5E7EB',
+                            paddingTop: '6px',
+                            marginTop: '4px',
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            fontSize: '14px',
+                          }}
+                        >
+                          <span style={{ fontWeight: '900', color: '#111827' }}>
+                            Total Equivalente:
+                          </span>
+                          <span style={{ fontWeight: '900', color: '#111827' }}>
+                            ${item.totalEquivalentUsd.toFixed(2)}
+                          </span>
+                        </div>
+                      </div>
+                      {/* Acciones */}
+                      <div
+                        className="action-buttons-wrapper"
+                        style={{
+                          display: 'flex',
+                          gap: '8px',
+                          marginTop: '8px',
+                          borderTop: '1px solid #E5E7EB',
+                          paddingTop: '12px',
+                          justifyContent: 'space-between',
+                        }}
+                      >
+                        <button
+                          onClick={() => {
+                            const modal = document.getElementById(
+                              'captured-history-modal'
+                            );
+                            if (modal) {
+                              modal.querySelector(
+                                '#captured-html-content'
+                              ).innerHTML =
+                                item.capturedHTML || '<p>Sin contenido.</p>';
+                              modal.style.display = 'flex';
+                            }
+                          }}
+                          style={{
+                            flex: 1,
+                            padding: '6px',
+                            backgroundColor: '#1e40af',
+                            color: '#ffffff',
+                            border: 'none',
+                            borderRadius: '6px',
+                            fontSize: '11px',
+                            fontWeight: 'bold',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            justifyContent: 'center',
+                            alignItems: 'center',
+                            gap: '4px',
+                          }}
+                        >
+                          <Eye size={13} /> Ver Factura
+                        </button>
+                        <button
+                          onClick={() => handlePrintCapturedInvoicePDF(item)}
+                          style={{
+                            flex: 1,
+                            padding: '6px',
+                            backgroundColor: '#111827',
+                            color: '#ffffff',
+                            border: 'none',
+                            borderRadius: '6px',
+                            fontSize: '11px',
+                            fontWeight: 'bold',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            justifyContent: 'center',
+                            alignItems: 'center',
+                            gap: '4px',
+                          }}
+                        >
+                          <Download size={13} /> PDF
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                ))
-              )}
-            </div>
+                  ))}
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
