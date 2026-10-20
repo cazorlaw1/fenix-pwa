@@ -94,13 +94,15 @@ export default function Users() {
 
   // --- ESTADOS PARA CREACIÓN DE CLIENTE ---
   const [newClientData, setNewClientData] = useState({
-    name: '',
-    rif_number: '',
-    ci_number: '',
-    phone: '',
-    address: '',
-    is_potential: false,
-  });
+  name: '',
+  rif_number: '',
+  ci_number: '',
+  phone: '',
+  city: '',
+  state: '',
+  address_detail: '',
+  is_potential: false,
+});
   const [creatingClient, setCreatingClient] = useState(false);
 
   // --- ESTADO PARA EDICIÓN DE ASIGNACIÓN EN TABLA ---
@@ -453,14 +455,16 @@ export default function Users() {
     setCreatingClient(true);
     try {
       const { error } = await supabase.from('clients').insert({
-        name: newClientData.name,
-        rif_number: newClientData.rif_number || null,
-        ci_number: newClientData.ci_number || null,
-        phone: newClientData.phone || null,
-        address: newClientData.address || null,
-        is_potential: newClientData.is_potential,
-        assigned_seller_id: null,
-      });
+  name: newClientData.name,
+  rif_number: newClientData.rif_number || null,
+  ci_number: newClientData.ci_number || null,
+  phone: newClientData.phone || null,
+  city: newClientData.city || null,
+  state: newClientData.state || null,
+  address_detail: newClientData.address_detail || null,
+  is_potential: newClientData.is_potential,
+  assigned_seller_id: null,
+});
       if (error) throw error;
       alert('Cliente creado exitosamente.');
       setNewClientData({
