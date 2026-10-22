@@ -7647,8 +7647,9 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                       <div style={{ textAlign: 'right' }}>
                         <p style={{ margin: 0 }}>
                           <strong>Fecha/Hora: </strong>{' '}
+                          {/* Se usa split/reverse para evitar el desfase de zona horaria al crear el objeto Date */}
                           {editNoteFecha
-                            ? new Date(editNoteFecha).toLocaleDateString()
+                            ? editNoteFecha.split('-').reverse().join('/')
                             : new Date(editingNote.created_at).toLocaleString()}
                         </p>
                         <p style={{ margin: '2px 0' }}>
