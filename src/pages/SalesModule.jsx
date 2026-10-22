@@ -68,7 +68,9 @@ function SearchableDropdown({
 
   const filtered = options.filter((opt) => {
     const text = String(opt[labelKey] || '').toLowerCase();
-    return text.includes(search.toLowerCase());
+    const searchTerms = search.toLowerCase().trim().split(/\s+/);
+    // Verifica que cada palabra escrita aparezca en el texto del producto
+    return searchTerms.every((term) => text.includes(term));
   });
 
   const selectedOption = options.find(
