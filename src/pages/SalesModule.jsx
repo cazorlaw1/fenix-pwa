@@ -1717,11 +1717,17 @@ export default function SalesModule() {
   const handleDownloadPDF = async (nota) => {
     try {
       setLoading(true);
+      const ITEMS_PER_PAGE = 20;
+      const discountPct = getDiscountPercent(
+        String(nota.payment_discount || '53.38')
+      );
+
       const { data: items, error } = await supabase
         .from('order_items')
         .select('*, products(code, description)')
         .eq('order_id', nota.id);
       if (error) throw error;
+
       if (!window.html2pdf) {
         await new Promise((resolve, reject) => {
           const script = document.createElement('script');
@@ -1732,55 +1738,160 @@ export default function SalesModule() {
           document.head.appendChild(script);
         });
       }
+
       const clientName = nota.clients?.name || 'Cliente';
       const transNo = nota.transaction_number || nota.id.substring(0, 8);
       const fecha = new Date(nota.created_at).toLocaleString();
       const vendedorName = currentSellerName;
-      let itemsHtml = '';
+
       let subTotal = 0;
+      (items || []).forEach((item) => {
+        subTotal +=
+          item.total_line_usd || item.quantity * item.discounted_unit_price_usd;
+      });
+
+      const itemChunks = [];
       if (items && items.length > 0) {
-        items.forEach((item) => {
+        for (let i = 0; i < items.length; i += ITEMS_PER_PAGE) {
+          itemChunks.push(items.slice(i, i + ITEMS_PER_PAGE));
+        }
+      } else {
+        itemChunks.push([]);
+      }
+
+      const totalPages = itemChunks.length;
+      const container = document.createElement('div');
+      let pagesHtml = '';
+
+      itemChunks.forEach((chunk, pageIndex) => {
+        const pageNum = pageIndex + 1;
+        const isLastPage = pageNum === totalPages;
+
+        let chunkRows = '';
+        chunk.forEach((item) => {
           const totalLine =
             item.total_line_usd ||
             item.quantity * item.discounted_unit_price_usd;
-          subTotal += totalLine;
-          itemsHtml += `<tr> <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; font-family: monospace;">${
-            item.products?.code || 'S/C'
-          }</td> <td style="padding: 6px 8px; border-bottom: 1px solid #ddd;">${
-            item.products?.description || 'Producto'
-          }</td> <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: center;">${
-            item.quantity
-          }</td> <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: right;">$${Number(
-            item.unit_price_usd || 0
-          ).toFixed(
-            2
-          )}</td> <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: right; color: #B45309;">$${Number(
-            item.discounted_unit_price_usd || 0
-          ).toFixed(
-            2
-          )}</td> <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: right; font-weight: bold;">$${Number(
-            totalLine
-          ).toFixed(2)}</td> </tr>`;
+          chunkRows += `
+            <tr>
+              <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; font-family: monospace;">${
+                item.products?.code || 'S/C'
+              }</td>
+              <td style="padding: 6px 8px; border-bottom: 1px solid #ddd;">${
+                item.products?.description || 'Producto'
+              }</td>
+              <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: center;">${
+                item.quantity
+              }</td>
+              <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: right;">$${Number(
+                item.unit_price_usd || 0
+              ).toFixed(2)}</td>
+              <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: right; color: #B45309;">$${Number(
+                item.discounted_unit_price_usd || 0
+              ).toFixed(2)}</td>
+              <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: right; font-weight: bold;">$${Number(
+                totalLine
+              ).toFixed(2)}</td>
+            </tr>`;
         });
-      }
-      const container = document.createElement('div');
-      container.innerHTML = `<div style="font-family: Arial, sans-serif; color: #111; padding: 25px; background: #fff; width: 700px; height: 1000px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between; margin: 0 auto;"> <div> <div style="display: flex; justify-content: space-between; border-bottom: 2px solid #111; padding-bottom: 15px; margin-bottom: 20px;"> <div> <h2 style="margin: 0; font-size: 20px; text-transform: uppercase;">FENIX AUTO PART C.A</h2> <p style="margin: 2px 0; font-size: 12px;"><strong>RIF:</strong> J-50261925-2</p> <p style="margin: 8px 0 0 0; font-size: 12px;"><strong>Cliente:</strong> ${clientName}</p> </div> <div style="text-align: right; font-size: 12px;"> <p style="margin: 2px 0;"><strong>N° Transacción:</strong> #${transNo}</p> <p style="margin: 2px 0;"><strong>Fecha/Hora:</strong> ${fecha}</p> <p style="margin: 2px 0;"><strong>Vendedor:</strong> ${vendedorName}</p> <p style="margin: 2px 0;"><strong>Categoría:</strong> ${
-        nota.category || 'General'
-      }</p> </div> </div> <table style="width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 20px;"> <thead> <tr style="background-color: #f3f4f6;"> <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: left;">Código</th> <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: left;">Descripción</th> <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: center;">Cantidad</th> <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: right;">V. Unitario</th> <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: right;">V. U. con Descuento</th> <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: right;">Total Línea</th> </tr> </thead> <tbody> ${itemsHtml} </tbody> </table> </div> <div> <div style="display: flex; justify-content: flex-end; font-size: 12px; margin-bottom: 15px;"> <div style="width: 280px; background: #f9fafb; padding: 12px; border: 1px solid #ddd; border-radius: 6px;"> <div style="display: flex; justify-content: space-between; margin-bottom: 6px;"> <span>Total Base:</span> <strong>$${Number(
-        nota.total_base_usd || subTotal
-      ).toFixed(
-        2
-      )}</strong> </div> <div style="display: flex; justify-content: space-between; margin-bottom: 6px; color: #B45309;"> <span>Descuento Aplicado:</span> <strong>-$${Number(
-        nota.discount_amount_usd || 0
-      ).toFixed(
-        2
-      )}</strong> </div> <div style="display: flex; justify-content: space-between; border-top: 1px solid #ccc; padding-top: 6px; font-weight: bold; font-size: 14px; color: #DC2626;"> <span>Precio Final:</span> <span>$${Number(
-        nota.final_price_usd || subTotal
-      ).toFixed(2)}</span> </div> </div> </div> ${
-        nota.observation
-          ? `<div style="font-size: 11px; color: #333; background: #fffbeb; border: 1px solid #fde68a; padding: 10px; border-radius: 4px; margin-bottom: 10px; text-align: justify;"><strong>Observación:</strong> ${nota.observation}</div>`
-          : ''
-      } <div style="font-size: 10px; color: #555; background: #f3f4f6; padding: 10px; border-radius: 4px; line-height: 1.4; text-align: justify;"><strong>Términos y condiciones:</strong> ${globalTerms}</div> </div> </div>`;
+
+        pagesHtml += `
+          <div style="font-family: Arial, sans-serif; color: #111; padding: 20px 25px; background: #fff; width: 700px; height: 1020px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between; page-break-after: always; margin: 0 auto;">
+            
+            <div>
+              <div style="display: flex; justify-content: space-between; border-bottom: 2px solid #111; padding-bottom: 12px; margin-bottom: 15px;">
+                <div>
+                  <h2 style="margin: 0; font-size: 18px; text-transform: uppercase;">FENIX AUTO PART C.A</h2>
+                  <p style="margin: 2px 0; font-size: 11px;"><strong>RIF:</strong> J-50261925-2</p>
+                  <p style="margin: 6px 0 0 0; font-size: 11px;"><strong>Cliente:</strong> ${clientName}</p>
+                </div>
+                <div style="text-align: right; font-size: 11px;">
+                  <p style="margin: 2px 0;"><strong>N° Transacción:</strong> #${transNo}</p>
+                  <p style="margin: 2px 0;"><strong>Fecha/Hora:</strong> ${fecha}</p>
+                  <p style="margin: 2px 0;"><strong>Vendedor:</strong> ${vendedorName}</p>
+                  <p style="margin: 2px 0;"><strong>Categoría:</strong> ${
+                    nota.category || 'General'
+                  }</p>
+                </div>
+              </div>
+
+              <table style="width: 100%; border-collapse: collapse; font-size: 11px;">
+                <thead>
+                  <tr style="background-color: #f3f4f6;">
+                    <th style="padding: 6px 8px; border-bottom: 2px solid #ddd; text-align: left;">Código</th>
+                    <th style="padding: 6px 8px; border-bottom: 2px solid #ddd; text-align: left;">Descripción</th>
+                    <th style="padding: 6px 8px; border-bottom: 2px solid #ddd; text-align: center;">Cantidad</th>
+                    <th style="padding: 6px 8px; border-bottom: 2px solid #ddd; text-align: right;">V. Unitario</th>
+                    <th style="padding: 6px 8px; border-bottom: 2px solid #ddd; text-align: right;">V. U. con Desc.</th>
+                    <th style="padding: 6px 8px; border-bottom: 2px solid #ddd; text-align: right;">Total Línea</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${
+                    chunkRows ||
+                    '<tr><td colspan="6" style="padding: 10px; text-align: center; color: #888;">Sin artículos...</td></tr>'
+                  }
+                </tbody>
+              </table>
+            </div>
+
+            <div>
+              ${
+                isLastPage
+                  ? `
+                <div style="display: flex; justify-content: flex-end; font-size: 11px; margin-bottom: 10px;">
+                  <div style="width: 260px; background: #f9fafb; padding: 10px; border: 1px solid #e5e7eb; border-radius: 6px;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                      <span>Total Base:</span>
+                      <strong>$${Number(
+                        nota.total_base_usd || subTotal
+                      ).toFixed(2)}</strong>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 4px; color: #D97706;">
+                      <span>Descuento Aplicado (${discountPct}%):</span>
+                      <strong>-$${Number(nota.discount_amount_usd || 0).toFixed(
+                        2
+                      )}</strong>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; border-top: 1px solid #ccc; padding-top: 4px; font-weight: bold; font-size: 13px; color: #DC2626;">
+                      <span>Precio Final:</span>
+                      <span>$${Number(nota.final_price_usd || subTotal).toFixed(
+                        2
+                      )}</span>
+                    </div>                                
+                  </div>
+                </div>
+
+                ${
+                  nota.observation
+                    ? `
+                  <div style="font-size: 10px; color: #333; background: #fffbeb; border: 1px solid #fde68a; padding: 8px; border-radius: 4px; margin-bottom: 8px; text-align: justify;">
+                    <strong>Observación:</strong> ${nota.observation}
+                  </div>
+                `
+                    : ''
+                }
+
+                <div style="font-size: 9px; color: #555; background: #f3f4f6; padding: 8px; border-radius: 4px; line-height: 1.3; text-align: justify; margin-bottom: 8px;">
+                  <strong>Términos y condiciones:</strong> ${globalTerms}
+                </div>
+              `
+                  : `
+                <div style="height: 140px; margin-bottom: 8px;"></div>
+              `
+              }
+
+              <div style="text-align: center; font-size: 10px; color: #666; border-top: 1px solid #eee; padding-top: 6px;">
+                Página ${pageNum} de ${totalPages}
+              </div>
+            </div>
+
+          </div>
+        `;
+      });
+
+      container.innerHTML = pagesHtml;
+
       const opciones = {
         margin: 0,
         filename: `nota-entrega-${transNo}.pdf`,
@@ -1788,6 +1899,7 @@ export default function SalesModule() {
         html2canvas: { scale: 2, useCORS: true },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
       };
+
       await window.html2pdf().from(container).set(opciones).save();
     } catch (err) {
       alert('Error al generar PDF: ' + err.message);
@@ -1831,11 +1943,17 @@ export default function SalesModule() {
   const handleSendPDF = async (nota) => {
     try {
       setLoading(true);
+      const ITEMS_PER_PAGE = 20;
+      const discountPct = getDiscountPercent(
+        String(nota.payment_discount || '53.38')
+      );
+
       const { data: items, error } = await supabase
         .from('order_items')
         .select('*, products(code, description)')
         .eq('order_id', nota.id);
       if (error) throw error;
+
       if (!window.html2pdf) {
         await new Promise((resolve, reject) => {
           const script = document.createElement('script');
@@ -1846,55 +1964,160 @@ export default function SalesModule() {
           document.head.appendChild(script);
         });
       }
+
       const clientName = nota.clients?.name || 'Cliente';
       const transNo = nota.transaction_number || nota.id.substring(0, 8);
       const fecha = new Date(nota.created_at).toLocaleString();
       const vendedorName = currentSellerName;
-      let itemsHtml = '';
+
       let subTotal = 0;
+      (items || []).forEach((item) => {
+        subTotal +=
+          item.total_line_usd || item.quantity * item.discounted_unit_price_usd;
+      });
+
+      const itemChunks = [];
       if (items && items.length > 0) {
-        items.forEach((item) => {
+        for (let i = 0; i < items.length; i += ITEMS_PER_PAGE) {
+          itemChunks.push(items.slice(i, i + ITEMS_PER_PAGE));
+        }
+      } else {
+        itemChunks.push([]);
+      }
+
+      const totalPages = itemChunks.length;
+      const container = document.createElement('div');
+      let pagesHtml = '';
+
+      itemChunks.forEach((chunk, pageIndex) => {
+        const pageNum = pageIndex + 1;
+        const isLastPage = pageNum === totalPages;
+
+        let chunkRows = '';
+        chunk.forEach((item) => {
           const totalLine =
             item.total_line_usd ||
             item.quantity * item.discounted_unit_price_usd;
-          subTotal += totalLine;
-          itemsHtml += `<tr> <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; font-family: monospace;">${
-            item.products?.code || 'S/C'
-          }</td> <td style="padding: 6px 8px; border-bottom: 1px solid #ddd;">${
-            item.products?.description || 'Producto'
-          }</td> <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: center;">${
-            item.quantity
-          }</td> <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: right;">$${Number(
-            item.unit_price_usd || 0
-          ).toFixed(
-            2
-          )}</td> <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: right; color: #B45309;">$${Number(
-            item.discounted_unit_price_usd || 0
-          ).toFixed(
-            2
-          )}</td> <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: right; font-weight: bold;">$${Number(
-            totalLine
-          ).toFixed(2)}</td> </tr>`;
+          chunkRows += `
+            <tr>
+              <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; font-family: monospace;">${
+                item.products?.code || 'S/C'
+              }</td>
+              <td style="padding: 6px 8px; border-bottom: 1px solid #ddd;">${
+                item.products?.description || 'Producto'
+              }</td>
+              <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: center;">${
+                item.quantity
+              }</td>
+              <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: right;">$${Number(
+                item.unit_price_usd || 0
+              ).toFixed(2)}</td>
+              <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: right; color: #B45309;">$${Number(
+                item.discounted_unit_price_usd || 0
+              ).toFixed(2)}</td>
+              <td style="padding: 6px 8px; border-bottom: 1px solid #ddd; text-align: right; font-weight: bold;">$${Number(
+                totalLine
+              ).toFixed(2)}</td>
+            </tr>`;
         });
-      }
-      const container = document.createElement('div');
-      container.innerHTML = `<div style="font-family: Arial, sans-serif; color: #111; padding: 25px; background: #fff; width: 700px; height: 1000px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between; margin: 0 auto;"> <div> <div style="display: flex; justify-content: space-between; border-bottom: 2px solid #111; padding-bottom: 15px; margin-bottom: 20px;"> <div> <h2 style="margin: 0; font-size: 20px; text-transform: uppercase;">FENIX AUTO PART C.A</h2> <p style="margin: 2px 0; font-size: 12px;"><strong>RIF:</strong> J-50261925-2</p> <p style="margin: 8px 0 0 0; font-size: 12px;"><strong>Cliente:</strong> ${clientName}</p> </div> <div style="text-align: right; font-size: 12px;"> <p style="margin: 2px 0;"><strong>N° Transacción:</strong> #${transNo}</p> <p style="margin: 2px 0;"><strong>Fecha/Hora:</strong> ${fecha}</p> <p style="margin: 2px 0;"><strong>Vendedor:</strong> ${vendedorName}</p> <p style="margin: 2px 0;"><strong>Categoría:</strong> ${
-        nota.category || 'General'
-      }</p> </div> </div> <table style="width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 20px;"> <thead> <tr style="background-color: #f3f4f6;"> <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: left;">Código</th> <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: left;">Descripción</th> <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: center;">Cantidad</th> <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: right;">V. Unitario</th> <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: right;">V. U. con Descuento</th> <th style="padding: 8px; border-bottom: 2px solid #ddd; text-align: right;">Total Línea</th> </tr> </thead> <tbody> ${itemsHtml} </tbody> </table> </div> <div> <div style="display: flex; justify-content: flex-end; font-size: 12px; margin-bottom: 15px;"> <div style="width: 280px; background: #f9fafb; padding: 12px; border: 1px solid #ddd; border-radius: 6px;"> <div style="display: flex; justify-content: space-between; margin-bottom: 6px;"> <span>Total Base:</span> <strong>$${Number(
-        nota.total_base_usd || subTotal
-      ).toFixed(
-        2
-      )}</strong> </div> <div style="display: flex; justify-content: space-between; margin-bottom: 6px; color: #B45309;"> <span>Descuento Aplicado:</span> <strong>-$${Number(
-        nota.discount_amount_usd || 0
-      ).toFixed(
-        2
-      )}</strong> </div> <div style="display: flex; justify-content: space-between; border-top: 1px solid #ccc; padding-top: 6px; font-weight: bold; font-size: 14px; color: #DC2626;"> <span>Precio Final:</span> <span>$${Number(
-        nota.final_price_usd || subTotal
-      ).toFixed(2)}</span> </div> </div> </div> ${
-        nota.observation
-          ? `<div style="font-size: 11px; color: #333; background: #fffbeb; border: 1px solid #fde68a; padding: 10px; border-radius: 4px; margin-bottom: 10px; text-align: justify;"><strong>Observación:</strong> ${nota.observation}</div>`
-          : ''
-      } <div style="font-size: 10px; color: #555; background: #f3f4f6; padding: 10px; border-radius: 4px; line-height: 1.4; text-align: justify;"><strong>Términos y condiciones:</strong> ${globalTerms}</div> </div> </div>`;
+
+        pagesHtml += `
+          <div style="font-family: Arial, sans-serif; color: #111; padding: 20px 25px; background: #fff; width: 700px; height: 1020px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between; page-break-after: always; margin: 0 auto;">
+            
+            <div>
+              <div style="display: flex; justify-content: space-between; border-bottom: 2px solid #111; padding-bottom: 12px; margin-bottom: 15px;">
+                <div>
+                  <h2 style="margin: 0; font-size: 18px; text-transform: uppercase;">FENIX AUTO PART C.A</h2>
+                  <p style="margin: 2px 0; font-size: 11px;"><strong>RIF:</strong> J-50261925-2</p>
+                  <p style="margin: 6px 0 0 0; font-size: 11px;"><strong>Cliente:</strong> ${clientName}</p>
+                </div>
+                <div style="text-align: right; font-size: 11px;">
+                  <p style="margin: 2px 0;"><strong>N° Transacción:</strong> #${transNo}</p>
+                  <p style="margin: 2px 0;"><strong>Fecha/Hora:</strong> ${fecha}</p>
+                  <p style="margin: 2px 0;"><strong>Vendedor:</strong> ${vendedorName}</p>
+                  <p style="margin: 2px 0;"><strong>Categoría:</strong> ${
+                    nota.category || 'General'
+                  }</p>
+                </div>
+              </div>
+
+              <table style="width: 100%; border-collapse: collapse; font-size: 11px;">
+                <thead>
+                  <tr style="background-color: #f3f4f6;">
+                    <th style="padding: 6px 8px; border-bottom: 2px solid #ddd; text-align: left;">Código</th>
+                    <th style="padding: 6px 8px; border-bottom: 2px solid #ddd; text-align: left;">Descripción</th>
+                    <th style="padding: 6px 8px; border-bottom: 2px solid #ddd; text-align: center;">Cantidad</th>
+                    <th style="padding: 6px 8px; border-bottom: 2px solid #ddd; text-align: right;">V. Unitario</th>
+                    <th style="padding: 6px 8px; border-bottom: 2px solid #ddd; text-align: right;">V. U. con Desc.</th>
+                    <th style="padding: 6px 8px; border-bottom: 2px solid #ddd; text-align: right;">Total Línea</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${
+                    chunkRows ||
+                    '<tr><td colspan="6" style="padding: 10px; text-align: center; color: #888;">Sin artículos...</td></tr>'
+                  }
+                </tbody>
+              </table>
+            </div>
+
+            <div>
+              ${
+                isLastPage
+                  ? `
+                <div style="display: flex; justify-content: flex-end; font-size: 11px; margin-bottom: 10px;">
+                  <div style="width: 260px; background: #f9fafb; padding: 10px; border: 1px solid #e5e7eb; border-radius: 6px;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                      <span>Total Base:</span>
+                      <strong>$${Number(
+                        nota.total_base_usd || subTotal
+                      ).toFixed(2)}</strong>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 4px; color: #D97706;">
+                      <span>Descuento Aplicado (${discountPct}%):</span>
+                      <strong>-$${Number(nota.discount_amount_usd || 0).toFixed(
+                        2
+                      )}</strong>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; border-top: 1px solid #ccc; padding-top: 4px; font-weight: bold; font-size: 13px; color: #DC2626;">
+                      <span>Precio Final:</span>
+                      <span>$${Number(nota.final_price_usd || subTotal).toFixed(
+                        2
+                      )}</span>
+                    </div>                                
+                  </div>
+                </div>
+
+                ${
+                  nota.observation
+                    ? `
+                  <div style="font-size: 10px; color: #333; background: #fffbeb; border: 1px solid #fde68a; padding: 8px; border-radius: 4px; margin-bottom: 8px; text-align: justify;">
+                    <strong>Observación:</strong> ${nota.observation}
+                  </div>
+                `
+                    : ''
+                }
+
+                <div style="font-size: 9px; color: #555; background: #f3f4f6; padding: 8px; border-radius: 4px; line-height: 1.3; text-align: justify; margin-bottom: 8px;">
+                  <strong>Términos y condiciones:</strong> ${globalTerms}
+                </div>
+              `
+                  : `
+                <div style="height: 140px; margin-bottom: 8px;"></div>
+              `
+              }
+
+              <div style="text-align: center; font-size: 10px; color: #666; border-top: 1px solid #eee; padding-top: 6px;">
+                Página ${pageNum} de ${totalPages}
+              </div>
+            </div>
+
+          </div>
+        `;
+      });
+
+      container.innerHTML = pagesHtml;
+
       const opt = {
         margin: 0,
         filename: `Nota-${transNo}.pdf`,
@@ -1903,6 +2126,7 @@ export default function SalesModule() {
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
         output: 'blob',
       };
+
       const pdfBlob = await window
         .html2pdf()
         .from(container)
@@ -1911,6 +2135,7 @@ export default function SalesModule() {
       const file = new File([pdfBlob], `Nota-Entrega-${transNo}.pdf`, {
         type: 'application/pdf',
       });
+
       if (
         navigator.share &&
         navigator.canShare &&
