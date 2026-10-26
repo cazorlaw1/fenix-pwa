@@ -34,8 +34,7 @@ import {
   Upload,
 } from 'lucide-react';
 
-// --- COMPONENTE SEARCHABLE DROPDOWN (ACTUALIZADO CON MINIATURA Y BÚSQUEDA AVANZADA) ---
-// --- COMPONENTE SEARCHABLE DROPDOWN (VERSIÓN FINAL CON FILTRO AVANZADO) ---
+// --- COMPONENTE SEARCHABLE DROPDOWN (ACTUALIZADO CON MULTILÍNEA, MINIATURA Y BOTÓN DE LIMPIAR) ---
 function SearchableDropdown({
   options,
   value,
@@ -44,6 +43,7 @@ function SearchableDropdown({
   labelKey = 'label',
   valueKey = 'value',
   imageKey = 'image_url',
+  onClear, // Nueva prop para manejar la limpieza
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState('');
@@ -62,14 +62,11 @@ function SearchableDropdown({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // --- AQUÍ ESTÁ EL FILTRO QUE PEDISTE ---
   const filtered = options.filter((opt) => {
     const text = String(opt[labelKey] || '').toLowerCase();
     const searchTerms = search.toLowerCase().trim().split(/\s+/);
-    // Verifica que cada palabra escrita aparezca en el texto del producto
     return searchTerms.every((term) => text.includes(term));
   });
-  // ----------------------------------------
 
   const selectedOption = options.find(
     (o) => String(o[valueKey]) === String(value)
@@ -78,7 +75,6 @@ function SearchableDropdown({
   return (
     <div ref={containerRef} style={{ position: 'relative', width: '100%' }}>
       <div
-        onClick={() => setIsOpen(!isOpen)}
         style={{
           width: '100%',
           padding: '8px 12px',
@@ -87,7 +83,6 @@ function SearchableDropdown({
           borderRadius: '6px',
           backgroundColor: '#FFFFFF',
           boxSizing: 'border-box',
-          cursor: 'pointer',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
@@ -95,11 +90,15 @@ function SearchableDropdown({
           gap: '8px',
         }}
       >
+        {/* Contenedor principal con soporte de multilínea (whiteSpace: normal) */}
         <div
+          onClick={() => setIsOpen(!isOpen)}
           style={{
             display: 'flex',
             alignItems: 'center',
             gap: '8px',
+            flex: 1,
+            cursor: 'pointer',
             overflow: 'hidden',
           }}
         >
@@ -118,18 +117,51 @@ function SearchableDropdown({
           ) : null}
           <span
             style={{
+              whiteSpace: 'normal', // Permite salto de línea en 2 o 3 líneas
+              wordBreak: 'break-word',
+              lineHeight: '1.2',
+              display: '-webkit-box',
+              WebkitLineClamp: 3, // Muestra hasta 3 líneas completas antes de truncar
+              WebkitBoxOrient: 'vertical',
               overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
             }}
           >
             {selectedOption ? selectedOption[labelKey] : placeholder}
           </span>
         </div>
-        <span style={{ fontSize: '12px', color: '#6b7280', flexShrink: 0 }}>
-          ▼
-        </span>
+
+        {/* Botones de acción derecha: Limpiar y Flecha */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+          {value && onClear && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onClear();
+              }}
+              title="Limpiar selección"
+              style={{
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                color: '#9ca3af',
+                padding: '2px',
+                display: 'flex',
+                alignItems: 'center',
+              }}
+            >
+              <X size={16} />
+            </button>
+          )}
+          <span
+            onClick={() => setIsOpen(!isOpen)}
+            style={{ fontSize: '12px', color: '#6b7280', cursor: 'pointer' }}
+          >
+            ▼
+          </span>
+        </div>
       </div>
+
       {isOpen && (
         <div
           style={{
@@ -233,11 +265,12 @@ function SearchableDropdown({
                       }}
                     />
                   )}
+                  {/* Multilínea también en las opciones del listado desplegable */}
                   <span
                     style={{
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
+                      whiteSpace: 'normal',
+                      wordBreak: 'break-word',
+                      lineHeight: '1.3',
                     }}
                   >
                     {opt[labelKey]}
@@ -293,7 +326,10 @@ export default function AdminModule() {
   const [neSearchProduct, setNeSearchProduct] = useState('');
   const [neSelectedProdId, setNeSelectedProdId] = useState('');
   const [neQuantity, setNeQuantity] = useState(1);
-  const [neCart, setNeCart] = useState([]);
+  const [neCart, setNeCart] = useState(() => {
+    const cachedCart = localStorage.getItem('admin_ne_cart_cache');
+    return cachedCart ? JSON.parse(cachedCart) : [];
+  });
   const [neObservacion, setNeObservacion] = useState('');
   const [estimatedNextFolio, setEstimatedNextFolio] = useState('');
   const [manualFolioMode, setManualFolioMode] = useState(false);
@@ -377,7 +413,9 @@ export default function AdminModule() {
     startDate: '',
     endDate: '',
   });
-
+  useEffect(() => {
+    localStorage.setItem('admin_ne_cart_cache', JSON.stringify(neCart));
+  }, [neCart]);
   // --- EFECTO PARA PERSISTENCIA DE PESTAÑA (D) ---
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
@@ -785,6 +823,7 @@ export default function AdminModule() {
       setSpecificFolioNum('');
       setManualFolioMode(false);
       setNeFecha(new Date().toISOString().split('T')[0]);
+      localStorage.removeItem('admin_ne_cart_cache');
       await fetchEstimatedFolio();
       fetchTabData();
       fetchGlobalCreateNeAndCierreData();
