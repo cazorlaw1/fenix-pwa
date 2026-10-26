@@ -131,7 +131,14 @@ function SearchableDropdown({
         </div>
 
         {/* Botones de acción derecha: Limpiar y Flecha */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            flexShrink: 0,
+          }}
+        >
           {value && onClear && (
             <button
               type="button"
@@ -467,7 +474,7 @@ export default function AdminModule() {
     fetchGlobalCreateNeAndCierreData();
     fetchEstimatedFolio();
     fetchGlobalSettings();
-  }, [activeTab]);
+  }, [activeTab, selectedMonth, selectedYear, selectedCycle]);
 
   useEffect(() => {
     obtenerTasaBCV(false);
@@ -1319,18 +1326,12 @@ export default function AdminModule() {
   };
 
   const getClosedNotesForUserAndCycle = (userId) => {
-    // Combina notas activas cerradas y notas liquidadas (que siguen existiendo en BD)
     const activeNotes = closedOrdersList.filter((order) => {
       const orderSellerId = order.seller_id || order.seller?.id;
       return String(orderSellerId) === String(userId);
     });
 
-    const liquidatedNotes = liquidatedNotesList.filter((order) => {
-      const orderSellerId = order.seller_id || order.seller?.id;
-      return String(orderSellerId) === String(userId);
-    });
-
-    return [...activeNotes, ...liquidatedNotes];
+    return activeNotes;
   };
 
   // VALES INDEPENDIENTES: Filtrado solo por usuario, sin dependencia de order_id
