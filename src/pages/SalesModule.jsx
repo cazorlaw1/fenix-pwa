@@ -39,7 +39,7 @@ const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-// --- COMPONENTE SEARCHABLE DROPDOWN (ACTUALIZADO CON MINIATURA) ---
+// --- COMPONENTE SEARCHABLE DROPDOWN (ACTUALIZADO CON MULTILÍNEA Y LIMPIAR) ---
 function SearchableDropdown({
   options,
   value,
@@ -48,6 +48,7 @@ function SearchableDropdown({
   labelKey = 'label',
   valueKey = 'value',
   imageKey = 'image_url',
+  onClear, // NUEVO: Prop para limpiar la selección
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState('');
@@ -69,7 +70,6 @@ function SearchableDropdown({
   const filtered = options.filter((opt) => {
     const text = String(opt[labelKey] || '').toLowerCase();
     const searchTerms = search.toLowerCase().trim().split(/\s+/);
-    // Verifica que cada palabra escrita aparezca en el texto del producto
     return searchTerms.every((term) => text.includes(term));
   });
 
@@ -80,7 +80,6 @@ function SearchableDropdown({
   return (
     <div ref={containerRef} style={{ position: 'relative', width: '100%' }}>
       <div
-        onClick={() => setIsOpen(!isOpen)}
         style={{
           width: '100%',
           padding: '8px 12px',
@@ -89,7 +88,6 @@ function SearchableDropdown({
           borderRadius: '6px',
           backgroundColor: '#FFFFFF',
           boxSizing: 'border-box',
-          cursor: 'pointer',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
@@ -98,10 +96,13 @@ function SearchableDropdown({
         }}
       >
         <div
+          onClick={() => setIsOpen(!isOpen)}
           style={{
             display: 'flex',
             alignItems: 'center',
             gap: '8px',
+            flex: 1,
+            cursor: 'pointer',
             overflow: 'hidden',
           }}
         >
@@ -118,20 +119,61 @@ function SearchableDropdown({
               }}
             />
           ) : null}
+          {/* Soporte multilínea habilitado con whiteSpace: normal */}
           <span
             style={{
+              whiteSpace: 'normal',
+              wordBreak: 'break-word',
+              lineHeight: '1.2',
+              display: '-webkit-box',
+              WebkitLineClamp: 3,
+              WebkitBoxOrient: 'vertical',
               overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
             }}
           >
             {selectedOption ? selectedOption[labelKey] : placeholder}
           </span>
         </div>
-        <span style={{ fontSize: '12px', color: '#6b7280', flexShrink: 0 }}>
-          ▼
-        </span>
+
+        {/* Botones de acción derecha: Limpiar y Flecha */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            flexShrink: 0,
+          }}
+        >
+          {value && onClear && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onClear();
+              }}
+              title="Limpiar selección"
+              style={{
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                color: '#9ca3af',
+                padding: '2px',
+                display: 'flex',
+                alignItems: 'center',
+              }}
+            >
+              <X size={16} />
+            </button>
+          )}
+          <span
+            onClick={() => setIsOpen(!isOpen)}
+            style={{ fontSize: '12px', color: '#6b7280', cursor: 'pointer' }}
+          >
+            ▼
+          </span>
+        </div>
       </div>
+
       {isOpen && (
         <div
           style={{
@@ -237,9 +279,9 @@ function SearchableDropdown({
                   )}
                   <span
                     style={{
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
+                      whiteSpace: 'normal',
+                      wordBreak: 'break-word',
+                      lineHeight: '1.3',
                     }}
                   >
                     {opt[labelKey]}
@@ -253,7 +295,6 @@ function SearchableDropdown({
     </div>
   );
 }
-// ---------------------------------------------------------------
 export default function SalesModule() {
   const { user, role } = useAuth();
   // Referencias para el menú móvil
@@ -407,8 +448,14 @@ export default function SalesModule() {
   // B. ACTUALIZACIÓN: Modalidad ahora soporta 4 valores
   const [neTipoPago, setNeTipoPago] = useState('53.38');
   const [neQuantity, setNeQuantity] = useState(1);
-  const [neCart, setNeCart] = useState([]);
-
+  const [neCart, setNeCart] = useState(() => {
+    const cachedCart = localStorage.getItem('sales_ne_cart_cache');
+    return cachedCart ? JSON.parse(cachedCart) : [];
+  });
+  // Guardar automáticamente en caché cada vez que cambie el carrito
+  useEffect(() => {
+    localStorage.setItem('sales_ne_cart_cache', JSON.stringify(neCart));
+  }, [neCart]);
   // NUEVO: Efecto para recalcular precios del carrito al cambiar el tipo de pago/descuento
   useEffect(() => {
     if (neCart.length > 0) {
@@ -1457,6 +1504,7 @@ export default function SalesModule() {
       setNeObservacion('');
       setNeGpsLocation(null);
       setEditModeId(null);
+      localStorage.removeItem('sales_ne_cart_cache'); // <--- AÑADE ESTA LÍNEA AQUÍ
       fetchSalesHistory();
       fetchComisionesYVales();
       fetchEstimatedFolio();
@@ -6693,6 +6741,7 @@ export default function SalesModule() {
                     onChange={setNeSelectedProdId}
                     placeholder="-- Seleccionar producto --"
                     imageKey="image_url"
+                    onClear={() => setNeSelectedProdId('')} // <--- AÑADE ESTA LÍNEA
                   />
                 </div>
 
@@ -9299,6 +9348,7 @@ export default function SalesModule() {
                     onChange={setEditNeSelectedProdId}
                     placeholder="-- Seleccionar producto --"
                     imageKey="image_url"
+                    onClear={() => setEditNeSelectedProdId('')} // <--- AÑADE ESTA LÍNEA
                   />
                 </div>
 
