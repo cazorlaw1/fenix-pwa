@@ -2801,11 +2801,11 @@ export default function Users() {
                 <input
                   type="text"
                   placeholder="Dirección"
-                  value={newClientData.address_detail}
+                  value={newClientData.address} // <-- Cambiado de address_detail a address
                   onChange={(e) =>
                     setNewClientData({
                       ...newClientData,
-                      address_detail: e.target.value,
+                      address: e.target.value, // <-- Cambiado de address_detail a address
                     })
                   }
                   style={{
