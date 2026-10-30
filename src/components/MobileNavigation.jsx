@@ -9,6 +9,7 @@ import {
   Users as UsersIcon,
   FileText,
   TrendingUp,
+  BarChart3,
   ShoppingCart,
   User,
   LogOut,
@@ -35,6 +36,12 @@ export default function MobileNavigation({ isOpen, onClose }) {
       label: 'Dashboard',
       icon: LayoutDashboard,
       roles: ['administrador', 'gerente', 'supervisor', 'vendedor', 'tecnico'],
+    },
+    {
+      to: '/finanzas',
+      label: 'Finanzas',
+      icon: BarChart3, // Asegúrate de importar PieChart de lucide-react arriba
+      roles: ['administrador', 'tecnico'],
     },
     {
       to: '/inventario',
@@ -70,7 +77,14 @@ export default function MobileNavigation({ isOpen, onClose }) {
       to: '/profile',
       label: 'Mi Perfil',
       icon: User,
-      roles: ['administrador', 'gerente', 'supervisor', 'vendedor', 'stock', 'tecnico'],
+      roles: [
+        'administrador',
+        'gerente',
+        'supervisor',
+        'vendedor',
+        'stock',
+        'tecnico',
+      ],
     },
   ];
 
@@ -81,9 +95,7 @@ export default function MobileNavigation({ isOpen, onClose }) {
     .trim();
 
   // Filtrar ítems según el rol del usuario
-  const navItems = allNavItems.filter((item) =>
-    item.roles.includes(userRole)
-  );
+  const navItems = allNavItems.filter((item) => item.roles.includes(userRole));
 
   return (
     <div

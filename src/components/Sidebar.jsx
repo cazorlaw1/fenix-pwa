@@ -36,6 +36,13 @@ export default function Sidebar() {
           Dashboard
         </NavLink>
 
+        {/* NUEVO ENLACE FINANZAS */}
+        {isTechOrAdmin && (
+          <NavLink to="/finanzas" style={linkStyle}>
+            Finanzas
+          </NavLink>
+        )}
+
         {/* 3.2 Inventario - Disponible para todos */}
         <NavLink to="/inventario" style={linkStyle}>
           Inventario

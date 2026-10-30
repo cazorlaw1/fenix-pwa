@@ -12,7 +12,6 @@ import Header from './components/Header';
 import Sidebar from './components/Sidebar';
 import MobileNavigation from './components/MobileNavigation';
 import { supabase } from './lib/supabase';
-import { RefreshCw } from 'lucide-react';
 
 // Páginas
 import Dashboard from './pages/Dashboard';
@@ -24,145 +23,49 @@ import Inventory from './pages/Inventory';
 import AdminModule from './pages/AdminModule';
 import Vendedores from './pages/Vendedores';
 import SalesModule from './pages/SalesModule';
+import FinancialReports from './pages/FinancialReports'; // <-- IMPORTAR
 
-// Componente Pull-to-Refresh para móviles
-function PullToRefreshContainer({ children }) {
-  const [startY, setStartY] = useState(0);
-  const [pullDistance, setPullDistance] = useState(0);
-  const [refreshing, setRefreshing] = useState(false);
-  const threshold = 80;
-
-  useEffect(() => {
-    const handleTouchStart = (e) => {
-      if (window.scrollY === 0) {
-        setStartY(e.touches[0].clientY);
-      }
-    };
-
-    const handleTouchMove = (e) => {
-      if (!startY) return;
-      const currentY = e.touches[0].clientY;
-      const distance = currentY - startY;
-
-      if (distance > 0 && window.scrollY === 0) {
-        setPullDistance(Math.min(distance * 0.4, 120));
-      } else {
-        setPullDistance(0);
-      }
-    };
-
-    const handleTouchEnd = () => {
-      if (!startY) return;
-
-      if (pullDistance >= threshold && !refreshing) {
-        setRefreshing(true);
-        setTimeout(() => {
-          window.location.reload();
-        }, 600);
-      } else {
-        setPullDistance(0);
-      }
-      setStartY(0);
-    };
-
-    window.addEventListener('touchstart', handleTouchStart);
-    window.addEventListener('touchmove', handleTouchMove);
-    window.addEventListener('touchend', handleTouchEnd);
-
-    return () => {
-      window.removeEventListener('touchstart', handleTouchStart);
-      window.removeEventListener('touchmove', handleTouchMove);
-      window.removeEventListener('touchend', handleTouchEnd);
-    };
-  }, [startY, pullDistance, refreshing]);
-
-  return (
-    <div style={{ position: 'relative', minHeight: '100vh', width: '100%' }}>
-      <div
-        style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          height: `${pullDistance}px`,
-          maxHeight: '100px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          backgroundColor: '#1c1917',
-          color: '#D4AF37',
-          overflow: 'hidden',
-          transition: pullDistance === 0 ? 'height 0.3s ease' : 'none',
-          zIndex: 99999,
-          boxShadow: pullDistance > 0 ? '0 4px 6px rgba(0,0,0,0.1)' : 'none',
-        }}
-      >
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            fontSize: '13px',
-            fontWeight: 'bold',
-            opacity: pullDistance > 30 ? 1 : 0,
-            transition: 'opacity 0.2s',
-          }}
-        >
-          <RefreshCw
-            size={18}
-            style={{
-              transform: `rotate(${pullDistance * 3}deg)`,
-              transition: pullDistance === 0 ? 'transform 0.3s' : 'none',
-            }}
-          />
-          <span>
-            {refreshing
-              ? 'Actualizando Fenix...'
-              : pullDistance >= threshold
-              ? 'Suelta para actualizar'
-              : 'Desliza hacia abajo'}
-          </span>
-        </div>
-      </div>
-
-      <div
-        style={{
-          transform: `translateY(${pullDistance}px)`,
-          transition: pullDistance === 0 ? 'transform 0.3s ease' : 'none',
-          width: '100%',
-          minHeight: '100vh',
-        }}
-      >
-        {children}
-      </div>
-    </div>
-  );
-}
-
-// Pantalla en negro para Acceso No Autorizado (Con botón)
 function Unauthorized() {
   return (
-    <div style={{
-      backgroundColor: '#000000',
-      color: '#ffffff',
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      justifyContent: 'center',
-      minHeight: '100vh',
-      padding: '20px',
-      textAlign: 'center',
-      fontFamily: 'system-ui, sans-serif'
-    }}>
+    <div
+      style={{
+        backgroundColor: '#000000',
+        color: '#ffffff',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        minHeight: '100vh',
+        padding: '20px',
+        textAlign: 'center',
+        fontFamily: 'system-ui, sans-serif',
+      }}
+    >
       <div style={{ fontSize: '56px', marginBottom: '20px' }}>🚫</div>
-      <h1 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '10px', color: '#f87171' }}>
+      <h1
+        style={{
+          fontSize: '24px',
+          fontWeight: 'bold',
+          marginBottom: '10px',
+          color: '#f87171',
+        }}
+      >
         Acceso Restringido
       </h1>
-      <p style={{ color: '#9ca3af', maxWidth: '420px', marginBottom: '24px', fontSize: '15px', lineHeight: '1.5' }}>
-        No cuentas con los permisos necesarios para visualizar este módulo dentro del sistema.
+      <p
+        style={{
+          color: '#9ca3af',
+          maxWidth: '420px',
+          marginBottom: '24px',
+          fontSize: '15px',
+          lineHeight: '1.5',
+        }}
+      >
+        No cuentas con los permisos necesarios para visualizar este módulo
+        dentro del sistema.
       </p>
-      <a 
-        href="/dashboard" 
+      <a
+        href="/dashboard"
         style={{
           backgroundColor: '#dc2626',
           color: '#ffffff',
@@ -180,33 +83,51 @@ function Unauthorized() {
   );
 }
 
-// Pantalla en negro para Cuenta Suspendida (SIN BOTÓN)
 function SuspendedAccountView() {
   return (
-    <div style={{
-      backgroundColor: '#000000',
-      color: '#ffffff',
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      justifyContent: 'center',
-      minHeight: '100vh',
-      padding: '20px',
-      textAlign: 'center',
-      fontFamily: 'system-ui, sans-serif'
-    }}>
+    <div
+      style={{
+        backgroundColor: '#000000',
+        color: '#ffffff',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        minHeight: '100vh',
+        padding: '20px',
+        textAlign: 'center',
+        fontFamily: 'system-ui, sans-serif',
+      }}
+    >
       <div style={{ fontSize: '56px', marginBottom: '20px' }}>⚠️</div>
-      <h1 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '10px', color: '#ef4444' }}>
+      <h1
+        style={{
+          fontSize: '24px',
+          fontWeight: 'bold',
+          marginBottom: '10px',
+          color: '#ef4444',
+        }}
+      >
         Cuenta Suspendida o Inactiva
       </h1>
-      <p style={{ color: '#9ca3af', maxWidth: '440px', fontSize: '15px', lineHeight: '1.6' }}>
-        Tu cuenta se encuentra actualmente suspendida o inactiva en el sistema. No posees acceso a ninguna sección ni funcionalidad. Debes hablar directamente con un <strong style={{ color: '#ffffff' }}>administrador</strong> para solucionar tu estatus.
+      <p
+        style={{
+          color: '#9ca3af',
+          maxWidth: '440px',
+          fontSize: '15px',
+          lineHeight: '1.6',
+        }}
+      >
+        Tu cuenta se encuentra actualmente suspendida o inactiva en el sistema.
+        No posees acceso a ninguna sección ni funcionalidad. Debes hablar
+        directamente con un{' '}
+        <strong style={{ color: '#ffffff' }}>administrador</strong> para
+        solucionar tu estatus.
       </p>
     </div>
   );
 }
 
-// Componente interno para manejar el callback de Google y evitar pantalla blanca
 function AuthCallback() {
   const navigate = useNavigate();
   const { fetchProfile } = useAuth();
@@ -214,46 +135,44 @@ function AuthCallback() {
   useEffect(() => {
     const handleCallback = async () => {
       try {
-        const { data: { session }, error } = await supabase.auth.getSession();
-        
+        const {
+          data: { session },
+          error,
+        } = await supabase.auth.getSession();
         if (error || !session) {
-          console.error('Error en callback de auth:', error);
           navigate('/login');
           return;
         }
-
         const userProfile = await fetchProfile(session.user.id);
-        
         if (userProfile?.role === 'pendiente' || !userProfile?.role) {
           navigate('/pending');
         } else {
           navigate('/');
         }
       } catch (err) {
-        console.error('Error procesando callback:', err);
         navigate('/login');
       }
     };
-
     handleCallback();
   }, [navigate, fetchProfile]);
 
   return (
-    <div style={{ 
-      backgroundColor: '#000000',
-      color: '#ffffff',
-      display: 'flex', 
-      alignItems: 'center', 
-      justifyContent: 'center', 
-      height: '100vh',
-      fontFamily: 'system-ui, sans-serif'
-    }}>
+    <div
+      style={{
+        backgroundColor: '#000000',
+        color: '#ffffff',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        height: '100vh',
+        fontFamily: 'system-ui',
+      }}
+    >
       <p>Verificando credenciales del sistema...</p>
     </div>
   );
 }
 
-// Componente protector de rutas
 function RoleProtectedRoute({ allowedRoles }) {
   const { user, profile, loading: authLoading } = useAuth();
   const [checking, setChecking] = useState(true);
@@ -265,12 +184,10 @@ function RoleProtectedRoute({ allowedRoles }) {
         setChecking(false);
         return;
       }
-
       if (profile && profile.role) {
         setChecking(false);
         return;
       }
-
       try {
         const { data, error } = await supabase
           .from('profiles')
@@ -283,12 +200,11 @@ function RoleProtectedRoute({ allowedRoles }) {
           setProfileMissing(true);
         }
       } catch (err) {
-        console.error('Error verificando existencia de perfil:', err);
+        console.error('Error verificando perfil:', err);
       } finally {
         setChecking(false);
       }
     }
-
     if (!authLoading) {
       verifyUserExists();
     }
@@ -296,7 +212,17 @@ function RoleProtectedRoute({ allowedRoles }) {
 
   if (authLoading || checking) {
     return (
-      <div style={{ backgroundColor: '#000000', color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', fontFamily: 'system-ui' }}>
+      <div
+        style={{
+          backgroundColor: '#000000',
+          color: '#ffffff',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          height: '100vh',
+          fontFamily: 'system-ui',
+        }}
+      >
         <p>Cargando sistema...</p>
       </div>
     );
@@ -312,26 +238,17 @@ function RoleProtectedRoute({ allowedRoles }) {
   if (isActive === false || currentRole === 'suspendido') {
     return <SuspendedAccountView />;
   }
-
   if (currentRole === 'pendiente' || !currentRole) {
     return <Navigate to="/pending" replace />;
   }
-
   if (allowedRoles && !allowedRoles.includes(currentRole)) {
     return <Unauthorized />;
   }
-
   return null;
 }
 
 function Layout({ children, activeTab, setActiveTab }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const handleOpenMobileMenu = () => {
-    setIsMobileMenuOpen(true);
-  };
-  const handleCloseMobileMenu = () => {
-    setIsMobileMenuOpen(false);
-  };
   return (
     <div
       style={{
@@ -362,7 +279,7 @@ function Layout({ children, activeTab, setActiveTab }) {
         <Header
           activeTab={activeTab}
           setActiveTab={setActiveTab}
-          onOpenMobileMenu={handleOpenMobileMenu}
+          onOpenMobileMenu={() => setIsMobileMenuOpen(true)}
         />
         <main
           style={{
@@ -382,26 +299,13 @@ function Layout({ children, activeTab, setActiveTab }) {
       </div>
       <MobileNavigation
         isOpen={isMobileMenuOpen}
-        onClose={handleCloseMobileMenu}
+        onClose={() => setIsMobileMenuOpen(false)}
       />
       <style>{`
-        * {
-          box-sizing: border-box;
-        }
-        html, body, #root {
-          margin: 0;
-          padding: 0;
-          width: 100%;
-          height: 100%;
-          overflow: hidden;
-          font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-        }
-        @media (max-width: 768px) {
-          .desktop-sidebar-wrapper { display: none !important; }
-        }
-        @media (min-width: 769px) {
-          .desktop-sidebar-wrapper { display: block !important; }
-        }
+        * { box-sizing: border-box; }
+        html, body, #root { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+        @media (max-width: 768px) { .desktop-sidebar-wrapper { display: none !important; } }
+        @media (min-width: 769px) { .desktop-sidebar-wrapper { display: block !important; } }
       `}</style>
     </div>
   );
@@ -419,14 +323,13 @@ function DashboardWrapper() {
 function VendedoresWrapper() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const handleSelectSellerHistory = (vendedor) => {
-    navigate(`/ventas/historial?sellerId=${vendedor.id}`);
-  };
   return (
     <Layout>
       <Vendedores
         currentUser={user || { id: '', role: 'vendedor' }}
-        onSelectSellerHistory={handleSelectSellerHistory}
+        onSelectSellerHistory={(v) =>
+          navigate(`/ventas/historial?sellerId=${v.id}`)
+        }
       />
     </Layout>
   );
@@ -436,98 +339,149 @@ export default function App() {
   useEffect(() => {
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js')
-          .then((reg) => console.log('Service Worker registrado con éxito:', reg.scope))
-          .catch((err) => console.error('Error al registrar Service Worker:', err));
+        navigator.serviceWorker.register('/sw.js').catch(() => {});
       });
     }
   }, []);
 
   return (
     <AuthProvider>
-      <PullToRefreshContainer>
-        <Router>
-          <Routes>
-            <Route path="/login" element={<Login />} />
-            <Route path="/pending" element={<PendingApproval />} />
-            <Route path="/auth/callback" element={<AuthCallback />} />
-            
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
-            
-            <Route 
-              path="/dashboard" 
-              element={
-                <>
-                  <RoleProtectedRoute allowedRoles={['administrador', 'tecnico', 'gerente', 'supervisor', 'vendedor', 'stock']} />
-                  <DashboardWrapper />
-                </>
-              } 
-            />
+      <Router>
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route path="/pending" element={<PendingApproval />} />
+          <Route path="/auth/callback" element={<AuthCallback />} />
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
 
-            <Route
-              path="/inventario"
-              element={
-                <>
-                  <RoleProtectedRoute allowedRoles={['administrador', 'tecnico', 'gerente', 'supervisor', 'vendedor', 'stock']} />
-                  <Layout><Inventory /></Layout>
-                </>
-              }
-            />
+          <Route
+            path="/dashboard"
+            element={
+              <>
+                <RoleProtectedRoute
+                  allowedRoles={[
+                    'administrador',
+                    'tecnico',
+                    'gerente',
+                    'supervisor',
+                    'vendedor',
+                    'stock',
+                  ]}
+                />
+                <DashboardWrapper />
+              </>
+            }
+          />
+          <Route
+            path="/finanzas"
+            element={
+              <>
+                <RoleProtectedRoute
+                  allowedRoles={['administrador', 'tecnico']}
+                />
+                <Layout>
+                  <FinancialReports />
+                </Layout>
+              </>
+            }
+          />
+          <Route
+            path="/inventario"
+            element={
+              <>
+                <RoleProtectedRoute
+                  allowedRoles={['administrador', 'tecnico', 'stock']}
+                />
+                <Layout>
+                  <Inventory />
+                </Layout>
+              </>
+            }
+          />
+          <Route
+            path="/usuarios"
+            element={
+              <>
+                <RoleProtectedRoute
+                  allowedRoles={['administrador', 'tecnico']}
+                />
+                <Layout>
+                  <Users />
+                </Layout>
+              </>
+            }
+          />
+          <Route
+            path="/administrativo"
+            element={
+              <>
+                <RoleProtectedRoute
+                  allowedRoles={['administrador', 'tecnico']}
+                />
+                <Layout>
+                  <AdminModule />
+                </Layout>
+              </>
+            }
+          />
+          <Route
+            path="/vendedores"
+            element={
+              <>
+                <RoleProtectedRoute
+                  allowedRoles={[
+                    'administrador',
+                    'tecnico',
+                    'gerente',
+                    'supervisor',
+                  ]}
+                />
+                <VendedoresWrapper />
+              </>
+            }
+          />
+          <Route
+            path="/ventas"
+            element={
+              <>
+                <RoleProtectedRoute
+                  allowedRoles={[
+                    'administrador',
+                    'tecnico',
+                    'gerente',
+                    'supervisor',
+                    'vendedor',
+                  ]}
+                />
+                <Layout>
+                  <SalesModule />
+                </Layout>
+              </>
+            }
+          />
+          <Route
+            path="/profile"
+            element={
+              <>
+                <RoleProtectedRoute
+                  allowedRoles={[
+                    'administrador',
+                    'tecnico',
+                    'gerente',
+                    'supervisor',
+                    'vendedor',
+                    'stock',
+                  ]}
+                />
+                <Layout>
+                  <Profile />
+                </Layout>
+              </>
+            }
+          />
 
-            <Route
-              path="/usuarios"
-              element={
-                <>
-                  <RoleProtectedRoute allowedRoles={['administrador', 'tecnico']} />
-                  <Layout><Users /></Layout>
-                </>
-              }
-            />
-
-            <Route
-              path="/administrativo"
-              element={
-                <>
-                  <RoleProtectedRoute allowedRoles={['administrador', 'tecnico']} />
-                  <Layout><AdminModule /></Layout>
-                </>
-              }
-            />
-
-            <Route 
-              path="/vendedores" 
-              element={
-                <>
-                  <RoleProtectedRoute allowedRoles={['administrador', 'tecnico', 'gerente', 'supervisor']} />
-                  <VendedoresWrapper />
-                </>
-              } 
-            />
-
-            <Route
-              path="/ventas"
-              element={
-                <>
-                  <RoleProtectedRoute allowedRoles={['administrador', 'tecnico', 'gerente', 'supervisor', 'vendedor']} />
-                  <Layout><SalesModule /></Layout>
-                </>
-              }
-            />
-
-            <Route
-              path="/profile"
-              element={
-                <>
-                  <RoleProtectedRoute allowedRoles={['administrador', 'tecnico', 'gerente', 'supervisor', 'vendedor', 'stock']} />
-                  <Layout><Profile /></Layout>
-                </>
-              }
-            />
-
-            <Route path="*" element={<Navigate to="/dashboard" replace />} />
-          </Routes>
-        </Router>
-      </PullToRefreshContainer>
+          <Route path="*" element={<Navigate to="/dashboard" replace />} />
+        </Routes>
+      </Router>
     </AuthProvider>
   );
 }
