@@ -2018,7 +2018,7 @@ const HistoryMainView = ({
             gap: '6px',
           }}
         >
-          <History size={16} /> Copias Automáticas (Triggers)
+          <History size={16} /> Copias Automáticas
         </button>
         <button
           onClick={() => {
@@ -2075,7 +2075,7 @@ const HistoryMainView = ({
                   color: '#111827',
                 }}
               >
-                Historial de Copias de Registros (Trigger)
+                Historial de Copias de Registros
               </h3>
               <p
                 style={{
@@ -4799,7 +4799,7 @@ const LiquidationView = ({
             }}
           >
             <FileText size={20} color="#4b5563" /> Historial de Facturas
-            Emitidas (settlement_invoices)
+            Emitidas
           </h3>
           <div>
             {isInvoicesOpen ? (
