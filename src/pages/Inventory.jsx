@@ -17,6 +17,7 @@ import {
   FileText,
   Archive,
   ChevronDown,
+  FileSpreadsheet, // Icono para representar N.E.
 } from 'lucide-react';
 
 export default function Inventory() {
@@ -27,16 +28,25 @@ export default function Inventory() {
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+  
   // Estado para el rol del usuario actual
   const [userRole, setUserRole] = useState(null);
+  
   // Estado para el menú dropdown en móvil
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const mobileMenuRef = useRef(null);
+
   // Modales
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
   const [adjustingStockProduct, setAdjustingStockProduct] = useState(null);
   const [selectedImageModal, setSelectedImageModal] = useState(null);
+  
+  // Modal para ver Notas de Entrega asociadas
+  const [neModalProduct, setNeModalProduct] = useState(null);
+  const [neList, setNeList] = useState([]);
+  const [neLoading, setNeLoading] = useState(false);
+
   // Modales de Importación/Exportación
   const [showExportModal, setShowExportModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
@@ -44,6 +54,7 @@ export default function Inventory() {
   const [importWithImages, setImportWithImages] = useState(false);
   const [exportProcessing, setExportProcessing] = useState(false);
   const [importProcessing, setImportProcessing] = useState(false);
+
   // Formulario de Registro / Edición de Producto
   const [formCode, setFormCode] = useState('');
   const [formDescription, setFormDescription] = useState('');
@@ -53,6 +64,7 @@ export default function Inventory() {
   const [formStock, setFormStock] = useState('');
   const [formImageFile, setFormImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState('');
+
   // Formulario de Ajuste Rápido de Stock
   const [stockAdjustmentValue, setStockAdjustmentValue] = useState('');
   const [stockAdjustmentType, setStockAdjustmentType] = useState('add');
@@ -83,6 +95,9 @@ export default function Inventory() {
 
   // Verificar si el usuario tiene permiso de gestión (administrador o stock)
   const canManage = userRole === 'administrador' || userRole === 'stock';
+
+  // Verificar si el usuario puede ver N.E. (administrador o tecnico)
+  const canViewNE = userRole === 'administrador' || userRole === 'tecnico';
 
   // Si no tiene permisos y está en la pestaña restringida, redirigir al inventario
   useEffect(() => {
@@ -162,12 +177,10 @@ export default function Inventory() {
           image_url: imageUrl,
           updated_at: new Date(),
         };
-
         // Solo agregar base_price si el usuario tiene permisos
         if (canManage) {
           updateData.base_price = parseFloat(formBasePrice || 0);
         }
-
         const { error } = await supabase
           .from('products')
           .update(updateData)
@@ -183,12 +196,10 @@ export default function Inventory() {
           stock_current: parseInt(formStock || 0),
           image_url: imageUrl,
         };
-
         // Solo agregar base_price si el usuario tiene permisos
         if (canManage) {
           insertData.base_price = parseFloat(formBasePrice || 0);
         }
-
         const { error } = await supabase.from('products').insert([insertData]);
         if (error) throw error;
         setSuccessMsg('Producto registrado exitosamente.');
@@ -234,6 +245,7 @@ export default function Inventory() {
       if (itemsError) {
         console.warn('Error al eliminar order_items relacionados:', itemsError);
       }
+
       const { error } = await supabase
         .from('products')
         .delete()
@@ -258,6 +270,7 @@ export default function Inventory() {
       let newStock = adjustingStockProduct.stock_current;
       const amount = parseInt(stockAdjustmentValue);
       if (isNaN(amount)) throw new Error('Cantidad inválida');
+
       if (stockAdjustmentType === 'add') {
         newStock += amount;
       } else if (stockAdjustmentType === 'subtract') {
@@ -311,6 +324,42 @@ export default function Inventory() {
     setAdjustingStockProduct(null);
     setStockAdjustmentValue('');
     setIsMobileMenuOpen(false);
+    setNeModalProduct(null);
+    setNeList([]);
+  };
+
+  // Función para abrir el modal de N.E. y cargar los datos
+  const openNeModal = async (product) => {
+    setNeModalProduct(product);
+    setNeLoading(true);
+    setNeList([]);
+    try {
+      // Buscar en order_items todos los order_id donde esté este producto
+      const { data: items, error } = await supabase
+        .from('order_items')
+        .select('order_id')
+        .eq('product_id', product.id);
+
+      if (error) throw error;
+
+      if (items && items.length > 0) {
+        const orderIds = items.map((item) => item.order_id);
+        // Buscar las sales_orders correspondientes para obtener el transaction_number
+        const { data: orders, error: orderError } = await supabase
+          .from('sales_orders')
+          .select('transaction_number')
+          .in('id', orderIds)
+          .order('transaction_number', { ascending: false });
+
+        if (orderError) throw orderError;
+        setNeList(orders || []);
+      }
+    } catch (err) {
+      console.error('Error al cargar N.E. asociadas:', err);
+      setErrorMsg('No se pudieron cargar las notas de entrega.');
+    } finally {
+      setNeLoading(false);
+    }
   };
 
   const filteredProducts = products.filter(
@@ -328,7 +377,9 @@ export default function Inventory() {
         .from('products')
         .select('*')
         .order('created_at', { ascending: false });
+
       if (error) throw error;
+
       if (!allProducts || allProducts.length === 0) {
         setErrorMsg('No hay productos para exportar.');
         setExportProcessing(false);
@@ -353,11 +404,13 @@ export default function Inventory() {
         p.stock_current || 0,
         p.image_url || '',
       ]);
+
       const csvContent = [csvHeaders, ...csvRows]
         .map((row) =>
           row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(',')
         )
         .join('\n');
+
       if (!withImages) {
         const blob = new Blob(['\ufeff' + csvContent], {
           type: 'text/csv;charset=utf-8;',
@@ -422,6 +475,7 @@ export default function Inventory() {
         .split('\n')
         .map((line) => line.replace(/\r$/, ''))
         .filter((line) => line.trim());
+
       if (lines.length < 2) {
         throw new Error('El archivo CSV está vacío o no tiene datos válidos.');
       }
@@ -442,6 +496,7 @@ export default function Inventory() {
           productsToImport.push(product);
         }
       }
+
       if (withImages && zipFile) {
         const zip = await JSZip.loadAsync(zipFile);
         const imageFolder = zip.folder('imagenes');
@@ -470,6 +525,7 @@ export default function Inventory() {
           }
         }
       }
+
       let importedCount = 0;
       let updatedCount = 0;
       for (const product of productsToImport) {
@@ -478,6 +534,7 @@ export default function Inventory() {
           .select('id')
           .eq('code', product.code)
           .single();
+
         if (existingProduct) {
           const updateData = {
             description: product.description,
@@ -487,12 +544,10 @@ export default function Inventory() {
             image_url: product.image_url || null,
             updated_at: new Date(),
           };
-
           // Importar base_price si existe en el CSV
           if (product.base_price !== undefined) {
             updateData.base_price = parseFloat(product.base_price) || 0;
           }
-
           const { error } = await supabase
             .from('products')
             .update(updateData)
@@ -511,12 +566,10 @@ export default function Inventory() {
             stock_current: parseInt(product.stock_current) || 0,
             image_url: product.image_url || null,
           };
-
           // Importar base_price si existe en el CSV
           if (product.base_price !== undefined) {
             insertData.base_price = parseFloat(product.base_price) || 0;
           }
-
           const { error } = await supabase
             .from('products')
             .insert([insertData]);
@@ -600,75 +653,78 @@ export default function Inventory() {
     <div style={{ padding: '24px', maxWidth: '1200px', margin: '0 auto' }}>
       {/* Estilos CSS para responsividad */}
       <style>{`
-@media (max-width: 768px) {
-.desktop-tabs { display: none !important; }
-.mobile-dropdown { display: block !important; }
-.desktop-table { display: none !important; }
-.mobile-cards { display: block !important; }
-}
-@media (min-width: 769px) {
-.desktop-tabs { display: flex !important; }
-.mobile-dropdown { display: none !important; }
-.desktop-table { display: block !important; }
-.mobile-cards { display: none !important; }
-}
-    /* Estilos para tarjetas móviles */
-     .mobile-card {
-       background-color: #ffffff;
-       border-radius: 8px;
-       box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-       padding: 16px;
-       margin-bottom: 12px;
-       border: 1px solid #e5e7eb;
-     }
-     .mobile-card-header {
-       display: flex;
-       align-items: center;
-       gap: 12px;
-       margin-bottom: 12px;
-       padding-bottom: 12px;
-       border-bottom: 1px solid #e5e7eb;
-     }
-     .mobile-card-field {
-       display: flex;
-       justify-content: space-between;
-       align-items: center;
-       padding: 8px 0;
-       border-bottom: 1px solid #f3f4f6;
-     }
-     .mobile-card-field:last-child { border-bottom: none; }
-     .mobile-card-label {
-       font-size: 12px;
-       font-weight: 600;
-       color: #6b7280;
-       text-transform: uppercase;
-     }
-     .mobile-card-value {
-       font-size: 14px;
-       color: #111827;
-       font-weight: 500;
-     }
-     .mobile-card-actions {
-       display: flex;
-       gap: 8px;
-       margin-top: 12px;
-       padding-top: 12px;
-       border-top: 1px solid #e5e7eb;
-     }
-     .mobile-card-actions button {
-       flex: 1;
-       padding: 8px;
-       border-radius: 6px;
-       border: 1px solid;
-       cursor: pointer;
-       display: flex;
-       align-items: center;
-       justify-content: center;
-       gap: 6px;
-       font-size: 12px;
-       font-weight: 600;
-     }
-   `}</style>
+        @media (max-width: 768px) {
+          .desktop-tabs { display: none !important; }
+          .mobile-dropdown { display: block !important; }
+          .desktop-table { display: none !important; }
+          .mobile-cards { display: block !important; }
+        }
+        @media (min-width: 769px) {
+          .desktop-tabs { display: flex !important; }
+          .mobile-dropdown { display: none !important; }
+          .desktop-table { display: block !important; }
+          .mobile-cards { display: none !important; }
+        }
+        /* Estilos para tarjetas móviles */
+        .mobile-card {
+          background-color: #ffffff;
+          border-radius: 8px;
+          box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+          padding: 16px;
+          margin-bottom: 12px;
+          border: 1px solid #e5e7eb;
+        }
+        .mobile-card-header {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          margin-bottom: 12px;
+          padding-bottom: 12px;
+          border-bottom: 1px solid #e5e7eb;
+        }
+        .mobile-card-field {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 8px 0;
+          border-bottom: 1px solid #f3f4f6;
+        }
+        .mobile-card-field:last-child {
+          border-bottom: none;
+        }
+        .mobile-card-label {
+          font-size: 12px;
+          font-weight: 600;
+          color: #6b7280;
+          text-transform: uppercase;
+        }
+        .mobile-card-value {
+          font-size: 14px;
+          color: #111827;
+          font-weight: 500;
+        }
+        .mobile-card-actions {
+          display: flex;
+          gap: 8px;
+          margin-top: 12px;
+          padding-top: 12px;
+          border-top: 1px solid #e5e7eb;
+        }
+        .mobile-card-actions button {
+          flex: 1;
+          padding: 8px;
+          border-radius: 6px;
+          border: 1px solid;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 6px;
+          font-size: 12px;
+          font-weight: 600;
+        }
+      `}</style>
+
       {/* Encabezado del Módulo */}
       <div
         style={{
@@ -719,6 +775,7 @@ export default function Inventory() {
           </button>
         )}
       </div>
+
       {/* Alertas de Feedback */}
       {errorMsg && (
         <div
@@ -752,8 +809,9 @@ export default function Inventory() {
           <Check size={18} /> {successMsg}
         </div>
       )}
+
       {/* ========================================== */}
-      {/* MENÚ DE NAVEGACIÓN RESPONSIVO                */}
+      {/* MENÚ DE NAVEGACIÓN RESPONSIVO                 */}
       {/* ========================================== */}
       {/* Versión Escritorio: Pestañas Horizontales */}
       <div
@@ -805,6 +863,7 @@ export default function Inventory() {
           );
         })}
       </div>
+
       {/* Versión Móvil: Dropdown Compacto */}
       <div
         className="mobile-dropdown"
@@ -909,8 +968,9 @@ export default function Inventory() {
           </div>
         )}
       </div>
+
       {/* ========================================== */}
-      {/* CONTENIDO DE LA PESTAÑA DE INVENTARIO      */}
+      {/* CONTENIDO DE LA PESTAÑA DE INVENTARIO       */}
       {/* ========================================== */}
       {activeMainTab === 'inventory' && (
         <>
@@ -942,6 +1002,7 @@ export default function Inventory() {
               }}
             />
           </div>
+
           {/* Tabla de Escritorio */}
           <div
             className="desktop-table"
@@ -977,6 +1038,11 @@ export default function Inventory() {
                     <th style={{ padding: '12px 16px' }}>Precio Base</th>
                   )}
                   <th style={{ padding: '12px 16px' }}>Stock Actual</th>
+                  {canViewNE && (
+                    <th style={{ padding: '12px 16px', textAlign: 'center' }}>
+                      N.E.
+                    </th>
+                  )}
                   {canManage && (
                     <th style={{ padding: '12px 16px', textAlign: 'center' }}>
                       Acciones
@@ -988,7 +1054,15 @@ export default function Inventory() {
                 {loading ? (
                   <tr>
                     <td
-                      colSpan={canManage ? '8' : '7'}
+                      colSpan={
+                        canManage
+                          ? canViewNE
+                            ? '9'
+                            : '8'
+                          : canViewNE
+                          ? '8'
+                          : '7'
+                      }
                       style={{
                         textAlign: 'center',
                         padding: '24px',
@@ -1001,7 +1075,15 @@ export default function Inventory() {
                 ) : filteredProducts.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={canManage ? '8' : '7'}
+                      colSpan={
+                        canManage
+                          ? canViewNE
+                            ? '9'
+                            : '8'
+                          : canViewNE
+                          ? '8'
+                          : '7'
+                      }
                       style={{
                         textAlign: 'center',
                         padding: '24px',
@@ -1103,6 +1185,38 @@ export default function Inventory() {
                           {p.stock_current} un.
                         </span>
                       </td>
+                      {canViewNE && (
+                        <td
+                          style={{
+                            padding: '12px 16px',
+                            textAlign: 'center',
+                          }}
+                        >
+                          <button
+                            onClick={() => openNeModal(p)}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              padding: '4px 8px',
+                              borderRadius: '4px',
+                              backgroundColor: '#eff6ff',
+                              color: '#1d4ed8',
+                              fontWeight: 'bold',
+                              fontSize: '13px',
+                            }}
+                            title="Ver Notas de Entrega asociadas"
+                          >
+                            <FileSpreadsheet size={14} />
+                            {/* Aquí podríamos mostrar un contador si lo tuviéramos precalculado, 
+                                pero como es dinámico, mostramos un icono o texto genérico hasta cargar */}
+                            Ver
+                          </button>
+                        </td>
+                      )}
                       {canManage && (
                         <td
                           style={{ padding: '12px 16px', textAlign: 'center' }}
@@ -1165,6 +1279,7 @@ export default function Inventory() {
               </tbody>
             </table>
           </div>
+
           {/* Tarjetas para Móvil */}
           <div className="mobile-cards">
             {loading ? (
@@ -1281,6 +1396,29 @@ export default function Inventory() {
                       {p.stock_current} un.
                     </span>
                   </div>
+                  {canViewNE && (
+                    <div className="mobile-card-field">
+                      <span className="mobile-card-label">N.E. Asociadas</span>
+                      <button
+                        onClick={() => openNeModal(p)}
+                        style={{
+                          background: '#eff6ff',
+                          border: '1px solid #bfdbfe',
+                          color: '#1d4ed8',
+                          padding: '4px 10px',
+                          borderRadius: '4px',
+                          fontSize: '12px',
+                          fontWeight: '600',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                        }}
+                      >
+                        <FileSpreadsheet size={12} /> Ver Lista
+                      </button>
+                    </div>
+                  )}
                   {canManage && (
                     <div className="mobile-card-actions">
                       <button
@@ -1324,8 +1462,9 @@ export default function Inventory() {
           </div>
         </>
       )}
+
       {/* ========================================== */}
-      {/* CONTENIDO DE IMPORTACIÓN/EXPORTACIÓN       */}
+      {/* CONTENIDO DE IMPORTACIÓN/EXPORTACIÓN        */}
       {/* ========================================== */}
       {activeMainTab === 'import_export' && canManage && (
         <div
@@ -1356,6 +1495,7 @@ export default function Inventory() {
               o sin imágenes.
             </p>
           </div>
+
           {/* Grid Responsivo Corregido: Nunca se desbordará */}
           <div
             style={{
@@ -1434,6 +1574,7 @@ export default function Inventory() {
                 </button>
               </div>
             </div>
+
             {/* Tarjeta de Importación */}
             <div
               style={{
@@ -1503,6 +1644,7 @@ export default function Inventory() {
               </div>
             </div>
           </div>
+
           {/* Información Adicional */}
           <div
             style={{
@@ -1555,9 +1697,155 @@ export default function Inventory() {
           </div>
         </div>
       )}
+
       {/* ========================================== */}
-      {/* MODALES (Exportación, Importación, etc.)   */}
+      {/* MODALES (Exportación, Importación, etc.)    */}
       {/* ========================================== */}
+      
+      {/* Modal de Notas de Entrega Asociadas */}
+      {neModalProduct && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0,0,0,0.6)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1200,
+            padding: '16px',
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: '#ffffff',
+              borderRadius: '12px',
+              width: '100%',
+              maxWidth: '500px',
+              maxHeight: '80vh',
+              overflowY: 'auto',
+              padding: '24px',
+              boxShadow: '0 10px 25px rgba(0,0,0,0.15)',
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '16px',
+                borderBottom: '1px solid #e5e7eb',
+                paddingBottom: '12px',
+              }}
+            >
+              <h2
+                style={{
+                  fontSize: '18px',
+                  fontWeight: 'bold',
+                  color: '#111827',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                }}
+              >
+                <FileSpreadsheet size={20} color="#1d4ed8" />
+                N.E. Asociadas a: {neModalProduct.code}
+              </h2>
+              <button
+                onClick={() => setNeModalProduct(null)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                }}
+              >
+                <X size={20} color="#6b7280" />
+              </button>
+            </div>
+
+            {neLoading ? (
+              <div
+                style={{
+                  textAlign: 'center',
+                  padding: '20px',
+                  color: '#6b7280',
+                }}
+              >
+                Cargando notas de entrega...
+              </div>
+            ) : neList.length === 0 ? (
+              <div
+                style={{
+                  textAlign: 'center',
+                  padding: '20px',
+                  color: '#6b7280',
+                  fontStyle: 'italic',
+                }}
+              >
+                Este producto no está asignado a ninguna Nota de Entrega.
+              </div>
+            ) : (
+              <div
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '8px',
+                }}
+              >
+                {neList.map((ne, index) => (
+                  <div
+                    key={index}
+                    style={{
+                      padding: '10px 12px',
+                      backgroundColor: '#f8fafc',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '6px',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontWeight: '600',
+                        color: '#334155',
+                        fontSize: '14px',
+                      }}
+                    >
+                      N.E. #{ne.transaction_number}
+                    </span>
+                    <FileText size={16} color="#94a3b8" />
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div
+              style={{
+                marginTop: '20px',
+                display: 'flex',
+                justifyContent: 'flex-end',
+              }}
+            >
+              <button
+                onClick={() => setNeModalProduct(null)}
+                style={{
+                  padding: '8px 16px',
+                  backgroundColor: '#f3f4f6',
+                  color: '#374151',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '6px',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                }}
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Modal de Exportación */}
       {showExportModal && canManage && (
         <div
@@ -1683,12 +1971,13 @@ export default function Inventory() {
                 color: '#6b7280',
               }}
             >
-              <strong>Nota:</strong> La exportación con imágenes puede tardar
+              <strong>Nota: </strong> La exportación con imágenes puede tardar
               más tiempo dependiendo de la cantidad de productos.
             </div>
           </div>
         </div>
       )}
+
       {/* Modal de Importación */}
       {showImportModal && canManage && (
         <div
@@ -1928,12 +2217,13 @@ export default function Inventory() {
                 color: '#991b1b',
               }}
             >
-              <strong>Advertencia:</strong> La importación actualizará los
+              <strong>Advertencia: </strong> La importación actualizará los
               productos existentes según su código único y creará los nuevos.
             </div>
           </div>
         </div>
       )}
+
       {/* Modal de Registro / Edición */}
       {showAddModal && canManage && (
         <div
@@ -2325,6 +2615,7 @@ export default function Inventory() {
           </div>
         </div>
       )}
+
       {/* Modal de Ajuste de Stock */}
       {adjustingStockProduct && canManage && (
         <div
@@ -2493,6 +2784,7 @@ export default function Inventory() {
           </div>
         </div>
       )}
+
       {/* Modal para Ampliar Imagen */}
       {selectedImageModal && (
         <div
