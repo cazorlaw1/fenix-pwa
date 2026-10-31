@@ -16,7 +16,7 @@ import Dashboard from './pages/Dashboard';
 import Login from './pages/Login';
 import PendingApproval from './pages/PendingApproval';
 import Profile from './pages/Profile';
-import Users from './pages/Users';
+import Users from './pages/in';
 
 function Layout({ children, activeTab, setActiveTab }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);

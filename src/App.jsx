@@ -389,7 +389,11 @@ export default function App() {
             element={
               <>
                 <RoleProtectedRoute
-                  allowedRoles={['administrador', 'tecnico', 'stock']}
+                  allowedRoles={[
+                    'administrador',
+                    'tecnico',
+                    'gerente',
+                    'supervisor', 'stock']}
                 />
                 <Layout>
                   <Inventory />
