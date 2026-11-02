@@ -1,5 +1,5 @@
 // src/App.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   BrowserRouter as Router,
   Routes,
@@ -11,6 +11,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import Header from './components/Header';
 import Sidebar from './components/Sidebar';
 import MobileNavigation from './components/MobileNavigation';
+import PullToRefresh from './components/PullToRefresh'; // <-- IMPORTADO CORRECTAMENTE
 import { supabase } from './lib/supabase';
 
 // Páginas
@@ -23,7 +24,7 @@ import Inventory from './pages/Inventory';
 import AdminModule from './pages/AdminModule';
 import Vendedores from './pages/Vendedores';
 import SalesModule from './pages/SalesModule';
-import FinancialReports from './pages/FinancialReports'; // <-- IMPORTAR
+import FinancialReports from './pages/FinancialReports';
 
 function Unauthorized() {
   return (
@@ -249,6 +250,8 @@ function RoleProtectedRoute({ allowedRoles }) {
 
 function Layout({ children, activeTab, setActiveTab }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const scrollContainerRef = useRef(null); // <-- Referencia para el contenedor con scroll
+
   return (
     <div
       style={{
@@ -282,6 +285,7 @@ function Layout({ children, activeTab, setActiveTab }) {
           onOpenMobileMenu={() => setIsMobileMenuOpen(true)}
         />
         <main
+          ref={scrollContainerRef} // <-- Asignamos la referencia aquí
           style={{
             flex: 1,
             overflowY: 'auto',
@@ -290,11 +294,15 @@ function Layout({ children, activeTab, setActiveTab }) {
             boxSizing: 'border-box',
             display: 'flex',
             flexDirection: 'column',
+            position: 'relative',
           }}
         >
-          <div style={{ width: '100%', flex: 1, paddingBottom: '24px' }}>
-            {children}
-          </div>
+          {/* PullToRefresh integrado envolviendo el contenido */}
+          <PullToRefresh scrollableRef={scrollContainerRef}>
+            <div style={{ width: '100%', flex: 1, paddingBottom: '24px' }}>
+              {children}
+            </div>
+          </PullToRefresh>
         </main>
       </div>
       <MobileNavigation
@@ -483,7 +491,7 @@ export default function App() {
             }
           />
 
-          <Route path="*" element={<Navigate to="/dashboard" replace />} />
+          <Route path="*" element=(<Navigate to="/dashboard" replace />) />
         </Routes>
       </Router>
     </AuthProvider>
