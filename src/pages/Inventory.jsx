@@ -17,7 +17,7 @@ import {
   FileText,
   Archive,
   ChevronDown,
-  FileSpreadsheet, // Icono para representar N.E.
+  FileSpreadsheet,
 } from 'lucide-react';
 
 export default function Inventory() {
@@ -29,25 +29,19 @@ export default function Inventory() {
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   
-  // Estado para el rol del usuario actual
   const [userRole, setUserRole] = useState(null);
-  
-  // Estado para el menú dropdown en móvil
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const mobileMenuRef = useRef(null);
 
-  // Modales
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
   const [adjustingStockProduct, setAdjustingStockProduct] = useState(null);
   const [selectedImageModal, setSelectedImageModal] = useState(null);
   
-  // Modal para ver Notas de Entrega asociadas
   const [neModalProduct, setNeModalProduct] = useState(null);
   const [neList, setNeList] = useState([]);
   const [neLoading, setNeLoading] = useState(false);
 
-  // Modales de Importación/Exportación
   const [showExportModal, setShowExportModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
   const [importFile, setImportFile] = useState(null);
@@ -55,21 +49,18 @@ export default function Inventory() {
   const [exportProcessing, setExportProcessing] = useState(false);
   const [importProcessing, setImportProcessing] = useState(false);
 
-  // Formulario de Registro / Edición de Producto
   const [formCode, setFormCode] = useState('');
   const [formDescription, setFormDescription] = useState('');
   const [formCategory, setFormCategory] = useState('bombillos');
-  const [formPrice, setFormPrice] = useState(''); // Precio Full
-  const [formBasePrice, setFormBasePrice] = useState(''); // Precio Base (Nuevo)
+  const [formPrice, setFormPrice] = useState('');
+  const [formBasePrice, setFormBasePrice] = useState('');
   const [formStock, setFormStock] = useState('');
   const [formImageFile, setFormImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState('');
 
-  // Formulario de Ajuste Rápido de Stock
   const [stockAdjustmentValue, setStockAdjustmentValue] = useState('');
   const [stockAdjustmentType, setStockAdjustmentType] = useState('add');
 
-  // Obtener el rol del usuario autenticado
   useEffect(() => {
     async function fetchUserRole() {
       try {
@@ -93,13 +84,9 @@ export default function Inventory() {
     fetchUserRole();
   }, []);
 
-  // Verificar si el usuario tiene permiso de gestión (administrador o stock)
   const canManage = userRole === 'administrador' || userRole === 'stock';
-
-  // Verificar si el usuario puede ver N.E. (administrador o tecnico)
   const canViewNE = userRole === 'administrador' || userRole === 'tecnico';
 
-  // Si no tiene permisos y está en la pestaña restringida, redirigir al inventario
   useEffect(() => {
     if (activeMainTab === 'import_export' && userRole !== null && !canManage) {
       setActiveMainTab('inventory');
@@ -107,7 +94,6 @@ export default function Inventory() {
     }
   }, [userRole, activeMainTab]);
 
-  // Cerrar dropdown al hacer clic fuera
   useEffect(() => {
     function handleClickOutside(event) {
       if (
@@ -126,6 +112,37 @@ export default function Inventory() {
       fetchProducts();
     }
   }, [activeCategory, activeMainTab]);
+
+  // BLOQUEO DE SCROLL CUANDO CUALQUIER MODAL ESTÁ ABIERTO
+  useEffect(() => {
+    const isAnyModalOpen = 
+      neModalProduct ||
+      showExportModal ||
+      showImportModal ||
+      showAddModal ||
+      adjustingStockProduct ||
+      selectedImageModal;
+
+    if (isAnyModalOpen) {
+      document.body.style.overflow = 'hidden';
+      document.documentElement.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+      document.documentElement.style.overflow = '';
+    }
+
+    return () => {
+      document.body.style.overflow = '';
+      document.documentElement.style.overflow = '';
+    };
+  }, [
+    neModalProduct,
+    showExportModal,
+    showImportModal,
+    showAddModal,
+    adjustingStockProduct,
+    selectedImageModal,
+  ]);
 
   const fetchProducts = async () => {
     setLoading(true);
@@ -177,7 +194,6 @@ export default function Inventory() {
           image_url: imageUrl,
           updated_at: new Date(),
         };
-        // Solo agregar base_price si el usuario tiene permisos
         if (canManage) {
           updateData.base_price = parseFloat(formBasePrice || 0);
         }
@@ -196,7 +212,6 @@ export default function Inventory() {
           stock_current: parseInt(formStock || 0),
           image_url: imageUrl,
         };
-        // Solo agregar base_price si el usuario tiene permisos
         if (canManage) {
           insertData.base_price = parseFloat(formBasePrice || 0);
         }
@@ -298,7 +313,7 @@ export default function Inventory() {
     setFormDescription(product.description);
     setFormCategory(product.category);
     setFormPrice(product.price_usd);
-    setFormBasePrice(product.base_price || ''); // Cargar precio base
+    setFormBasePrice(product.base_price || '');
     setFormStock(product.stock_current);
     setImagePreview(product.image_url || '');
     setFormImageFile(null);
@@ -311,7 +326,7 @@ export default function Inventory() {
     setFormDescription('');
     setFormCategory(activeCategory);
     setFormPrice('');
-    setFormBasePrice(''); // Resetear precio base
+    setFormBasePrice('');
     setFormStock('');
     setImagePreview('');
     setFormImageFile(null);
@@ -328,13 +343,11 @@ export default function Inventory() {
     setNeList([]);
   };
 
-  // Función para abrir el modal de N.E. y cargar los datos
   const openNeModal = async (product) => {
     setNeModalProduct(product);
     setNeLoading(true);
     setNeList([]);
     try {
-      // Buscar en order_items todos los order_id donde esté este producto
       const { data: items, error } = await supabase
         .from('order_items')
         .select('order_id')
@@ -344,7 +357,6 @@ export default function Inventory() {
 
       if (items && items.length > 0) {
         const orderIds = items.map((item) => item.order_id);
-        // Buscar las sales_orders correspondientes para obtener el transaction_number
         const { data: orders, error: orderError } = await supabase
           .from('sales_orders')
           .select('transaction_number')
@@ -391,7 +403,7 @@ export default function Inventory() {
         'description',
         'category',
         'price_usd',
-        'base_price', // Nueva columna
+        'base_price',
         'stock_current',
         'image_url',
       ];
@@ -400,7 +412,7 @@ export default function Inventory() {
         p.description || '',
         p.category || '',
         p.price_usd || 0,
-        p.base_price || 0, // Nuevo valor
+        p.base_price || 0,
         p.stock_current || 0,
         p.image_url || '',
       ]);
@@ -544,7 +556,6 @@ export default function Inventory() {
             image_url: product.image_url || null,
             updated_at: new Date(),
           };
-          // Importar base_price si existe en el CSV
           if (product.base_price !== undefined) {
             updateData.base_price = parseFloat(product.base_price) || 0;
           }
@@ -566,7 +577,6 @@ export default function Inventory() {
             stock_current: parseInt(product.stock_current) || 0,
             image_url: product.image_url || null,
           };
-          // Importar base_price si existe en el CSV
           if (product.base_price !== undefined) {
             insertData.base_price = parseFloat(product.base_price) || 0;
           }
@@ -634,7 +644,6 @@ export default function Inventory() {
     }
   };
 
-  // Opciones del menú (Restringir "Importación/Exportación" si no es admin o stock)
   const menuOptions = [
     { id: 'bombillos', label: 'Bombillos', icon: Package },
     { id: 'fluidos', label: 'Fluidos', icon: Package },
@@ -651,7 +660,6 @@ export default function Inventory() {
 
   return (
     <div style={{ padding: '24px', maxWidth: '1200px', margin: '0 auto' }}>
-      {/* Estilos CSS para responsividad */}
       <style>{`
         @media (max-width: 768px) {
           .desktop-tabs { display: none !important; }
@@ -665,7 +673,6 @@ export default function Inventory() {
           .desktop-table { display: block !important; }
           .mobile-cards { display: none !important; }
         }
-        /* Estilos para tarjetas móviles */
         .mobile-card {
           background-color: #ffffff;
           border-radius: 8px;
@@ -725,7 +732,6 @@ export default function Inventory() {
         }
       `}</style>
 
-      {/* Encabezado del Módulo */}
       <div
         style={{
           display: 'flex',
@@ -753,7 +759,6 @@ export default function Inventory() {
             Visualice y administre productos en tiempo real.
           </p>
         </div>
-        {/* Botón de Registrar Producto restringido a administrador y stock */}
         {canManage && activeMainTab === 'inventory' && (
           <button
             onClick={openNewModal}
@@ -776,7 +781,6 @@ export default function Inventory() {
         )}
       </div>
 
-      {/* Alertas de Feedback */}
       {errorMsg && (
         <div
           style={{
@@ -810,10 +814,6 @@ export default function Inventory() {
         </div>
       )}
 
-      {/* ========================================== */}
-      {/* MENÚ DE NAVEGACIÓN RESPONSIVO                 */}
-      {/* ========================================== */}
-      {/* Versión Escritorio: Pestañas Horizontales */}
       <div
         className="desktop-tabs"
         style={{
@@ -864,7 +864,6 @@ export default function Inventory() {
         })}
       </div>
 
-      {/* Versión Móvil: Dropdown Compacto */}
       <div
         className="mobile-dropdown"
         ref={mobileMenuRef}
@@ -969,12 +968,8 @@ export default function Inventory() {
         )}
       </div>
 
-      {/* ========================================== */}
-      {/* CONTENIDO DE LA PESTAÑA DE INVENTARIO       */}
-      {/* ========================================== */}
       {activeMainTab === 'inventory' && (
         <>
-          {/* Barra de Búsqueda */}
           <div style={{ position: 'relative', marginBottom: '20px' }}>
             <Search
               style={{
@@ -1003,7 +998,6 @@ export default function Inventory() {
             />
           </div>
 
-          {/* Tabla de Escritorio */}
           <div
             className="desktop-table"
             style={{
@@ -1211,8 +1205,6 @@ export default function Inventory() {
                             title="Ver Notas de Entrega asociadas"
                           >
                             <FileSpreadsheet size={14} />
-                            {/* Aquí podríamos mostrar un contador si lo tuviéramos precalculado, 
-                                pero como es dinámico, mostramos un icono o texto genérico hasta cargar */}
                             Ver
                           </button>
                         </td>
@@ -1280,7 +1272,6 @@ export default function Inventory() {
             </table>
           </div>
 
-          {/* Tarjetas para Móvil */}
           <div className="mobile-cards">
             {loading ? (
               <div
@@ -1463,9 +1454,6 @@ export default function Inventory() {
         </>
       )}
 
-      {/* ========================================== */}
-      {/* CONTENIDO DE IMPORTACIÓN/EXPORTACIÓN        */}
-      {/* ========================================== */}
       {activeMainTab === 'import_export' && canManage && (
         <div
           style={{
@@ -1496,7 +1484,6 @@ export default function Inventory() {
             </p>
           </div>
 
-          {/* Grid Responsivo Corregido: Nunca se desbordará */}
           <div
             style={{
               display: 'grid',
@@ -1506,7 +1493,6 @@ export default function Inventory() {
               width: '100%',
             }}
           >
-            {/* Tarjeta de Exportación */}
             <div
               style={{
                 backgroundColor: '#f0fdf4',
@@ -1575,7 +1561,6 @@ export default function Inventory() {
               </div>
             </div>
 
-            {/* Tarjeta de Importación */}
             <div
               style={{
                 backgroundColor: '#eff6ff',
@@ -1645,7 +1630,6 @@ export default function Inventory() {
             </div>
           </div>
 
-          {/* Información Adicional */}
           <div
             style={{
               padding: '16px',
@@ -1698,28 +1682,18 @@ export default function Inventory() {
         </div>
       )}
 
-      {/* ========================================== */}
-      {/* MODALES (Exportación, Importación, etc.)    */}
-      {/* ========================================== */}
-      
-      {/* Modal de Notas de Entrega Asociadas */}
       {neModalProduct && (
         <div
           style={{
             position: 'fixed',
-            top: 0,
-            left: 0,
-            width: '100vw',
-            height: '100vh',
+            inset: 0,
             backgroundColor: 'rgba(0,0,0,0.6)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            zIndex: 99999,
+            zIndex: 1200,
             padding: '16px',
-            boxSizing: 'border-box',
           }}
-          onClick={() => setNeModalProduct(null)}
         >
           <div
             style={{
@@ -1728,13 +1702,10 @@ export default function Inventory() {
               width: '100%',
               maxWidth: '500px',
               maxHeight: '80vh',
-              display: 'flex',
-              flexDirection: 'column',
+              overflowY: 'auto',
               padding: '24px',
-              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.2)',
-              boxSizing: 'border-box',
+              boxShadow: '0 10px 25px rgba(0,0,0,0.15)',
             }}
-            onClick={(e) => e.stopPropagation()}
           >
             <div
               style={{
@@ -1744,7 +1715,6 @@ export default function Inventory() {
                 marginBottom: '16px',
                 borderBottom: '1px solid #e5e7eb',
                 paddingBottom: '12px',
-                flexShrink: 0,
               }}
             >
               <h2
@@ -1755,7 +1725,6 @@ export default function Inventory() {
                   display: 'flex',
                   alignItems: 'center',
                   gap: '8px',
-                  margin: 0,
                 }}
               >
                 <FileSpreadsheet size={20} color="#1d4ed8" />
@@ -1767,10 +1736,6 @@ export default function Inventory() {
                   background: 'none',
                   border: 'none',
                   cursor: 'pointer',
-                  padding: '4px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
                 }}
               >
                 <X size={20} color="#6b7280" />
@@ -1801,12 +1766,9 @@ export default function Inventory() {
             ) : (
               <div
                 style={{
-                  overflowY: 'auto',
                   display: 'flex',
                   flexDirection: 'column',
                   gap: '8px',
-                  paddingRight: '4px',
-                  flexGrow: 1,
                 }}
               >
                 {neList.map((ne, index) => (
@@ -1842,9 +1804,6 @@ export default function Inventory() {
                 marginTop: '20px',
                 display: 'flex',
                 justifyContent: 'flex-end',
-                borderTop: '1px solid #e5e7eb',
-                paddingTop: '12px',
-                flexShrink: 0,
               }}
             >
               <button
@@ -1865,7 +1824,7 @@ export default function Inventory() {
           </div>
         </div>
       )}
-      {/* Modal de Exportación */}
+
       {showExportModal && canManage && (
         <div
           style={{
@@ -1997,7 +1956,6 @@ export default function Inventory() {
         </div>
       )}
 
-      {/* Modal de Importación */}
       {showImportModal && canManage && (
         <div
           style={{
@@ -2243,7 +2201,6 @@ export default function Inventory() {
         </div>
       )}
 
-      {/* Modal de Registro / Edición */}
       {showAddModal && canManage && (
         <div
           style={{
@@ -2635,7 +2592,6 @@ export default function Inventory() {
         </div>
       )}
 
-      {/* Modal de Ajuste de Stock */}
       {adjustingStockProduct && canManage && (
         <div
           style={{
@@ -2804,7 +2760,6 @@ export default function Inventory() {
         </div>
       )}
 
-      {/* Modal para Ampliar Imagen */}
       {selectedImageModal && (
         <div
           style={{
