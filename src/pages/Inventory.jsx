@@ -1707,14 +1707,19 @@ export default function Inventory() {
         <div
           style={{
             position: 'fixed',
-            inset: 0,
+            top: 0,
+            left: 0,
+            width: '100vw',
+            height: '100vh',
             backgroundColor: 'rgba(0,0,0,0.6)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            zIndex: 1200,
+            zIndex: 99999,
             padding: '16px',
+            boxSizing: 'border-box',
           }}
+          onClick={() => setNeModalProduct(null)}
         >
           <div
             style={{
@@ -1723,10 +1728,13 @@ export default function Inventory() {
               width: '100%',
               maxWidth: '500px',
               maxHeight: '80vh',
-              overflowY: 'auto',
+              display: 'flex',
+              flexDirection: 'column',
               padding: '24px',
-              boxShadow: '0 10px 25px rgba(0,0,0,0.15)',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.2)',
+              boxSizing: 'border-box',
             }}
+            onClick={(e) => e.stopPropagation()}
           >
             <div
               style={{
@@ -1736,6 +1744,7 @@ export default function Inventory() {
                 marginBottom: '16px',
                 borderBottom: '1px solid #e5e7eb',
                 paddingBottom: '12px',
+                flexShrink: 0,
               }}
             >
               <h2
@@ -1746,6 +1755,7 @@ export default function Inventory() {
                   display: 'flex',
                   alignItems: 'center',
                   gap: '8px',
+                  margin: 0,
                 }}
               >
                 <FileSpreadsheet size={20} color="#1d4ed8" />
@@ -1757,6 +1767,10 @@ export default function Inventory() {
                   background: 'none',
                   border: 'none',
                   cursor: 'pointer',
+                  padding: '4px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
                 }}
               >
                 <X size={20} color="#6b7280" />
@@ -1787,9 +1801,12 @@ export default function Inventory() {
             ) : (
               <div
                 style={{
+                  overflowY: 'auto',
                   display: 'flex',
                   flexDirection: 'column',
                   gap: '8px',
+                  paddingRight: '4px',
+                  flexGrow: 1,
                 }}
               >
                 {neList.map((ne, index) => (
@@ -1825,6 +1842,9 @@ export default function Inventory() {
                 marginTop: '20px',
                 display: 'flex',
                 justifyContent: 'flex-end',
+                borderTop: '1px solid #e5e7eb',
+                paddingTop: '12px',
+                flexShrink: 0,
               }}
             >
               <button
@@ -1845,7 +1865,6 @@ export default function Inventory() {
           </div>
         </div>
       )}
-
       {/* Modal de Exportación */}
       {showExportModal && canManage && (
         <div
