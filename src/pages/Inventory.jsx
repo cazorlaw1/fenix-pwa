@@ -107,42 +107,39 @@ export default function Inventory() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // BLOQUEAR SCROLL DEL BODY CUANDO HAY MODALES ABIERTOS
+  useEffect(() => {
+    const isAnyModalOpen = neModalProduct || selectedImageModal || showAddModal || adjustingStockProduct || showExportModal || showImportModal;
+    
+    if (isAnyModalOpen) {
+      document.body.style.overflow = 'hidden';
+      document.body.style.position = 'fixed';
+      document.body.style.width = '100%';
+      document.body.style.top = `-${window.scrollY}px`;
+    } else {
+      const scrollY = document.body.style.top;
+      document.body.style.overflow = '';
+      document.body.style.position = '';
+      document.body.style.width = '';
+      document.body.style.top = '';
+      if (scrollY) {
+        window.scrollTo(0, parseInt(scrollY || '0') * -1);
+      }
+    }
+
+    return () => {
+      document.body.style.overflow = '';
+      document.body.style.position = '';
+      document.body.style.width = '';
+      document.body.style.top = '';
+    };
+  }, [neModalProduct, selectedImageModal, showAddModal, adjustingStockProduct, showExportModal, showImportModal]);
+
   useEffect(() => {
     if (activeMainTab === 'inventory') {
       fetchProducts();
     }
   }, [activeCategory, activeMainTab]);
-
-  // BLOQUEO DE SCROLL CUANDO CUALQUIER MODAL ESTÁ ABIERTO
-  useEffect(() => {
-    const isAnyModalOpen = 
-      neModalProduct ||
-      showExportModal ||
-      showImportModal ||
-      showAddModal ||
-      adjustingStockProduct ||
-      selectedImageModal;
-
-    if (isAnyModalOpen) {
-      document.body.style.overflow = 'hidden';
-      document.documentElement.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = '';
-      document.documentElement.style.overflow = '';
-    }
-
-    return () => {
-      document.body.style.overflow = '';
-      document.documentElement.style.overflow = '';
-    };
-  }, [
-    neModalProduct,
-    showExportModal,
-    showImportModal,
-    showAddModal,
-    adjustingStockProduct,
-    selectedImageModal,
-  ]);
 
   const fetchProducts = async () => {
     setLoading(true);
@@ -1682,17 +1679,29 @@ export default function Inventory() {
         </div>
       )}
 
+      {/* MODAL DE NOTAS DE ENTREGA - CORREGIDO PARA QUEDAR FIJO */}
       {neModalProduct && (
         <div
           style={{
             position: 'fixed',
-            inset: 0,
-            backgroundColor: 'rgba(0,0,0,0.6)',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            width: '100vw',
+            height: '100vh',
+            backgroundColor: 'rgba(0,0,0,0.7)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            zIndex: 1200,
+            zIndex: 99999,
             padding: '16px',
+            overflow: 'hidden',
+          }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setNeModalProduct(null);
+            }
           }}
         >
           <div
@@ -1701,11 +1710,14 @@ export default function Inventory() {
               borderRadius: '12px',
               width: '100%',
               maxWidth: '500px',
-              maxHeight: '80vh',
+              maxHeight: '85vh',
               overflowY: 'auto',
               padding: '24px',
-              boxShadow: '0 10px 25px rgba(0,0,0,0.15)',
+              boxShadow: '0 20px 50px rgba(0,0,0,0.3)',
+              position: 'relative',
+              zIndex: 100000,
             }}
+            onClick={(e) => e.stopPropagation()}
           >
             <div
               style={{
@@ -1713,7 +1725,7 @@ export default function Inventory() {
                 justifyContent: 'space-between',
                 alignItems: 'center',
                 marginBottom: '16px',
-                borderBottom: '1px solid #e5e7eb',
+                borderBottom: '2px solid #e5e7eb',
                 paddingBottom: '12px',
               }}
             >
@@ -1725,6 +1737,7 @@ export default function Inventory() {
                   display: 'flex',
                   alignItems: 'center',
                   gap: '8px',
+                  margin: 0,
                 }}
               >
                 <FileSpreadsheet size={20} color="#1d4ed8" />
@@ -1733,12 +1746,18 @@ export default function Inventory() {
               <button
                 onClick={() => setNeModalProduct(null)}
                 style={{
-                  background: 'none',
+                  background: '#fee2e2',
                   border: 'none',
                   cursor: 'pointer',
+                  borderRadius: '50%',
+                  width: '32px',
+                  height: '32px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
                 }}
               >
-                <X size={20} color="#6b7280" />
+                <X size={18} color="#dc2626" />
               </button>
             </div>
 
@@ -1746,17 +1765,17 @@ export default function Inventory() {
               <div
                 style={{
                   textAlign: 'center',
-                  padding: '20px',
+                  padding: '40px 20px',
                   color: '#6b7280',
                 }}
               >
-                Cargando notas de entrega...
+                <div style={{ marginBottom: '12px' }}>Cargando notas de entrega...</div>
               </div>
             ) : neList.length === 0 ? (
               <div
                 style={{
                   textAlign: 'center',
-                  padding: '20px',
+                  padding: '40px 20px',
                   color: '#6b7280',
                   fontStyle: 'italic',
                 }}
@@ -1775,13 +1794,22 @@ export default function Inventory() {
                   <div
                     key={index}
                     style={{
-                      padding: '10px 12px',
+                      padding: '12px 16px',
                       backgroundColor: '#f8fafc',
                       border: '1px solid #e2e8f0',
-                      borderRadius: '6px',
+                      borderRadius: '8px',
                       display: 'flex',
                       justifyContent: 'space-between',
                       alignItems: 'center',
+                      transition: 'all 0.2s',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = '#eff6ff';
+                      e.currentTarget.style.borderColor = '#bfdbfe';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = '#f8fafc';
+                      e.currentTarget.style.borderColor = '#e2e8f0';
                     }}
                   >
                     <span
@@ -1809,13 +1837,14 @@ export default function Inventory() {
               <button
                 onClick={() => setNeModalProduct(null)}
                 style={{
-                  padding: '8px 16px',
+                  padding: '10px 20px',
                   backgroundColor: '#f3f4f6',
                   color: '#374151',
                   border: '1px solid #d1d5db',
                   borderRadius: '6px',
                   fontWeight: '600',
                   cursor: 'pointer',
+                  fontSize: '14px',
                 }}
               >
                 Cerrar
@@ -1829,12 +1858,17 @@ export default function Inventory() {
         <div
           style={{
             position: 'fixed',
-            inset: 0,
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            width: '100vw',
+            height: '100vh',
             backgroundColor: 'rgba(0,0,0,0.5)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            zIndex: 1000,
+            zIndex: 99999,
             padding: '16px',
           }}
         >
@@ -1960,12 +1994,17 @@ export default function Inventory() {
         <div
           style={{
             position: 'fixed',
-            inset: 0,
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            width: '100vw',
+            height: '100vh',
             backgroundColor: 'rgba(0,0,0,0.5)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            zIndex: 1000,
+            zIndex: 99999,
             padding: '16px',
           }}
         >
@@ -2205,12 +2244,17 @@ export default function Inventory() {
         <div
           style={{
             position: 'fixed',
-            inset: 0,
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            width: '100vw',
+            height: '100vh',
             backgroundColor: 'rgba(0,0,0,0.5)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            zIndex: 1000,
+            zIndex: 99999,
             padding: '16px',
           }}
         >
@@ -2596,12 +2640,17 @@ export default function Inventory() {
         <div
           style={{
             position: 'fixed',
-            inset: 0,
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            width: '100vw',
+            height: '100vh',
             backgroundColor: 'rgba(0,0,0,0.5)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            zIndex: 1000,
+            zIndex: 99999,
             padding: '16px',
           }}
         >
@@ -2764,12 +2813,17 @@ export default function Inventory() {
         <div
           style={{
             position: 'fixed',
-            inset: 0,
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            width: '100vw',
+            height: '100vh',
             backgroundColor: 'rgba(0,0,0,0.8)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            zIndex: 1100,
+            zIndex: 99999,
             padding: '16px',
           }}
           onClick={() => setSelectedImageModal(null)}
