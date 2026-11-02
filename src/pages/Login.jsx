@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { createPortal } from 'react-dom';
 import { supabase } from '../lib/supabase';
 import JSZip from 'jszip';
 import {
@@ -108,39 +107,42 @@ export default function Inventory() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // BLOQUEAR SCROLL DEL BODY CUANDO HAY MODALES ABIERTOS
-  useEffect(() => {
-    const isAnyModalOpen = neModalProduct || selectedImageModal || showAddModal || adjustingStockProduct || showExportModal || showImportModal;
-    
-    if (isAnyModalOpen) {
-      const scrollY = window.scrollY;
-      document.body.style.overflow = 'hidden';
-      document.body.style.position = 'fixed';
-      document.body.style.top = `-${scrollY}px`;
-      document.body.style.width = '100%';
-      document.body.dataset.scrollY = scrollY;
-    } else {
-      const scrollY = document.body.dataset.scrollY || '0';
-      document.body.style.overflow = '';
-      document.body.style.position = '';
-      document.body.style.top = '';
-      document.body.style.width = '';
-      window.scrollTo(0, parseInt(scrollY));
-    }
-
-    return () => {
-      document.body.style.overflow = '';
-      document.body.style.position = '';
-      document.body.style.top = '';
-      document.body.style.width = '';
-    };
-  }, [neModalProduct, selectedImageModal, showAddModal, adjustingStockProduct, showExportModal, showImportModal]);
-
   useEffect(() => {
     if (activeMainTab === 'inventory') {
       fetchProducts();
     }
   }, [activeCategory, activeMainTab]);
+
+  // BLOQUEO DE SCROLL CUANDO CUALQUIER MODAL ESTÁ ABIERTO
+  useEffect(() => {
+    const isAnyModalOpen = 
+      neModalProduct ||
+      showExportModal ||
+      showImportModal ||
+      showAddModal ||
+      adjustingStockProduct ||
+      selectedImageModal;
+
+    if (isAnyModalOpen) {
+      document.body.style.overflow = 'hidden';
+      document.documentElement.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+      document.documentElement.style.overflow = '';
+    }
+
+    return () => {
+      document.body.style.overflow = '';
+      document.documentElement.style.overflow = '';
+    };
+  }, [
+    neModalProduct,
+    showExportModal,
+    showImportModal,
+    showAddModal,
+    adjustingStockProduct,
+    selectedImageModal,
+  ]);
 
   const fetchProducts = async () => {
     setLoading(true);
@@ -655,1257 +657,6 @@ export default function Inventory() {
         ]
       : []),
   ];
-
-  // ============================================
-  // CONTENEDOR PARA MODALES (adjunto al body)
-  // ============================================
-  const [modalContainer, setModalContainer] = useState(null);
-
-  useEffect(() => {
-    const div = document.createElement('div');
-    div.id = 'inventory-modal-root';
-    div.style.position = 'fixed';
-    div.style.top = '0';
-    div.style.left = '0';
-    div.style.width = '100%';
-    div.style.height = '100%';
-    div.style.zIndex = '99999';
-    div.style.pointerEvents = 'none';
-    document.body.appendChild(div);
-    setModalContainer(div);
-
-    return () => {
-      if (div.parentNode) {
-        div.parentNode.removeChild(div);
-      }
-    };
-  }, []);
-
-  // ============================================
-  // MODAL DE NOTAS DE ENTREGA
-  // ============================================
-  const ModalNE = () => {
-    if (!neModalProduct || !modalContainer) return null;
-    return createPortal(
-      <div
-        style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          width: '100vw',
-          height: '100vh',
-          backgroundColor: 'rgba(0,0,0,0.7)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 99999,
-          padding: '16px',
-          pointerEvents: 'auto',
-        }}
-        onClick={(e) => {
-          if (e.target === e.currentTarget) {
-            setNeModalProduct(null);
-          }
-        }}
-      >
-        <div
-          style={{
-            backgroundColor: '#ffffff',
-            borderRadius: '12px',
-            width: '100%',
-            maxWidth: '500px',
-            maxHeight: '85vh',
-            overflowY: 'auto',
-            padding: '24px',
-            boxShadow: '0 20px 50px rgba(0,0,0,0.3)',
-            position: 'relative',
-          }}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              marginBottom: '16px',
-              borderBottom: '2px solid #e5e7eb',
-              paddingBottom: '12px',
-            }}
-          >
-            <h2
-              style={{
-                fontSize: '18px',
-                fontWeight: 'bold',
-                color: '#111827',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                margin: 0,
-              }}
-            >
-              <FileSpreadsheet size={20} color="#1d4ed8" />
-              N.E. Asociadas a: {neModalProduct.code}
-            </h2>
-            <button
-              onClick={() => setNeModalProduct(null)}
-              style={{
-                background: '#fee2e2',
-                border: 'none',
-                cursor: 'pointer',
-                borderRadius: '50%',
-                width: '32px',
-                height: '32px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <X size={18} color="#dc2626" />
-            </button>
-          </div>
-
-          {neLoading ? (
-            <div
-              style={{
-                textAlign: 'center',
-                padding: '40px 20px',
-                color: '#6b7280',
-              }}
-            >
-              <div style={{ marginBottom: '12px' }}>Cargando notas de entrega...</div>
-            </div>
-          ) : neList.length === 0 ? (
-            <div
-              style={{
-                textAlign: 'center',
-                padding: '40px 20px',
-                color: '#6b7280',
-                fontStyle: 'italic',
-              }}
-            >
-              Este producto no está asignado a ninguna Nota de Entrega.
-            </div>
-          ) : (
-            <div
-              style={{
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '8px',
-              }}
-            >
-              {neList.map((ne, index) => (
-                <div
-                  key={index}
-                  style={{
-                    padding: '12px 16px',
-                    backgroundColor: '#f8fafc',
-                    border: '1px solid #e2e8f0',
-                    borderRadius: '8px',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    transition: 'all 0.2s',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = '#eff6ff';
-                    e.currentTarget.style.borderColor = '#bfdbfe';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = '#f8fafc';
-                    e.currentTarget.style.borderColor = '#e2e8f0';
-                  }}
-                >
-                  <span
-                    style={{
-                      fontWeight: '600',
-                      color: '#334155',
-                      fontSize: '14px',
-                    }}
-                  >
-                    N.E. #{ne.transaction_number}
-                  </span>
-                  <FileText size={16} color="#94a3b8" />
-                </div>
-              ))}
-            </div>
-          )}
-
-          <div
-            style={{
-              marginTop: '20px',
-              display: 'flex',
-              justifyContent: 'flex-end',
-            }}
-          >
-            <button
-              onClick={() => setNeModalProduct(null)}
-              style={{
-                padding: '10px 20px',
-                backgroundColor: '#f3f4f6',
-                color: '#374151',
-                border: '1px solid #d1d5db',
-                borderRadius: '6px',
-                fontWeight: '600',
-                cursor: 'pointer',
-                fontSize: '14px',
-              }}
-            >
-              Cerrar
-            </button>
-          </div>
-        </div>
-      </div>,
-      modalContainer
-    );
-  };
-
-  // ============================================
-  // MODAL DE EXPORTACIÓN
-  // ============================================
-  const ModalExport = () => {
-    if (!showExportModal || !canManage || !modalContainer) return null;
-    return createPortal(
-      <div
-        style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          width: '100vw',
-          height: '100vh',
-          backgroundColor: 'rgba(0,0,0,0.5)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 99999,
-          padding: '16px',
-          pointerEvents: 'auto',
-        }}
-      >
-        <div
-          style={{
-            backgroundColor: '#ffffff',
-            borderRadius: '12px',
-            width: '100%',
-            maxWidth: '450px',
-            padding: '24px',
-            boxShadow: '0 10px 25px rgba(0,0,0,0.15)',
-          }}
-        >
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              marginBottom: '20px',
-            }}
-          >
-            <h2
-              style={{
-                fontSize: '18px',
-                fontWeight: 'bold',
-                color: '#111827',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-              }}
-            >
-              <Download size={20} color="#059669" /> Exportar Inventario
-            </h2>
-            <button
-              type="button"
-              onClick={() => setShowExportModal(false)}
-              style={{
-                background: 'none',
-                border: 'none',
-                cursor: 'pointer',
-              }}
-            >
-              <X size={20} color="#6b7280" />
-            </button>
-          </div>
-          <p
-            style={{
-              fontSize: '14px',
-              color: '#374151',
-              marginBottom: '20px',
-              textAlign: 'center',
-              fontWeight: '600',
-            }}
-          >
-            ¿Desea exportar con imágenes o sin imágenes?
-          </p>
-          <div
-            style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}
-          >
-            <button
-              onClick={() => exportToCSV(false)}
-              disabled={exportProcessing}
-              style={{
-                padding: '14px 20px',
-                backgroundColor: '#f0fdf4',
-                color: '#166534',
-                border: '2px solid #bbf7d0',
-                borderRadius: '8px',
-                fontWeight: '600',
-                fontSize: '14px',
-                cursor: exportProcessing ? 'not-allowed' : 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '10px',
-                transition: 'all 0.2s',
-              }}
-            >
-              <FileText size={18} />{' '}
-              {exportProcessing ? 'Procesando...' : 'Sin Imágenes (CSV)'}
-            </button>
-            <button
-              onClick={() => exportToCSV(true)}
-              disabled={exportProcessing}
-              style={{
-                padding: '14px 20px',
-                backgroundColor: '#eff6ff',
-                color: '#1e40af',
-                border: '2px solid #bfdbfe',
-                borderRadius: '8px',
-                fontWeight: '600',
-                fontSize: '14px',
-                cursor: exportProcessing ? 'not-allowed' : 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '10px',
-                transition: 'all 0.2s',
-              }}
-            >
-              <Archive size={18} />{' '}
-              {exportProcessing ? 'Procesando...' : 'Con Imágenes (ZIP)'}
-            </button>
-          </div>
-          <div
-            style={{
-              marginTop: '20px',
-              padding: '12px',
-              backgroundColor: '#f9fafb',
-              borderRadius: '6px',
-              fontSize: '12px',
-              color: '#6b7280',
-            }}
-          >
-            <strong>Nota: </strong> La exportación con imágenes puede tardar
-            más tiempo dependiendo de la cantidad de productos.
-          </div>
-        </div>
-      </div>,
-      modalContainer
-    );
-  };
-
-  // ============================================
-  // MODAL DE IMPORTACIÓN
-  // ============================================
-  const ModalImport = () => {
-    if (!showImportModal || !canManage || !modalContainer) return null;
-    return createPortal(
-      <div
-        style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          width: '100vw',
-          height: '100vh',
-          backgroundColor: 'rgba(0,0,0,0.5)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 99999,
-          padding: '16px',
-          pointerEvents: 'auto',
-        }}
-      >
-        <div
-          style={{
-            backgroundColor: '#ffffff',
-            borderRadius: '12px',
-            width: '100%',
-            maxWidth: '500px',
-            padding: '24px',
-            boxShadow: '0 10px 25px rgba(0,0,0,0.15)',
-          }}
-        >
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              marginBottom: '20px',
-            }}
-          >
-            <h2
-              style={{
-                fontSize: '18px',
-                fontWeight: 'bold',
-                color: '#111827',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-              }}
-            >
-              <Upload size={20} color="#2563eb" /> Importar Inventario
-            </h2>
-            <button
-              type="button"
-              onClick={() => {
-                setShowImportModal(false);
-                setImportFile(null);
-                setImportWithImages(false);
-              }}
-              style={{
-                background: 'none',
-                border: 'none',
-                cursor: 'pointer',
-              }}
-            >
-              <X size={20} color="#6b7280" />
-            </button>
-          </div>
-          <p
-            style={{
-              fontSize: '14px',
-              color: '#374151',
-              marginBottom: '20px',
-              textAlign: 'center',
-              fontWeight: '600',
-            }}
-          >
-            ¿Desea importar con imágenes o sin imágenes?
-          </p>
-          <div
-            style={{
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '12px',
-              marginBottom: '20px',
-            }}
-          >
-            <button
-              onClick={() => {
-                setImportWithImages(false);
-                document.getElementById('import-file-input').click();
-              }}
-              disabled={importProcessing}
-              style={{
-                padding: '14px 20px',
-                backgroundColor:
-                  importWithImages === false && importFile
-                    ? '#f0fdf4'
-                    : '#f9fafb',
-                color:
-                  importWithImages === false && importFile
-                    ? '#166534'
-                    : '#374151',
-                border:
-                  importWithImages === false && importFile
-                    ? '2px solid #bbf7d0'
-                    : '2px solid #e5e7eb',
-                borderRadius: '8px',
-                fontWeight: '600',
-                fontSize: '14px',
-                cursor: importProcessing ? 'not-allowed' : 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '10px',
-                transition: 'all 0.2s',
-              }}
-            >
-              <FileText size={18} /> Sin Imágenes (CSV)
-            </button>
-            <button
-              onClick={() => {
-                setImportWithImages(true);
-                document.getElementById('import-file-input').click();
-              }}
-              disabled={importProcessing}
-              style={{
-                padding: '14px 20px',
-                backgroundColor:
-                  importWithImages === true && importFile
-                    ? '#eff6ff'
-                    : '#f9fafb',
-                color:
-                  importWithImages === true && importFile
-                    ? '#1e40af'
-                    : '#374151',
-                border:
-                  importWithImages === true && importFile
-                    ? '2px solid #bfdbfe'
-                    : '2px solid #e5e7eb',
-                borderRadius: '8px',
-                fontWeight: '600',
-                fontSize: '14px',
-                cursor: importProcessing ? 'not-allowed' : 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '10px',
-                transition: 'all 0.2s',
-              }}
-            >
-              <Archive size={18} /> Con Imágenes (ZIP)
-            </button>
-          </div>
-          <input
-            type="file"
-            id="import-file-input"
-            accept={importWithImages ? '.zip' : '.csv'}
-            onChange={(e) => {
-              if (e.target.files && e.target.files[0]) {
-                setImportFile(e.target.files[0]);
-              }
-            }}
-            style={{ display: 'none' }}
-          />
-          {importFile && (
-            <div
-              style={{
-                padding: '12px',
-                backgroundColor: '#f0fdf4',
-                borderRadius: '6px',
-                marginBottom: '16px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-              }}
-            >
-              <Check size={16} color="#059669" />
-              <span
-                style={{
-                  fontSize: '13px',
-                  color: '#166534',
-                  fontWeight: '600',
-                }}
-              >
-                Archivo seleccionado: {importFile.name}
-              </span>
-            </div>
-          )}
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'flex-end',
-              gap: '10px',
-            }}
-          >
-            <button
-              type="button"
-              onClick={() => {
-                setShowImportModal(false);
-                setImportFile(null);
-                setImportWithImages(false);
-              }}
-              style={{
-                padding: '10px 16px',
-                backgroundColor: '#f3f4f6',
-                color: '#374151',
-                border: 'none',
-                borderRadius: '6px',
-                fontWeight: '600',
-                cursor: 'pointer',
-              }}
-            >
-              Cancelar
-            </button>
-            <button
-              type="button"
-              onClick={handleImportFile}
-              disabled={importProcessing || !importFile}
-              style={{
-                padding: '10px 20px',
-                backgroundColor:
-                  importProcessing || !importFile ? '#9ca3af' : '#2563eb',
-                color: '#ffffff',
-                border: 'none',
-                borderRadius: '6px',
-                fontWeight: '600',
-                cursor:
-                  importProcessing || !importFile ? 'not-allowed' : 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-              }}
-            >
-              {importProcessing ? 'Procesando...' : 'Importar'}
-            </button>
-          </div>
-          <div
-            style={{
-              marginTop: '16px',
-              padding: '12px',
-              backgroundColor: '#fef2f2',
-              borderRadius: '6px',
-              fontSize: '12px',
-              color: '#991b1b',
-            }}
-          >
-            <strong>Advertencia: </strong> La importación actualizará los
-            productos existentes según su código único y creará los nuevos.
-          </div>
-        </div>
-      </div>,
-      modalContainer
-    );
-  };
-
-  // ============================================
-  // MODAL DE REGISTRO/EDICIÓN
-  // ============================================
-  const ModalAddEdit = () => {
-    if (!showAddModal || !canManage || !modalContainer) return null;
-    return createPortal(
-      <div
-        style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          width: '100vw',
-          height: '100vh',
-          backgroundColor: 'rgba(0,0,0,0.5)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 99999,
-          padding: '16px',
-          pointerEvents: 'auto',
-        }}
-      >
-        <div
-          style={{
-            backgroundColor: '#ffffff',
-            borderRadius: '12px',
-            width: '100%',
-            maxWidth: '500px',
-            padding: '24px',
-            boxShadow: '0 10px 25px rgba(0,0,0,0.15)',
-          }}
-        >
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              marginBottom: '20px',
-            }}
-          >
-            <h2
-              style={{
-                fontSize: '18px',
-                fontWeight: 'bold',
-                color: '#111827',
-              }}
-            >
-              {editingProduct
-                ? 'Editar Producto'
-                : 'Registrar Nuevo Producto'}
-            </h2>
-            <button
-              type="button"
-              onClick={closeModals}
-              style={{
-                background: 'none',
-                border: 'none',
-                cursor: 'pointer',
-              }}
-            >
-              <X size={20} color="#6b7280" />
-            </button>
-          </div>
-          <form
-            onSubmit={handleSaveProduct}
-            style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}
-          >
-            <div>
-              <label
-                style={{
-                  display: 'block',
-                  fontSize: '13px',
-                  fontWeight: '600',
-                  marginBottom: '6px',
-                  color: '#374151',
-                }}
-              >
-                Categoría
-              </label>
-              <select
-                value={formCategory}
-                onChange={(e) => setFormCategory(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '10px',
-                  borderRadius: '6px',
-                  border: '1px solid #d1d5db',
-                  backgroundColor: '#fff',
-                }}
-              >
-                <option value="bombillos">Bombillos</option>
-                <option value="fluidos">Fluidos</option>
-              </select>
-            </div>
-            <div>
-              <label
-                style={{
-                  display: 'block',
-                  fontSize: '13px',
-                  fontWeight: '600',
-                  marginBottom: '6px',
-                  color: '#374151',
-                }}
-              >
-                Código Único
-              </label>
-              <input
-                type="text"
-                required
-                placeholder="Ej. BOM-001"
-                value={formCode}
-                onChange={(e) => setFormCode(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '10px',
-                  borderRadius: '6px',
-                  border: '1px solid #d1d5db',
-                  boxSizing: 'border-box',
-                }}
-              />
-            </div>
-            <div>
-              <label
-                style={{
-                  display: 'block',
-                  fontSize: '13px',
-                  fontWeight: '600',
-                  marginBottom: '6px',
-                  color: '#374151',
-                }}
-              >
-                Descripción y Especificaciones
-              </label>
-              <textarea
-                required
-                rows={2}
-                placeholder="Nombre y detalles del producto..."
-                value={formDescription}
-                onChange={(e) => setFormDescription(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '10px',
-                  borderRadius: '6px',
-                  border: '1px solid #d1d5db',
-                  boxSizing: 'border-box',
-                }}
-              />
-            </div>
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: '1fr 1fr',
-                gap: '12px',
-              }}
-            >
-              <div>
-                <label
-                  style={{
-                    display: 'block',
-                    fontSize: '13px',
-                    fontWeight: '600',
-                    marginBottom: '6px',
-                    color: '#374151',
-                  }}
-                >
-                  Precio Full ($)
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  required
-                  placeholder="0.00"
-                  value={formPrice}
-                  onChange={(e) => setFormPrice(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '10px',
-                    borderRadius: '6px',
-                    border: '1px solid #d1d5db',
-                    boxSizing: 'border-box',
-                  }}
-                />
-              </div>
-              <div>
-                <label
-                  style={{
-                    display: 'block',
-                    fontSize: '13px',
-                    fontWeight: '600',
-                    marginBottom: '6px',
-                    color: '#374151',
-                  }}
-                >
-                  Precio Base ($)
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  placeholder="0.00"
-                  value={formBasePrice}
-                  onChange={(e) => setFormBasePrice(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '10px',
-                    borderRadius: '6px',
-                    border: '1px solid #d1d5db',
-                    boxSizing: 'border-box',
-                  }}
-                />
-              </div>
-            </div>
-            {!editingProduct && (
-              <div>
-                <label
-                  style={{
-                    display: 'block',
-                    fontSize: '13px',
-                    fontWeight: '600',
-                    marginBottom: '6px',
-                    color: '#374151',
-                  }}
-                >
-                  Stock Inicial
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  required
-                  placeholder="0"
-                  value={formStock}
-                  onChange={(e) => setFormStock(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '10px',
-                    borderRadius: '6px',
-                    border: '1px solid #d1d5db',
-                    boxSizing: 'border-box',
-                  }}
-                />
-              </div>
-            )}
-            <div>
-              <label
-                style={{
-                  display: 'block',
-                  fontSize: '13px',
-                  fontWeight: '600',
-                  marginBottom: '6px',
-                  color: '#374151',
-                }}
-              >
-                Foto del Producto (Única)
-              </label>
-              {!imagePreview ? (
-                <label
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '10px',
-                    padding: '12px 16px',
-                    backgroundColor: '#f8fafc',
-                    color: '#111827',
-                    border: '2px dashed #d1d5db',
-                    borderRadius: '8px',
-                    cursor: 'pointer',
-                    fontWeight: '600',
-                    fontSize: '14px',
-                    transition: 'all 0.2s',
-                    boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
-                  }}
-                >
-                  <Upload size={18} color="#dc2626" />
-                  <span>Seleccionar Imagen...</span>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    style={{ display: 'none' }}
-                    onChange={(e) => {
-                      if (e.target.files && e.target.files[0]) {
-                        const file = e.target.files[0];
-                        setFormImageFile(file);
-                        setImagePreview(URL.createObjectURL(file));
-                        e.target.value = null;
-                      }
-                    }}
-                  />
-                </label>
-              ) : (
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '12px',
-                    padding: '8px',
-                    border: '1px solid #e5e7eb',
-                    borderRadius: '8px',
-                    backgroundColor: '#f9fafb',
-                  }}
-                >
-                  <img
-                    src={imagePreview}
-                    alt="Vista previa"
-                    style={{
-                      width: '60px',
-                      height: '60px',
-                      objectFit: 'cover',
-                      borderRadius: '6px',
-                      border: '1px solid #e5e7eb',
-                    }}
-                  />
-                  <div
-                    style={{
-                      flex: 1,
-                      fontSize: '13px',
-                      color: '#374151',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
-                    }}
-                  >
-                    {formImageFile
-                      ? formImageFile.name
-                      : 'Imagen actual del producto'}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setFormImageFile(null);
-                      setImagePreview('');
-                      if (editingProduct) {
-                        setEditingProduct({
-                          ...editingProduct,
-                          image_url: null,
-                        });
-                      }
-                    }}
-                    style={{
-                      background: '#fee2e2',
-                      border: 'none',
-                      borderRadius: '50%',
-                      width: '32px',
-                      height: '32px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      cursor: 'pointer',
-                      color: '#b91c1c',
-                    }}
-                  >
-                    <X size={18} />
-                  </button>
-                </div>
-              )}
-            </div>
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'flex-end',
-                gap: '12px',
-                marginTop: '10px',
-              }}
-            >
-              <button
-                type="button"
-                onClick={closeModals}
-                style={{
-                  padding: '10px 16px',
-                  backgroundColor: '#f3f4f6',
-                  color: '#374151',
-                  border: 'none',
-                  borderRadius: '6px',
-                  fontWeight: '600',
-                  cursor: 'pointer',
-                }}
-              >
-                Cancelar
-              </button>
-              <button
-                type="submit"
-                style={{
-                  padding: '10px 20px',
-                  backgroundColor: '#dc2626',
-                  color: '#ffffff',
-                  border: 'none',
-                  borderRadius: '6px',
-                  fontWeight: '600',
-                  cursor: 'pointer',
-                }}
-              >
-                Guardar Producto
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>,
-      modalContainer
-    );
-  };
-
-  // ============================================
-  // MODAL DE AJUSTE DE STOCK
-  // ============================================
-  const ModalStock = () => {
-    if (!adjustingStockProduct || !canManage || !modalContainer) return null;
-    return createPortal(
-      <div
-        style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          width: '100vw',
-          height: '100vh',
-          backgroundColor: 'rgba(0,0,0,0.5)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 99999,
-          padding: '16px',
-          pointerEvents: 'auto',
-        }}
-      >
-        <div
-          style={{
-            backgroundColor: '#ffffff',
-            borderRadius: '12px',
-            width: '100%',
-            maxWidth: '400px',
-            padding: '24px',
-            boxShadow: '0 10px 25px rgba(0,0,0,0.15)',
-          }}
-        >
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              marginBottom: '16px',
-            }}
-          >
-            <h2
-              style={{
-                fontSize: '16px',
-                fontWeight: 'bold',
-                color: '#111827',
-              }}
-            >
-              Ajuste de Inventario
-            </h2>
-            <button
-              type="button"
-              onClick={closeModals}
-              style={{
-                background: 'none',
-                border: 'none',
-                cursor: 'pointer',
-              }}
-            >
-              <X size={20} color="#6b7280" />
-            </button>
-          </div>
-          <p
-            style={{
-              fontSize: '13px',
-              color: '#6b7280',
-              marginBottom: '16px',
-            }}
-          >
-            Producto: <strong>{adjustingStockProduct.description}</strong>
-            <br />
-            Stock Actual:{' '}
-            <span style={{ color: '#059669', fontWeight: 'bold' }}>
-              {adjustingStockProduct.stock_current} unidades
-            </span>
-          </p>
-          <form
-            onSubmit={handleQuickStockAdjustment}
-            style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}
-          >
-            <div>
-              <label
-                style={{
-                  display: 'block',
-                  fontSize: '13px',
-                  fontWeight: '600',
-                  marginBottom: '6px',
-                  color: '#374151',
-                }}
-              >
-                Tipo de Ajuste
-              </label>
-              <select
-                value={stockAdjustmentType}
-                onChange={(e) => setStockAdjustmentType(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '10px',
-                  borderRadius: '6px',
-                  border: '1px solid #d1d5db',
-                }}
-              >
-                <option value="add">Incrementar Stock (+)</option>
-                <option value="subtract">Decrementar Stock (-)</option>
-                <option value="set">Establecer Cantidad Exacta</option>
-              </select>
-            </div>
-            <div>
-              <label
-                style={{
-                  display: 'block',
-                  fontSize: '13px',
-                  fontWeight: '600',
-                  marginBottom: '6px',
-                  color: '#374151',
-                }}
-              >
-                Cantidad
-              </label>
-              <input
-                type="number"
-                min="0"
-                required
-                placeholder="Ingrese cantidad"
-                value={stockAdjustmentValue}
-                onChange={(e) => setStockAdjustmentValue(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '10px',
-                  borderRadius: '6px',
-                  border: '1px solid #d1d5db',
-                  boxSizing: 'border-box',
-                }}
-              />
-            </div>
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'flex-end',
-                gap: '10px',
-                marginTop: '10px',
-              }}
-            >
-              <button
-                type="button"
-                onClick={closeModals}
-                style={{
-                  padding: '8px 14px',
-                  backgroundColor: '#f3f4f6',
-                  color: '#374151',
-                  border: 'none',
-                  borderRadius: '6px',
-                  fontWeight: '600',
-                  cursor: 'pointer',
-                }}
-              >
-                Cancelar
-              </button>
-              <button
-                type="submit"
-                style={{
-                  padding: '8px 16px',
-                  backgroundColor: '#f59e0b',
-                  color: '#ffffff',
-                  border: 'none',
-                  borderRadius: '6px',
-                  fontWeight: '600',
-                  cursor: 'pointer',
-                }}
-              >
-                Aplicar Ajuste
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>,
-      modalContainer
-    );
-  };
-
-  // ============================================
-  // MODAL DE IMAGEN
-  // ============================================
-  const ModalImage = () => {
-    if (!selectedImageModal || !modalContainer) return null;
-    return createPortal(
-      <div
-        style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          width: '100vw',
-          height: '100vh',
-          backgroundColor: 'rgba(0,0,0,0.8)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 99999,
-          padding: '16px',
-          pointerEvents: 'auto',
-        }}
-        onClick={() => setSelectedImageModal(null)}
-      >
-        <div
-          style={{ position: 'relative', maxWidth: '90%', maxHeight: '90%' }}
-        >
-          <button
-            type="button"
-            onClick={() => setSelectedImageModal(null)}
-            style={{
-              position: 'absolute',
-              top: '-40px',
-              right: '0',
-              background: 'none',
-              border: 'none',
-              color: '#fff',
-              cursor: 'pointer',
-            }}
-          >
-            <X size={28} />
-          </button>
-          <img
-            src={selectedImageModal}
-            alt="Ampliada"
-            style={{
-              maxWidth: '100%',
-              maxHeight: '80vh',
-              borderRadius: '8px',
-              objectFit: 'contain',
-            }}
-          />
-        </div>
-      </div>,
-      modalContainer
-    );
-  };
 
   return (
     <div style={{ padding: '24px', maxWidth: '1200px', margin: '0 auto' }}>
@@ -2931,13 +1682,1129 @@ export default function Inventory() {
         </div>
       )}
 
-      {/* RENDERIZAR TODOS LOS MODALES VIA PORTAL */}
-      <ModalNE />
-      <ModalExport />
-      <ModalImport />
-      <ModalAddEdit />
-      <ModalStock />
-      <ModalImage />
+      {neModalProduct && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0,0,0,0.6)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1200,
+            padding: '16px',
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: '#ffffff',
+              borderRadius: '12px',
+              width: '100%',
+              maxWidth: '500px',
+              maxHeight: '80vh',
+              overflowY: 'auto',
+              padding: '24px',
+              boxShadow: '0 10px 25px rgba(0,0,0,0.15)',
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '16px',
+                borderBottom: '1px solid #e5e7eb',
+                paddingBottom: '12px',
+              }}
+            >
+              <h2
+                style={{
+                  fontSize: '18px',
+                  fontWeight: 'bold',
+                  color: '#111827',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                }}
+              >
+                <FileSpreadsheet size={20} color="#1d4ed8" />
+                N.E. Asociadas a: {neModalProduct.code}
+              </h2>
+              <button
+                onClick={() => setNeModalProduct(null)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                }}
+              >
+                <X size={20} color="#6b7280" />
+              </button>
+            </div>
+
+            {neLoading ? (
+              <div
+                style={{
+                  textAlign: 'center',
+                  padding: '20px',
+                  color: '#6b7280',
+                }}
+              >
+                Cargando notas de entrega...
+              </div>
+            ) : neList.length === 0 ? (
+              <div
+                style={{
+                  textAlign: 'center',
+                  padding: '20px',
+                  color: '#6b7280',
+                  fontStyle: 'italic',
+                }}
+              >
+                Este producto no está asignado a ninguna Nota de Entrega.
+              </div>
+            ) : (
+              <div
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '8px',
+                }}
+              >
+                {neList.map((ne, index) => (
+                  <div
+                    key={index}
+                    style={{
+                      padding: '10px 12px',
+                      backgroundColor: '#f8fafc',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '6px',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontWeight: '600',
+                        color: '#334155',
+                        fontSize: '14px',
+                      }}
+                    >
+                      N.E. #{ne.transaction_number}
+                    </span>
+                    <FileText size={16} color="#94a3b8" />
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div
+              style={{
+                marginTop: '20px',
+                display: 'flex',
+                justifyContent: 'flex-end',
+              }}
+            >
+              <button
+                onClick={() => setNeModalProduct(null)}
+                style={{
+                  padding: '8px 16px',
+                  backgroundColor: '#f3f4f6',
+                  color: '#374151',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '6px',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                }}
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showExportModal && canManage && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            padding: '16px',
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: '#ffffff',
+              borderRadius: '12px',
+              width: '100%',
+              maxWidth: '450px',
+              padding: '24px',
+              boxShadow: '0 10px 25px rgba(0,0,0,0.15)',
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '20px',
+              }}
+            >
+              <h2
+                style={{
+                  fontSize: '18px',
+                  fontWeight: 'bold',
+                  color: '#111827',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                }}
+              >
+                <Download size={20} color="#059669" /> Exportar Inventario
+              </h2>
+              <button
+                type="button"
+                onClick={() => setShowExportModal(false)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                }}
+              >
+                <X size={20} color="#6b7280" />
+              </button>
+            </div>
+            <p
+              style={{
+                fontSize: '14px',
+                color: '#374151',
+                marginBottom: '20px',
+                textAlign: 'center',
+                fontWeight: '600',
+              }}
+            >
+              ¿Desea exportar con imágenes o sin imágenes?
+            </p>
+            <div
+              style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}
+            >
+              <button
+                onClick={() => exportToCSV(false)}
+                disabled={exportProcessing}
+                style={{
+                  padding: '14px 20px',
+                  backgroundColor: '#f0fdf4',
+                  color: '#166534',
+                  border: '2px solid #bbf7d0',
+                  borderRadius: '8px',
+                  fontWeight: '600',
+                  fontSize: '14px',
+                  cursor: exportProcessing ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '10px',
+                  transition: 'all 0.2s',
+                }}
+              >
+                <FileText size={18} />{' '}
+                {exportProcessing ? 'Procesando...' : 'Sin Imágenes (CSV)'}
+              </button>
+              <button
+                onClick={() => exportToCSV(true)}
+                disabled={exportProcessing}
+                style={{
+                  padding: '14px 20px',
+                  backgroundColor: '#eff6ff',
+                  color: '#1e40af',
+                  border: '2px solid #bfdbfe',
+                  borderRadius: '8px',
+                  fontWeight: '600',
+                  fontSize: '14px',
+                  cursor: exportProcessing ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '10px',
+                  transition: 'all 0.2s',
+                }}
+              >
+                <Archive size={18} />{' '}
+                {exportProcessing ? 'Procesando...' : 'Con Imágenes (ZIP)'}
+              </button>
+            </div>
+            <div
+              style={{
+                marginTop: '20px',
+                padding: '12px',
+                backgroundColor: '#f9fafb',
+                borderRadius: '6px',
+                fontSize: '12px',
+                color: '#6b7280',
+              }}
+            >
+              <strong>Nota: </strong> La exportación con imágenes puede tardar
+              más tiempo dependiendo de la cantidad de productos.
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showImportModal && canManage && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            padding: '16px',
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: '#ffffff',
+              borderRadius: '12px',
+              width: '100%',
+              maxWidth: '500px',
+              padding: '24px',
+              boxShadow: '0 10px 25px rgba(0,0,0,0.15)',
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '20px',
+              }}
+            >
+              <h2
+                style={{
+                  fontSize: '18px',
+                  fontWeight: 'bold',
+                  color: '#111827',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                }}
+              >
+                <Upload size={20} color="#2563eb" /> Importar Inventario
+              </h2>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowImportModal(false);
+                  setImportFile(null);
+                  setImportWithImages(false);
+                }}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                }}
+              >
+                <X size={20} color="#6b7280" />
+              </button>
+            </div>
+            <p
+              style={{
+                fontSize: '14px',
+                color: '#374151',
+                marginBottom: '20px',
+                textAlign: 'center',
+                fontWeight: '600',
+              }}
+            >
+              ¿Desea importar con imágenes o sin imágenes?
+            </p>
+            <div
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '12px',
+                marginBottom: '20px',
+              }}
+            >
+              <button
+                onClick={() => {
+                  setImportWithImages(false);
+                  document.getElementById('import-file-input').click();
+                }}
+                disabled={importProcessing}
+                style={{
+                  padding: '14px 20px',
+                  backgroundColor:
+                    importWithImages === false && importFile
+                      ? '#f0fdf4'
+                      : '#f9fafb',
+                  color:
+                    importWithImages === false && importFile
+                      ? '#166534'
+                      : '#374151',
+                  border:
+                    importWithImages === false && importFile
+                      ? '2px solid #bbf7d0'
+                      : '2px solid #e5e7eb',
+                  borderRadius: '8px',
+                  fontWeight: '600',
+                  fontSize: '14px',
+                  cursor: importProcessing ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '10px',
+                  transition: 'all 0.2s',
+                }}
+              >
+                <FileText size={18} /> Sin Imágenes (CSV)
+              </button>
+              <button
+                onClick={() => {
+                  setImportWithImages(true);
+                  document.getElementById('import-file-input').click();
+                }}
+                disabled={importProcessing}
+                style={{
+                  padding: '14px 20px',
+                  backgroundColor:
+                    importWithImages === true && importFile
+                      ? '#eff6ff'
+                      : '#f9fafb',
+                  color:
+                    importWithImages === true && importFile
+                      ? '#1e40af'
+                      : '#374151',
+                  border:
+                    importWithImages === true && importFile
+                      ? '2px solid #bfdbfe'
+                      : '2px solid #e5e7eb',
+                  borderRadius: '8px',
+                  fontWeight: '600',
+                  fontSize: '14px',
+                  cursor: importProcessing ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '10px',
+                  transition: 'all 0.2s',
+                }}
+              >
+                <Archive size={18} /> Con Imágenes (ZIP)
+              </button>
+            </div>
+            <input
+              type="file"
+              id="import-file-input"
+              accept={importWithImages ? '.zip' : '.csv'}
+              onChange={(e) => {
+                if (e.target.files && e.target.files[0]) {
+                  setImportFile(e.target.files[0]);
+                }
+              }}
+              style={{ display: 'none' }}
+            />
+            {importFile && (
+              <div
+                style={{
+                  padding: '12px',
+                  backgroundColor: '#f0fdf4',
+                  borderRadius: '6px',
+                  marginBottom: '16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                }}
+              >
+                <Check size={16} color="#059669" />
+                <span
+                  style={{
+                    fontSize: '13px',
+                    color: '#166534',
+                    fontWeight: '600',
+                  }}
+                >
+                  Archivo seleccionado: {importFile.name}
+                </span>
+              </div>
+            )}
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'flex-end',
+                gap: '10px',
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => {
+                  setShowImportModal(false);
+                  setImportFile(null);
+                  setImportWithImages(false);
+                }}
+                style={{
+                  padding: '10px 16px',
+                  backgroundColor: '#f3f4f6',
+                  color: '#374151',
+                  border: 'none',
+                  borderRadius: '6px',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                }}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleImportFile}
+                disabled={importProcessing || !importFile}
+                style={{
+                  padding: '10px 20px',
+                  backgroundColor:
+                    importProcessing || !importFile ? '#9ca3af' : '#2563eb',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '6px',
+                  fontWeight: '600',
+                  cursor:
+                    importProcessing || !importFile ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                }}
+              >
+                {importProcessing ? 'Procesando...' : 'Importar'}
+              </button>
+            </div>
+            <div
+              style={{
+                marginTop: '16px',
+                padding: '12px',
+                backgroundColor: '#fef2f2',
+                borderRadius: '6px',
+                fontSize: '12px',
+                color: '#991b1b',
+              }}
+            >
+              <strong>Advertencia: </strong> La importación actualizará los
+              productos existentes según su código único y creará los nuevos.
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showAddModal && canManage && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            padding: '16px',
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: '#ffffff',
+              borderRadius: '12px',
+              width: '100%',
+              maxWidth: '500px',
+              padding: '24px',
+              boxShadow: '0 10px 25px rgba(0,0,0,0.15)',
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '20px',
+              }}
+            >
+              <h2
+                style={{
+                  fontSize: '18px',
+                  fontWeight: 'bold',
+                  color: '#111827',
+                }}
+              >
+                {editingProduct
+                  ? 'Editar Producto'
+                  : 'Registrar Nuevo Producto'}
+              </h2>
+              <button
+                type="button"
+                onClick={closeModals}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                }}
+              >
+                <X size={20} color="#6b7280" />
+              </button>
+            </div>
+            <form
+              onSubmit={handleSaveProduct}
+              style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}
+            >
+              <div>
+                <label
+                  style={{
+                    display: 'block',
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    marginBottom: '6px',
+                    color: '#374151',
+                  }}
+                >
+                  Categoría
+                </label>
+                <select
+                  value={formCategory}
+                  onChange={(e) => setFormCategory(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '10px',
+                    borderRadius: '6px',
+                    border: '1px solid #d1d5db',
+                    backgroundColor: '#fff',
+                  }}
+                >
+                  <option value="bombillos">Bombillos</option>
+                  <option value="fluidos">Fluidos</option>
+                </select>
+              </div>
+              <div>
+                <label
+                  style={{
+                    display: 'block',
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    marginBottom: '6px',
+                    color: '#374151',
+                  }}
+                >
+                  Código Único
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Ej. BOM-001"
+                  value={formCode}
+                  onChange={(e) => setFormCode(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '10px',
+                    borderRadius: '6px',
+                    border: '1px solid #d1d5db',
+                    boxSizing: 'border-box',
+                  }}
+                />
+              </div>
+              <div>
+                <label
+                  style={{
+                    display: 'block',
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    marginBottom: '6px',
+                    color: '#374151',
+                  }}
+                >
+                  Descripción y Especificaciones
+                </label>
+                <textarea
+                  required
+                  rows={2}
+                  placeholder="Nombre y detalles del producto..."
+                  value={formDescription}
+                  onChange={(e) => setFormDescription(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '10px',
+                    borderRadius: '6px',
+                    border: '1px solid #d1d5db',
+                    boxSizing: 'border-box',
+                  }}
+                />
+              </div>
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1fr 1fr',
+                  gap: '12px',
+                }}
+              >
+                <div>
+                  <label
+                    style={{
+                      display: 'block',
+                      fontSize: '13px',
+                      fontWeight: '600',
+                      marginBottom: '6px',
+                      color: '#374151',
+                    }}
+                  >
+                    Precio Full ($)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    required
+                    placeholder="0.00"
+                    value={formPrice}
+                    onChange={(e) => setFormPrice(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '10px',
+                      borderRadius: '6px',
+                      border: '1px solid #d1d5db',
+                      boxSizing: 'border-box',
+                    }}
+                  />
+                </div>
+                <div>
+                  <label
+                    style={{
+                      display: 'block',
+                      fontSize: '13px',
+                      fontWeight: '600',
+                      marginBottom: '6px',
+                      color: '#374151',
+                    }}
+                  >
+                    Precio Base ($)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder="0.00"
+                    value={formBasePrice}
+                    onChange={(e) => setFormBasePrice(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '10px',
+                      borderRadius: '6px',
+                      border: '1px solid #d1d5db',
+                      boxSizing: 'border-box',
+                    }}
+                  />
+                </div>
+              </div>
+              {!editingProduct && (
+                <div>
+                  <label
+                    style={{
+                      display: 'block',
+                      fontSize: '13px',
+                      fontWeight: '600',
+                      marginBottom: '6px',
+                      color: '#374151',
+                    }}
+                  >
+                    Stock Inicial
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    required
+                    placeholder="0"
+                    value={formStock}
+                    onChange={(e) => setFormStock(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '10px',
+                      borderRadius: '6px',
+                      border: '1px solid #d1d5db',
+                      boxSizing: 'border-box',
+                    }}
+                  />
+                </div>
+              )}
+              <div>
+                <label
+                  style={{
+                    display: 'block',
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    marginBottom: '6px',
+                    color: '#374151',
+                  }}
+                >
+                  Foto del Producto (Única)
+                </label>
+                {!imagePreview ? (
+                  <label
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '10px',
+                      padding: '12px 16px',
+                      backgroundColor: '#f8fafc',
+                      color: '#111827',
+                      border: '2px dashed #d1d5db',
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      fontWeight: '600',
+                      fontSize: '14px',
+                      transition: 'all 0.2s',
+                      boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                    }}
+                  >
+                    <Upload size={18} color="#dc2626" />
+                    <span>Seleccionar Imagen...</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      style={{ display: 'none' }}
+                      onChange={(e) => {
+                        if (e.target.files && e.target.files[0]) {
+                          const file = e.target.files[0];
+                          setFormImageFile(file);
+                          setImagePreview(URL.createObjectURL(file));
+                          e.target.value = null;
+                        }
+                      }}
+                    />
+                  </label>
+                ) : (
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '12px',
+                      padding: '8px',
+                      border: '1px solid #e5e7eb',
+                      borderRadius: '8px',
+                      backgroundColor: '#f9fafb',
+                    }}
+                  >
+                    <img
+                      src={imagePreview}
+                      alt="Vista previa"
+                      style={{
+                        width: '60px',
+                        height: '60px',
+                        objectFit: 'cover',
+                        borderRadius: '6px',
+                        border: '1px solid #e5e7eb',
+                      }}
+                    />
+                    <div
+                      style={{
+                        flex: 1,
+                        fontSize: '13px',
+                        color: '#374151',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {formImageFile
+                        ? formImageFile.name
+                        : 'Imagen actual del producto'}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFormImageFile(null);
+                        setImagePreview('');
+                        if (editingProduct) {
+                          setEditingProduct({
+                            ...editingProduct,
+                            image_url: null,
+                          });
+                        }
+                      }}
+                      style={{
+                        background: '#fee2e2',
+                        border: 'none',
+                        borderRadius: '50%',
+                        width: '32px',
+                        height: '32px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer',
+                        color: '#b91c1c',
+                      }}
+                    >
+                      <X size={18} />
+                    </button>
+                  </div>
+                )}
+              </div>
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'flex-end',
+                  gap: '12px',
+                  marginTop: '10px',
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={closeModals}
+                  style={{
+                    padding: '10px 16px',
+                    backgroundColor: '#f3f4f6',
+                    color: '#374151',
+                    border: 'none',
+                    borderRadius: '6px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  style={{
+                    padding: '10px 20px',
+                    backgroundColor: '#dc2626',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '6px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Guardar Producto
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {adjustingStockProduct && canManage && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            padding: '16px',
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: '#ffffff',
+              borderRadius: '12px',
+              width: '100%',
+              maxWidth: '400px',
+              padding: '24px',
+              boxShadow: '0 10px 25px rgba(0,0,0,0.15)',
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '16px',
+              }}
+            >
+              <h2
+                style={{
+                  fontSize: '16px',
+                  fontWeight: 'bold',
+                  color: '#111827',
+                }}
+              >
+                Ajuste de Inventario
+              </h2>
+              <button
+                type="button"
+                onClick={closeModals}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                }}
+              >
+                <X size={20} color="#6b7280" />
+              </button>
+            </div>
+            <p
+              style={{
+                fontSize: '13px',
+                color: '#6b7280',
+                marginBottom: '16px',
+              }}
+            >
+              Producto: <strong>{adjustingStockProduct.description}</strong>
+              <br />
+              Stock Actual:{' '}
+              <span style={{ color: '#059669', fontWeight: 'bold' }}>
+                {adjustingStockProduct.stock_current} unidades
+              </span>
+            </p>
+            <form
+              onSubmit={handleQuickStockAdjustment}
+              style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}
+            >
+              <div>
+                <label
+                  style={{
+                    display: 'block',
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    marginBottom: '6px',
+                    color: '#374151',
+                  }}
+                >
+                  Tipo de Ajuste
+                </label>
+                <select
+                  value={stockAdjustmentType}
+                  onChange={(e) => setStockAdjustmentType(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '10px',
+                    borderRadius: '6px',
+                    border: '1px solid #d1d5db',
+                  }}
+                >
+                  <option value="add">Incrementar Stock (+)</option>
+                  <option value="subtract">Decrementar Stock (-)</option>
+                  <option value="set">Establecer Cantidad Exacta</option>
+                </select>
+              </div>
+              <div>
+                <label
+                  style={{
+                    display: 'block',
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    marginBottom: '6px',
+                    color: '#374151',
+                  }}
+                >
+                  Cantidad
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  required
+                  placeholder="Ingrese cantidad"
+                  value={stockAdjustmentValue}
+                  onChange={(e) => setStockAdjustmentValue(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '10px',
+                    borderRadius: '6px',
+                    border: '1px solid #d1d5db',
+                    boxSizing: 'border-box',
+                  }}
+                />
+              </div>
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'flex-end',
+                  gap: '10px',
+                  marginTop: '10px',
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={closeModals}
+                  style={{
+                    padding: '8px 14px',
+                    backgroundColor: '#f3f4f6',
+                    color: '#374151',
+                    border: 'none',
+                    borderRadius: '6px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  style={{
+                    padding: '8px 16px',
+                    backgroundColor: '#f59e0b',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '6px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Aplicar Ajuste
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {selectedImageModal && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0,0,0,0.8)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1100,
+            padding: '16px',
+          }}
+          onClick={() => setSelectedImageModal(null)}
+        >
+          <div
+            style={{ position: 'relative', maxWidth: '90%', maxHeight: '90%' }}
+          >
+            <button
+              type="button"
+              onClick={() => setSelectedImageModal(null)}
+              style={{
+                position: 'absolute',
+                top: '-40px',
+                right: '0',
+                background: 'none',
+                border: 'none',
+                color: '#fff',
+                cursor: 'pointer',
+              }}
+            >
+              <X size={28} />
+            </button>
+            <img
+              src={selectedImageModal}
+              alt="Ampliada"
+              style={{
+                maxWidth: '100%',
+                maxHeight: '80vh',
+                borderRadius: '8px',
+                objectFit: 'contain',
+              }}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
