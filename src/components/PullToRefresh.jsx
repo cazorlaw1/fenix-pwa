@@ -1,32 +1,49 @@
 // src/components/PullToRefresh.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Settings } from 'lucide-react';
 
-export default function PullToRefresh({ children, scrollableRef }) {
+export default function PullToRefresh({ children }) {
   const [startY, setStartY] = useState(null);
   const [pullDistance, setPullDistance] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
-  const threshold = 80; // Píxeles necesarios para disparar la recarga
+  const threshold = 80;
+  const rootRef = useRef(null);
 
   useEffect(() => {
-    const scrollContainer = scrollableRef?.current;
+    // Detecta automáticamente el contenedor padre que tiene scroll vertical (el <main>)
+    const findScrollParent = (node) => {
+      let curr = node?.parentElement;
+      while (curr) {
+        const style = window.getComputedStyle(curr);
+        if (style.overflowY === 'auto' || style.overflowY === 'scroll') {
+          return curr;
+        }
+        curr = curr.parentElement;
+      }
+      return window;
+    };
+
+    const scrollContainer = findScrollParent(rootRef.current);
     if (!scrollContainer) return;
 
+    const getScrollTop = () => {
+      return scrollContainer === window ? window.scrollY : scrollContainer.scrollTop;
+    };
+
     const handleTouchStart = (e) => {
-      // Verificamos estrictamente que estemos en el tope superior absoluto (scrollTop === 0)
-      if (scrollContainer.scrollTop === 0) {
+      // Solo se activa si estamos estrictamente en el tope superior (scrollTop === 0)
+      if (getScrollTop() === 0) {
         setStartY(e.touches[0].clientY);
       } else {
-        setStartY(null); // Si no estamos arriba, ignoramos el gesto
+        setStartY(null);
       }
     };
 
     const handleTouchMove = (e) => {
-      // Si no se inició arriba del todo, no hacemos nada
       if (startY === null) return;
 
-      // Doble comprobación por si el usuario hizo scroll durante el toque
-      if (scrollContainer.scrollTop > 0) {
+      // Si el usuario hizo scroll hacia abajo mientras arrastraba, cancelamos
+      if (getScrollTop() > 0) {
         setPullDistance(0);
         setStartY(null);
         return;
@@ -35,9 +52,8 @@ export default function PullToRefresh({ children, scrollableRef }) {
       const currentY = e.touches[0].clientY;
       const distance = currentY - startY;
 
-      // Solo permitimos el gesto si se desliza hacia abajo (distance > 0) y estamos arriba
+      // Solo responde si se desliza hacia abajo y estamos arriba
       if (distance > 0) {
-        // Aplicamos resistencia para que el movimiento sea suave
         setPullDistance(Math.min(distance * 0.4, 120));
       } else {
         setPullDistance(0);
@@ -58,19 +74,20 @@ export default function PullToRefresh({ children, scrollableRef }) {
       setStartY(null);
     };
 
-    scrollContainer.addEventListener('touchstart', handleTouchStart, { passive: true });
-    scrollContainer.addEventListener('touchmove', handleTouchMove, { passive: true });
-    scrollContainer.addEventListener('touchend', handleTouchEnd);
+    const target = scrollContainer === window ? window : scrollContainer;
+    target.addEventListener('touchstart', handleTouchStart, { passive: true });
+    target.addEventListener('touchmove', handleTouchMove, { passive: true });
+    target.addEventListener('touchend', handleTouchEnd);
 
     return () => {
-      scrollContainer.removeEventListener('touchstart', handleTouchStart);
-      scrollContainer.removeEventListener('touchmove', handleTouchMove);
-      scrollContainer.removeEventListener('touchend', handleTouchEnd);
+      target.removeEventListener('touchstart', handleTouchStart);
+      target.removeEventListener('touchmove', handleTouchMove);
+      target.removeEventListener('touchend', handleTouchEnd);
     };
-  }, [startY, pullDistance, refreshing, scrollableRef]);
+  }, [startY, pullDistance, refreshing]);
 
   return (
-    <div style={{ position: 'relative', minHeight: '100vh', width: '100%' }}>
+    <div ref={rootRef} style={{ position: 'relative', minHeight: '100vh', width: '100%' }}>
       {/* Indicador visual superior */}
       <div
         style={{
