@@ -11,7 +11,8 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import Header from './components/Header';
 import Sidebar from './components/Sidebar';
 import MobileNavigation from './components/MobileNavigation';
-import PullToRefresh from './components/PullToRefresh';
+import PullToRefresh from './components/PullToRefresh'; // <-- IMPORTADO CORRECTAMENTE
+import { supabase } from './lib/supabase';
 
 // Páginas
 import Dashboard from './pages/Dashboard';
