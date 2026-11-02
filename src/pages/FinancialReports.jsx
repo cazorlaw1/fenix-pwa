@@ -1118,7 +1118,7 @@ export default function FinancialReports() {
       }}
     >
       <style>{`
-        .fin-tabs-desktop { display: flex; gap: 8px; border-bottom: 2px solid #e5e7eb; margin-bottom: 24px; overflow-x: auto; }
+        .fin-tabs-desktop { display: flex; gap: 8px; border-bottom: 2px solid #e5e7eb; margin-bottom: 16px; flex-wrap: wrap; }
         .fin-tabs-mobile { display: none; position: relative; margin-bottom: 24px; }
         .fin-grid-kpi { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 24px; }
         .fin-input { width: 100%; padding: 8px 12px; font-size: 13px; border: 1px solid #d1d5db; border-radius: 6px; box-sizing: border-box; background-color: #ffffff; color: #111827; }
