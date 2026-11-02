@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { supabase } from '../lib/supabase';
 import JSZip from 'jszip';
 import {
@@ -112,26 +113,26 @@ export default function Inventory() {
     const isAnyModalOpen = neModalProduct || selectedImageModal || showAddModal || adjustingStockProduct || showExportModal || showImportModal;
     
     if (isAnyModalOpen) {
+      const scrollY = window.scrollY;
       document.body.style.overflow = 'hidden';
       document.body.style.position = 'fixed';
+      document.body.style.top = `-${scrollY}px`;
       document.body.style.width = '100%';
-      document.body.style.top = `-${window.scrollY}px`;
+      document.body.dataset.scrollY = scrollY;
     } else {
-      const scrollY = document.body.style.top;
+      const scrollY = document.body.dataset.scrollY || '0';
       document.body.style.overflow = '';
       document.body.style.position = '';
-      document.body.style.width = '';
       document.body.style.top = '';
-      if (scrollY) {
-        window.scrollTo(0, parseInt(scrollY || '0') * -1);
-      }
+      document.body.style.width = '';
+      window.scrollTo(0, parseInt(scrollY));
     }
 
     return () => {
       document.body.style.overflow = '';
       document.body.style.position = '';
-      document.body.style.width = '';
       document.body.style.top = '';
+      document.body.style.width = '';
     };
   }, [neModalProduct, selectedImageModal, showAddModal, adjustingStockProduct, showExportModal, showImportModal]);
 
@@ -656,12 +657,36 @@ export default function Inventory() {
   ];
 
   // ============================================
-  // COMPONENTES DE MODAL USANDO PORTALS
+  // CONTENEDOR PARA MODALES (adjunto al body)
   // ============================================
-  
+  const [modalContainer, setModalContainer] = useState(null);
+
+  useEffect(() => {
+    const div = document.createElement('div');
+    div.id = 'inventory-modal-root';
+    div.style.position = 'fixed';
+    div.style.top = '0';
+    div.style.left = '0';
+    div.style.width = '100%';
+    div.style.height = '100%';
+    div.style.zIndex = '99999';
+    div.style.pointerEvents = 'none';
+    document.body.appendChild(div);
+    setModalContainer(div);
+
+    return () => {
+      if (div.parentNode) {
+        div.parentNode.removeChild(div);
+      }
+    };
+  }, []);
+
+  // ============================================
+  // MODAL DE NOTAS DE ENTREGA
+  // ============================================
   const ModalNE = () => {
-    if (!neModalProduct) return null;
-    return ReactDOM.createPortal(
+    if (!neModalProduct || !modalContainer) return null;
+    return createPortal(
       <div
         style={{
           position: 'fixed',
@@ -677,7 +702,7 @@ export default function Inventory() {
           justifyContent: 'center',
           zIndex: 99999,
           padding: '16px',
-          overflow: 'hidden',
+          pointerEvents: 'auto',
         }}
         onClick={(e) => {
           if (e.target === e.currentTarget) {
@@ -696,7 +721,6 @@ export default function Inventory() {
             padding: '24px',
             boxShadow: '0 20px 50px rgba(0,0,0,0.3)',
             position: 'relative',
-            zIndex: 100000,
           }}
           onClick={(e) => e.stopPropagation()}
         >
@@ -833,13 +857,16 @@ export default function Inventory() {
           </div>
         </div>
       </div>,
-      document.body
+      modalContainer
     );
   };
 
+  // ============================================
+  // MODAL DE EXPORTACIÓN
+  // ============================================
   const ModalExport = () => {
-    if (!showExportModal || !canManage) return null;
-    return ReactDOM.createPortal(
+    if (!showExportModal || !canManage || !modalContainer) return null;
+    return createPortal(
       <div
         style={{
           position: 'fixed',
@@ -855,6 +882,7 @@ export default function Inventory() {
           justifyContent: 'center',
           zIndex: 99999,
           padding: '16px',
+          pointerEvents: 'auto',
         }}
       >
         <div
@@ -973,13 +1001,16 @@ export default function Inventory() {
           </div>
         </div>
       </div>,
-      document.body
+      modalContainer
     );
   };
 
+  // ============================================
+  // MODAL DE IMPORTACIÓN
+  // ============================================
   const ModalImport = () => {
-    if (!showImportModal || !canManage) return null;
-    return ReactDOM.createPortal(
+    if (!showImportModal || !canManage || !modalContainer) return null;
+    return createPortal(
       <div
         style={{
           position: 'fixed',
@@ -995,6 +1026,7 @@ export default function Inventory() {
           justifyContent: 'center',
           zIndex: 99999,
           padding: '16px',
+          pointerEvents: 'auto',
         }}
       >
         <div
@@ -1227,13 +1259,16 @@ export default function Inventory() {
           </div>
         </div>
       </div>,
-      document.body
+      modalContainer
     );
   };
 
+  // ============================================
+  // MODAL DE REGISTRO/EDICIÓN
+  // ============================================
   const ModalAddEdit = () => {
-    if (!showAddModal || !canManage) return null;
-    return ReactDOM.createPortal(
+    if (!showAddModal || !canManage || !modalContainer) return null;
+    return createPortal(
       <div
         style={{
           position: 'fixed',
@@ -1249,6 +1284,7 @@ export default function Inventory() {
           justifyContent: 'center',
           zIndex: 99999,
           padding: '16px',
+          pointerEvents: 'auto',
         }}
       >
         <div
@@ -1627,13 +1663,16 @@ export default function Inventory() {
           </form>
         </div>
       </div>,
-      document.body
+      modalContainer
     );
   };
 
+  // ============================================
+  // MODAL DE AJUSTE DE STOCK
+  // ============================================
   const ModalStock = () => {
-    if (!adjustingStockProduct || !canManage) return null;
-    return ReactDOM.createPortal(
+    if (!adjustingStockProduct || !canManage || !modalContainer) return null;
+    return createPortal(
       <div
         style={{
           position: 'fixed',
@@ -1649,6 +1688,7 @@ export default function Inventory() {
           justifyContent: 'center',
           zIndex: 99999,
           padding: '16px',
+          pointerEvents: 'auto',
         }}
       >
         <div
@@ -1804,13 +1844,16 @@ export default function Inventory() {
           </form>
         </div>
       </div>,
-      document.body
+      modalContainer
     );
   };
 
+  // ============================================
+  // MODAL DE IMAGEN
+  // ============================================
   const ModalImage = () => {
-    if (!selectedImageModal) return null;
-    return ReactDOM.createPortal(
+    if (!selectedImageModal || !modalContainer) return null;
+    return createPortal(
       <div
         style={{
           position: 'fixed',
@@ -1826,6 +1869,7 @@ export default function Inventory() {
           justifyContent: 'center',
           zIndex: 99999,
           padding: '16px',
+          pointerEvents: 'auto',
         }}
         onClick={() => setSelectedImageModal(null)}
       >
@@ -1859,7 +1903,7 @@ export default function Inventory() {
           />
         </div>
       </div>,
-      document.body
+      modalContainer
     );
   };
 
@@ -2887,7 +2931,7 @@ export default function Inventory() {
         </div>
       )}
 
-      {/* RENDERIZAR MODALES USANDO PORTALS */}
+      {/* RENDERIZAR TODOS LOS MODALES VIA PORTAL */}
       <ModalNE />
       <ModalExport />
       <ModalImport />
