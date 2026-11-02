@@ -1,8 +1,8 @@
 import React, { createContext, useContext, useState } from 'react';
+import cargandoGif from '../assets/cargando.gif'; // <-- Importas la imagen desde src/assets
 
 const LoaderContext = createContext();
 
-// Variables globales para permitir disparar el loader desde fuera de los componentes (ej. en Supabase)
 export let globalShowLoader = () => {};
 export let globalHideLoader = () => {};
 
@@ -19,7 +19,6 @@ export function LoaderProvider({ children }) {
     setLoading(false);
   };
 
-  // Asignamos a las variables globales
   globalShowLoader = showLoader;
   globalHideLoader = hideLoader;
 
@@ -30,9 +29,9 @@ export function LoaderProvider({ children }) {
         <div style={{
           position: 'fixed',
           inset: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.4)', // Fondo oscuro semitransparente
-          backdropFilter: 'blur(4px)',          // Desenfoque elegante del fondo
-          WebkitBackdropFilter: 'blur(4px)',    // Compatibilidad con Safari
+          backgroundColor: 'rgba(0, 0, 0, 0.4)',
+          backdropFilter: 'blur(4px)',
+          WebkitBackdropFilter: 'blur(4px)',
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
@@ -43,9 +42,9 @@ export function LoaderProvider({ children }) {
           gap: '16px',
           userSelect: 'none'
         }}>
-          {/* GIF 3 veces más grande (de 60px a 180px) */}
+          {/* Usas la variable importada */}
           <img 
-            src="/cargando.gif" 
+            src={cargandoGif} 
             alt="Cargando" 
             style={{ width: '180px', height: '180px', objectFit: 'contain' }} 
           />
