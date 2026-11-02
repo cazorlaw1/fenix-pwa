@@ -1,5 +1,5 @@
-import React, { createContext, useContext, useState } from 'react';
-import cargandoGif from '../assets/cargando.gif'; // <-- Importas la imagen desde src/assets
+import React, { createContext, useContext, useState, useRef } from 'react';
+import cargandoGif from '../assets/cargando.gif';
 
 const LoaderContext = createContext();
 
@@ -9,14 +9,34 @@ export let globalHideLoader = () => {};
 export function LoaderProvider({ children }) {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("Cargando...");
+  
+  // Referencias para controlar el tiempo en pantalla y evitar parpadeos
+  const showTimestamp = useRef(0);
+  const hideTimeoutRef = useRef(null);
 
   const showLoader = (msg = "Cargando...") => {
+    // Si había un cierre pendiente, lo cancelamos
+    if (hideTimeoutRef.current) {
+      clearTimeout(hideTimeoutRef.current);
+      hideTimeoutRef.current = null;
+    }
     setMessage(msg);
+    showTimestamp.current = Date.now();
     setLoading(true);
   };
 
   const hideLoader = () => {
-    setLoading(false);
+    const elapsed = Date.now() - showTimestamp.current;
+    const minDisplayTime = 500; // Mantiene el loader visible al menos 500ms para evitar parpadeos
+
+    if (elapsed < minDisplayTime) {
+      // Si la petición fue demasiado rápida, esperamos lo que falta para cumplir los 500ms
+      hideTimeoutRef.current = setTimeout(() => {
+        setLoading(false);
+      }, minDisplayTime - elapsed);
+    } else {
+      setLoading(false);
+    }
   };
 
   globalShowLoader = showLoader;
@@ -42,7 +62,6 @@ export function LoaderProvider({ children }) {
           gap: '16px',
           userSelect: 'none'
         }}>
-          {/* Usas la variable importada */}
           <img 
             src={cargandoGif} 
             alt="Cargando" 
