@@ -2,28 +2,42 @@
 import React, { useState, useEffect } from 'react';
 import { Settings } from 'lucide-react';
 
-export default function PullToRefresh({ children }) {
-  const [startY, setStartY] = useState(0);
+export default function PullToRefresh({ children, scrollableRef }) {
+  const [startY, setStartY] = useState(null);
   const [pullDistance, setPullDistance] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const threshold = 80; // Píxeles necesarios para disparar la recarga
 
   useEffect(() => {
+    const scrollContainer = scrollableRef?.current;
+    if (!scrollContainer) return;
+
     const handleTouchStart = (e) => {
-      // Solo activamos si estamos en el tope de la página (scrollTop === 0)
-      if (window.scrollY === 0) {
+      // Verificamos estrictamente que estemos en el tope superior absoluto (scrollTop === 0)
+      if (scrollContainer.scrollTop === 0) {
         setStartY(e.touches[0].clientY);
+      } else {
+        setStartY(null); // Si no estamos arriba, ignoramos el gesto
       }
     };
 
     const handleTouchMove = (e) => {
-      if (!startY) return;
+      // Si no se inició arriba del todo, no hacemos nada
+      if (startY === null) return;
+
+      // Doble comprobación por si el usuario hizo scroll durante el toque
+      if (scrollContainer.scrollTop > 0) {
+        setPullDistance(0);
+        setStartY(null);
+        return;
+      }
+
       const currentY = e.touches[0].clientY;
       const distance = currentY - startY;
 
-      // Si desliza hacia abajo desde el tope
-      if (distance > 0 && window.scrollY === 0) {
-        // Aplicamos una pequeña resistencia matemática para que no sea tan brusco
+      // Solo permitimos el gesto si se desliza hacia abajo (distance > 0) y estamos arriba
+      if (distance > 0) {
+        // Aplicamos resistencia para que el movimiento sea suave
         setPullDistance(Math.min(distance * 0.4, 120));
       } else {
         setPullDistance(0);
@@ -31,37 +45,36 @@ export default function PullToRefresh({ children }) {
     };
 
     const handleTouchEnd = () => {
-      if (!startY) return;
+      if (startY === null) return;
 
       if (pullDistance >= threshold && !refreshing) {
         setRefreshing(true);
-        // Recargamos la página completa o ejecutamos un refetch global
         setTimeout(() => {
           window.location.reload();
         }, 600);
       } else {
         setPullDistance(0);
       }
-      setStartY(0);
+      setStartY(null);
     };
 
-    window.addEventListener('touchstart', handleTouchStart);
-    window.addEventListener('touchmove', handleTouchMove);
-    window.addEventListener('touchend', handleTouchEnd);
+    scrollContainer.addEventListener('touchstart', handleTouchStart, { passive: true });
+    scrollContainer.addEventListener('touchmove', handleTouchMove, { passive: true });
+    scrollContainer.addEventListener('touchend', handleTouchEnd);
 
     return () => {
-      window.removeEventListener('touchstart', handleTouchStart);
-      window.removeEventListener('touchmove', handleTouchMove);
-      window.removeEventListener('touchend', handleTouchEnd);
+      scrollContainer.removeEventListener('touchstart', handleTouchStart);
+      scrollContainer.removeEventListener('touchmove', handleTouchMove);
+      scrollContainer.removeEventListener('touchend', handleTouchEnd);
     };
-  }, [startY, pullDistance, refreshing]);
+  }, [startY, pullDistance, refreshing, scrollableRef]);
 
   return (
-    <div style={{ position: 'relative', minHeight: '100vh' }}>
-      {/* Indicador visual superior que aparece al arrastrar */}
+    <div style={{ position: 'relative', minHeight: '100vh', width: '100%' }}>
+      {/* Indicador visual superior */}
       <div
         style={{
-          position: 'fixed',
+          position: 'absolute',
           top: 0,
           left: 0,
           right: 0,
@@ -71,11 +84,10 @@ export default function PullToRefresh({ children }) {
           alignItems: 'center',
           justifyContent: 'center',
           backgroundColor: '#1c1917',
-          color: '#D4AF37', // Color dorado acorde al diseño de Fenix
+          color: '#D4AF37',
           overflow: 'hidden',
           transition: pullDistance === 0 ? 'height 0.3s ease' : 'none',
-          zIndex: 99999,
-          boxShadow: pullDistance > 0 ? '0 4px 6px rgba(0,0,0,0.1)' : 'none',
+          zIndex: 99,
         }}
       >
         <div
@@ -89,7 +101,6 @@ export default function PullToRefresh({ children }) {
             transition: 'opacity 0.2s',
           }}
         >
-          {/* Único icono: Engranaje girando con el gesto */}
           <Settings
             size={20}
             className={refreshing ? 'animate-spin' : ''}
@@ -109,11 +120,12 @@ export default function PullToRefresh({ children }) {
         </div>
       </div>
 
-      {/* Contenido principal de la aplicación */}
+      {/* Contenido principal */}
       <div
         style={{
           transform: `translateY(${pullDistance}px)`,
           transition: pullDistance === 0 ? 'transform 0.3s ease' : 'none',
+          height: '100%',
         }}
       >
         {children}
