@@ -11,7 +11,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import Header from './components/Header';
 import Sidebar from './components/Sidebar';
 import MobileNavigation from './components/MobileNavigation';
-import PullToRefresh from './components/PullToRefresh';
+import PullToRefresh from './components/PullToRefresh'; // <-- Importado correctamente
 import { supabase } from './lib/supabase';
 
 // Páginas
@@ -24,7 +24,7 @@ import Inventory from './pages/Inventory';
 import AdminModule from './pages/AdminModule';
 import Vendedores from './pages/Vendedores';
 import SalesModule from './pages/SalesModule';
-import FinancialReports from './pages/FinancialReports'; // <-- IMPORTAR
+import FinancialReports from './pages/FinancialReports';
 
 function Unauthorized() {
   return (
@@ -293,9 +293,12 @@ function Layout({ children, activeTab, setActiveTab }) {
             flexDirection: 'column',
           }}
         >
-          <div style={{ width: '100%', flex: 1, paddingBottom: '24px' }}>
-            {children}
-          </div>
+          {/* PullToRefresh envuelve las vistas para permitir actualizar deslizando hacia abajo */}
+          <PullToRefresh>
+            <div style={{ width: '100%', flex: 1, paddingBottom: '24px' }}>
+              {children}
+            </div>
+          </PullToRefresh>
         </main>
       </div>
       <MobileNavigation
@@ -394,7 +397,9 @@ export default function App() {
                     'administrador',
                     'tecnico',
                     'gerente',
-                    'supervisor', 'stock']}
+                    'supervisor',
+                    'stock',
+                  ]}
                 />
                 <Layout>
                   <Inventory />
