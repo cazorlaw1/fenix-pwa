@@ -5515,24 +5515,25 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                 inset: 0,
                 backgroundColor: 'rgba(0,0,0,0.6)',
                 display: 'flex',
-                alignItems: 'center',
+                alignItems: 'stretch',
                 justifyContent: 'center',
                 zIndex: 1250,
-                padding: '16px',
+                padding: '0',
               }}
             >
               <div
                 style={{
-                  backgroundColor: '#ffffff',
-                  border: '2px solid #111827',
-                  borderRadius: '12px',
-                  width: '100%',
-                  maxWidth: '850px',
-                  maxHeight: '90vh',
-                  overflowY: 'auto',
-                  padding: '24px',
-                  boxShadow: '0 10px 40px rgba(0,0,0,0.3)',
-                  boxSizing: 'border-box',
+      backgroundColor: '#ffffff',
+      border: 'none',
+      borderRadius: '0', // Pantalla completa real estilo app móvil
+      width: '100%',
+      maxWidth: '100vw',
+      height: '100vh', // Forzar altura completa de la ventana
+      maxHeight: '100vh',
+      overflowY: 'auto',
+      padding: '16px',
+      boxShadow: 'none',
+      boxSizing: 'border-box',
                 }}
               >
                 <div
@@ -7479,30 +7480,33 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
           )}
           {editingNote && isCobranzaNEModal && (
             <div
-              style={{
-                position: 'fixed',
-                inset: 0,
-                backgroundColor: 'rgba(0,0,0,0.6)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                zIndex: 1250,
-                padding: '16px',
-              }}
-            >
-              <div
-                style={{
-                  backgroundColor: '#ffffff',
-                  border: '2px solid #111827',
-                  borderRadius: '12px',
-                  width: '100%',
-                  maxWidth: '850px',
-                  maxHeight: '90vh',
-                  overflowY: 'auto',
-                  padding: '24px',
-                  boxShadow: '0 10px 40px rgba(0,0,0,0.3)',
-                  boxSizing: 'border-box',
-                }}
+  style={{
+    position: 'fixed',
+    inset: 0, // Ocupa toda la pantalla (top: 0, left: 0, right: 0, bottom: 0)
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    display: 'flex',
+    alignItems: 'stretch', // Cambiado de 'center' a 'stretch' para pantalla completa vertical
+    justifyContent: 'center',
+    zIndex: 1250,
+    padding: '0', // Eliminamos padding externo para aprovechar el 100% del espacio
+  }}
+>
+  <div
+    style={{
+      backgroundColor: '#ffffff',
+      border: 'none',
+      borderRadius: '0', // Pantalla completa real estilo app móvil
+      width: '100%',
+      maxWidth: '100vw',
+      height: '100vh', // Forzar altura completa de la ventana
+      maxHeight: '100vh',
+      overflowY: 'auto',
+      padding: '16px',
+      boxShadow: 'none',
+      boxSizing: 'border-box',
+    }}
+  >
+    {/* Contenido de la ventana modal */}
               >
                 <div
                   style={{
