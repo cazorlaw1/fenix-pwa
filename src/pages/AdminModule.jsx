@@ -700,7 +700,54 @@ export default function AdminModule() {
       (p.description?.toLowerCase().includes(neSearchProduct.toLowerCase()) ||
         p.code?.toLowerCase().includes(neSearchProduct.toLowerCase()))
   );
+  // --- AHORA / NUEVAS FUNCIONES DE CONTROL ---
+  const handleMoveCartItem = (index, direction) => {
+    const newCart = [...neCart];
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= newCart.length) return;
+    const temp = newCart[index];
+    newCart[index] = newCart[targetIndex];
+    newCart[targetIndex] = temp;
+    setNeCart(newCart);
+  };
 
+  const handleUpdateCartQuantity = (product_id, newQty) => {
+    const qty = Number(newQty);
+    if (isNaN(qty) || qty <= 0) return;
+    setNeCart(
+      neCart.map((item) => {
+        if (item.product_id === product_id) {
+          const totalLine = qty * Number(item.discounted_unit_price_usd);
+          return { ...item, quantity: qty, total_line_usd: totalLine };
+        }
+        return item;
+      })
+    );
+  };
+
+  const handleMoveEditItem = (index, direction) => {
+    const newItems = [...editNoteItems];
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= newItems.length) return;
+    const temp = newItems[index];
+    newItems[index] = newItems[targetIndex];
+    newItems[targetIndex] = temp;
+    setEditNoteItems(newItems);
+  };
+
+  const handleUpdateEditItemQuantity = (product_id, newQty) => {
+    const qty = Number(newQty);
+    if (isNaN(qty) || qty <= 0) return;
+    setEditNoteItems(
+      editNoteItems.map((item) => {
+        if (item.product_id === product_id) {
+          const totalLine = qty * Number(item.discounted_unit_price_usd);
+          return { ...item, quantity: qty, total_line_usd: totalLine };
+        }
+        return item;
+      })
+    );
+  };
   const handleAddToCartCreateNe = () => {
     if (!neSelectedProdId) return;
     const prod = allProductsList.find((p) => p.id === neSelectedProdId);
@@ -3729,7 +3776,13 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
   const todayISO = new Date().toISOString().split('T')[0];
 
   // --- RENDER HELPERS FOR MOBILE CARDS (PRODUCTS) ---
-  const renderProductCards = (items, isEditable, onRemove) => {
+  const renderProductCards = (
+    items,
+    isEditable,
+    onRemove,
+    onMove,
+    onQtyChange
+  ) => {
     return items.map((item, idx) => (
       <div
         key={item.product_id || idx}
@@ -3746,29 +3799,79 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
           style={{
             display: 'flex',
             justifyContent: 'space-between',
-            alignItems: 'flex-start',
+            alignItems: 'center',
+            marginBottom: '8px',
+            borderBottom: '1px solid #f3f4f6',
+            paddingBottom: '6px',
+          }}
+        >
+          <span
+            style={{
+              fontWeight: '900',
+              fontSize: '13px',
+              backgroundColor: '#f3f4f6',
+              padding: '2px 8px',
+              borderRadius: '4px',
+            }}
+          >
+            #{idx + 1}
+          </span>
+          {isEditable && (
+            <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+              <button
+                type="button"
+                onClick={() => onMove(idx, 'up')}
+                disabled={idx === 0}
+                style={{
+                  background: '#f3f4f6',
+                  border: 'none',
+                  borderRadius: '4px',
+                  padding: '4px 6px',
+                  cursor: idx === 0 ? 'not-allowed' : 'pointer',
+                }}
+              >
+                <ChevronUp size={14} />
+              </button>
+              <button
+                type="button"
+                onClick={() => onMove(idx, 'down')}
+                disabled={idx === items.length - 1}
+                style={{
+                  background: '#f3f4f6',
+                  border: 'none',
+                  borderRadius: '4px',
+                  padding: '4px 6px',
+                  cursor: idx === items.length - 1 ? 'not-allowed' : 'pointer',
+                }}
+              >
+                <ChevronDown size={14} />
+              </button>
+              <button
+                type="button"
+                onClick={() => onRemove(item.product_id)}
+                style={{
+                  background: '#fee2e2',
+                  border: 'none',
+                  borderRadius: '4px',
+                  padding: '4px 6px',
+                  color: '#dc2626',
+                  cursor: 'pointer',
+                }}
+              >
+                <Trash2 size={14} />
+              </button>
+            </div>
+          )}
+        </div>
+        <div
+          style={{
+            fontWeight: '700',
+            fontSize: '14px',
+            color: '#111827',
             marginBottom: '8px',
           }}
         >
-          <div
-            style={{ fontWeight: '700', fontSize: '14px', color: '#111827' }}
-          >
-            {item.description}
-          </div>
-          {isEditable && (
-            <button
-              onClick={() => onRemove(item.product_id)}
-              style={{
-                background: 'none',
-                border: 'none',
-                color: '#dc2626',
-                cursor: 'pointer',
-                padding: '4px',
-              }}
-            >
-              <Trash2 size={16} />
-            </button>
-          )}
+          {item.description}
         </div>
         <div
           style={{
@@ -3782,9 +3885,34 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
             <span style={{ color: '#6b7280' }}>Código: </span>{' '}
             <strong>{item.code}</strong>
           </div>
-          <div style={{ textAlign: 'right' }}>
-            <span style={{ color: '#6b7280' }}>Cant: </span>{' '}
-            <strong>{item.quantity}</strong>
+          <div
+            style={{
+              textAlign: 'right',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'flex-end',
+              gap: '4px',
+            }}
+          >
+            <span style={{ color: '#6b7280' }}>Cant: </span>
+            {isEditable ? (
+              <input
+                type="number"
+                min="1"
+                value={item.quantity}
+                onChange={(e) => onQtyChange(item.product_id, e.target.value)}
+                style={{
+                  width: '50px',
+                  padding: '2px',
+                  textAlign: 'center',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '4px',
+                  fontWeight: 'bold',
+                }}
+              />
+            ) : (
+              <strong>{item.quantity}</strong>
+            )}
           </div>
           <div>
             <span style={{ color: '#6b7280' }}>P. Unit: </span>{' '}
@@ -3808,7 +3936,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
               color: '#059669',
             }}
           >
-            Total: ${Number(item.total_line_usd).toFixed(2)}
+            Total Línea: ${Number(item.total_line_usd).toFixed(2)}
           </div>
         </div>
       </div>
@@ -4723,6 +4851,24 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                         fontWeight: '700',
                       }}
                     >
+                      <th
+                        style={{
+                          padding: '8px',
+                          textAlign: 'center',
+                          width: '40px',
+                        }}
+                      >
+                        #
+                      </th>
+                      <th
+                        style={{
+                          padding: '8px',
+                          textAlign: 'center',
+                          width: '70px',
+                        }}
+                      >
+                        Mover
+                      </th>
                       <th style={{ padding: '8px' }}>Código</th>
                       <th style={{ padding: '8px' }}>Descripción</th>
                       <th style={{ padding: '8px', textAlign: 'center' }}>
@@ -4732,13 +4878,13 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                         Valor Unitario
                       </th>
                       <th style={{ padding: '8px', textAlign: 'right' }}>
-                        V. U. con descuento
+                        V. U. con desc.
                       </th>
                       <th style={{ padding: '8px', textAlign: 'right' }}>
                         Valor Total
                       </th>
                       <th style={{ padding: '8px', textAlign: 'center' }}>
-                        Eliminar
+                        Acciones
                       </th>
                     </tr>
                   </thead>
@@ -4746,7 +4892,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                     {neCart.length === 0 ? (
                       <tr>
                         <td
-                          colSpan="7"
+                          colSpan="9"
                           style={{
                             padding: '16px',
                             textAlign: 'center',
@@ -4758,11 +4904,67 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                         </td>
                       </tr>
                     ) : (
-                      neCart.map((item) => (
+                      neCart.map((item, idx) => (
                         <tr
                           key={item.product_id}
                           style={{ borderBottom: '1px solid #E5E7EB' }}
                         >
+                          <td
+                            style={{
+                              padding: '8px',
+                              textAlign: 'center',
+                              fontWeight: 'bold',
+                            }}
+                          >
+                            {idx + 1}
+                          </td>
+                          <td style={{ padding: '8px', textAlign: 'center' }}>
+                            <div
+                              style={{
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '2px',
+                                alignItems: 'center',
+                              }}
+                            >
+                              <button
+                                type="button"
+                                onClick={() => handleMoveCartItem(idx, 'up')}
+                                disabled={idx === 0}
+                                style={{
+                                  background: 'none',
+                                  border: 'none',
+                                  cursor: idx === 0 ? 'not-allowed' : 'pointer',
+                                  color: idx === 0 ? '#d1d5db' : '#374151',
+                                  padding: 0,
+                                }}
+                                title="Mover arriba"
+                              >
+                                <ChevronUp size={14} />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleMoveCartItem(idx, 'down')}
+                                disabled={idx === neCart.length - 1}
+                                style={{
+                                  background: 'none',
+                                  border: 'none',
+                                  cursor:
+                                    idx === neCart.length - 1
+                                      ? 'not-allowed'
+                                      : 'pointer',
+                                  color:
+                                    idx === neCart.length - 1
+                                      ? '#d1d5db'
+                                      : '#374151',
+                                  padding: 0,
+                                }}
+                                title="Mover abajo"
+                              >
+                                <ChevronDown size={14} />
+                              </button>
+                            </div>
+                          </td>
                           <td
                             style={{ padding: '8px', fontFamily: 'monospace' }}
                           >
@@ -4772,7 +4974,25 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                             {item.description}
                           </td>
                           <td style={{ padding: '8px', textAlign: 'center' }}>
-                            {item.quantity}
+                            <input
+                              type="number"
+                              min="1"
+                              value={item.quantity}
+                              onChange={(e) =>
+                                handleUpdateCartQuantity(
+                                  item.product_id,
+                                  e.target.value
+                                )
+                              }
+                              style={{
+                                width: '60px',
+                                padding: '4px',
+                                textAlign: 'center',
+                                border: '1px solid #d1d5db',
+                                borderRadius: '4px',
+                                fontWeight: 'bold',
+                              }}
+                            />
                           </td>
                           <td style={{ padding: '8px', textAlign: 'right' }}>
                             ${Number(item.unit_price_usd).toFixed(2)}
@@ -4797,6 +5017,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                           </td>
                           <td style={{ padding: '8px', textAlign: 'center' }}>
                             <button
+                              type="button"
                               onClick={() =>
                                 handleRemoveFromCartCreateNe(item.product_id)
                               }
@@ -4806,6 +5027,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                                 cursor: 'pointer',
                                 color: '#dc2626',
                               }}
+                              title="Eliminar"
                             >
                               <Trash2 size={16} />
                             </button>
@@ -4832,6 +5054,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                 renderProductCards(neCart, true, handleRemoveFromCartCreateNe)
               )}
             </div>
+
             <div
               style={{
                 display: 'flex',
@@ -4849,6 +5072,33 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                   border: '1px solid #E5E7EB',
                 }}
               >
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    marginBottom: '4px',
+                    color: '#374151',
+                  }}
+                >
+                  <span>Total Artículos: </span>
+                  <strong>{neCart.length}</strong>
+                </div>
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    marginBottom: '4px',
+                    color: '#374151',
+                  }}
+                >
+                  <span>Total Unidades: </span>
+                  <strong>
+                    {neCart.reduce(
+                      (acc, i) => acc + Number(i.quantity || 0),
+                      0
+                    )}
+                  </strong>
+                </div>
                 <div
                   style={{
                     display: 'flex',
@@ -5791,6 +6041,24 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                               fontWeight: '700',
                             }}
                           >
+                            <th
+                              style={{
+                                padding: '8px',
+                                textAlign: 'center',
+                                width: '40px',
+                              }}
+                            >
+                              #
+                            </th>
+                            <th
+                              style={{
+                                padding: '8px',
+                                textAlign: 'center',
+                                width: '70px',
+                              }}
+                            >
+                              Mover
+                            </th>
                             <th style={{ padding: '8px' }}>Código</th>
                             <th style={{ padding: '8px' }}>Descripción</th>
                             <th style={{ padding: '8px', textAlign: 'center' }}>
@@ -5800,13 +6068,13 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                               Valor Unitario
                             </th>
                             <th style={{ padding: '8px', textAlign: 'right' }}>
-                              V. U. con descuento
+                              V. U. con desc.
                             </th>
                             <th style={{ padding: '8px', textAlign: 'right' }}>
                               Valor Total
                             </th>
                             <th style={{ padding: '8px', textAlign: 'center' }}>
-                              Eliminar
+                              Acciones
                             </th>
                           </tr>
                         </thead>
@@ -5814,7 +6082,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                           {editNoteItems.length === 0 ? (
                             <tr>
                               <td
-                                colSpan="7"
+                                colSpan="9"
                                 style={{
                                   padding: '16px',
                                   textAlign: 'center',
@@ -5826,11 +6094,78 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                               </td>
                             </tr>
                           ) : (
-                            editNoteItems.map((item) => (
+                            editNoteItems.map((item, idx) => (
                               <tr
                                 key={item.product_id}
                                 style={{ borderBottom: '1px solid #E5E7EB' }}
                               >
+                                <td
+                                  style={{
+                                    padding: '8px',
+                                    textAlign: 'center',
+                                    fontWeight: 'bold',
+                                  }}
+                                >
+                                  {idx + 1}
+                                </td>
+                                <td
+                                  style={{
+                                    padding: '8px',
+                                    textAlign: 'center',
+                                  }}
+                                >
+                                  <div
+                                    style={{
+                                      display: 'flex',
+                                      flexDirection: 'column',
+                                      gap: '2px',
+                                      alignItems: 'center',
+                                    }}
+                                  >
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        handleMoveEditItem(idx, 'up')
+                                      }
+                                      disabled={idx === 0}
+                                      style={{
+                                        background: 'none',
+                                        border: 'none',
+                                        cursor:
+                                          idx === 0 ? 'not-allowed' : 'pointer',
+                                        color:
+                                          idx === 0 ? '#d1d5db' : '#374151',
+                                        padding: 0,
+                                      }}
+                                    >
+                                      <ChevronUp size={14} />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        handleMoveEditItem(idx, 'down')
+                                      }
+                                      disabled={
+                                        idx === editNoteItems.length - 1
+                                      }
+                                      style={{
+                                        background: 'none',
+                                        border: 'none',
+                                        cursor:
+                                          idx === editNoteItems.length - 1
+                                            ? 'not-allowed'
+                                            : 'pointer',
+                                        color:
+                                          idx === editNoteItems.length - 1
+                                            ? '#d1d5db'
+                                            : '#374151',
+                                        padding: 0,
+                                      }}
+                                    >
+                                      <ChevronDown size={14} />
+                                    </button>
+                                  </div>
+                                </td>
                                 <td
                                   style={{
                                     padding: '8px',
@@ -5850,7 +6185,25 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                                     textAlign: 'center',
                                   }}
                                 >
-                                  {item.quantity}
+                                  <input
+                                    type="number"
+                                    min="1"
+                                    value={item.quantity}
+                                    onChange={(e) =>
+                                      handleUpdateEditItemQuantity(
+                                        item.product_id,
+                                        e.target.value
+                                      )
+                                    }
+                                    style={{
+                                      width: '60px',
+                                      padding: '4px',
+                                      textAlign: 'center',
+                                      border: '1px solid #d1d5db',
+                                      borderRadius: '4px',
+                                      fontWeight: 'bold',
+                                    }}
+                                  />
                                 </td>
                                 <td
                                   style={{ padding: '8px', textAlign: 'right' }}
@@ -7854,6 +8207,24 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                               fontWeight: '700',
                             }}
                           >
+                            <th
+                              style={{
+                                padding: '8px',
+                                textAlign: 'center',
+                                width: '40px',
+                              }}
+                            >
+                              #
+                            </th>
+                            <th
+                              style={{
+                                padding: '8px',
+                                textAlign: 'center',
+                                width: '70px',
+                              }}
+                            >
+                              Mover
+                            </th>
                             <th style={{ padding: '8px' }}>Código</th>
                             <th style={{ padding: '8px' }}>Descripción</th>
                             <th style={{ padding: '8px', textAlign: 'center' }}>
@@ -7863,13 +8234,13 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                               Valor Unitario
                             </th>
                             <th style={{ padding: '8px', textAlign: 'right' }}>
-                              V. U. con descuento
+                              V. U. con desc.
                             </th>
                             <th style={{ padding: '8px', textAlign: 'right' }}>
                               Valor Total
                             </th>
                             <th style={{ padding: '8px', textAlign: 'center' }}>
-                              Eliminar
+                              Acciones
                             </th>
                           </tr>
                         </thead>
@@ -7877,7 +8248,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                           {editNoteItems.length === 0 ? (
                             <tr>
                               <td
-                                colSpan="7"
+                                colSpan="9"
                                 style={{
                                   padding: '16px',
                                   textAlign: 'center',
@@ -7889,11 +8260,78 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                               </td>
                             </tr>
                           ) : (
-                            editNoteItems.map((item) => (
+                            editNoteItems.map((item, idx) => (
                               <tr
                                 key={item.product_id}
                                 style={{ borderBottom: '1px solid #E5E7EB' }}
                               >
+                                <td
+                                  style={{
+                                    padding: '8px',
+                                    textAlign: 'center',
+                                    fontWeight: 'bold',
+                                  }}
+                                >
+                                  {idx + 1}
+                                </td>
+                                <td
+                                  style={{
+                                    padding: '8px',
+                                    textAlign: 'center',
+                                  }}
+                                >
+                                  <div
+                                    style={{
+                                      display: 'flex',
+                                      flexDirection: 'column',
+                                      gap: '2px',
+                                      alignItems: 'center',
+                                    }}
+                                  >
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        handleMoveEditItem(idx, 'up')
+                                      }
+                                      disabled={idx === 0}
+                                      style={{
+                                        background: 'none',
+                                        border: 'none',
+                                        cursor:
+                                          idx === 0 ? 'not-allowed' : 'pointer',
+                                        color:
+                                          idx === 0 ? '#d1d5db' : '#374151',
+                                        padding: 0,
+                                      }}
+                                    >
+                                      <ChevronUp size={14} />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        handleMoveEditItem(idx, 'down')
+                                      }
+                                      disabled={
+                                        idx === editNoteItems.length - 1
+                                      }
+                                      style={{
+                                        background: 'none',
+                                        border: 'none',
+                                        cursor:
+                                          idx === editNoteItems.length - 1
+                                            ? 'not-allowed'
+                                            : 'pointer',
+                                        color:
+                                          idx === editNoteItems.length - 1
+                                            ? '#d1d5db'
+                                            : '#374151',
+                                        padding: 0,
+                                      }}
+                                    >
+                                      <ChevronDown size={14} />
+                                    </button>
+                                  </div>
+                                </td>
                                 <td
                                   style={{
                                     padding: '8px',
@@ -7913,7 +8351,25 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                                     textAlign: 'center',
                                   }}
                                 >
-                                  {item.quantity}
+                                  <input
+                                    type="number"
+                                    min="1"
+                                    value={item.quantity}
+                                    onChange={(e) =>
+                                      handleUpdateEditItemQuantity(
+                                        item.product_id,
+                                        e.target.value
+                                      )
+                                    }
+                                    style={{
+                                      width: '60px',
+                                      padding: '4px',
+                                      textAlign: 'center',
+                                      border: '1px solid #d1d5db',
+                                      borderRadius: '4px',
+                                      fontWeight: 'bold',
+                                    }}
+                                  />
                                 </td>
                                 <td
                                   style={{ padding: '8px', textAlign: 'right' }}
@@ -8008,6 +8464,33 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                           border: '1px solid #E5E7EB',
                         }}
                       >
+                        <div
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            marginBottom: '4px',
+                            color: '#374151',
+                          }}
+                        >
+                          <span>Total Artículos (Líneas): </span>
+                          <strong>{editNoteItems.length}</strong>
+                        </div>
+                        <div
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            marginBottom: '4px',
+                            color: '#374151',
+                          }}
+                        >
+                          <span>Cantidad Total Unidades: </span>
+                          <strong>
+                            {editNoteItems.reduce(
+                              (acc, i) => acc + Number(i.quantity || 0),
+                              0
+                            )}
+                          </strong>
+                        </div>
                         <div
                           style={{
                             display: 'flex',
@@ -9128,96 +9611,200 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                     <thead>
                       <tr
                         style={{
-                          backgroundColor: '#f3f4f6',
-                          borderBottom: '1px solid #d1d5db',
+                          backgroundColor: '#F3F4F6',
+                          borderBottom: '1px solid #D1D5DB',
+                          fontWeight: '700',
                         }}
                       >
+                        <th
+                          style={{
+                            padding: '8px',
+                            textAlign: 'center',
+                            width: '40px',
+                          }}
+                        >
+                          #
+                        </th>
+                        <th
+                          style={{
+                            padding: '8px',
+                            textAlign: 'center',
+                            width: '70px',
+                          }}
+                        >
+                          Mover
+                        </th>
                         <th style={{ padding: '8px' }}>Código</th>
                         <th style={{ padding: '8px' }}>Descripción</th>
                         <th style={{ padding: '8px', textAlign: 'center' }}>
                           Cantidad
                         </th>
                         <th style={{ padding: '8px', textAlign: 'right' }}>
-                          Unitario ($)
+                          Valor Unitario
                         </th>
                         <th style={{ padding: '8px', textAlign: 'right' }}>
-                          Desc. Unitario ($)
+                          V. U. con desc.
                         </th>
                         <th style={{ padding: '8px', textAlign: 'right' }}>
-                          Total Línea ($)
+                          Valor Total
+                        </th>
+                        <th style={{ padding: '8px', textAlign: 'center' }}>
+                          Acciones
                         </th>
                       </tr>
                     </thead>
                     <tbody>
-                      {valeVistaItems.length === 0 ? (
+                      {editNoteItems.length === 0 ? (
                         <tr>
                           <td
-                            colSpan="6"
+                            colSpan="9"
                             style={{
                               padding: '16px',
                               textAlign: 'center',
-                              color: '#6b7280',
+                              color: '#9CA3AF',
+                              fontStyle: 'italic',
                             }}
                           >
-                            Sin ítems detallados.
+                            No hay productos añadidos a la nota de entrega.
                           </td>
                         </tr>
                       ) : (
-                        valeVistaItems.map((item) => {
-                          const totLine =
-                            item.total_line_usd ||
-                            item.quantity *
-                              Number(item.discounted_unit_price_usd || 0);
-                          return (
-                            <tr
-                              key={item.id}
-                              style={{ borderBottom: '1px solid #e5e7eb' }}
+                        editNoteItems.map((item, idx) => (
+                          <tr
+                            key={item.product_id}
+                            style={{ borderBottom: '1px solid #E5E7EB' }}
+                          >
+                            <td
+                              style={{
+                                padding: '8px',
+                                textAlign: 'center',
+                                fontWeight: 'bold',
+                              }}
                             >
-                              <td
+                              {idx + 1}
+                            </td>
+                            <td style={{ padding: '8px', textAlign: 'center' }}>
+                              <div
                                 style={{
-                                  padding: '8px',
-                                  fontFamily: 'monospace',
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  gap: '2px',
+                                  alignItems: 'center',
                                 }}
                               >
-                                {item.products?.code || 'S/C'}
-                              </td>
-                              <td style={{ padding: '8px' }}>
-                                {item.products?.description || 'Producto'}
-                              </td>
-                              <td
-                                style={{ padding: '8px', textAlign: 'center' }}
-                              >
-                                {item.quantity}
-                              </td>
-                              <td
-                                style={{ padding: '8px', textAlign: 'right' }}
-                              >
-                                ${Number(item.unit_price_usd || 0).toFixed(2)}
-                              </td>
-                              <td
+                                <button
+                                  type="button"
+                                  onClick={() => handleMoveEditItem(idx, 'up')}
+                                  disabled={idx === 0}
+                                  style={{
+                                    background: 'none',
+                                    border: 'none',
+                                    cursor:
+                                      idx === 0 ? 'not-allowed' : 'pointer',
+                                    color: idx === 0 ? '#d1d5db' : '#374151',
+                                    padding: 0,
+                                  }}
+                                >
+                                  <ChevronUp size={14} />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    handleMoveEditItem(idx, 'down')
+                                  }
+                                  disabled={idx === editNoteItems.length - 1}
+                                  style={{
+                                    background: 'none',
+                                    border: 'none',
+                                    cursor:
+                                      idx === editNoteItems.length - 1
+                                        ? 'not-allowed'
+                                        : 'pointer',
+                                    color:
+                                      idx === editNoteItems.length - 1
+                                        ? '#d1d5db'
+                                        : '#374151',
+                                    padding: 0,
+                                  }}
+                                >
+                                  <ChevronDown size={14} />
+                                </button>
+                              </div>
+                            </td>
+                            <td
+                              style={{
+                                padding: '8px',
+                                fontFamily: 'monospace',
+                              }}
+                            >
+                              {item.code}
+                            </td>
+                            <td style={{ padding: '8px', fontWeight: '600' }}>
+                              {item.description}
+                            </td>
+                            <td style={{ padding: '8px', textAlign: 'center' }}>
+                              <input
+                                type="number"
+                                min="1"
+                                value={item.quantity}
+                                onChange={(e) =>
+                                  handleUpdateEditItemQuantity(
+                                    item.product_id,
+                                    e.target.value
+                                  )
+                                }
                                 style={{
-                                  padding: '8px',
-                                  textAlign: 'right',
-                                  color: '#b45309',
-                                }}
-                              >
-                                $
-                                {Number(
-                                  item.discounted_unit_price_usd || 0
-                                ).toFixed(2)}
-                              </td>
-                              <td
-                                style={{
-                                  padding: '8px',
-                                  textAlign: 'right',
+                                  width: '60px',
+                                  padding: '4px',
+                                  textAlign: 'center',
+                                  border: '1px solid #d1d5db',
+                                  borderRadius: '4px',
                                   fontWeight: 'bold',
                                 }}
+                              />
+                            </td>
+                            <td style={{ padding: '8px', textAlign: 'right' }}>
+                              ${Number(item.unit_price_usd).toFixed(2)}
+                            </td>
+                            <td
+                              style={{
+                                padding: '8px',
+                                textAlign: 'right',
+                                color: '#B45309',
+                              }}
+                            >
+                              $
+                              {Number(item.discounted_unit_price_usd).toFixed(
+                                2
+                              )}
+                            </td>
+                            <td
+                              style={{
+                                padding: '8px',
+                                textAlign: 'right',
+                                fontWeight: '700',
+                              }}
+                            >
+                              ${Number(item.total_line_usd).toFixed(2)}
+                            </td>
+                            <td style={{ padding: '8px', textAlign: 'center' }}>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleEditNoteRemoveItem(item.product_id)
+                                }
+                                style={{
+                                  border: 'none',
+                                  background: 'none',
+                                  cursor: 'pointer',
+                                  color: '#dc2626',
+                                }}
                               >
-                                ${Number(totLine).toFixed(2)}
-                              </td>
-                            </tr>
-                          );
-                        })
+                                <Trash2 size={16} />
+                              </button>
+                            </td>
+                          </tr>
+                        ))
                       )}
                     </tbody>
                   </table>
