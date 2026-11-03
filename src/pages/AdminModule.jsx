@@ -329,7 +329,7 @@ export default function AdminModule() {
   const [neTargetUserId, setNeTargetUserId] = useState('');
   const [neClientId, setNeClientId] = useState('');
   const [neCategoria, setNeCategoria] = useState('bombillos');
-  const [neTipoPago, setNeTipoPago] = useState('53.38');
+  const [neTipoPago, setNeTipoPago] = useState('0');
   const [neSearchProduct, setNeSearchProduct] = useState('');
   const [neSelectedProdId, setNeSelectedProdId] = useState('');
   const [neQuantity, setNeQuantity] = useState(1);
