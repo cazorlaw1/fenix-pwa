@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { supabase } from '../lib/supabase';
 import {
   ShieldCheck,
@@ -49,6 +50,17 @@ function SearchableDropdown({
   const [search, setSearch] = useState('');
   const containerRef = useRef(null);
 
+ // --- BLOQUEAR SCROLL DE FONDO CUANDO HAY UN MODAL ABIERTO ---
+  useEffect(() => {
+    if (editingNote || valeVistaNote || historyInvoiceModalData || imagePreviewModal || abonoModalNote || rejectModalNote) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'auto';
+    }
+    return () => {
+      document.body.style.overflow = 'auto';
+    };
+  }, [editingNote, valeVistaNote, historyInvoiceModalData, imagePreviewModal, abonoModalNote, rejectModalNote]); 
   useEffect(() => {
     function handleClickOutside(event) {
       if (
@@ -5508,733 +5520,732 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
               )}
             </div>
           </div>
-          {editingNote && !isCobranzaNEModal && (
+{editingNote && !isCobranzaNEModal && createPortal(
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0,0,0,0.6)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            padding: '16px',
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: '#ffffff',
+              border: '2px solid #111827',
+              borderRadius: '12px',
+              width: '100%',
+              maxWidth: '850px',
+              maxHeight: '90vh',
+              overflowY: 'auto',
+              padding: '24px',
+              boxShadow: '0 10px 40px rgba(0,0,0,0.3)',
+              boxSizing: 'border-box',
+            }}
+          >
             <div
               style={{
-                position: 'fixed',
-                inset: 0,
-                backgroundColor: 'rgba(0,0,0,0.6)',
                 display: 'flex',
+                justifyContent: 'space-between',
                 alignItems: 'center',
-                justifyContent: 'center',
-                zIndex: 1250,
-                padding: '16px',
+                marginBottom: '16px',
+                borderBottom: '2px solid #111827',
+                paddingBottom: '12px',
+              }}
+            >
+              <div>
+                <h2
+                  style={{ fontSize: '18px', fontWeight: '900', margin: 0 }}
+                >
+                  Panel Editable - Nota de Entrega #
+                  {editingNote.transaction_number}
+                </h2>
+              </div>
+              <button
+                onClick={() => setEditingNoteId(null)}
+                style={{
+                  background: '#111827',
+                  color: '#fff',
+                  border: 'none',
+                  padding: '6px 12px',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontSize: '12px',
+                  fontWeight: 'bold',
+                }}
+              >
+                Cerrar Panel
+              </button>
+            </div>
+            <div
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '16px',
               }}
             >
               <div
                 style={{
                   backgroundColor: '#ffffff',
+                  padding: '16px',
+                  borderRadius: '12px',
+                  border: '1px solid #E5E7EB',
+                  display: 'grid',
+                  gridTemplateColumns:
+                    'repeat(auto-fit, minmax(240px, 1fr))',
+                  gap: '12px',
+                }}
+              >
+                <div>
+                  <label
+                    style={{
+                      display: 'block',
+                      fontSize: '12px',
+                      fontWeight: '700',
+                      marginBottom: '4px',
+                    }}
+                  >
+                    Cliente
+                  </label>
+                  <input
+                    type="text"
+                    disabled
+                    value={editNoteClientName}
+                    style={{
+                      width: '100%',
+                      padding: '6px 8px',
+                      fontSize: '12px',
+                      border: '1px solid #D1D5DB',
+                      borderRadius: '6px',
+                      backgroundColor: '#F3F4F6',
+                      boxSizing: 'border-box',
+                    }}
+                  />
+                </div>
+                <div>
+                  <label
+                    style={{
+                      display: 'block',
+                      fontSize: '12px',
+                      fontWeight: '700',
+                      marginBottom: '4px',
+                    }}
+                  >
+                    Categoría *
+                  </label>
+                  <select
+                    value={editNoteCategory}
+                    onChange={(e) => setEditNoteCategory(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px',
+                      fontSize: '14px',
+                      border: '1px solid #D1D5DB',
+                      borderRadius: '6px',
+                      backgroundColor: '#FFFFFF',
+                      boxSizing: 'border-box',
+                    }}
+                  >
+                    <option value="bombillos">Bombillos</option>
+                    <option value="fluidos">Fluidos</option>
+                  </select>
+                </div>
+                <div>
+                  <label
+                    style={{
+                      display: 'block',
+                      fontSize: '12px',
+                      fontWeight: '700',
+                      marginBottom: '4px',
+                    }}
+                  >
+                    % Descuento (Pago Bs) *
+                  </label>
+                  <select
+                    value={editNotePaymentDiscount}
+                    onChange={(e) => {
+                      setEditNotePaymentDiscount(e.target.value);
+                      handleEditNoteRecalculatePrices(e.target.value);
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px',
+                      fontSize: '14px',
+                      border: '1px solid #F59E0B',
+                      borderRadius: '6px',
+                      backgroundColor: '#FEF3C7',
+                      color: '#78350F',
+                      fontWeight: '700',
+                      boxSizing: 'border-box',
+                    }}
+                  >
+                    <option value="53.38">
+                      {globalDiscount53}% Pagará en $
+                    </option>
+                    <option value="23.08">
+                      {globalDiscount23}% Pagará en Bs BCV
+                    </option>
+                    <option value="10">
+                      {globalDiscount10}% Descuento Especial
+                    </option>
+                    <option value="0">
+                      {globalDiscount0}% Sin Descuento
+                    </option>
+                  </select>
+                </div>
+              </div>
+              {/* SECCIÓN DE SELECCIÓN DE PRODUCTO CON IMAGEN (EDITAR DESDE APROBACIONES) */}
+              <div
+                style={{
+                  backgroundColor: '#ffffff',
+                  padding: '16px',
+                  borderRadius: '12px',
+                  border: '1px solid #E5E7EB',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '12px',
+                }}
+              >
+                <h3
+                  style={{
+                    fontSize: '13px',
+                    fontWeight: '900',
+                    textTransform: 'uppercase',
+                    margin: 0,
+                  }}
+                >
+                  Agregar Productos
+                </h3>
+                <div style={{ width: '100%' }}>
+                  <SearchableDropdown
+                    options={filteredProducts.map((p) => {
+                      const descPct = getDiscountPercent(
+                        editNotePaymentDiscount
+                      );
+                      const desc =
+                        Number(p.price_usd) * (1 - descPct / 100);
+                      return {
+                        value: p.id,
+                        label: `[${p.code}] ${p.description} | Stock: ${
+                          p.stock_current
+                        } | Base: $${Number(p.price_usd).toFixed(
+                          2
+                        )} | Desc: $${desc.toFixed(2)}`,
+                        image_url: p.image_url,
+                      };
+                    })}
+                    value={editNoteSelectedProdId}
+                    onChange={setEditNoteSelectedProdId}
+                    placeholder="-- Seleccionar producto --"
+                    imageKey="image_url"
+                  />
+                </div>
+                {editNoteSelectedProdId &&
+                  (() => {
+                    const selectedProd = editNoteProductsList.find(
+                      (p) => p.id === editNoteSelectedProdId
+                    );
+                    if (!selectedProd) return null;
+                    return (
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '12px',
+                          padding: '10px',
+                          backgroundColor: '#f8fafc',
+                          borderRadius: '8px',
+                          border: '1px solid #e2e8f0',
+                        }}
+                      >
+                        {selectedProd.image_url ? (
+                          <img
+                            src={selectedProd.image_url}
+                            alt="Producto"
+                            onClick={() =>
+                              setImagePreviewModal(selectedProd.image_url)
+                            }
+                            style={{
+                              width: '60px',
+                              height: '60px',
+                              objectFit: 'cover',
+                              borderRadius: '6px',
+                              border: '1px solid #cbd5e1',
+                              cursor: 'pointer',
+                              flexShrink: 0,
+                            }}
+                          />
+                        ) : (
+                          <div
+                            style={{
+                              width: '60px',
+                              height: '60px',
+                              backgroundColor: '#e2e8f0',
+                              borderRadius: '6px',
+                              flexShrink: 0,
+                            }}
+                          />
+                        )}
+                        <div style={{ flex: 1, minWidth: '0' }}>
+                          <div
+                            style={{
+                              fontSize: '12px',
+                              fontWeight: '700',
+                              color: '#1e293b',
+                              marginBottom: '2px',
+                            }}
+                          >
+                            {selectedProd.code} - {selectedProd.description}
+                          </div>
+                          <div
+                            style={{ fontSize: '11px', color: '#64748b' }}
+                          >
+                            Stock:{' '}
+                            <strong style={{ color: '#0f172a' }}>
+                              {selectedProd.stock_current}
+                            </strong>{' '}
+                            | Base:{' '}
+                            <strong style={{ color: '#059669' }}>
+                              ${Number(selectedProd.price_usd).toFixed(2)}
+                            </strong>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                <div
+                  style={{
+                    display: 'flex',
+                    gap: '10px',
+                    alignItems: 'flex-end',
+                    justifyContent: 'flex-end',
+                  }}
+                >
+                  <div style={{ width: '120px' }}>
+                    <label
+                      style={{
+                        display: 'block',
+                        fontSize: '11px',
+                        fontWeight: '600',
+                        marginBottom: '4px',
+                      }}
+                    >
+                      Cantidad
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={editNoteQuantity}
+                      onChange={(e) => setEditNoteQuantity(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '10px 12px',
+                        fontSize: '14px',
+                        border: '1px solid #D1D5DB',
+                        borderRadius: '6px',
+                        boxSizing: 'border-box',
+                        height: '42px',
+                      }}
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleEditNoteAddProduct}
+                    style={{
+                      padding: '10px 20px',
+                      backgroundColor: '#059669',
+                      color: '#FFFFFF',
+                      border: 'none',
+                      borderRadius: '6px',
+                      fontSize: '14px',
+                      fontWeight: '700',
+                      cursor: 'pointer',
+                      height: '42px',
+                    }}
+                  >
+                    Agregar
+                  </button>
+                </div>
+              </div>
+              <div
+                style={{
+                  backgroundColor: '#ffffff',
                   border: '2px solid #111827',
                   borderRadius: '12px',
-                  width: '100%',
-                  maxWidth: '850px',
-                  maxHeight: '90vh',
-                  overflowY: 'auto',
-                  padding: '24px',
-                  boxShadow: '0 10px 40px rgba(0,0,0,0.3)',
-                  boxSizing: 'border-box',
+                  padding: '16px',
                 }}
               >
                 <div
                   style={{
                     display: 'flex',
                     justifyContent: 'space-between',
-                    alignItems: 'center',
-                    marginBottom: '16px',
-                    borderBottom: '2px solid #111827',
+                    borderBottom: '1px solid #E5E7EB',
                     paddingBottom: '12px',
+                    marginBottom: '12px',
+                    fontSize: '12px',
+                    flexWrap: 'wrap',
+                    gap: '12px',
                   }}
                 >
                   <div>
                     <h2
-                      style={{ fontSize: '18px', fontWeight: '900', margin: 0 }}
+                      style={{
+                        fontSize: '15px',
+                        fontWeight: '900',
+                        margin: 0,
+                      }}
                     >
-                      Panel Editable - Nota de Entrega #
-                      {editingNote.transaction_number}
+                      FENIX AUTO PART C.A
                     </h2>
+                    <p style={{ fontWeight: '700', margin: '2px 0' }}>
+                      RIF: J-50261925-2
+                    </p>
+                    <p style={{ margin: '6px 0 0 0' }}>
+                      <strong>Cliente: </strong> {editNoteClientName}
+                    </p>
                   </div>
-                  <button
-                    onClick={() => setEditingNoteId(null)}
+                  <div style={{ textAlign: 'right' }}>
+                    <p style={{ margin: 0 }}>
+                      <strong>Fecha/Hora: </strong>{' '}
+                      {new Date(editingNote.created_at).toLocaleString()}
+                    </p>
+                    <p style={{ margin: '2px 0' }}>
+                      <strong>N° Transacción: </strong> #
+                      {editingNote.transaction_number}
+                    </p>
+                  </div>
+                </div>
+                <div
+                  style={{ width: '100%', overflowX: 'auto' }}
+                  className="admin-table-desktop"
+                >
+                  <table
                     style={{
-                      background: '#111827',
-                      color: '#fff',
-                      border: 'none',
-                      padding: '6px 12px',
-                      borderRadius: '6px',
-                      cursor: 'pointer',
+                      width: '100%',
+                      minWidth: '700px',
+                      borderCollapse: 'collapse',
+                      textAlign: 'left',
                       fontSize: '12px',
-                      fontWeight: 'bold',
+                      marginBottom: '12px',
                     }}
                   >
-                    Cerrar Panel
-                  </button>
+                    <thead>
+                      <tr
+                        style={{
+                          backgroundColor: '#F3F4F6',
+                          borderBottom: '1px solid #D1D5DB',
+                          fontWeight: '700',
+                        }}
+                      >
+                        <th style={{ padding: '8px' }}>Código</th>
+                        <th style={{ padding: '8px' }}>Descripción</th>
+                        <th style={{ padding: '8px', textAlign: 'center' }}>
+                          Cantidad
+                        </th>
+                        <th style={{ padding: '8px', textAlign: 'right' }}>
+                          Valor Unitario
+                        </th>
+                        <th style={{ padding: '8px', textAlign: 'right' }}>
+                          V. U. con descuento
+                        </th>
+                        <th style={{ padding: '8px', textAlign: 'right' }}>
+                          Valor Total
+                        </th>
+                        <th style={{ padding: '8px', textAlign: 'center' }}>
+                          Eliminar
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {editNoteItems.length === 0 ? (
+                        <tr>
+                          <td
+                            colSpan="7"
+                            style={{
+                              padding: '16px',
+                              textAlign: 'center',
+                              color: '#9CA3AF',
+                              fontStyle: 'italic',
+                            }}
+                          >
+                            No hay productos añadidos a la nota de entrega.
+                          </td>
+                        </tr>
+                      ) : (
+                        editNoteItems.map((item) => (
+                          <tr
+                            key={item.product_id}
+                            style={{ borderBottom: '1px solid #E5E7EB' }}
+                          >
+                            <td
+                              style={{
+                                padding: '8px',
+                                fontFamily: 'monospace',
+                              }}
+                            >
+                              {item.code}
+                            </td>
+                            <td
+                              style={{ padding: '8px', fontWeight: '600' }}
+                            >
+                              {item.description}
+                            </td>
+                            <td
+                              style={{
+                                padding: '8px',
+                                textAlign: 'center',
+                              }}
+                            >
+                              {item.quantity}
+                            </td>
+                            <td
+                              style={{ padding: '8px', textAlign: 'right' }}
+                            >
+                              ${Number(item.unit_price_usd).toFixed(2)}
+                            </td>
+                            <td
+                              style={{
+                                padding: '8px',
+                                textAlign: 'right',
+                                color: '#B45309',
+                              }}
+                            >
+                              $
+                              {Number(
+                                item.discounted_unit_price_usd
+                              ).toFixed(2)}
+                            </td>
+                            <td
+                              style={{
+                                padding: '8px',
+                                textAlign: 'right',
+                                fontWeight: '700',
+                              }}
+                            >
+                              ${Number(item.total_line_usd).toFixed(2)}
+                            </td>
+                            <td
+                              style={{
+                                padding: '8px',
+                                textAlign: 'center',
+                              }}
+                            >
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleEditNoteRemoveItem(item.product_id)
+                                }
+                                style={{
+                                  border: 'none',
+                                  background: 'none',
+                                  cursor: 'pointer',
+                                  color: '#dc2626',
+                                }}
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="admin-mobile-cards">
+                  {editNoteItems.length === 0 ? (
+                    <div
+                      style={{
+                        padding: '16px',
+                        textAlign: 'center',
+                        color: '#9CA3AF',
+                      }}
+                    >
+                      No hay productos.
+                    </div>
+                  ) : (
+                    renderProductCards(
+                      editNoteItems,
+                      true,
+                      handleEditNoteRemoveItem
+                    )
+                  )}
                 </div>
                 <div
                   style={{
                     display: 'flex',
-                    flexDirection: 'column',
-                    gap: '16px',
+                    justifyContent: 'flex-end',
+                    marginBottom: '12px',
+                    fontSize: '12px',
                   }}
                 >
                   <div
                     style={{
-                      backgroundColor: '#ffffff',
-                      padding: '16px',
-                      borderRadius: '12px',
+                      width: '300px',
+                      backgroundColor: '#F9FAFB',
+                      padding: '10px',
+                      borderRadius: '8px',
                       border: '1px solid #E5E7EB',
-                      display: 'grid',
-                      gridTemplateColumns:
-                        'repeat(auto-fit, minmax(240px, 1fr))',
-                      gap: '12px',
                     }}
                   >
-                    <div>
-                      <label
-                        style={{
-                          display: 'block',
-                          fontSize: '12px',
-                          fontWeight: '700',
-                          marginBottom: '4px',
-                        }}
-                      >
-                        Cliente
-                      </label>
-                      <input
-                        type="text"
-                        disabled
-                        value={editNoteClientName}
-                        style={{
-                          width: '100%',
-                          padding: '6px 8px',
-                          fontSize: '12px',
-                          border: '1px solid #D1D5DB',
-                          borderRadius: '6px',
-                          backgroundColor: '#F3F4F6',
-                          boxSizing: 'border-box',
-                        }}
-                      />
-                    </div>
-                    <div>
-                      <label
-                        style={{
-                          display: 'block',
-                          fontSize: '12px',
-                          fontWeight: '700',
-                          marginBottom: '4px',
-                        }}
-                      >
-                        Categoría *
-                      </label>
-                      <select
-                        value={editNoteCategory}
-                        onChange={(e) => setEditNoteCategory(e.target.value)}
-                        style={{
-                          width: '100%',
-                          padding: '10px 12px',
-                          fontSize: '14px',
-                          border: '1px solid #D1D5DB',
-                          borderRadius: '6px',
-                          backgroundColor: '#FFFFFF',
-                          boxSizing: 'border-box',
-                        }}
-                      >
-                        <option value="bombillos">Bombillos</option>
-                        <option value="fluidos">Fluidos</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label
-                        style={{
-                          display: 'block',
-                          fontSize: '12px',
-                          fontWeight: '700',
-                          marginBottom: '4px',
-                        }}
-                      >
-                        % Descuento (Pago Bs) *
-                      </label>
-                      <select
-                        value={editNotePaymentDiscount}
-                        onChange={(e) => {
-                          setEditNotePaymentDiscount(e.target.value);
-                          handleEditNoteRecalculatePrices(e.target.value);
-                        }}
-                        style={{
-                          width: '100%',
-                          padding: '10px 12px',
-                          fontSize: '14px',
-                          border: '1px solid #F59E0B',
-                          borderRadius: '6px',
-                          backgroundColor: '#FEF3C7',
-                          color: '#78350F',
-                          fontWeight: '700',
-                          boxSizing: 'border-box',
-                        }}
-                      >
-                        <option value="53.38">
-                          {globalDiscount53}% Pagará en $
-                        </option>
-                        <option value="23.08">
-                          {globalDiscount23}% Pagará en Bs BCV
-                        </option>
-                        <option value="10">
-                          {globalDiscount10}% Descuento Especial
-                        </option>
-                        <option value="0">
-                          {globalDiscount0}% Sin Descuento
-                        </option>
-                      </select>
-                    </div>
-                  </div>
-                  {/* SECCIÓN DE SELECCIÓN DE PRODUCTO CON IMAGEN (EDITAR DESDE APROBACIONES) */}
-                  <div
-                    style={{
-                      backgroundColor: '#ffffff',
-                      padding: '16px',
-                      borderRadius: '12px',
-                      border: '1px solid #E5E7EB',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '12px',
-                    }}
-                  >
-                    <h3
+                    <div
                       style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        marginBottom: '4px',
+                      }}
+                    >
+                      <span>Total sin Descuento: </span>
+                      <strong>${editTotalSinDesc.toFixed(2)}</strong>
+                    </div>
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        marginBottom: '4px',
+                        color: '#B45309',
+                      }}
+                    >
+                      <span>
+                        {getDiscountPercent(editNotePaymentDiscount)}% de
+                        descuento aplicado:{' '}
+                      </span>
+                      <strong>-${editMontoAhorrado.toFixed(2)}</strong>
+                    </div>
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        borderTop: '1px solid #D1D5DB',
+                        paddingTop: '4px',
                         fontSize: '13px',
                         fontWeight: '900',
-                        textTransform: 'uppercase',
-                        margin: 0,
                       }}
                     >
-                      Agregar Productos
-                    </h3>
-                    <div style={{ width: '100%' }}>
-                      <SearchableDropdown
-                        options={filteredProducts.map((p) => {
-                          const descPct = getDiscountPercent(
-                            editNotePaymentDiscount
-                          );
-                          const desc =
-                            Number(p.price_usd) * (1 - descPct / 100);
-                          return {
-                            value: p.id,
-                            label: `[${p.code}] ${p.description} | Stock: ${
-                              p.stock_current
-                            } | Base: $${Number(p.price_usd).toFixed(
-                              2
-                            )} | Desc: $${desc.toFixed(2)}`,
-                            image_url: p.image_url,
-                          };
-                        })}
-                        value={editNoteSelectedProdId}
-                        onChange={setEditNoteSelectedProdId}
-                        placeholder="-- Seleccionar producto --"
-                        imageKey="image_url"
-                      />
-                    </div>
-                    {editNoteSelectedProdId &&
-                      (() => {
-                        const selectedProd = editNoteProductsList.find(
-                          (p) => p.id === editNoteSelectedProdId
-                        );
-                        if (!selectedProd) return null;
-                        return (
-                          <div
-                            style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '12px',
-                              padding: '10px',
-                              backgroundColor: '#f8fafc',
-                              borderRadius: '8px',
-                              border: '1px solid #e2e8f0',
-                            }}
-                          >
-                            {selectedProd.image_url ? (
-                              <img
-                                src={selectedProd.image_url}
-                                alt="Producto"
-                                onClick={() =>
-                                  setImagePreviewModal(selectedProd.image_url)
-                                }
-                                style={{
-                                  width: '60px',
-                                  height: '60px',
-                                  objectFit: 'cover',
-                                  borderRadius: '6px',
-                                  border: '1px solid #cbd5e1',
-                                  cursor: 'pointer',
-                                  flexShrink: 0,
-                                }}
-                              />
-                            ) : (
-                              <div
-                                style={{
-                                  width: '60px',
-                                  height: '60px',
-                                  backgroundColor: '#e2e8f0',
-                                  borderRadius: '6px',
-                                  flexShrink: 0,
-                                }}
-                              />
-                            )}
-                            <div style={{ flex: 1, minWidth: '0' }}>
-                              <div
-                                style={{
-                                  fontSize: '12px',
-                                  fontWeight: '700',
-                                  color: '#1e293b',
-                                  marginBottom: '2px',
-                                }}
-                              >
-                                {selectedProd.code} - {selectedProd.description}
-                              </div>
-                              <div
-                                style={{ fontSize: '11px', color: '#64748b' }}
-                              >
-                                Stock:{' '}
-                                <strong style={{ color: '#0f172a' }}>
-                                  {selectedProd.stock_current}
-                                </strong>{' '}
-                                | Base:{' '}
-                                <strong style={{ color: '#059669' }}>
-                                  ${Number(selectedProd.price_usd).toFixed(2)}
-                                </strong>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })()}
-                    <div
-                      style={{
-                        display: 'flex',
-                        gap: '10px',
-                        alignItems: 'flex-end',
-                        justifyContent: 'flex-end',
-                      }}
-                    >
-                      <div style={{ width: '120px' }}>
-                        <label
-                          style={{
-                            display: 'block',
-                            fontSize: '11px',
-                            fontWeight: '600',
-                            marginBottom: '4px',
-                          }}
-                        >
-                          Cantidad
-                        </label>
-                        <input
-                          type="number"
-                          min="1"
-                          value={editNoteQuantity}
-                          onChange={(e) => setEditNoteQuantity(e.target.value)}
-                          style={{
-                            width: '100%',
-                            padding: '10px 12px',
-                            fontSize: '14px',
-                            border: '1px solid #D1D5DB',
-                            borderRadius: '6px',
-                            boxSizing: 'border-box',
-                            height: '42px',
-                          }}
-                        />
-                      </div>
-                      <button
-                        type="button"
-                        onClick={handleEditNoteAddProduct}
-                        style={{
-                          padding: '10px 20px',
-                          backgroundColor: '#059669',
-                          color: '#FFFFFF',
-                          border: 'none',
-                          borderRadius: '6px',
-                          fontSize: '14px',
-                          fontWeight: '700',
-                          cursor: 'pointer',
-                          height: '42px',
-                        }}
-                      >
-                        Agregar
-                      </button>
+                      <span>Precio Final: </span>
+                      <span style={{ color: '#059669' }}>
+                        ${editPrecioFinal.toFixed(2)}
+                      </span>
                     </div>
                   </div>
-                  <div
+                </div>
+                <div style={{ marginBottom: '12px' }}>
+                  <label
                     style={{
-                      backgroundColor: '#ffffff',
-                      border: '2px solid #111827',
-                      borderRadius: '12px',
-                      padding: '16px',
+                      display: 'block',
+                      fontSize: '12px',
+                      fontWeight: '700',
+                      marginBottom: '4px',
                     }}
                   >
-                    <div
+                    Observación:
+                  </label>
+                  <textarea
+                    rows="2"
+                    value={editNoteObservation}
+                    onChange={(e) => setEditNoteObservation(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '6px 8px',
+                      fontSize: '12px',
+                      border: '1px solid #D1D5DB',
+                      borderRadius: '6px',
+                      boxSizing: 'border-box',
+                    }}
+                  ></textarea>
+                </div>
+                <div
+                  style={{
+                    backgroundColor: '#F3F4F6',
+                    padding: '10px',
+                    borderRadius: '6px',
+                    fontSize: '10px',
+                    color: '#4B5563',
+                    lineHeight: '1.4',
+                    marginBottom: '12px',
+                    textAlign: 'justify',
+                  }}
+                >
+                  <strong>Términos y condiciones: </strong> {globalTerms}
+                </div>
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    flexWrap: 'wrap',
+                    gap: '12px',
+                    borderTop: '1px solid #e5e7eb',
+                    paddingTop: '16px',
+                  }}
+                >
+                  <button
+                    type="button"
+                    onClick={() => handleSaveEditedNote(editingNote)}
+                    disabled={loading}
+                    style={{
+                      padding: '10px 16px',
+                      backgroundColor: '#111827',
+                      color: '#ffffff',
+                      border: 'none',
+                      borderRadius: '8px',
+                      fontSize: '12px',
+                      fontWeight: '700',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Guardar Cambios N.E.
+                  </button>
+                  <div style={{ display: 'flex', gap: '10px' }}>
+                    <button
+                      type="button"
+                      onClick={() => handleApproveNote(editingNote)}
+                      disabled={loading}
                       style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        borderBottom: '1px solid #E5E7EB',
-                        paddingBottom: '12px',
-                        marginBottom: '12px',
+                        padding: '10px 20px',
+                        backgroundColor: '#059669',
+                        color: '#ffffff',
+                        border: 'none',
+                        borderRadius: '8px',
                         fontSize: '12px',
-                        flexWrap: 'wrap',
-                        gap: '12px',
-                      }}
-                    >
-                      <div>
-                        <h2
-                          style={{
-                            fontSize: '15px',
-                            fontWeight: '900',
-                            margin: 0,
-                          }}
-                        >
-                          FENIX AUTO PART C.A
-                        </h2>
-                        <p style={{ fontWeight: '700', margin: '2px 0' }}>
-                          RIF: J-50261925-2
-                        </p>
-                        <p style={{ margin: '6px 0 0 0' }}>
-                          <strong>Cliente: </strong> {editNoteClientName}
-                        </p>
-                      </div>
-                      <div style={{ textAlign: 'right' }}>
-                        <p style={{ margin: 0 }}>
-                          <strong>Fecha/Hora: </strong>{' '}
-                          {new Date(editingNote.created_at).toLocaleString()}
-                        </p>
-                        <p style={{ margin: '2px 0' }}>
-                          <strong>N° Transacción: </strong> #
-                          {editingNote.transaction_number}
-                        </p>
-                      </div>
-                    </div>
-                    <div
-                      style={{ width: '100%', overflowX: 'auto' }}
-                      className="admin-table-desktop"
-                    >
-                      <table
-                        style={{
-                          width: '100%',
-                          minWidth: '700px',
-                          borderCollapse: 'collapse',
-                          textAlign: 'left',
-                          fontSize: '12px',
-                          marginBottom: '12px',
-                        }}
-                      >
-                        <thead>
-                          <tr
-                            style={{
-                              backgroundColor: '#F3F4F6',
-                              borderBottom: '1px solid #D1D5DB',
-                              fontWeight: '700',
-                            }}
-                          >
-                            <th style={{ padding: '8px' }}>Código</th>
-                            <th style={{ padding: '8px' }}>Descripción</th>
-                            <th style={{ padding: '8px', textAlign: 'center' }}>
-                              Cantidad
-                            </th>
-                            <th style={{ padding: '8px', textAlign: 'right' }}>
-                              Valor Unitario
-                            </th>
-                            <th style={{ padding: '8px', textAlign: 'right' }}>
-                              V. U. con descuento
-                            </th>
-                            <th style={{ padding: '8px', textAlign: 'right' }}>
-                              Valor Total
-                            </th>
-                            <th style={{ padding: '8px', textAlign: 'center' }}>
-                              Eliminar
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {editNoteItems.length === 0 ? (
-                            <tr>
-                              <td
-                                colSpan="7"
-                                style={{
-                                  padding: '16px',
-                                  textAlign: 'center',
-                                  color: '#9CA3AF',
-                                  fontStyle: 'italic',
-                                }}
-                              >
-                                No hay productos añadidos a la nota de entrega.
-                              </td>
-                            </tr>
-                          ) : (
-                            editNoteItems.map((item) => (
-                              <tr
-                                key={item.product_id}
-                                style={{ borderBottom: '1px solid #E5E7EB' }}
-                              >
-                                <td
-                                  style={{
-                                    padding: '8px',
-                                    fontFamily: 'monospace',
-                                  }}
-                                >
-                                  {item.code}
-                                </td>
-                                <td
-                                  style={{ padding: '8px', fontWeight: '600' }}
-                                >
-                                  {item.description}
-                                </td>
-                                <td
-                                  style={{
-                                    padding: '8px',
-                                    textAlign: 'center',
-                                  }}
-                                >
-                                  {item.quantity}
-                                </td>
-                                <td
-                                  style={{ padding: '8px', textAlign: 'right' }}
-                                >
-                                  ${Number(item.unit_price_usd).toFixed(2)}
-                                </td>
-                                <td
-                                  style={{
-                                    padding: '8px',
-                                    textAlign: 'right',
-                                    color: '#B45309',
-                                  }}
-                                >
-                                  $
-                                  {Number(
-                                    item.discounted_unit_price_usd
-                                  ).toFixed(2)}
-                                </td>
-                                <td
-                                  style={{
-                                    padding: '8px',
-                                    textAlign: 'right',
-                                    fontWeight: '700',
-                                  }}
-                                >
-                                  ${Number(item.total_line_usd).toFixed(2)}
-                                </td>
-                                <td
-                                  style={{
-                                    padding: '8px',
-                                    textAlign: 'center',
-                                  }}
-                                >
-                                  <button
-                                    type="button"
-                                    onClick={() =>
-                                      handleEditNoteRemoveItem(item.product_id)
-                                    }
-                                    style={{
-                                      border: 'none',
-                                      background: 'none',
-                                      cursor: 'pointer',
-                                      color: '#dc2626',
-                                    }}
-                                  >
-                                    <Trash2 size={16} />
-                                  </button>
-                                </td>
-                              </tr>
-                            ))
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
-                    <div className="admin-mobile-cards">
-                      {editNoteItems.length === 0 ? (
-                        <div
-                          style={{
-                            padding: '16px',
-                            textAlign: 'center',
-                            color: '#9CA3AF',
-                          }}
-                        >
-                          No hay productos.
-                        </div>
-                      ) : (
-                        renderProductCards(
-                          editNoteItems,
-                          true,
-                          handleEditNoteRemoveItem
-                        )
-                      )}
-                    </div>
-                    <div
-                      style={{
+                        fontWeight: '700',
+                        cursor: 'pointer',
                         display: 'flex',
-                        justifyContent: 'flex-end',
-                        marginBottom: '12px',
-                        fontSize: '12px',
-                      }}
-                    >
-                      <div
-                        style={{
-                          width: '300px',
-                          backgroundColor: '#F9FAFB',
-                          padding: '10px',
-                          borderRadius: '8px',
-                          border: '1px solid #E5E7EB',
-                        }}
-                      >
-                        <div
-                          style={{
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            marginBottom: '4px',
-                          }}
-                        >
-                          <span>Total sin Descuento: </span>
-                          <strong>${editTotalSinDesc.toFixed(2)}</strong>
-                        </div>
-                        <div
-                          style={{
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            marginBottom: '4px',
-                            color: '#B45309',
-                          }}
-                        >
-                          <span>
-                            {getDiscountPercent(editNotePaymentDiscount)}% de
-                            descuento aplicado:{' '}
-                          </span>
-                          <strong>-${editMontoAhorrado.toFixed(2)}</strong>
-                        </div>
-                        <div
-                          style={{
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            borderTop: '1px solid #D1D5DB',
-                            paddingTop: '4px',
-                            fontSize: '13px',
-                            fontWeight: '900',
-                          }}
-                        >
-                          <span>Precio Final: </span>
-                          <span style={{ color: '#059669' }}>
-                            ${editPrecioFinal.toFixed(2)}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                    <div style={{ marginBottom: '12px' }}>
-                      <label
-                        style={{
-                          display: 'block',
-                          fontSize: '12px',
-                          fontWeight: '700',
-                          marginBottom: '4px',
-                        }}
-                      >
-                        Observación:
-                      </label>
-                      <textarea
-                        rows="2"
-                        value={editNoteObservation}
-                        onChange={(e) => setEditNoteObservation(e.target.value)}
-                        style={{
-                          width: '100%',
-                          padding: '6px 8px',
-                          fontSize: '12px',
-                          border: '1px solid #D1D5DB',
-                          borderRadius: '6px',
-                          boxSizing: 'border-box',
-                        }}
-                      ></textarea>
-                    </div>
-                    <div
-                      style={{
-                        backgroundColor: '#F3F4F6',
-                        padding: '10px',
-                        borderRadius: '6px',
-                        fontSize: '10px',
-                        color: '#4B5563',
-                        lineHeight: '1.4',
-                        marginBottom: '12px',
-                        textAlign: 'justify',
-                      }}
-                    >
-                      <strong>Términos y condiciones: </strong> {globalTerms}
-                    </div>
-                    <div
-                      style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
                         alignItems: 'center',
-                        flexWrap: 'wrap',
-                        gap: '12px',
-                        borderTop: '1px solid #e5e7eb',
-                        paddingTop: '16px',
+                        gap: '6px',
                       }}
                     >
-                      <button
-                        type="button"
-                        onClick={() => handleSaveEditedNote(editingNote)}
-                        disabled={loading}
-                        style={{
-                          padding: '10px 16px',
-                          backgroundColor: '#111827',
-                          color: '#ffffff',
-                          border: 'none',
-                          borderRadius: '8px',
-                          fontSize: '12px',
-                          fontWeight: '700',
-                          cursor: 'pointer',
-                        }}
-                      >
-                        Guardar Cambios N.E.
-                      </button>
-                      <div style={{ display: 'flex', gap: '10px' }}>
-                        <button
-                          type="button"
-                          onClick={() => handleApproveNote(editingNote)}
-                          disabled={loading}
-                          style={{
-                            padding: '10px 20px',
-                            backgroundColor: '#059669',
-                            color: '#ffffff',
-                            border: 'none',
-                            borderRadius: '8px',
-                            fontSize: '12px',
-                            fontWeight: '700',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '6px',
-                          }}
-                        >
-                          <CheckCircle size={16} /> Aprobar Nota
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setRejectModalNote(editingNote)}
-                          style={{
-                            padding: '10px 20px',
-                            backgroundColor: '#dc2626',
-                            color: '#ffffff',
-                            border: 'none',
-                            borderRadius: '8px',
-                            fontSize: '12px',
-                            fontWeight: '700',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '6px',
-                          }}
-                        >
-                          <XCircle size={16} /> Rechazar Nota
-                        </button>
-                      </div>
-                    </div>
+                      <CheckCircle size={16} /> Aprobar Nota
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setRejectModalNote(editingNote)}
+                      style={{
+                        padding: '10px 20px',
+                        backgroundColor: '#dc2626',
+                        color: '#ffffff',
+                        border: 'none',
+                        borderRadius: '8px',
+                        fontSize: '12px',
+                        fontWeight: '700',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                      }}
+                    >
+                      <XCircle size={16} /> Rechazar Nota
+                    </button>
                   </div>
                 </div>
               </div>
             </div>
-          )}
-        </div>
+          </div>
+        </div>,
+        document.body
       )}
       {/* PESTAÑA COBRANZA */}
       {activeTab === 'cobranza' && (
