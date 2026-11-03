@@ -19,6 +19,8 @@ import {
   Archive,
   ChevronDown,
   FileSpreadsheet,
+  Save,
+  Layers,
 } from 'lucide-react';
 
 export default function Inventory() {
@@ -29,7 +31,7 @@ export default function Inventory() {
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
-  
+
   const [userRole, setUserRole] = useState(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const mobileMenuRef = useRef(null);
@@ -38,7 +40,7 @@ export default function Inventory() {
   const [editingProduct, setEditingProduct] = useState(null);
   const [adjustingStockProduct, setAdjustingStockProduct] = useState(null);
   const [selectedImageModal, setSelectedImageModal] = useState(null);
-  
+
   const [neModalProduct, setNeModalProduct] = useState(null);
   const [neList, setNeList] = useState([]);
   const [neLoading, setNeLoading] = useState(false);
@@ -61,6 +63,15 @@ export default function Inventory() {
 
   const [stockAdjustmentValue, setStockAdjustmentValue] = useState('');
   const [stockAdjustmentType, setStockAdjustmentType] = useState('add');
+
+  // ESTADOS PARA LA MODIFICACIÓN MASIVA
+  const [bulkCategory, setBulkCategory] = useState('bombillos');
+  const [bulkProducts, setBulkProducts] = useState([]);
+  const [bulkLoading, setBulkLoading] = useState(false);
+  const [bulkSaving, setBulkSaving] = useState(false);
+  const [bulkSearch, setBulkSearch] = useState('');
+  const [pendingImages, setPendingImages] = useState({}); // { [productId]: { file, preview } }
+  const [zipProcessing, setZipProcessing] = useState(false);
 
   useEffect(() => {
     async function fetchUserRole() {
@@ -87,9 +98,14 @@ export default function Inventory() {
 
   const canManage = userRole === 'administrador' || userRole === 'stock';
   const canViewNE = userRole === 'administrador' || userRole === 'tecnico';
+  const canBulkEdit = userRole === 'administrador' || userRole === 'tecnico';
 
   useEffect(() => {
     if (activeMainTab === 'import_export' && userRole !== null && !canManage) {
+      setActiveMainTab('inventory');
+      setActiveCategory('bombillos');
+    }
+    if (activeMainTab === 'bulk_edit' && userRole !== null && !canBulkEdit) {
       setActiveMainTab('inventory');
       setActiveCategory('bombillos');
     }
@@ -110,8 +126,14 @@ export default function Inventory() {
 
   // BLOQUEAR SCROLL DEL BODY CUANDO HAY MODALES ABIERTOS
   useEffect(() => {
-    const isAnyModalOpen = neModalProduct || selectedImageModal || showAddModal || adjustingStockProduct || showExportModal || showImportModal;
-    
+    const isAnyModalOpen =
+      neModalProduct ||
+      selectedImageModal ||
+      showAddModal ||
+      adjustingStockProduct ||
+      showExportModal ||
+      showImportModal;
+
     if (isAnyModalOpen) {
       const scrollY = window.scrollY;
       document.body.style.overflow = 'hidden';
@@ -134,13 +156,22 @@ export default function Inventory() {
       document.body.style.top = '';
       document.body.style.width = '';
     };
-  }, [neModalProduct, selectedImageModal, showAddModal, adjustingStockProduct, showExportModal, showImportModal]);
+  }, [
+    neModalProduct,
+    selectedImageModal,
+    showAddModal,
+    adjustingStockProduct,
+    showExportModal,
+    showImportModal,
+  ]);
 
   useEffect(() => {
     if (activeMainTab === 'inventory') {
       fetchProducts();
+    } else if (activeMainTab === 'bulk_edit') {
+      fetchBulkProducts();
     }
-  }, [activeCategory, activeMainTab]);
+  }, [activeCategory, activeMainTab, bulkCategory]);
 
   const fetchProducts = async () => {
     setLoading(true);
@@ -158,6 +189,175 @@ export default function Inventory() {
       setErrorMsg('No se pudo cargar el inventario.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchBulkProducts = async () => {
+    setBulkLoading(true);
+    setPendingImages({});
+    try {
+      const { data, error } = await supabase
+        .from('products')
+        .select('*')
+        .eq('category', bulkCategory)
+        .order('code', { ascending: true });
+
+      if (error) throw error;
+      setBulkProducts(data || []);
+    } catch (err) {
+      console.error('Error al cargar productos para edición masiva:', err);
+      setErrorMsg('No se pudieron cargar los productos para edición masiva.');
+    } finally {
+      setBulkLoading(false);
+    }
+  };
+
+  const handleBulkChange = (id, field, value) => {
+    setBulkProducts((prev) =>
+      prev.map((p) => (p.id === id ? { ...p, [field]: value } : p))
+    );
+  };
+
+  const handleBulkSingleImageChange = (id, file) => {
+    if (!file) return;
+    const preview = URL.createObjectURL(file);
+    setPendingImages((prev) => ({
+      ...prev,
+      [id]: { file, preview },
+    }));
+  };
+
+  const handleZipImagesUpload = async (e) => {
+    const zipFile = e.target.files[0];
+    if (!zipFile) return;
+
+    if (!zipFile.name.toLowerCase().endsWith('.zip')) {
+      setErrorMsg('Por favor seleccione un archivo en formato ZIP.');
+      return;
+    }
+
+    setZipProcessing(true);
+    setErrorMsg('');
+    setSuccessMsg('');
+
+    try {
+      const zip = await JSZip.loadAsync(zipFile);
+      const newPending = { ...pendingImages };
+      let matchedCount = 0;
+
+      for (const [filename, fileObj] of Object.entries(zip.files)) {
+        if (fileObj.dir) continue;
+        const cleanName = filename.split('/').pop();
+        if (!cleanName || cleanName.startsWith('.')) continue;
+
+        const nameWithoutExt =
+          cleanName.substring(0, cleanName.lastIndexOf('.')) || cleanName;
+        const normalizedName = nameWithoutExt.trim().toLowerCase();
+
+        const targetProduct = bulkProducts.find(
+          (p) => p.code && p.code.trim().toLowerCase() === normalizedName
+        );
+
+        if (targetProduct) {
+          const blob = await fileObj.async('blob');
+          const ext = cleanName.split('.').pop() || 'jpg';
+          const file = new File([blob], `${targetProduct.code}.${ext}`, {
+            type: blob.type || 'image/jpeg',
+          });
+          const preview = URL.createObjectURL(file);
+          newPending[targetProduct.id] = { file, preview };
+          matchedCount++;
+        }
+      }
+
+      setPendingImages(newPending);
+      if (matchedCount > 0) {
+        setSuccessMsg(
+          `Se vincularon ${matchedCount} imágenes del ZIP correctamente por código.`
+        );
+      } else {
+        setErrorMsg(
+          'No se encontraron imágenes en el ZIP cuyos nombres coincidan con los códigos de los productos.'
+        );
+      }
+    } catch (err) {
+      console.error('Error al procesar el archivo ZIP:', err);
+      setErrorMsg('Error al leer el archivo ZIP. Verifique que sea válido.');
+    } finally {
+      setZipProcessing(false);
+      e.target.value = null;
+    }
+  };
+
+  const handleSaveBulk = async () => {
+    setBulkSaving(true);
+    setErrorMsg('');
+    setSuccessMsg('');
+
+    try {
+      const updatedProducts = [...bulkProducts];
+
+      for (let i = 0; i < updatedProducts.length; i++) {
+        const prod = updatedProducts[i];
+        let imageUrl = prod.image_url;
+
+        if (pendingImages[prod.id]) {
+          const { file } = pendingImages[prod.id];
+          const fileExt = file.name.split('.').pop();
+          const fileName = `${Date.now()}_${Math.random()
+            .toString(36)
+            .substring(7)}.${fileExt}`;
+
+          const { error: uploadError } = await supabase.storage
+            .from('products')
+            .upload(fileName, file);
+
+          if (uploadError) {
+            console.warn(
+              `Error al subir imagen para ${prod.code}:`,
+              uploadError
+            );
+          } else {
+            const { data: publicUrlData } = supabase.storage
+              .from('products')
+              .getPublicUrl(fileName);
+            imageUrl = publicUrlData.publicUrl;
+          }
+        }
+
+        const updateData = {
+          code: prod.code,
+          description: prod.description,
+          category: prod.category,
+          price_usd: parseFloat(prod.price_usd) || 0,
+          stock_current: parseInt(prod.stock_current) || 0,
+          image_url: imageUrl,
+          updated_at: new Date(),
+        };
+
+        if (userRole === 'administrador' || userRole === 'stock') {
+          updateData.base_price = parseFloat(prod.base_price) || 0;
+        }
+
+        const { error } = await supabase
+          .from('products')
+          .update(updateData)
+          .eq('id', prod.id);
+
+        if (error) throw error;
+      }
+
+      setSuccessMsg(
+        '¡Todos los cambios del inventario se han guardado masivamente con éxito!'
+      );
+      fetchBulkProducts();
+    } catch (err) {
+      console.error('Error al guardar de manera masiva:', err);
+      setErrorMsg(
+        err.message || 'Error al guardar los productos de manera masiva.'
+      );
+    } finally {
+      setBulkSaving(false);
     }
   };
 
@@ -376,6 +576,12 @@ export default function Inventory() {
     (p) =>
       p.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
       p.description.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const filteredBulkProducts = bulkProducts.filter(
+    (p) =>
+      p.code.toLowerCase().includes(bulkSearch.toLowerCase()) ||
+      p.description.toLowerCase().includes(bulkSearch.toLowerCase())
   );
 
   const exportToCSV = async (withImages) => {
@@ -645,6 +851,15 @@ export default function Inventory() {
   const menuOptions = [
     { id: 'bombillos', label: 'Bombillos', icon: Package },
     { id: 'fluidos', label: 'Fluidos', icon: Package },
+    ...(canBulkEdit
+      ? [
+          {
+            id: 'bulk_edit',
+            label: 'Modificación Masiva',
+            icon: Layers,
+          },
+        ]
+      : []),
     ...(canManage
       ? [
           {
@@ -774,7 +989,9 @@ export default function Inventory() {
                 color: '#6b7280',
               }}
             >
-              <div style={{ marginBottom: '12px' }}>Cargando notas de entrega...</div>
+              <div style={{ marginBottom: '12px' }}>
+                Cargando notas de entrega...
+              </div>
             </div>
           ) : neList.length === 0 ? (
             <div
@@ -996,8 +1213,8 @@ export default function Inventory() {
               color: '#6b7280',
             }}
           >
-            <strong>Nota: </strong> La exportación con imágenes puede tardar
-            más tiempo dependiendo de la cantidad de productos.
+            <strong>Nota: </strong> La exportación con imágenes puede tardar más
+            tiempo dependiendo de la cantidad de productos.
           </div>
         </div>
       </div>,
@@ -1312,9 +1529,7 @@ export default function Inventory() {
                 color: '#111827',
               }}
             >
-              {editingProduct
-                ? 'Editar Producto'
-                : 'Registrar Nuevo Producto'}
+              {editingProduct ? 'Editar Producto' : 'Registrar Nuevo Producto'}
             </h2>
             <button
               type="button"
@@ -2077,6 +2292,8 @@ export default function Inventory() {
           const isActive =
             tab.id === 'import_export'
               ? activeMainTab === 'import_export'
+              : tab.id === 'bulk_edit'
+              ? activeMainTab === 'bulk_edit'
               : activeMainTab === 'inventory' && activeCategory === tab.id;
           return (
             <button
@@ -2084,6 +2301,8 @@ export default function Inventory() {
               onClick={() => {
                 if (tab.id === 'import_export') {
                   setActiveMainTab('import_export');
+                } else if (tab.id === 'bulk_edit') {
+                  setActiveMainTab('bulk_edit');
                 } else {
                   setActiveMainTab('inventory');
                   setActiveCategory(tab.id);
@@ -2138,11 +2357,15 @@ export default function Inventory() {
           <span style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             {activeMainTab === 'import_export' ? (
               <Archive size={18} color="#dc2626" />
+            ) : activeMainTab === 'bulk_edit' ? (
+              <Layers size={18} color="#dc2626" />
             ) : (
               <Package size={18} color="#dc2626" />
             )}
             {activeMainTab === 'import_export'
               ? 'Importación/Exportación'
+              : activeMainTab === 'bulk_edit'
+              ? 'Modificación Masiva'
               : activeCategory === 'bombillos'
               ? 'Bombillos'
               : 'Fluidos'}
@@ -2177,14 +2400,18 @@ export default function Inventory() {
               const isActive =
                 tab.id === 'import_export'
                   ? activeMainTab === 'import_export'
+                  : tab.id === 'bulk_edit'
+                  ? activeMainTab === 'bulk_edit'
                   : activeMainTab === 'inventory' && activeCategory === tab.id;
               return (
                 <button
                   key={tab.id}
                   onClick={() => {
-                    if (tab.id === 'import_export')
+                    if (tab.id === 'import_export') {
                       setActiveMainTab('import_export');
-                    else {
+                    } else if (tab.id === 'bulk_edit') {
+                      setActiveMainTab('bulk_edit');
+                    } else {
                       setActiveMainTab('inventory');
                       setActiveCategory(tab.id);
                     }
@@ -2701,6 +2928,497 @@ export default function Inventory() {
             )}
           </div>
         </>
+      )}
+
+      {/* ============================================ */}
+      {/* VISTA DE MODIFICACIÓN MASIVA                 */}
+      {/* ============================================ */}
+      {activeMainTab === 'bulk_edit' && canBulkEdit && (
+        <div
+          style={{
+            backgroundColor: '#ffffff',
+            borderRadius: '8px',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+            padding: '24px',
+          }}
+        >
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              gap: '16px',
+              marginBottom: '20px',
+            }}
+          >
+            <div>
+              <h2
+                style={{
+                  fontSize: '20px',
+                  fontWeight: 'bold',
+                  color: '#111827',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px',
+                  margin: 0,
+                }}
+              >
+                <Layers size={24} color="#dc2626" /> Modificación Masiva de
+                Inventario
+              </h2>
+              <p
+                style={{ color: '#6b7280', fontSize: '14px', marginTop: '4px' }}
+              >
+                Edite directamente los datos en la tabla y guarde todos los
+                cambios de una sola vez.
+              </p>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <label
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  backgroundColor: '#eff6ff',
+                  color: '#1d4ed8',
+                  padding: '10px 16px',
+                  borderRadius: '8px',
+                  border: '1px solid #bfdbfe',
+                  fontWeight: '600',
+                  fontSize: '13px',
+                  cursor: zipProcessing ? 'not-allowed' : 'pointer',
+                  transition: 'all 0.2s',
+                }}
+              >
+                <Upload size={18} />
+                {zipProcessing ? 'Cargando ZIP...' : 'Cargar ZIP de Imágenes'}
+                <input
+                  type="file"
+                  accept=".zip"
+                  onChange={handleZipImagesUpload}
+                  disabled={zipProcessing}
+                  style={{ display: 'none' }}
+                />
+              </label>
+
+              <button
+                onClick={handleSaveBulk}
+                disabled={bulkSaving || bulkLoading}
+                style={{
+                  backgroundColor: bulkSaving ? '#9ca3af' : '#16a34a',
+                  color: '#ffffff',
+                  padding: '10px 24px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  fontWeight: '700',
+                  fontSize: '14px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  cursor: bulkSaving || bulkLoading ? 'not-allowed' : 'pointer',
+                  boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+                }}
+              >
+                <Save size={18} />
+                {bulkSaving ? 'Guardando...' : 'Guardar Todo'}
+              </button>
+            </div>
+          </div>
+
+          <div
+            style={{
+              display: 'flex',
+              gap: '12px',
+              borderBottom: '2px solid #e5e7eb',
+              marginBottom: '20px',
+            }}
+          >
+            <button
+              onClick={() => setBulkCategory('bombillos')}
+              style={{
+                padding: '10px 20px',
+                border: 'none',
+                borderBottom:
+                  bulkCategory === 'bombillos'
+                    ? '3px solid #dc2626'
+                    : '3px solid transparent',
+                backgroundColor: 'transparent',
+                color: bulkCategory === 'bombillos' ? '#dc2626' : '#4b5563',
+                fontWeight: bulkCategory === 'bombillos' ? 'bold' : '500',
+                fontSize: '14px',
+                cursor: 'pointer',
+              }}
+            >
+              Bombillos
+            </button>
+            <button
+              onClick={() => setBulkCategory('fluidos')}
+              style={{
+                padding: '10px 20px',
+                border: 'none',
+                borderBottom:
+                  bulkCategory === 'fluidos'
+                    ? '3px solid #dc2626'
+                    : '3px solid transparent',
+                backgroundColor: 'transparent',
+                color: bulkCategory === 'fluidos' ? '#dc2626' : '#4b5563',
+                fontWeight: bulkCategory === 'fluidos' ? 'bold' : '500',
+                fontSize: '14px',
+                cursor: 'pointer',
+              }}
+            >
+              Fluidos
+            </button>
+          </div>
+
+          <div style={{ position: 'relative', marginBottom: '16px' }}>
+            <Search
+              style={{
+                position: 'absolute',
+                left: '12px',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                color: '#9ca3af',
+              }}
+              size={18}
+            />
+            <input
+              type="text"
+              placeholder="Filtrar por código o descripción en esta lista..."
+              value={bulkSearch}
+              onChange={(e) => setBulkSearch(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '8px 12px 8px 38px',
+                borderRadius: '6px',
+                border: '1px solid #d1d5db',
+                outline: 'none',
+                fontSize: '13px',
+              }}
+            />
+          </div>
+
+          <div
+            style={{
+              overflowX: 'auto',
+              border: '1px solid #e5e7eb',
+              borderRadius: '8px',
+            }}
+          >
+            <table
+              style={{
+                width: '100%',
+                borderCollapse: 'collapse',
+                fontSize: '13px',
+              }}
+            >
+              <thead>
+                <tr
+                  style={{
+                    backgroundColor: '#f8fafc',
+                    borderBottom: '2px solid #e2e8f0',
+                    color: '#334155',
+                    textAlign: 'left',
+                  }}
+                >
+                  <th style={{ padding: '10px 12px', width: '70px' }}>
+                    Imagen
+                  </th>
+                  <th style={{ padding: '10px 12px', width: '130px' }}>
+                    Código
+                  </th>
+                  <th style={{ padding: '10px 12px' }}>Descripción</th>
+                  <th style={{ padding: '10px 12px', width: '120px' }}>
+                    Categoría
+                  </th>
+                  <th style={{ padding: '10px 12px', width: '110px' }}>
+                    Precio Full ($)
+                  </th>
+                  {(userRole === 'administrador' || userRole === 'stock') && (
+                    <th style={{ padding: '10px 12px', width: '110px' }}>
+                      Precio Base ($)
+                    </th>
+                  )}
+                  <th style={{ padding: '10px 12px', width: '100px' }}>
+                    Stock
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {bulkLoading ? (
+                  <tr>
+                    <td
+                      colSpan={
+                        userRole === 'administrador' || userRole === 'stock'
+                          ? 7
+                          : 6
+                      }
+                      style={{
+                        textAlign: 'center',
+                        padding: '30px',
+                        color: '#64748b',
+                      }}
+                    >
+                      Cargando tabla masiva...
+                    </td>
+                  </tr>
+                ) : filteredBulkProducts.length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan={
+                        userRole === 'administrador' || userRole === 'stock'
+                          ? 7
+                          : 6
+                      }
+                      style={{
+                        textAlign: 'center',
+                        padding: '30px',
+                        color: '#64748b',
+                      }}
+                    >
+                      No se encontraron productos para modificar en esta
+                      categoría.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredBulkProducts.map((p) => {
+                    const currentPreview =
+                      pendingImages[p.id]?.preview || p.image_url;
+                    return (
+                      <tr
+                        key={p.id}
+                        style={{ borderBottom: '1px solid #f1f5f9' }}
+                      >
+                        <td
+                          style={{
+                            padding: '8px 12px',
+                            verticalAlign: 'middle',
+                          }}
+                        >
+                          <label
+                            style={{
+                              position: 'relative',
+                              cursor: 'pointer',
+                              display: 'inline-block',
+                            }}
+                          >
+                            {currentPreview ? (
+                              <img
+                                src={currentPreview}
+                                alt="prod"
+                                style={{
+                                  width: '42px',
+                                  height: '42px',
+                                  objectFit: 'cover',
+                                  borderRadius: '6px',
+                                  border: pendingImages[p.id]
+                                    ? '2px solid #16a34a'
+                                    : '1px solid #cbd5e1',
+                                }}
+                              />
+                            ) : (
+                              <div
+                                style={{
+                                  width: '42px',
+                                  height: '42px',
+                                  backgroundColor: '#f1f5f9',
+                                  borderRadius: '6px',
+                                  border: '1px dashed #94a3b8',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  color: '#64748b',
+                                }}
+                              >
+                                <ImageIcon size={18} />
+                              </div>
+                            )}
+                            <input
+                              type="file"
+                              accept="image/*"
+                              style={{ display: 'none' }}
+                              onChange={(e) => {
+                                if (e.target.files && e.target.files[0]) {
+                                  handleBulkSingleImageChange(
+                                    p.id,
+                                    e.target.files[0]
+                                  );
+                                }
+                              }}
+                            />
+                          </label>
+                        </td>
+
+                        <td
+                          style={{
+                            padding: '8px 12px',
+                            verticalAlign: 'middle',
+                          }}
+                        >
+                          <input
+                            type="text"
+                            value={p.code || ''}
+                            onChange={(e) =>
+                              handleBulkChange(p.id, 'code', e.target.value)
+                            }
+                            style={{
+                              width: '100%',
+                              padding: '6px 8px',
+                              borderRadius: '4px',
+                              border: '1px solid #cbd5e1',
+                              fontWeight: '600',
+                            }}
+                          />
+                        </td>
+
+                        <td
+                          style={{
+                            padding: '8px 12px',
+                            verticalAlign: 'middle',
+                          }}
+                        >
+                          <input
+                            type="text"
+                            value={p.description || ''}
+                            onChange={(e) =>
+                              handleBulkChange(
+                                p.id,
+                                'description',
+                                e.target.value
+                              )
+                            }
+                            style={{
+                              width: '100%',
+                              padding: '6px 8px',
+                              borderRadius: '4px',
+                              border: '1px solid #cbd5e1',
+                            }}
+                          />
+                        </td>
+
+                        <td
+                          style={{
+                            padding: '8px 12px',
+                            verticalAlign: 'middle',
+                          }}
+                        >
+                          <select
+                            value={p.category || 'bombillos'}
+                            onChange={(e) =>
+                              handleBulkChange(p.id, 'category', e.target.value)
+                            }
+                            style={{
+                              width: '100%',
+                              padding: '6px 8px',
+                              borderRadius: '4px',
+                              border: '1px solid #cbd5e1',
+                              backgroundColor: '#fff',
+                            }}
+                          >
+                            <option value="bombillos">Bombillos</option>
+                            <option value="fluidos">Fluidos</option>
+                          </select>
+                        </td>
+
+                        <td
+                          style={{
+                            padding: '8px 12px',
+                            verticalAlign: 'middle',
+                          }}
+                        >
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={p.price_usd !== undefined ? p.price_usd : ''}
+                            onChange={(e) =>
+                              handleBulkChange(
+                                p.id,
+                                'price_usd',
+                                e.target.value
+                              )
+                            }
+                            style={{
+                              width: '100%',
+                              padding: '6px 8px',
+                              borderRadius: '4px',
+                              border: '1px solid #cbd5e1',
+                              color: '#059669',
+                              fontWeight: '700',
+                            }}
+                          />
+                        </td>
+
+                        {(userRole === 'administrador' ||
+                          userRole === 'stock') && (
+                          <td
+                            style={{
+                              padding: '8px 12px',
+                              verticalAlign: 'middle',
+                            }}
+                          >
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={
+                                p.base_price !== undefined ? p.base_price : ''
+                              }
+                              onChange={(e) =>
+                                handleBulkChange(
+                                  p.id,
+                                  'base_price',
+                                  e.target.value
+                                )
+                              }
+                              style={{
+                                width: '100%',
+                                padding: '6px 8px',
+                                borderRadius: '4px',
+                                border: '1px solid #cbd5e1',
+                                color: '#334155',
+                              }}
+                            />
+                          </td>
+                        )}
+
+                        <td
+                          style={{
+                            padding: '8px 12px',
+                            verticalAlign: 'middle',
+                          }}
+                        >
+                          <input
+                            type="number"
+                            value={
+                              p.stock_current !== undefined
+                                ? p.stock_current
+                                : ''
+                            }
+                            onChange={(e) =>
+                              handleBulkChange(
+                                p.id,
+                                'stock_current',
+                                e.target.value
+                              )
+                            }
+                            style={{
+                              width: '100%',
+                              padding: '6px 8px',
+                              borderRadius: '4px',
+                              border: '1px solid #cbd5e1',
+                              fontWeight: '600',
+                            }}
+                          />
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
       )}
 
       {activeMainTab === 'import_export' && canManage && (
