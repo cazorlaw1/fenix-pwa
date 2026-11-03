@@ -34,7 +34,7 @@ import {
   Upload,
 } from 'lucide-react';
 
-// --- COMPONENTE SEARCHABLE DROPDOWN (MODIFICADO: ABRE ARRIBA Y SIN SCROLL) ---
+// --- COMPONENTE SEARCHABLE DROPDOWN (ACTUALIZADO CON MULTILÍNEA, MINIATURA Y BOTÓN DE LIMPIAR) ---
 function SearchableDropdown({
   options,
   value,
@@ -43,7 +43,7 @@ function SearchableDropdown({
   labelKey = 'label',
   valueKey = 'value',
   imageKey = 'image_url',
-  onClear,
+  onClear, // Nueva prop para manejar la limpieza
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState('');
@@ -90,6 +90,7 @@ function SearchableDropdown({
           gap: '8px',
         }}
       >
+        {/* Contenedor principal con soporte de multilínea (whiteSpace: normal) */}
         <div
           onClick={() => setIsOpen(!isOpen)}
           style={{
@@ -116,11 +117,11 @@ function SearchableDropdown({
           ) : null}
           <span
             style={{
-              whiteSpace: 'normal',
+              whiteSpace: 'normal', // Permite salto de línea en 2 o 3 líneas
               wordBreak: 'break-word',
               lineHeight: '1.2',
               display: '-webkit-box',
-              WebkitLineClamp: 3,
+              WebkitLineClamp: 3, // Muestra hasta 3 líneas completas antes de truncar
               WebkitBoxOrient: 'vertical',
               overflow: 'hidden',
             }}
@@ -129,6 +130,7 @@ function SearchableDropdown({
           </span>
         </div>
 
+        {/* Botones de acción derecha: Limpiar y Flecha */}
         <div
           style={{
             display: 'flex',
@@ -162,7 +164,7 @@ function SearchableDropdown({
             onClick={() => setIsOpen(!isOpen)}
             style={{ fontSize: '12px', color: '#6b7280', cursor: 'pointer' }}
           >
-            ▲
+            ▼
           </span>
         </div>
       </div>
@@ -171,16 +173,16 @@ function SearchableDropdown({
         <div
           style={{
             position: 'absolute',
-            bottom: '100%', // <-- CAMBIADO: Se posiciona arriba del input
+            top: '100%',
             left: 0,
             right: 0,
             zIndex: 999,
             backgroundColor: '#fff',
             border: '1px solid #cbd5e1',
             borderRadius: '6px',
-            boxShadow: '0 -4px 12px rgba(0,0,0,0.15)', // Sombra hacia arriba
-            marginBottom: '4px', // <-- CAMBIADO: Margen inferior para separarlo del input
-            maxHeight: 'none', // <-- QUITADO EL LÍMITE DE ALTURA
+            boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+            marginTop: '4px',
+            maxHeight: '260px',
             display: 'flex',
             flexDirection: 'column',
           }}
@@ -203,8 +205,7 @@ function SearchableDropdown({
               }}
             />
           </div>
-          {/* QUITADO EL SCROLL Y EL FLEX 1 PARA EVITAR BARRAS */}
-          <div style={{ overflowY: 'visible' }}>
+          <div style={{ overflowY: 'auto', flex: 1 }}>
             {filtered.length === 0 ? (
               <div
                 style={{
@@ -271,6 +272,7 @@ function SearchableDropdown({
                       }}
                     />
                   )}
+                  {/* Multilínea también en las opciones del listado desplegable */}
                   <span
                     style={{
                       whiteSpace: 'normal',
@@ -327,7 +329,7 @@ export default function AdminModule() {
   const [neTargetUserId, setNeTargetUserId] = useState('');
   const [neClientId, setNeClientId] = useState('');
   const [neCategoria, setNeCategoria] = useState('bombillos');
-  const [neTipoPago, setNeTipoPago] = useState('0');
+  const [neTipoPago, setNeTipoPago] = useState('53.38');
   const [neSearchProduct, setNeSearchProduct] = useState('');
   const [neSelectedProdId, setNeSelectedProdId] = useState('');
   const [neQuantity, setNeQuantity] = useState(1);
@@ -3707,250 +3709,91 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
 
   const todayISO = new Date().toISOString().split('T')[0];
 
-  // --- FUNCIONES AUXILIARES PARA CARRITO (CREAR Y EDITAR) ---
-  const handleQuantityChange = (productId, newQty, isEditing = false) => {
-    const qty = Math.max(1, parseInt(newQty) || 1);
-    if (isEditing) {
-      setEditNoteItems(
-        editNoteItems.map((item) => {
-          if (item.product_id === productId) {
-            return {
-              ...item,
-              quantity: qty,
-              total_line_usd: qty * item.discounted_unit_price_usd,
-            };
-          }
-          return item;
-        })
-      );
-    } else {
-      setNeCart(
-        neCart.map((item) => {
-          if (item.product_id === productId) {
-            return {
-              ...item,
-              quantity: qty,
-              total_line_usd: qty * item.discounted_unit_price_usd,
-            };
-          }
-          return item;
-        })
-      );
-    }
-  };
-
-  const handleMoveItem = (index, direction, isEditing = false) => {
-    const items = isEditing ? [...editNoteItems] : [...neCart];
-    const targetIndex = direction === 'up' ? index - 1 : index + 1;
-
-    if (targetIndex < 0 || targetIndex >= items.length) return;
-
-    const temp = items[index];
-    items[index] = items[targetIndex];
-    items[targetIndex] = temp;
-
-    if (isEditing) {
-      setEditNoteItems(items);
-    } else {
-      setNeCart(items);
-    }
-  };
-
   // --- RENDER HELPERS FOR MOBILE CARDS (PRODUCTS) ---
-  const renderProductCards = (
-    items,
-    isEditable,
-    onRemove,
-    isEditingMode = false
-  ) => {
-    const totalVarieties = items.length;
-    const totalUnits = items.reduce(
-      (acc, item) => acc + Number(item.quantity || 0),
-      0
-    );
-
-    return (
-      <div>
+  const renderProductCards = (items, isEditable, onRemove) => {
+    return items.map((item, idx) => (
+      <div
+        key={item.product_id || idx}
+        style={{
+          background: '#fff',
+          border: '1px solid #e5e7eb',
+          borderRadius: '8px',
+          padding: '12px',
+          marginBottom: '10px',
+          boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+        }}
+      >
         <div
           style={{
-            fontSize: '12px',
-            fontWeight: 'bold',
-            color: '#374151',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'flex-start',
             marginBottom: '8px',
-            backgroundColor: '#f3f4f6',
-            padding: '6px 10px',
-            borderRadius: '6px',
           }}
         >
-          📦 Total Artículos (Variedades): <strong>{totalVarieties}</strong> |
-          Cantidad Total de Productos:{' '}
-          <strong style={{ color: '#059669' }}>{totalUnits} un.</strong>
-        </div>
-        {items.map((item, idx) => (
           <div
-            key={item.product_id || idx}
+            style={{ fontWeight: '700', fontSize: '14px', color: '#111827' }}
+          >
+            {item.description}
+          </div>
+          {isEditable && (
+            <button
+              onClick={() => onRemove(item.product_id)}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: '#dc2626',
+                cursor: 'pointer',
+                padding: '4px',
+              }}
+            >
+              <Trash2 size={16} />
+            </button>
+          )}
+        </div>
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
+            gap: '8px',
+            fontSize: '12px',
+          }}
+        >
+          <div>
+            <span style={{ color: '#6b7280' }}>Código: </span>{' '}
+            <strong>{item.code}</strong>
+          </div>
+          <div style={{ textAlign: 'right' }}>
+            <span style={{ color: '#6b7280' }}>Cant: </span>{' '}
+            <strong>{item.quantity}</strong>
+          </div>
+          <div>
+            <span style={{ color: '#6b7280' }}>P. Unit: </span>{' '}
+            <strong>${Number(item.unit_price_usd).toFixed(2)}</strong>
+          </div>
+          <div style={{ textAlign: 'right' }}>
+            <span style={{ color: '#b45309' }}>Desc: </span>{' '}
+            <strong>
+              ${Number(item.discounted_unit_price_usd).toFixed(2)}
+            </strong>
+          </div>
+          <div
             style={{
-              background: '#fff',
-              border: '1px solid #e5e7eb',
-              borderRadius: '8px',
-              padding: '12px',
-              marginBottom: '10px',
-              boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+              gridColumn: '1 / -1',
+              borderTop: '1px dashed #e5e7eb',
+              paddingTop: '6px',
+              marginTop: '4px',
+              textAlign: 'right',
+              fontWeight: '800',
+              fontSize: '14px',
+              color: '#059669',
             }}
           >
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'flex-start',
-                marginBottom: '8px',
-              }}
-            >
-              <div
-                style={{
-                  fontWeight: '700',
-                  fontSize: '14px',
-                  color: '#111827',
-                }}
-              >
-                <span style={{ color: '#dc2626', marginRight: '6px' }}>
-                  #{idx + 1}
-                </span>{' '}
-                {item.description}
-              </div>
-              <div
-                style={{ display: 'flex', gap: '4px', alignItems: 'center' }}
-              >
-                {isEditable && (
-                  <>
-                    <button
-                      type="button"
-                      disabled={idx === 0}
-                      onClick={() => handleMoveItem(idx, 'up', isEditingMode)}
-                      title="Mover arriba"
-                      style={{
-                        background: '#f3f4f6',
-                        border: '1px solid #d1d5db',
-                        borderRadius: '4px',
-                        cursor: idx === 0 ? 'not-allowed' : 'pointer',
-                        padding: '2px 6px',
-                        fontSize: '11px',
-                      }}
-                    >
-                      ▲
-                    </button>
-                    <button
-                      type="button"
-                      disabled={idx === items.length - 1}
-                      onClick={() => handleMoveItem(idx, 'down', isEditingMode)}
-                      title="Mover abajo"
-                      style={{
-                        background: '#f3f4f6',
-                        border: '1px solid #d1d5db',
-                        borderRadius: '4px',
-                        cursor:
-                          idx === items.length - 1 ? 'not-allowed' : 'pointer',
-                        padding: '2px 6px',
-                        fontSize: '11px',
-                      }}
-                    >
-                      ▼
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => onRemove(item.product_id)}
-                      style={{
-                        background: 'none',
-                        border: 'none',
-                        color: '#dc2626',
-                        cursor: 'pointer',
-                        padding: '4px',
-                        marginLeft: '4px',
-                      }}
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </>
-                )}
-              </div>
-            </div>
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: '1fr 1fr',
-                gap: '8px',
-                fontSize: '12px',
-                alignItems: 'center',
-              }}
-            >
-              <div>
-                <span style={{ color: '#6b7280' }}>Código: </span>{' '}
-                <strong>{item.code}</strong>
-              </div>
-              <div
-                style={{
-                  textAlign: 'right',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'flex-end',
-                  gap: '4px',
-                }}
-              >
-                <span style={{ color: '#6b7280' }}>Cant: </span>
-                {isEditable ? (
-                  <input
-                    type="number"
-                    min="1"
-                    value={item.quantity}
-                    onChange={(e) =>
-                      handleQuantityChange(
-                        item.product_id,
-                        e.target.value,
-                        isEditingMode
-                      )
-                    }
-                    style={{
-                      width: '55px',
-                      padding: '2px 4px',
-                      textAlign: 'center',
-                      fontSize: '12px',
-                      border: '1px solid #d1d5db',
-                      borderRadius: '4px',
-                    }}
-                  />
-                ) : (
-                  <strong>{item.quantity}</strong>
-                )}
-              </div>
-              <div>
-                <span style={{ color: '#6b7280' }}>P. Unit: </span>{' '}
-                <strong>${Number(item.unit_price_usd).toFixed(2)}</strong>
-              </div>
-              <div style={{ textAlign: 'right' }}>
-                <span style={{ color: '#b45309' }}>Desc: </span>{' '}
-                <strong>
-                  ${Number(item.discounted_unit_price_usd).toFixed(2)}
-                </strong>
-              </div>
-              <div
-                style={{
-                  gridColumn: '1 / -1',
-                  borderTop: '1px dashed #e5e7eb',
-                  paddingTop: '6px',
-                  marginTop: '4px',
-                  textAlign: 'right',
-                  fontWeight: '800',
-                  fontSize: '14px',
-                  color: '#059669',
-                }}
-              >
-                Total: ${Number(item.total_line_usd).toFixed(2)}
-              </div>
-            </div>
+            Total: ${Number(item.total_line_usd).toFixed(2)}
           </div>
-        ))}
+        </div>
       </div>
-    );
+    ));
   };
 
   return (
