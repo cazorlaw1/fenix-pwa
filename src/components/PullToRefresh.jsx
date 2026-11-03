@@ -10,7 +10,6 @@ export default function PullToRefresh({ children }) {
   const rootRef = useRef(null);
 
   useEffect(() => {
-    // Detecta automáticamente el contenedor padre que tiene scroll vertical (el <main>)
     const findScrollParent = (node) => {
       let curr = node?.parentElement;
       while (curr) {
@@ -27,11 +26,12 @@ export default function PullToRefresh({ children }) {
     if (!scrollContainer) return;
 
     const getScrollTop = () => {
-      return scrollContainer === window ? window.scrollY : scrollContainer.scrollTop;
+      return scrollContainer === window
+        ? window.scrollY
+        : scrollContainer.scrollTop;
     };
 
     const handleTouchStart = (e) => {
-      // Solo se activa si estamos estrictamente en el tope superior (scrollTop === 0)
       if (getScrollTop() === 0) {
         setStartY(e.touches[0].clientY);
       } else {
@@ -42,7 +42,6 @@ export default function PullToRefresh({ children }) {
     const handleTouchMove = (e) => {
       if (startY === null) return;
 
-      // Si el usuario hizo scroll hacia abajo mientras arrastraba, cancelamos
       if (getScrollTop() > 0) {
         setPullDistance(0);
         setStartY(null);
@@ -52,9 +51,9 @@ export default function PullToRefresh({ children }) {
       const currentY = e.touches[0].clientY;
       const distance = currentY - startY;
 
-      // Solo responde si se desliza hacia abajo y estamos arriba
       if (distance > 0) {
-        setPullDistance(Math.min(distance * 0.4, 120));
+        // Limitamos la distancia máxima del arrastre a 100px
+        setPullDistance(Math.min(distance * 0.4, 100));
       } else {
         setPullDistance(0);
       }
@@ -87,16 +86,19 @@ export default function PullToRefresh({ children }) {
   }, [startY, pullDistance, refreshing]);
 
   return (
-    <div ref={rootRef} style={{ position: 'relative', minHeight: '100vh', width: '100%' }}>
-      {/* Indicador visual superior */}
+    <div
+      ref={rootRef}
+      style={{ position: 'relative', minHeight: '100vh', width: '100%' }}
+    >
+      {/* Panel de recarga desplegable superior (sin alterar modales fijos) */}
       <div
         style={{
-          position: 'absolute',
+          position: 'sticky',
           top: 0,
           left: 0,
           right: 0,
           height: `${pullDistance}px`,
-          maxHeight: '120px',
+          maxHeight: '100px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -104,7 +106,7 @@ export default function PullToRefresh({ children }) {
           color: '#D4AF37',
           overflow: 'hidden',
           transition: pullDistance === 0 ? 'height 0.3s ease' : 'none',
-          zIndex: 99,
+          zIndex: 99, // Mantiene el indicador ordenado
         }}
       >
         <div
@@ -114,8 +116,9 @@ export default function PullToRefresh({ children }) {
             gap: '8px',
             fontSize: '13px',
             fontWeight: 'bold',
-            opacity: pullDistance > 30 ? 1 : 0,
+            opacity: pullDistance > 25 ? 1 : 0,
             transition: 'opacity 0.2s',
+            whiteSpace: 'nowrap',
           }}
         >
           <Settings
@@ -137,16 +140,8 @@ export default function PullToRefresh({ children }) {
         </div>
       </div>
 
-      {/* Contenido principal */}
-      <div
-        style={{
-          transform: `translateY(${pullDistance}px)`,
-          transition: pullDistance === 0 ? 'transform 0.3s ease' : 'none',
-          height: '100%',
-        }}
-      >
-        {children}
-      </div>
+      {/* Contenido principal sin transformaciones CSS que afecten al position:fixed */}
+      <div style={{ width: '100%', height: '100%' }}>{children}</div>
     </div>
   );
 }
