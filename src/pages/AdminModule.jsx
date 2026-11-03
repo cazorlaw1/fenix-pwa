@@ -6737,13 +6737,21 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                               ${Number(note.final_price_usd).toFixed(2)}
                             </span>
                           </div>
+                          {/* MODIFÍCALO POR ESTE */}
                           <div className="admin-mobile-card-row">
                             <span className="admin-mobile-card-label">
                               Abonado
                             </span>
                             <span
                               className="admin-mobile-card-value"
-                              style={{ color: '#059669' }}
+                              style={{
+                                color: '#059669',
+                                cursor: 'pointer',
+                                textDecoration: 'underline dotted',
+                                fontWeight: '700',
+                              }}
+                              onClick={() => handleOpenEditAbonoModal(note)}
+                              title="Clic para editar monto abonado"
                             >
                               ${Number(note.total_paid_usd || 0).toFixed(2)}
                             </span>
