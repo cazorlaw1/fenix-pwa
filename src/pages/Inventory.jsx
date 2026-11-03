@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { createPortal } from 'react-dom';
 import { supabase } from '../lib/supabase';
 import JSZip from 'jszip';
 import {
@@ -18,9 +17,8 @@ import {
   FileText,
   Archive,
   ChevronDown,
-  FileSpreadsheet,
+  FileSpreadsheet, // Icono para representar N.E.
   Save,
-  Layers,
 } from 'lucide-react';
 
 export default function Inventory() {
@@ -32,19 +30,25 @@ export default function Inventory() {
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
 
+  // Estado para el rol del usuario actual
   const [userRole, setUserRole] = useState(null);
+
+  // Estado para el menú dropdown en móvil
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const mobileMenuRef = useRef(null);
 
+  // Modales
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
   const [adjustingStockProduct, setAdjustingStockProduct] = useState(null);
   const [selectedImageModal, setSelectedImageModal] = useState(null);
 
+  // Modal para ver Notas de Entrega asociadas
   const [neModalProduct, setNeModalProduct] = useState(null);
   const [neList, setNeList] = useState([]);
   const [neLoading, setNeLoading] = useState(false);
 
+  // Modales de Importación/Exportación
   const [showExportModal, setShowExportModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
   const [importFile, setImportFile] = useState(null);
@@ -52,27 +56,27 @@ export default function Inventory() {
   const [exportProcessing, setExportProcessing] = useState(false);
   const [importProcessing, setImportProcessing] = useState(false);
 
+  // Formulario de Registro / Edición de Producto
   const [formCode, setFormCode] = useState('');
   const [formDescription, setFormDescription] = useState('');
   const [formCategory, setFormCategory] = useState('bombillos');
-  const [formPrice, setFormPrice] = useState('');
-  const [formBasePrice, setFormBasePrice] = useState('');
+  const [formPrice, setFormPrice] = useState(''); // Precio Full
+  const [formBasePrice, setFormBasePrice] = useState(''); // Precio Base (Nuevo)
   const [formStock, setFormStock] = useState('');
   const [formImageFile, setFormImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState('');
 
+  // Formulario de Ajuste Rápido de Stock
   const [stockAdjustmentValue, setStockAdjustmentValue] = useState('');
   const [stockAdjustmentType, setStockAdjustmentType] = useState('add');
 
-  // ESTADOS PARA LA MODIFICACIÓN MASIVA
-  const [bulkCategory, setBulkCategory] = useState('bombillos');
-  const [bulkProducts, setBulkProducts] = useState([]);
-  const [bulkLoading, setBulkLoading] = useState(false);
-  const [bulkSaving, setBulkSaving] = useState(false);
-  const [bulkSearch, setBulkSearch] = useState('');
-  const [pendingImages, setPendingImages] = useState({}); // { [productId]: { file, preview } }
-  const [zipProcessing, setZipProcessing] = useState(false);
+  // Estados para Modificación Masiva
+  const [massProducts, setMassProducts] = useState([]);
+  const [massChanges, setMassChanges] = useState({}); // { [productId]: { field: value } }
+  const [massSaving, setMassSaving] = useState(false);
+  const [massSearch, setMassSearch] = useState('');
 
+  // Obtener el rol del usuario autenticado
   useEffect(() => {
     async function fetchUserRole() {
       try {
@@ -96,21 +100,32 @@ export default function Inventory() {
     fetchUserRole();
   }, []);
 
+  // Verificar si el usuario tiene permiso de gestión (administrador o stock)
   const canManage = userRole === 'administrador' || userRole === 'stock';
-  const canViewNE = userRole === 'administrador' || userRole === 'tecnico';
-  const canBulkEdit = userRole === 'administrador' || userRole === 'tecnico';
 
+  // Verificar si el usuario puede ver N.E. (administrador o tecnico)
+  const canViewNE = userRole === 'administrador' || userRole === 'tecnico';
+
+  // Verificar si el usuario puede ver la Modificación Masiva (administrador o tecnico)
+  const canMassModify = userRole === 'administrador' || userRole === 'tecnico';
+
+  // Si no tiene permisos y está en la pestaña restringida, redirigir al inventario
   useEffect(() => {
     if (activeMainTab === 'import_export' && userRole !== null && !canManage) {
       setActiveMainTab('inventory');
       setActiveCategory('bombillos');
     }
-    if (activeMainTab === 'bulk_edit' && userRole !== null && !canBulkEdit) {
+    if (
+      activeMainTab === 'mass_modification' &&
+      userRole !== null &&
+      !canMassModify
+    ) {
       setActiveMainTab('inventory');
       setActiveCategory('bombillos');
     }
-  }, [userRole, activeMainTab]);
+  }, [userRole, activeMainTab, canManage, canMassModify]);
 
+  // Cerrar dropdown al hacer clic fuera
   useEffect(() => {
     function handleClickOutside(event) {
       if (
@@ -124,54 +139,27 @@ export default function Inventory() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // BLOQUEAR SCROLL DEL BODY CUANDO HAY MODALES ABIERTOS
-  useEffect(() => {
-    const isAnyModalOpen =
-      neModalProduct ||
-      selectedImageModal ||
-      showAddModal ||
-      adjustingStockProduct ||
-      showExportModal ||
-      showImportModal;
-
-    if (isAnyModalOpen) {
-      const scrollY = window.scrollY;
-      document.body.style.overflow = 'hidden';
-      document.body.style.position = 'fixed';
-      document.body.style.top = `-${scrollY}px`;
-      document.body.style.width = '100%';
-      document.body.dataset.scrollY = scrollY;
-    } else {
-      const scrollY = document.body.dataset.scrollY || '0';
-      document.body.style.overflow = '';
-      document.body.style.position = '';
-      document.body.style.top = '';
-      document.body.style.width = '';
-      window.scrollTo(0, parseInt(scrollY));
-    }
-
-    return () => {
-      document.body.style.overflow = '';
-      document.body.style.position = '';
-      document.body.style.top = '';
-      document.body.style.width = '';
-    };
-  }, [
-    neModalProduct,
-    selectedImageModal,
-    showAddModal,
-    adjustingStockProduct,
-    showExportModal,
-    showImportModal,
-  ]);
-
   useEffect(() => {
     if (activeMainTab === 'inventory') {
       fetchProducts();
-    } else if (activeMainTab === 'bulk_edit') {
-      fetchBulkProducts();
+    } else if (activeMainTab === 'mass_modification') {
+      fetchMassProducts();
     }
-  }, [activeCategory, activeMainTab, bulkCategory]);
+  }, [activeCategory, activeMainTab]);
+
+  // Sistema de alerta beforeunload si hay cambios pendientes en Modificación Masiva
+  const hasUnsavedChanges = Object.keys(massChanges).length > 0;
+
+  useEffect(() => {
+    const handleBeforeUnload = (e) => {
+      if (hasUnsavedChanges) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [hasUnsavedChanges]);
 
   const fetchProducts = async () => {
     setLoading(true);
@@ -192,172 +180,162 @@ export default function Inventory() {
     }
   };
 
-  const fetchBulkProducts = async () => {
-    setBulkLoading(true);
-    setPendingImages({});
+  const fetchMassProducts = async () => {
+    setLoading(true);
     try {
       const { data, error } = await supabase
         .from('products')
         .select('*')
-        .eq('category', bulkCategory)
-        .order('code', { ascending: true });
+        .order('category', { ascending: true })
+        .order('description', { ascending: true });
 
       if (error) throw error;
-      setBulkProducts(data || []);
+      setMassProducts(data || []);
+      setMassChanges({});
     } catch (err) {
-      console.error('Error al cargar productos para edición masiva:', err);
-      setErrorMsg('No se pudieron cargar los productos para edición masiva.');
+      console.error('Error al cargar productos para modificación masiva:', err);
+      setErrorMsg('No se pudo cargar el inventario maestro.');
     } finally {
-      setBulkLoading(false);
+      setLoading(false);
     }
   };
 
-  const handleBulkChange = (id, field, value) => {
-    setBulkProducts((prev) =>
-      prev.map((p) => (p.id === id ? { ...p, [field]: value } : p))
-    );
-  };
+  const handleMassFieldChange = (productId, field, value) => {
+    setMassChanges((prev) => {
+      const productOriginal = massProducts.find((p) => p.id === productId);
+      const currentProductChanges = prev[productId] || {};
 
-  const handleBulkSingleImageChange = (id, file) => {
-    if (!file) return;
-    const preview = URL.createObjectURL(file);
-    setPendingImages((prev) => ({
-      ...prev,
-      [id]: { file, preview },
-    }));
-  };
-
-  const handleZipImagesUpload = async (e) => {
-    const zipFile = e.target.files[0];
-    if (!zipFile) return;
-
-    if (!zipFile.name.toLowerCase().endsWith('.zip')) {
-      setErrorMsg('Por favor seleccione un archivo en formato ZIP.');
-      return;
-    }
-
-    setZipProcessing(true);
-    setErrorMsg('');
-    setSuccessMsg('');
-
-    try {
-      const zip = await JSZip.loadAsync(zipFile);
-      const newPending = { ...pendingImages };
-      let matchedCount = 0;
-
-      for (const [filename, fileObj] of Object.entries(zip.files)) {
-        if (fileObj.dir) continue;
-        const cleanName = filename.split('/').pop();
-        if (!cleanName || cleanName.startsWith('.')) continue;
-
-        const nameWithoutExt =
-          cleanName.substring(0, cleanName.lastIndexOf('.')) || cleanName;
-        const normalizedName = nameWithoutExt.trim().toLowerCase();
-
-        const targetProduct = bulkProducts.find(
-          (p) => p.code && p.code.trim().toLowerCase() === normalizedName
-        );
-
-        if (targetProduct) {
-          const blob = await fileObj.async('blob');
-          const ext = cleanName.split('.').pop() || 'jpg';
-          const file = new File([blob], `${targetProduct.code}.${ext}`, {
-            type: blob.type || 'image/jpeg',
-          });
-          const preview = URL.createObjectURL(file);
-          newPending[targetProduct.id] = { file, preview };
-          matchedCount++;
+      const originalValue = productOriginal ? productOriginal[field] : '';
+      // Si el valor ingresado es igual al original, removemos el cambio de este campo
+      if (String(value) === String(originalValue ?? '')) {
+        const updatedProductChanges = { ...currentProductChanges };
+        delete updatedProductChanges[field];
+        if (Object.keys(updatedProductChanges).length === 0) {
+          const newPrev = { ...prev };
+          delete newPrev[productId];
+          return newPrev;
         }
+        return { ...prev, [productId]: updatedProductChanges };
       }
 
-      setPendingImages(newPending);
-      if (matchedCount > 0) {
-        setSuccessMsg(
-          `Se vincularon ${matchedCount} imágenes del ZIP correctamente por código.`
-        );
-      } else {
+      return {
+        ...prev,
+        [productId]: {
+          ...currentProductChanges,
+          [field]: value,
+        },
+      };
+    });
+  };
+
+  const handleSaveAllMassChanges = async () => {
+    const productIdsToUpdate = Object.keys(massChanges);
+    if (productIdsToUpdate.length === 0) return;
+
+    // Validación previa de datos
+    for (const id of productIdsToUpdate) {
+      const changes = massChanges[id];
+      const prod = massProducts.find((p) => p.id === id);
+      const finalPrice =
+        changes.price_usd !== undefined
+          ? parseFloat(changes.price_usd)
+          : prod.price_usd;
+      const finalBasePrice =
+        changes.base_price !== undefined
+          ? parseFloat(changes.base_price)
+          : prod.base_price;
+      const finalStock =
+        changes.stock_current !== undefined
+          ? parseInt(changes.stock_current)
+          : prod.stock_current;
+
+      if (
+        finalPrice < 0 ||
+        (finalBasePrice !== null &&
+          finalBasePrice !== undefined &&
+          finalBasePrice < 0)
+      ) {
         setErrorMsg(
-          'No se encontraron imágenes en el ZIP cuyos nombres coincidan con los códigos de los productos.'
+          `Error de validación: Los precios no pueden ser negativos en el producto ${
+            prod.code || id
+          }.`
         );
+        return;
       }
-    } catch (err) {
-      console.error('Error al procesar el archivo ZIP:', err);
-      setErrorMsg('Error al leer el archivo ZIP. Verifique que sea válido.');
-    } finally {
-      setZipProcessing(false);
-      e.target.value = null;
+      if (isNaN(finalStock) || finalStock < 0) {
+        setErrorMsg(
+          `Error de validación: El stock actual debe ser un número válido mayor o igual a 0 en el producto ${
+            prod.code || id
+          }.`
+        );
+        return;
+      }
     }
-  };
 
-  const handleSaveBulk = async () => {
-    setBulkSaving(true);
+    setMassSaving(true);
     setErrorMsg('');
     setSuccessMsg('');
 
-    try {
-      const updatedProducts = [...bulkProducts];
+    let successCount = 0;
+    let failCount = 0;
 
-      for (let i = 0; i < updatedProducts.length; i++) {
-        const prod = updatedProducts[i];
-        let imageUrl = prod.image_url;
+    for (const id of productIdsToUpdate) {
+      const changes = massChanges[id];
+      const updatePayload = {
+        ...changes,
+        updated_at: new Date(),
+      };
+      if (updatePayload.price_usd !== undefined)
+        updatePayload.price_usd = parseFloat(updatePayload.price_usd);
+      if (updatePayload.base_price !== undefined)
+        updatePayload.base_price = parseFloat(updatePayload.base_price || 0);
+      if (updatePayload.stock_current !== undefined)
+        updatePayload.stock_current = parseInt(
+          updatePayload.stock_current || 0
+        );
 
-        if (pendingImages[prod.id]) {
-          const { file } = pendingImages[prod.id];
-          const fileExt = file.name.split('.').pop();
-          const fileName = `${Date.now()}_${Math.random()
-            .toString(36)
-            .substring(7)}.${fileExt}`;
+      const { error } = await supabase
+        .from('products')
+        .update(updatePayload)
+        .eq('id', id);
 
-          const { error: uploadError } = await supabase.storage
-            .from('products')
-            .upload(fileName, file);
-
-          if (uploadError) {
-            console.warn(
-              `Error al subir imagen para ${prod.code}:`,
-              uploadError
-            );
-          } else {
-            const { data: publicUrlData } = supabase.storage
-              .from('products')
-              .getPublicUrl(fileName);
-            imageUrl = publicUrlData.publicUrl;
-          }
-        }
-
-        const updateData = {
-          code: prod.code,
-          description: prod.description,
-          category: prod.category,
-          price_usd: parseFloat(prod.price_usd) || 0,
-          stock_current: parseInt(prod.stock_current) || 0,
-          image_url: imageUrl,
-          updated_at: new Date(),
-        };
-
-        if (userRole === 'administrador' || userRole === 'stock') {
-          updateData.base_price = parseFloat(prod.base_price) || 0;
-        }
-
-        const { error } = await supabase
-          .from('products')
-          .update(updateData)
-          .eq('id', prod.id);
-
-        if (error) throw error;
+      if (error) {
+        console.error(`Error al actualizar producto ID ${id}:`, error);
+        failCount++;
+      } else {
+        successCount++;
       }
+    }
 
+    setMassSaving(false);
+    if (successCount > 0) {
       setSuccessMsg(
-        '¡Todos los cambios del inventario se han guardado masivamente con éxito!'
+        `Se actualizaron exitosamente ${successCount} productos.${
+          failCount > 0 ? ` Hubo ${failCount} errores.` : ''
+        }`
       );
-      fetchBulkProducts();
-    } catch (err) {
-      console.error('Error al guardar de manera masiva:', err);
-      setErrorMsg(
-        err.message || 'Error al guardar los productos de manera masiva.'
+      fetchMassProducts();
+    } else {
+      setErrorMsg('Ocurrió un error al guardar los cambios masivos.');
+    }
+  };
+
+  const handleTabSwitchAttempt = (targetTab, targetCategory = 'bombillos') => {
+    if (hasUnsavedChanges) {
+      const confirmLeave = window.confirm(
+        'Tienes cambios sin guardar. ¿Deseas salir sin guardar?'
       );
-    } finally {
-      setBulkSaving(false);
+      if (!confirmLeave) {
+        return;
+      }
+    }
+    if (targetTab === 'mass_modification') {
+      setActiveMainTab('mass_modification');
+    } else if (targetTab === 'import_export') {
+      setActiveMainTab('import_export');
+    } else {
+      setActiveMainTab('inventory');
+      setActiveCategory(targetCategory);
     }
   };
 
@@ -467,7 +445,11 @@ export default function Inventory() {
       setSuccessMsg(
         `Producto "${product.description}" eliminado exitosamente (incluyendo referencias en N.E.).`
       );
-      fetchProducts();
+      if (activeMainTab === 'inventory') {
+        fetchProducts();
+      } else if (activeMainTab === 'mass_modification') {
+        fetchMassProducts();
+      }
     } catch (err) {
       console.error('Error al eliminar producto:', err);
       setErrorMsg(err.message || 'Error al eliminar el producto.');
@@ -499,7 +481,11 @@ export default function Inventory() {
       if (error) throw error;
       setSuccessMsg('Inventario ajustado correctamente.');
       closeModals();
-      fetchProducts();
+      if (activeMainTab === 'inventory') {
+        fetchProducts();
+      } else if (activeMainTab === 'mass_modification') {
+        fetchMassProducts();
+      }
     } catch (err) {
       setErrorMsg(err.message || 'Error al ajustar el stock.');
     }
@@ -578,10 +564,17 @@ export default function Inventory() {
       p.description.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const filteredBulkProducts = bulkProducts.filter(
+  const filteredMassProducts = massProducts.filter(
     (p) =>
-      p.code.toLowerCase().includes(bulkSearch.toLowerCase()) ||
-      p.description.toLowerCase().includes(bulkSearch.toLowerCase())
+      p.code.toLowerCase().includes(massSearch.toLowerCase()) ||
+      p.description.toLowerCase().includes(massSearch.toLowerCase())
+  );
+
+  const bombillosMassProducts = filteredMassProducts.filter(
+    (p) => p.category === 'bombillos'
+  );
+  const fluidosMassProducts = filteredMassProducts.filter(
+    (p) => p.category === 'fluidos'
   );
 
   const exportToCSV = async (withImages) => {
@@ -848,15 +841,29 @@ export default function Inventory() {
     }
   };
 
+  // Opciones del menú (Agregando "Modificación Masiva" para admin y tecnico)
   const menuOptions = [
-    { id: 'bombillos', label: 'Bombillos', icon: Package },
-    { id: 'fluidos', label: 'Fluidos', icon: Package },
-    ...(canBulkEdit
+    {
+      id: 'bombillos',
+      label: 'Bombillos',
+      icon: Package,
+      tabType: 'inventory',
+      category: 'bombillos',
+    },
+    {
+      id: 'fluidos',
+      label: 'Fluidos',
+      icon: Package,
+      tabType: 'inventory',
+      category: 'fluidos',
+    },
+    ...(canMassModify
       ? [
           {
-            id: 'bulk_edit',
+            id: 'mass_modification',
             label: 'Modificación Masiva',
-            icon: Layers,
+            icon: Edit3,
+            tabType: 'mass_modification',
           },
         ]
       : []),
@@ -866,1264 +873,15 @@ export default function Inventory() {
             id: 'import_export',
             label: 'Importación/Exportación',
             icon: Archive,
+            tabType: 'import_export',
           },
         ]
       : []),
   ];
 
-  // ============================================
-  // CONTENEDOR PARA MODALES (adjunto al body)
-  // ============================================
-  const [modalContainer, setModalContainer] = useState(null);
-
-  useEffect(() => {
-    const div = document.createElement('div');
-    div.id = 'inventory-modal-root';
-    div.style.position = 'fixed';
-    div.style.top = '0';
-    div.style.left = '0';
-    div.style.width = '100%';
-    div.style.height = '100%';
-    div.style.zIndex = '99999';
-    div.style.pointerEvents = 'none';
-    document.body.appendChild(div);
-    setModalContainer(div);
-
-    return () => {
-      if (div.parentNode) {
-        div.parentNode.removeChild(div);
-      }
-    };
-  }, []);
-
-  // ============================================
-  // MODAL DE NOTAS DE ENTREGA
-  // ============================================
-  const ModalNE = () => {
-    if (!neModalProduct || !modalContainer) return null;
-    return createPortal(
-      <div
-        style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          width: '100vw',
-          height: '100vh',
-          backgroundColor: 'rgba(0,0,0,0.7)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 99999,
-          padding: '16px',
-          pointerEvents: 'auto',
-        }}
-        onClick={(e) => {
-          if (e.target === e.currentTarget) {
-            setNeModalProduct(null);
-          }
-        }}
-      >
-        <div
-          style={{
-            backgroundColor: '#ffffff',
-            borderRadius: '12px',
-            width: '100%',
-            maxWidth: '500px',
-            maxHeight: '85vh',
-            overflowY: 'auto',
-            padding: '24px',
-            boxShadow: '0 20px 50px rgba(0,0,0,0.3)',
-            position: 'relative',
-          }}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              marginBottom: '16px',
-              borderBottom: '2px solid #e5e7eb',
-              paddingBottom: '12px',
-            }}
-          >
-            <h2
-              style={{
-                fontSize: '18px',
-                fontWeight: 'bold',
-                color: '#111827',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                margin: 0,
-              }}
-            >
-              <FileSpreadsheet size={20} color="#1d4ed8" />
-              N.E. Asociadas a: {neModalProduct.code}
-            </h2>
-            <button
-              onClick={() => setNeModalProduct(null)}
-              style={{
-                background: '#fee2e2',
-                border: 'none',
-                cursor: 'pointer',
-                borderRadius: '50%',
-                width: '32px',
-                height: '32px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <X size={18} color="#dc2626" />
-            </button>
-          </div>
-
-          {neLoading ? (
-            <div
-              style={{
-                textAlign: 'center',
-                padding: '40px 20px',
-                color: '#6b7280',
-              }}
-            >
-              <div style={{ marginBottom: '12px' }}>
-                Cargando notas de entrega...
-              </div>
-            </div>
-          ) : neList.length === 0 ? (
-            <div
-              style={{
-                textAlign: 'center',
-                padding: '40px 20px',
-                color: '#6b7280',
-                fontStyle: 'italic',
-              }}
-            >
-              Este producto no está asignado a ninguna Nota de Entrega.
-            </div>
-          ) : (
-            <div
-              style={{
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '8px',
-              }}
-            >
-              {neList.map((ne, index) => (
-                <div
-                  key={index}
-                  style={{
-                    padding: '12px 16px',
-                    backgroundColor: '#f8fafc',
-                    border: '1px solid #e2e8f0',
-                    borderRadius: '8px',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    transition: 'all 0.2s',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = '#eff6ff';
-                    e.currentTarget.style.borderColor = '#bfdbfe';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = '#f8fafc';
-                    e.currentTarget.style.borderColor = '#e2e8f0';
-                  }}
-                >
-                  <span
-                    style={{
-                      fontWeight: '600',
-                      color: '#334155',
-                      fontSize: '14px',
-                    }}
-                  >
-                    N.E. #{ne.transaction_number}
-                  </span>
-                  <FileText size={16} color="#94a3b8" />
-                </div>
-              ))}
-            </div>
-          )}
-
-          <div
-            style={{
-              marginTop: '20px',
-              display: 'flex',
-              justifyContent: 'flex-end',
-            }}
-          >
-            <button
-              onClick={() => setNeModalProduct(null)}
-              style={{
-                padding: '10px 20px',
-                backgroundColor: '#f3f4f6',
-                color: '#374151',
-                border: '1px solid #d1d5db',
-                borderRadius: '6px',
-                fontWeight: '600',
-                cursor: 'pointer',
-                fontSize: '14px',
-              }}
-            >
-              Cerrar
-            </button>
-          </div>
-        </div>
-      </div>,
-      modalContainer
-    );
-  };
-
-  // ============================================
-  // MODAL DE EXPORTACIÓN
-  // ============================================
-  const ModalExport = () => {
-    if (!showExportModal || !canManage || !modalContainer) return null;
-    return createPortal(
-      <div
-        style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          width: '100vw',
-          height: '100vh',
-          backgroundColor: 'rgba(0,0,0,0.5)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 99999,
-          padding: '16px',
-          pointerEvents: 'auto',
-        }}
-      >
-        <div
-          style={{
-            backgroundColor: '#ffffff',
-            borderRadius: '12px',
-            width: '100%',
-            maxWidth: '450px',
-            padding: '24px',
-            boxShadow: '0 10px 25px rgba(0,0,0,0.15)',
-          }}
-        >
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              marginBottom: '20px',
-            }}
-          >
-            <h2
-              style={{
-                fontSize: '18px',
-                fontWeight: 'bold',
-                color: '#111827',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-              }}
-            >
-              <Download size={20} color="#059669" /> Exportar Inventario
-            </h2>
-            <button
-              type="button"
-              onClick={() => setShowExportModal(false)}
-              style={{
-                background: 'none',
-                border: 'none',
-                cursor: 'pointer',
-              }}
-            >
-              <X size={20} color="#6b7280" />
-            </button>
-          </div>
-          <p
-            style={{
-              fontSize: '14px',
-              color: '#374151',
-              marginBottom: '20px',
-              textAlign: 'center',
-              fontWeight: '600',
-            }}
-          >
-            ¿Desea exportar con imágenes o sin imágenes?
-          </p>
-          <div
-            style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}
-          >
-            <button
-              onClick={() => exportToCSV(false)}
-              disabled={exportProcessing}
-              style={{
-                padding: '14px 20px',
-                backgroundColor: '#f0fdf4',
-                color: '#166534',
-                border: '2px solid #bbf7d0',
-                borderRadius: '8px',
-                fontWeight: '600',
-                fontSize: '14px',
-                cursor: exportProcessing ? 'not-allowed' : 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '10px',
-                transition: 'all 0.2s',
-              }}
-            >
-              <FileText size={18} />{' '}
-              {exportProcessing ? 'Procesando...' : 'Sin Imágenes (CSV)'}
-            </button>
-            <button
-              onClick={() => exportToCSV(true)}
-              disabled={exportProcessing}
-              style={{
-                padding: '14px 20px',
-                backgroundColor: '#eff6ff',
-                color: '#1e40af',
-                border: '2px solid #bfdbfe',
-                borderRadius: '8px',
-                fontWeight: '600',
-                fontSize: '14px',
-                cursor: exportProcessing ? 'not-allowed' : 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '10px',
-                transition: 'all 0.2s',
-              }}
-            >
-              <Archive size={18} />{' '}
-              {exportProcessing ? 'Procesando...' : 'Con Imágenes (ZIP)'}
-            </button>
-          </div>
-          <div
-            style={{
-              marginTop: '20px',
-              padding: '12px',
-              backgroundColor: '#f9fafb',
-              borderRadius: '6px',
-              fontSize: '12px',
-              color: '#6b7280',
-            }}
-          >
-            <strong>Nota: </strong> La exportación con imágenes puede tardar más
-            tiempo dependiendo de la cantidad de productos.
-          </div>
-        </div>
-      </div>,
-      modalContainer
-    );
-  };
-
-  // ============================================
-  // MODAL DE IMPORTACIÓN
-  // ============================================
-  const ModalImport = () => {
-    if (!showImportModal || !canManage || !modalContainer) return null;
-    return createPortal(
-      <div
-        style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          width: '100vw',
-          height: '100vh',
-          backgroundColor: 'rgba(0,0,0,0.5)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 99999,
-          padding: '16px',
-          pointerEvents: 'auto',
-        }}
-      >
-        <div
-          style={{
-            backgroundColor: '#ffffff',
-            borderRadius: '12px',
-            width: '100%',
-            maxWidth: '500px',
-            padding: '24px',
-            boxShadow: '0 10px 25px rgba(0,0,0,0.15)',
-          }}
-        >
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              marginBottom: '20px',
-            }}
-          >
-            <h2
-              style={{
-                fontSize: '18px',
-                fontWeight: 'bold',
-                color: '#111827',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-              }}
-            >
-              <Upload size={20} color="#2563eb" /> Importar Inventario
-            </h2>
-            <button
-              type="button"
-              onClick={() => {
-                setShowImportModal(false);
-                setImportFile(null);
-                setImportWithImages(false);
-              }}
-              style={{
-                background: 'none',
-                border: 'none',
-                cursor: 'pointer',
-              }}
-            >
-              <X size={20} color="#6b7280" />
-            </button>
-          </div>
-          <p
-            style={{
-              fontSize: '14px',
-              color: '#374151',
-              marginBottom: '20px',
-              textAlign: 'center',
-              fontWeight: '600',
-            }}
-          >
-            ¿Desea importar con imágenes o sin imágenes?
-          </p>
-          <div
-            style={{
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '12px',
-              marginBottom: '20px',
-            }}
-          >
-            <button
-              onClick={() => {
-                setImportWithImages(false);
-                document.getElementById('import-file-input').click();
-              }}
-              disabled={importProcessing}
-              style={{
-                padding: '14px 20px',
-                backgroundColor:
-                  importWithImages === false && importFile
-                    ? '#f0fdf4'
-                    : '#f9fafb',
-                color:
-                  importWithImages === false && importFile
-                    ? '#166534'
-                    : '#374151',
-                border:
-                  importWithImages === false && importFile
-                    ? '2px solid #bbf7d0'
-                    : '2px solid #e5e7eb',
-                borderRadius: '8px',
-                fontWeight: '600',
-                fontSize: '14px',
-                cursor: importProcessing ? 'not-allowed' : 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '10px',
-                transition: 'all 0.2s',
-              }}
-            >
-              <FileText size={18} /> Sin Imágenes (CSV)
-            </button>
-            <button
-              onClick={() => {
-                setImportWithImages(true);
-                document.getElementById('import-file-input').click();
-              }}
-              disabled={importProcessing}
-              style={{
-                padding: '14px 20px',
-                backgroundColor:
-                  importWithImages === true && importFile
-                    ? '#eff6ff'
-                    : '#f9fafb',
-                color:
-                  importWithImages === true && importFile
-                    ? '#1e40af'
-                    : '#374151',
-                border:
-                  importWithImages === true && importFile
-                    ? '2px solid #bfdbfe'
-                    : '2px solid #e5e7eb',
-                borderRadius: '8px',
-                fontWeight: '600',
-                fontSize: '14px',
-                cursor: importProcessing ? 'not-allowed' : 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '10px',
-                transition: 'all 0.2s',
-              }}
-            >
-              <Archive size={18} /> Con Imágenes (ZIP)
-            </button>
-          </div>
-          <input
-            type="file"
-            id="import-file-input"
-            accept={importWithImages ? '.zip' : '.csv'}
-            onChange={(e) => {
-              if (e.target.files && e.target.files[0]) {
-                setImportFile(e.target.files[0]);
-              }
-            }}
-            style={{ display: 'none' }}
-          />
-          {importFile && (
-            <div
-              style={{
-                padding: '12px',
-                backgroundColor: '#f0fdf4',
-                borderRadius: '6px',
-                marginBottom: '16px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-              }}
-            >
-              <Check size={16} color="#059669" />
-              <span
-                style={{
-                  fontSize: '13px',
-                  color: '#166534',
-                  fontWeight: '600',
-                }}
-              >
-                Archivo seleccionado: {importFile.name}
-              </span>
-            </div>
-          )}
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'flex-end',
-              gap: '10px',
-            }}
-          >
-            <button
-              type="button"
-              onClick={() => {
-                setShowImportModal(false);
-                setImportFile(null);
-                setImportWithImages(false);
-              }}
-              style={{
-                padding: '10px 16px',
-                backgroundColor: '#f3f4f6',
-                color: '#374151',
-                border: 'none',
-                borderRadius: '6px',
-                fontWeight: '600',
-                cursor: 'pointer',
-              }}
-            >
-              Cancelar
-            </button>
-            <button
-              type="button"
-              onClick={handleImportFile}
-              disabled={importProcessing || !importFile}
-              style={{
-                padding: '10px 20px',
-                backgroundColor:
-                  importProcessing || !importFile ? '#9ca3af' : '#2563eb',
-                color: '#ffffff',
-                border: 'none',
-                borderRadius: '6px',
-                fontWeight: '600',
-                cursor:
-                  importProcessing || !importFile ? 'not-allowed' : 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-              }}
-            >
-              {importProcessing ? 'Procesando...' : 'Importar'}
-            </button>
-          </div>
-          <div
-            style={{
-              marginTop: '16px',
-              padding: '12px',
-              backgroundColor: '#fef2f2',
-              borderRadius: '6px',
-              fontSize: '12px',
-              color: '#991b1b',
-            }}
-          >
-            <strong>Advertencia: </strong> La importación actualizará los
-            productos existentes según su código único y creará los nuevos.
-          </div>
-        </div>
-      </div>,
-      modalContainer
-    );
-  };
-
-  // ============================================
-  // MODAL DE REGISTRO/EDICIÓN
-  // ============================================
-  const ModalAddEdit = () => {
-    if (!showAddModal || !canManage || !modalContainer) return null;
-    return createPortal(
-      <div
-        style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          width: '100vw',
-          height: '100vh',
-          backgroundColor: 'rgba(0,0,0,0.5)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 99999,
-          padding: '16px',
-          pointerEvents: 'auto',
-        }}
-      >
-        <div
-          style={{
-            backgroundColor: '#ffffff',
-            borderRadius: '12px',
-            width: '100%',
-            maxWidth: '500px',
-            padding: '24px',
-            boxShadow: '0 10px 25px rgba(0,0,0,0.15)',
-          }}
-        >
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              marginBottom: '20px',
-            }}
-          >
-            <h2
-              style={{
-                fontSize: '18px',
-                fontWeight: 'bold',
-                color: '#111827',
-              }}
-            >
-              {editingProduct ? 'Editar Producto' : 'Registrar Nuevo Producto'}
-            </h2>
-            <button
-              type="button"
-              onClick={closeModals}
-              style={{
-                background: 'none',
-                border: 'none',
-                cursor: 'pointer',
-              }}
-            >
-              <X size={20} color="#6b7280" />
-            </button>
-          </div>
-          <form
-            onSubmit={handleSaveProduct}
-            style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}
-          >
-            <div>
-              <label
-                style={{
-                  display: 'block',
-                  fontSize: '13px',
-                  fontWeight: '600',
-                  marginBottom: '6px',
-                  color: '#374151',
-                }}
-              >
-                Categoría
-              </label>
-              <select
-                value={formCategory}
-                onChange={(e) => setFormCategory(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '10px',
-                  borderRadius: '6px',
-                  border: '1px solid #d1d5db',
-                  backgroundColor: '#fff',
-                }}
-              >
-                <option value="bombillos">Bombillos</option>
-                <option value="fluidos">Fluidos</option>
-              </select>
-            </div>
-            <div>
-              <label
-                style={{
-                  display: 'block',
-                  fontSize: '13px',
-                  fontWeight: '600',
-                  marginBottom: '6px',
-                  color: '#374151',
-                }}
-              >
-                Código Único
-              </label>
-              <input
-                type="text"
-                required
-                placeholder="Ej. BOM-001"
-                value={formCode}
-                onChange={(e) => setFormCode(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '10px',
-                  borderRadius: '6px',
-                  border: '1px solid #d1d5db',
-                  boxSizing: 'border-box',
-                }}
-              />
-            </div>
-            <div>
-              <label
-                style={{
-                  display: 'block',
-                  fontSize: '13px',
-                  fontWeight: '600',
-                  marginBottom: '6px',
-                  color: '#374151',
-                }}
-              >
-                Descripción y Especificaciones
-              </label>
-              <textarea
-                required
-                rows={2}
-                placeholder="Nombre y detalles del producto..."
-                value={formDescription}
-                onChange={(e) => setFormDescription(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '10px',
-                  borderRadius: '6px',
-                  border: '1px solid #d1d5db',
-                  boxSizing: 'border-box',
-                }}
-              />
-            </div>
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: '1fr 1fr',
-                gap: '12px',
-              }}
-            >
-              <div>
-                <label
-                  style={{
-                    display: 'block',
-                    fontSize: '13px',
-                    fontWeight: '600',
-                    marginBottom: '6px',
-                    color: '#374151',
-                  }}
-                >
-                  Precio Full ($)
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  required
-                  placeholder="0.00"
-                  value={formPrice}
-                  onChange={(e) => setFormPrice(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '10px',
-                    borderRadius: '6px',
-                    border: '1px solid #d1d5db',
-                    boxSizing: 'border-box',
-                  }}
-                />
-              </div>
-              <div>
-                <label
-                  style={{
-                    display: 'block',
-                    fontSize: '13px',
-                    fontWeight: '600',
-                    marginBottom: '6px',
-                    color: '#374151',
-                  }}
-                >
-                  Precio Base ($)
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  placeholder="0.00"
-                  value={formBasePrice}
-                  onChange={(e) => setFormBasePrice(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '10px',
-                    borderRadius: '6px',
-                    border: '1px solid #d1d5db',
-                    boxSizing: 'border-box',
-                  }}
-                />
-              </div>
-            </div>
-            {!editingProduct && (
-              <div>
-                <label
-                  style={{
-                    display: 'block',
-                    fontSize: '13px',
-                    fontWeight: '600',
-                    marginBottom: '6px',
-                    color: '#374151',
-                  }}
-                >
-                  Stock Inicial
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  required
-                  placeholder="0"
-                  value={formStock}
-                  onChange={(e) => setFormStock(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '10px',
-                    borderRadius: '6px',
-                    border: '1px solid #d1d5db',
-                    boxSizing: 'border-box',
-                  }}
-                />
-              </div>
-            )}
-            <div>
-              <label
-                style={{
-                  display: 'block',
-                  fontSize: '13px',
-                  fontWeight: '600',
-                  marginBottom: '6px',
-                  color: '#374151',
-                }}
-              >
-                Foto del Producto (Única)
-              </label>
-              {!imagePreview ? (
-                <label
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '10px',
-                    padding: '12px 16px',
-                    backgroundColor: '#f8fafc',
-                    color: '#111827',
-                    border: '2px dashed #d1d5db',
-                    borderRadius: '8px',
-                    cursor: 'pointer',
-                    fontWeight: '600',
-                    fontSize: '14px',
-                    transition: 'all 0.2s',
-                    boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
-                  }}
-                >
-                  <Upload size={18} color="#dc2626" />
-                  <span>Seleccionar Imagen...</span>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    style={{ display: 'none' }}
-                    onChange={(e) => {
-                      if (e.target.files && e.target.files[0]) {
-                        const file = e.target.files[0];
-                        setFormImageFile(file);
-                        setImagePreview(URL.createObjectURL(file));
-                        e.target.value = null;
-                      }
-                    }}
-                  />
-                </label>
-              ) : (
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '12px',
-                    padding: '8px',
-                    border: '1px solid #e5e7eb',
-                    borderRadius: '8px',
-                    backgroundColor: '#f9fafb',
-                  }}
-                >
-                  <img
-                    src={imagePreview}
-                    alt="Vista previa"
-                    style={{
-                      width: '60px',
-                      height: '60px',
-                      objectFit: 'cover',
-                      borderRadius: '6px',
-                      border: '1px solid #e5e7eb',
-                    }}
-                  />
-                  <div
-                    style={{
-                      flex: 1,
-                      fontSize: '13px',
-                      color: '#374151',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
-                    }}
-                  >
-                    {formImageFile
-                      ? formImageFile.name
-                      : 'Imagen actual del producto'}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setFormImageFile(null);
-                      setImagePreview('');
-                      if (editingProduct) {
-                        setEditingProduct({
-                          ...editingProduct,
-                          image_url: null,
-                        });
-                      }
-                    }}
-                    style={{
-                      background: '#fee2e2',
-                      border: 'none',
-                      borderRadius: '50%',
-                      width: '32px',
-                      height: '32px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      cursor: 'pointer',
-                      color: '#b91c1c',
-                    }}
-                  >
-                    <X size={18} />
-                  </button>
-                </div>
-              )}
-            </div>
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'flex-end',
-                gap: '12px',
-                marginTop: '10px',
-              }}
-            >
-              <button
-                type="button"
-                onClick={closeModals}
-                style={{
-                  padding: '10px 16px',
-                  backgroundColor: '#f3f4f6',
-                  color: '#374151',
-                  border: 'none',
-                  borderRadius: '6px',
-                  fontWeight: '600',
-                  cursor: 'pointer',
-                }}
-              >
-                Cancelar
-              </button>
-              <button
-                type="submit"
-                style={{
-                  padding: '10px 20px',
-                  backgroundColor: '#dc2626',
-                  color: '#ffffff',
-                  border: 'none',
-                  borderRadius: '6px',
-                  fontWeight: '600',
-                  cursor: 'pointer',
-                }}
-              >
-                Guardar Producto
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>,
-      modalContainer
-    );
-  };
-
-  // ============================================
-  // MODAL DE AJUSTE DE STOCK
-  // ============================================
-  const ModalStock = () => {
-    if (!adjustingStockProduct || !canManage || !modalContainer) return null;
-    return createPortal(
-      <div
-        style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          width: '100vw',
-          height: '100vh',
-          backgroundColor: 'rgba(0,0,0,0.5)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 99999,
-          padding: '16px',
-          pointerEvents: 'auto',
-        }}
-      >
-        <div
-          style={{
-            backgroundColor: '#ffffff',
-            borderRadius: '12px',
-            width: '100%',
-            maxWidth: '400px',
-            padding: '24px',
-            boxShadow: '0 10px 25px rgba(0,0,0,0.15)',
-          }}
-        >
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              marginBottom: '16px',
-            }}
-          >
-            <h2
-              style={{
-                fontSize: '16px',
-                fontWeight: 'bold',
-                color: '#111827',
-              }}
-            >
-              Ajuste de Inventario
-            </h2>
-            <button
-              type="button"
-              onClick={closeModals}
-              style={{
-                background: 'none',
-                border: 'none',
-                cursor: 'pointer',
-              }}
-            >
-              <X size={20} color="#6b7280" />
-            </button>
-          </div>
-          <p
-            style={{
-              fontSize: '13px',
-              color: '#6b7280',
-              marginBottom: '16px',
-            }}
-          >
-            Producto: <strong>{adjustingStockProduct.description}</strong>
-            <br />
-            Stock Actual:{' '}
-            <span style={{ color: '#059669', fontWeight: 'bold' }}>
-              {adjustingStockProduct.stock_current} unidades
-            </span>
-          </p>
-          <form
-            onSubmit={handleQuickStockAdjustment}
-            style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}
-          >
-            <div>
-              <label
-                style={{
-                  display: 'block',
-                  fontSize: '13px',
-                  fontWeight: '600',
-                  marginBottom: '6px',
-                  color: '#374151',
-                }}
-              >
-                Tipo de Ajuste
-              </label>
-              <select
-                value={stockAdjustmentType}
-                onChange={(e) => setStockAdjustmentType(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '10px',
-                  borderRadius: '6px',
-                  border: '1px solid #d1d5db',
-                }}
-              >
-                <option value="add">Incrementar Stock (+)</option>
-                <option value="subtract">Decrementar Stock (-)</option>
-                <option value="set">Establecer Cantidad Exacta</option>
-              </select>
-            </div>
-            <div>
-              <label
-                style={{
-                  display: 'block',
-                  fontSize: '13px',
-                  fontWeight: '600',
-                  marginBottom: '6px',
-                  color: '#374151',
-                }}
-              >
-                Cantidad
-              </label>
-              <input
-                type="number"
-                min="0"
-                required
-                placeholder="Ingrese cantidad"
-                value={stockAdjustmentValue}
-                onChange={(e) => setStockAdjustmentValue(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '10px',
-                  borderRadius: '6px',
-                  border: '1px solid #d1d5db',
-                  boxSizing: 'border-box',
-                }}
-              />
-            </div>
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'flex-end',
-                gap: '10px',
-                marginTop: '10px',
-              }}
-            >
-              <button
-                type="button"
-                onClick={closeModals}
-                style={{
-                  padding: '8px 14px',
-                  backgroundColor: '#f3f4f6',
-                  color: '#374151',
-                  border: 'none',
-                  borderRadius: '6px',
-                  fontWeight: '600',
-                  cursor: 'pointer',
-                }}
-              >
-                Cancelar
-              </button>
-              <button
-                type="submit"
-                style={{
-                  padding: '8px 16px',
-                  backgroundColor: '#f59e0b',
-                  color: '#ffffff',
-                  border: 'none',
-                  borderRadius: '6px',
-                  fontWeight: '600',
-                  cursor: 'pointer',
-                }}
-              >
-                Aplicar Ajuste
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>,
-      modalContainer
-    );
-  };
-
-  // ============================================
-  // MODAL DE IMAGEN
-  // ============================================
-  const ModalImage = () => {
-    if (!selectedImageModal || !modalContainer) return null;
-    return createPortal(
-      <div
-        style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          width: '100vw',
-          height: '100vh',
-          backgroundColor: 'rgba(0,0,0,0.8)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 99999,
-          padding: '16px',
-          pointerEvents: 'auto',
-        }}
-        onClick={() => setSelectedImageModal(null)}
-      >
-        <div
-          style={{ position: 'relative', maxWidth: '90%', maxHeight: '90%' }}
-        >
-          <button
-            type="button"
-            onClick={() => setSelectedImageModal(null)}
-            style={{
-              position: 'absolute',
-              top: '-40px',
-              right: '0',
-              background: 'none',
-              border: 'none',
-              color: '#fff',
-              cursor: 'pointer',
-            }}
-          >
-            <X size={28} />
-          </button>
-          <img
-            src={selectedImageModal}
-            alt="Ampliada"
-            style={{
-              maxWidth: '100%',
-              maxHeight: '80vh',
-              borderRadius: '8px',
-              objectFit: 'contain',
-            }}
-          />
-        </div>
-      </div>,
-      modalContainer
-    );
-  };
-
   return (
     <div style={{ padding: '24px', maxWidth: '1200px', margin: '0 auto' }}>
+      {/* Estilos CSS para responsividad y edición masiva */}
       <style>{`
         @media (max-width: 768px) {
           .desktop-tabs { display: none !important; }
@@ -2137,6 +895,7 @@ export default function Inventory() {
           .desktop-table { display: block !important; }
           .mobile-cards { display: none !important; }
         }
+        /* Estilos para tarjetas móviles */
         .mobile-card {
           background-color: #ffffff;
           border-radius: 8px;
@@ -2159,6 +918,7 @@ export default function Inventory() {
           align-items: center;
           padding: 8px 0;
           border-bottom: 1px solid #f3f4f6;
+          gap: 8px;
         }
         .mobile-card-field:last-child {
           border-bottom: none;
@@ -2168,11 +928,22 @@ export default function Inventory() {
           font-weight: 600;
           color: #6b7280;
           text-transform: uppercase;
+          flex-shrink: 0;
+          width: 100px;
         }
         .mobile-card-value {
           font-size: 14px;
           color: #111827;
           font-weight: 500;
+          flex: 1;
+        }
+        .mobile-card-value input, .mobile-card-value textarea, .mobile-card-value select {
+          width: 100%;
+          padding: 6px 8px;
+          border: 1px solid #d1d5db;
+          border-radius: 4px;
+          font-size: 13px;
+          box-sizing: border-box;
         }
         .mobile-card-actions {
           display: flex;
@@ -2194,8 +965,29 @@ export default function Inventory() {
           font-size: 12px;
           font-weight: 600;
         }
+        .mass-input {
+          width: 100%;
+          padding: 6px 8px;
+          border: 1px solid #d1d5db;
+          border-radius: 4px;
+          font-size: 13px;
+          box-sizing: border-box;
+          background-color: #fff;
+          transition: border-color 0.2s, background-color 0.2s;
+        }
+        .mass-input:focus {
+          outline: none;
+          border-color: #dc2626;
+          box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.1);
+        }
+        .mass-input.modified {
+          background-color: #fef2f2;
+          border-color: #f87171;
+          font-weight: 600;
+        }
       `}</style>
 
+      {/* Encabezado del Módulo */}
       <div
         style={{
           display: 'flex',
@@ -2223,6 +1015,7 @@ export default function Inventory() {
             Visualice y administre productos en tiempo real.
           </p>
         </div>
+        {/* Botón de Registrar Producto restringido a administrador y stock */}
         {canManage && activeMainTab === 'inventory' && (
           <button
             onClick={openNewModal}
@@ -2245,6 +1038,7 @@ export default function Inventory() {
         )}
       </div>
 
+      {/* Alertas de Feedback */}
       {errorMsg && (
         <div
           style={{
@@ -2278,6 +1072,10 @@ export default function Inventory() {
         </div>
       )}
 
+      {/* ========================================== */}
+      {/* MENÚ DE NAVEGACIÓN RESPONSIVO                 */}
+      {/* ========================================== */}
+      {/* Versión Escritorio: Pestañas Horizontales */}
       <div
         className="desktop-tabs"
         style={{
@@ -2290,24 +1088,16 @@ export default function Inventory() {
         {menuOptions.map((tab) => {
           const Icon = tab.icon;
           const isActive =
-            tab.id === 'import_export'
+            tab.tabType === 'mass_modification'
+              ? activeMainTab === 'mass_modification'
+              : tab.tabType === 'import_export'
               ? activeMainTab === 'import_export'
-              : tab.id === 'bulk_edit'
-              ? activeMainTab === 'bulk_edit'
-              : activeMainTab === 'inventory' && activeCategory === tab.id;
+              : activeMainTab === 'inventory' &&
+                activeCategory === tab.category;
           return (
             <button
               key={tab.id}
-              onClick={() => {
-                if (tab.id === 'import_export') {
-                  setActiveMainTab('import_export');
-                } else if (tab.id === 'bulk_edit') {
-                  setActiveMainTab('bulk_edit');
-                } else {
-                  setActiveMainTab('inventory');
-                  setActiveCategory(tab.id);
-                }
-              }}
+              onClick={() => handleTabSwitchAttempt(tab.tabType, tab.category)}
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -2327,11 +1117,25 @@ export default function Inventory() {
             >
               <Icon size={18} color={isActive ? '#dc2626' : '#4b5563'} />
               {tab.label}
+              {tab.tabType === 'mass_modification' && hasUnsavedChanges && (
+                <span
+                  style={{
+                    backgroundColor: '#dc2626',
+                    color: '#fff',
+                    borderRadius: '50%',
+                    width: '8px',
+                    height: '8px',
+                    display: 'inline-block',
+                  }}
+                  title="Cambios sin guardar"
+                />
+              )}
             </button>
           );
         })}
       </div>
 
+      {/* Versión Móvil: Dropdown Compacto */}
       <div
         className="mobile-dropdown"
         ref={mobileMenuRef}
@@ -2355,20 +1159,25 @@ export default function Inventory() {
           }}
         >
           <span style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            {activeMainTab === 'import_export' ? (
+            {activeMainTab === 'mass_modification' ? (
+              <Edit3 size={18} color="#dc2626" />
+            ) : activeMainTab === 'import_export' ? (
               <Archive size={18} color="#dc2626" />
-            ) : activeMainTab === 'bulk_edit' ? (
-              <Layers size={18} color="#dc2626" />
             ) : (
               <Package size={18} color="#dc2626" />
             )}
-            {activeMainTab === 'import_export'
-              ? 'Importación/Exportación'
-              : activeMainTab === 'bulk_edit'
+            {activeMainTab === 'mass_modification'
               ? 'Modificación Masiva'
+              : activeMainTab === 'import_export'
+              ? 'Importación/Exportación'
               : activeCategory === 'bombillos'
               ? 'Bombillos'
               : 'Fluidos'}
+            {hasUnsavedChanges && activeMainTab !== 'mass_modification' && (
+              <span style={{ color: '#dc2626', fontSize: '12px' }}>
+                (Cambios pendientes)
+              </span>
+            )}
           </span>
           <ChevronDown
             size={18}
@@ -2398,23 +1207,17 @@ export default function Inventory() {
             {menuOptions.map((tab) => {
               const Icon = tab.icon;
               const isActive =
-                tab.id === 'import_export'
+                tab.tabType === 'mass_modification'
+                  ? activeMainTab === 'mass_modification'
+                  : tab.tabType === 'import_export'
                   ? activeMainTab === 'import_export'
-                  : tab.id === 'bulk_edit'
-                  ? activeMainTab === 'bulk_edit'
-                  : activeMainTab === 'inventory' && activeCategory === tab.id;
+                  : activeMainTab === 'inventory' &&
+                    activeCategory === tab.category;
               return (
                 <button
                   key={tab.id}
                   onClick={() => {
-                    if (tab.id === 'import_export') {
-                      setActiveMainTab('import_export');
-                    } else if (tab.id === 'bulk_edit') {
-                      setActiveMainTab('bulk_edit');
-                    } else {
-                      setActiveMainTab('inventory');
-                      setActiveCategory(tab.id);
-                    }
+                    handleTabSwitchAttempt(tab.tabType, tab.category);
                     setIsMobileMenuOpen(false);
                   }}
                   style={{
@@ -2434,6 +1237,20 @@ export default function Inventory() {
                 >
                   <Icon size={18} color={isActive ? '#dc2626' : '#9ca3af'} />
                   {tab.label}
+                  {tab.tabType === 'mass_modification' && hasUnsavedChanges && (
+                    <span
+                      style={{
+                        fontSize: '11px',
+                        backgroundColor: '#dc2626',
+                        color: '#fff',
+                        padding: '2px 6px',
+                        borderRadius: '10px',
+                        marginLeft: '4px',
+                      }}
+                    >
+                      Modificado
+                    </span>
+                  )}
                   {isActive && (
                     <Check size={16} style={{ marginLeft: 'auto' }} />
                   )}
@@ -2444,8 +1261,12 @@ export default function Inventory() {
         )}
       </div>
 
+      {/* ========================================== */}
+      {/* CONTENIDO DE LA PESTAÑA DE INVENTARIO       */}
+      {/* ========================================== */}
       {activeMainTab === 'inventory' && (
         <>
+          {/* Barra de Búsqueda */}
           <div style={{ position: 'relative', marginBottom: '20px' }}>
             <Search
               style={{
@@ -2474,6 +1295,7 @@ export default function Inventory() {
             />
           </div>
 
+          {/* Tabla de Escritorio */}
           <div
             className="desktop-table"
             style={{
@@ -2748,6 +1570,7 @@ export default function Inventory() {
             </table>
           </div>
 
+          {/* Tarjetas para Móvil */}
           <div className="mobile-cards">
             {loading ? (
               <div
@@ -2930,16 +1753,18 @@ export default function Inventory() {
         </>
       )}
 
-      {/* ============================================ */}
-      {/* VISTA DE MODIFICACIÓN MASIVA                 */}
-      {/* ============================================ */}
-      {activeMainTab === 'bulk_edit' && canBulkEdit && (
+      {/* ========================================== */}
+      {/* NUEVA PESTAÑA: "MODIFICACIÓN MASIVA"        */}
+      {/* ========================================== */}
+      {activeMainTab === 'mass_modification' && canMassModify && (
         <div
           style={{
             backgroundColor: '#ffffff',
             borderRadius: '8px',
             boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
             padding: '24px',
+            position: 'relative',
+            paddingBottom: '90px',
           }}
         >
           <div
@@ -2947,9 +1772,9 @@ export default function Inventory() {
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
+              marginBottom: '20px',
               flexWrap: 'wrap',
               gap: '16px',
-              marginBottom: '20px',
             }}
           >
             <div>
@@ -2958,122 +1783,24 @@ export default function Inventory() {
                   fontSize: '20px',
                   fontWeight: 'bold',
                   color: '#111827',
+                  marginBottom: '4px',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '10px',
-                  margin: 0,
+                  gap: '8px',
                 }}
               >
-                <Layers size={24} color="#dc2626" /> Modificación Masiva de
+                <Edit3 size={22} color="#dc2626" /> Modificación Masiva de
                 Inventario
               </h2>
-              <p
-                style={{ color: '#6b7280', fontSize: '14px', marginTop: '4px' }}
-              >
-                Edite directamente los datos en la tabla y guarde todos los
-                cambios de una sola vez.
+              <p style={{ color: '#6b7280', fontSize: '14px' }}>
+                Modifique cualquier campo directamente en las tablas o tarjetas
+                por categoría y guarde todos los cambios a la vez.
               </p>
             </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <label
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  backgroundColor: '#eff6ff',
-                  color: '#1d4ed8',
-                  padding: '10px 16px',
-                  borderRadius: '8px',
-                  border: '1px solid #bfdbfe',
-                  fontWeight: '600',
-                  fontSize: '13px',
-                  cursor: zipProcessing ? 'not-allowed' : 'pointer',
-                  transition: 'all 0.2s',
-                }}
-              >
-                <Upload size={18} />
-                {zipProcessing ? 'Cargando ZIP...' : 'Cargar ZIP de Imágenes'}
-                <input
-                  type="file"
-                  accept=".zip"
-                  onChange={handleZipImagesUpload}
-                  disabled={zipProcessing}
-                  style={{ display: 'none' }}
-                />
-              </label>
-
-              <button
-                onClick={handleSaveBulk}
-                disabled={bulkSaving || bulkLoading}
-                style={{
-                  backgroundColor: bulkSaving ? '#9ca3af' : '#16a34a',
-                  color: '#ffffff',
-                  padding: '10px 24px',
-                  borderRadius: '8px',
-                  border: 'none',
-                  fontWeight: '700',
-                  fontSize: '14px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  cursor: bulkSaving || bulkLoading ? 'not-allowed' : 'pointer',
-                  boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
-                }}
-              >
-                <Save size={18} />
-                {bulkSaving ? 'Guardando...' : 'Guardar Todo'}
-              </button>
-            </div>
           </div>
 
-          <div
-            style={{
-              display: 'flex',
-              gap: '12px',
-              borderBottom: '2px solid #e5e7eb',
-              marginBottom: '20px',
-            }}
-          >
-            <button
-              onClick={() => setBulkCategory('bombillos')}
-              style={{
-                padding: '10px 20px',
-                border: 'none',
-                borderBottom:
-                  bulkCategory === 'bombillos'
-                    ? '3px solid #dc2626'
-                    : '3px solid transparent',
-                backgroundColor: 'transparent',
-                color: bulkCategory === 'bombillos' ? '#dc2626' : '#4b5563',
-                fontWeight: bulkCategory === 'bombillos' ? 'bold' : '500',
-                fontSize: '14px',
-                cursor: 'pointer',
-              }}
-            >
-              Bombillos
-            </button>
-            <button
-              onClick={() => setBulkCategory('fluidos')}
-              style={{
-                padding: '10px 20px',
-                border: 'none',
-                borderBottom:
-                  bulkCategory === 'fluidos'
-                    ? '3px solid #dc2626'
-                    : '3px solid transparent',
-                backgroundColor: 'transparent',
-                color: bulkCategory === 'fluidos' ? '#dc2626' : '#4b5563',
-                fontWeight: bulkCategory === 'fluidos' ? 'bold' : '500',
-                fontSize: '14px',
-                cursor: 'pointer',
-              }}
-            >
-              Fluidos
-            </button>
-          </div>
-
-          <div style={{ position: 'relative', marginBottom: '16px' }}>
+          {/* Barra de Búsqueda para Modificación Masiva */}
+          <div style={{ position: 'relative', marginBottom: '24px' }}>
             <Search
               style={{
                 position: 'absolute',
@@ -3082,345 +1809,936 @@ export default function Inventory() {
                 transform: 'translateY(-50%)',
                 color: '#9ca3af',
               }}
-              size={18}
+              size={20}
             />
             <input
               type="text"
-              placeholder="Filtrar por código o descripción en esta lista..."
-              value={bulkSearch}
-              onChange={(e) => setBulkSearch(e.target.value)}
+              placeholder="Filtrar productos en modificación masiva..."
+              value={massSearch}
+              onChange={(e) => setMassSearch(e.target.value)}
               style={{
                 width: '100%',
-                padding: '8px 12px 8px 38px',
-                borderRadius: '6px',
+                padding: '10px 12px 10px 40px',
+                borderRadius: '8px',
                 border: '1px solid #d1d5db',
                 outline: 'none',
-                fontSize: '13px',
+                fontSize: '14px',
+                backgroundColor: '#ffffff',
+                boxSizing: 'border-box',
               }}
             />
           </div>
 
-          <div
-            style={{
-              overflowX: 'auto',
-              border: '1px solid #e5e7eb',
-              borderRadius: '8px',
-            }}
-          >
-            <table
-              style={{
-                width: '100%',
-                borderCollapse: 'collapse',
-                fontSize: '13px',
-              }}
+          {loading ? (
+            <div
+              style={{ textAlign: 'center', padding: '40px', color: '#6b7280' }}
             >
-              <thead>
-                <tr
+              Cargando catálogo maestro...
+            </div>
+          ) : (
+            <>
+              {/* SECCIÓN 1: BOMBILLOS */}
+              <div style={{ marginBottom: '32px' }}>
+                <div
                   style={{
                     backgroundColor: '#f8fafc',
-                    borderBottom: '2px solid #e2e8f0',
-                    color: '#334155',
-                    textAlign: 'left',
+                    padding: '12px 16px',
+                    borderRadius: '8px',
+                    borderLeft: '4px solid #dc2626',
+                    marginBottom: '16px',
                   }}
                 >
-                  <th style={{ padding: '10px 12px', width: '70px' }}>
-                    Imagen
-                  </th>
-                  <th style={{ padding: '10px 12px', width: '130px' }}>
-                    Código
-                  </th>
-                  <th style={{ padding: '10px 12px' }}>Descripción</th>
-                  <th style={{ padding: '10px 12px', width: '120px' }}>
-                    Categoría
-                  </th>
-                  <th style={{ padding: '10px 12px', width: '110px' }}>
-                    Precio Full ($)
-                  </th>
-                  {(userRole === 'administrador' || userRole === 'stock') && (
-                    <th style={{ padding: '10px 12px', width: '110px' }}>
-                      Precio Base ($)
-                    </th>
-                  )}
-                  <th style={{ padding: '10px 12px', width: '100px' }}>
-                    Stock
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {bulkLoading ? (
-                  <tr>
-                    <td
-                      colSpan={
-                        userRole === 'administrador' || userRole === 'stock'
-                          ? 7
-                          : 6
-                      }
-                      style={{
-                        textAlign: 'center',
-                        padding: '30px',
-                        color: '#64748b',
-                      }}
-                    >
-                      Cargando tabla masiva...
-                    </td>
-                  </tr>
-                ) : filteredBulkProducts.length === 0 ? (
-                  <tr>
-                    <td
-                      colSpan={
-                        userRole === 'administrador' || userRole === 'stock'
-                          ? 7
-                          : 6
-                      }
-                      style={{
-                        textAlign: 'center',
-                        padding: '30px',
-                        color: '#64748b',
-                      }}
-                    >
-                      No se encontraron productos para modificar en esta
-                      categoría.
-                    </td>
-                  </tr>
-                ) : (
-                  filteredBulkProducts.map((p) => {
-                    const currentPreview =
-                      pendingImages[p.id]?.preview || p.image_url;
-                    return (
+                  <h3
+                    style={{
+                      fontSize: '16px',
+                      fontWeight: 'bold',
+                      color: '#1e293b',
+                      margin: 0,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                    }}
+                  >
+                    <Package size={18} color="#dc2626" /> 1. Bombillos (
+                    {bombillosMassProducts.length})
+                  </h3>
+                </div>
+
+                {/* Tabla de Escritorio - Bombillos */}
+                <div
+                  className="desktop-table"
+                  style={{
+                    overflowX: 'auto',
+                    border: '1px solid #e5e7eb',
+                    borderRadius: '8px',
+                  }}
+                >
+                  <table
+                    style={{
+                      width: '100%',
+                      borderCollapse: 'collapse',
+                      textAlign: 'left',
+                      fontSize: '13px',
+                    }}
+                  >
+                    <thead>
                       <tr
-                        key={p.id}
-                        style={{ borderBottom: '1px solid #f1f5f9' }}
+                        style={{
+                          backgroundColor: '#f1f5f9',
+                          color: '#334155',
+                          borderBottom: '1px solid #e2e8f0',
+                        }}
                       >
-                        <td
-                          style={{
-                            padding: '8px 12px',
-                            verticalAlign: 'middle',
-                          }}
-                        >
-                          <label
-                            style={{
-                              position: 'relative',
-                              cursor: 'pointer',
-                              display: 'inline-block',
-                            }}
-                          >
-                            {currentPreview ? (
-                              <img
-                                src={currentPreview}
-                                alt="prod"
-                                style={{
-                                  width: '42px',
-                                  height: '42px',
-                                  objectFit: 'cover',
-                                  borderRadius: '6px',
-                                  border: pendingImages[p.id]
-                                    ? '2px solid #16a34a'
-                                    : '1px solid #cbd5e1',
-                                }}
-                              />
-                            ) : (
-                              <div
-                                style={{
-                                  width: '42px',
-                                  height: '42px',
-                                  backgroundColor: '#f1f5f9',
-                                  borderRadius: '6px',
-                                  border: '1px dashed #94a3b8',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  color: '#64748b',
-                                }}
-                              >
-                                <ImageIcon size={18} />
-                              </div>
-                            )}
-                            <input
-                              type="file"
-                              accept="image/*"
-                              style={{ display: 'none' }}
-                              onChange={(e) => {
-                                if (e.target.files && e.target.files[0]) {
-                                  handleBulkSingleImageChange(
-                                    p.id,
-                                    e.target.files[0]
-                                  );
-                                }
-                              }}
-                            />
-                          </label>
-                        </td>
-
-                        <td
-                          style={{
-                            padding: '8px 12px',
-                            verticalAlign: 'middle',
-                          }}
-                        >
-                          <input
-                            type="text"
-                            value={p.code || ''}
-                            onChange={(e) =>
-                              handleBulkChange(p.id, 'code', e.target.value)
-                            }
-                            style={{
-                              width: '100%',
-                              padding: '6px 8px',
-                              borderRadius: '4px',
-                              border: '1px solid #cbd5e1',
-                              fontWeight: '600',
-                            }}
-                          />
-                        </td>
-
-                        <td
-                          style={{
-                            padding: '8px 12px',
-                            verticalAlign: 'middle',
-                          }}
-                        >
-                          <input
-                            type="text"
-                            value={p.description || ''}
-                            onChange={(e) =>
-                              handleBulkChange(
-                                p.id,
-                                'description',
-                                e.target.value
-                              )
-                            }
-                            style={{
-                              width: '100%',
-                              padding: '6px 8px',
-                              borderRadius: '4px',
-                              border: '1px solid #cbd5e1',
-                            }}
-                          />
-                        </td>
-
-                        <td
-                          style={{
-                            padding: '8px 12px',
-                            verticalAlign: 'middle',
-                          }}
-                        >
-                          <select
-                            value={p.category || 'bombillos'}
-                            onChange={(e) =>
-                              handleBulkChange(p.id, 'category', e.target.value)
-                            }
-                            style={{
-                              width: '100%',
-                              padding: '6px 8px',
-                              borderRadius: '4px',
-                              border: '1px solid #cbd5e1',
-                              backgroundColor: '#fff',
-                            }}
-                          >
-                            <option value="bombillos">Bombillos</option>
-                            <option value="fluidos">Fluidos</option>
-                          </select>
-                        </td>
-
-                        <td
-                          style={{
-                            padding: '8px 12px',
-                            verticalAlign: 'middle',
-                          }}
-                        >
-                          <input
-                            type="number"
-                            step="0.01"
-                            value={p.price_usd !== undefined ? p.price_usd : ''}
-                            onChange={(e) =>
-                              handleBulkChange(
-                                p.id,
-                                'price_usd',
-                                e.target.value
-                              )
-                            }
-                            style={{
-                              width: '100%',
-                              padding: '6px 8px',
-                              borderRadius: '4px',
-                              border: '1px solid #cbd5e1',
-                              color: '#059669',
-                              fontWeight: '700',
-                            }}
-                          />
-                        </td>
-
-                        {(userRole === 'administrador' ||
-                          userRole === 'stock') && (
-                          <td
-                            style={{
-                              padding: '8px 12px',
-                              verticalAlign: 'middle',
-                            }}
-                          >
-                            <input
-                              type="number"
-                              step="0.01"
-                              value={
-                                p.base_price !== undefined ? p.base_price : ''
-                              }
-                              onChange={(e) =>
-                                handleBulkChange(
-                                  p.id,
-                                  'base_price',
-                                  e.target.value
-                                )
-                              }
-                              style={{
-                                width: '100%',
-                                padding: '6px 8px',
-                                borderRadius: '4px',
-                                border: '1px solid #cbd5e1',
-                                color: '#334155',
-                              }}
-                            />
-                          </td>
-                        )}
-
-                        <td
-                          style={{
-                            padding: '8px 12px',
-                            verticalAlign: 'middle',
-                          }}
-                        >
-                          <input
-                            type="number"
-                            value={
-                              p.stock_current !== undefined
-                                ? p.stock_current
-                                : ''
-                            }
-                            onChange={(e) =>
-                              handleBulkChange(
-                                p.id,
-                                'stock_current',
-                                e.target.value
-                              )
-                            }
-                            style={{
-                              width: '100%',
-                              padding: '6px 8px',
-                              borderRadius: '4px',
-                              border: '1px solid #cbd5e1',
-                              fontWeight: '600',
-                            }}
-                          />
-                        </td>
+                        <th style={{ padding: '10px 12px' }}>Código</th>
+                        <th style={{ padding: '10px 12px' }}>Descripción</th>
+                        <th style={{ padding: '10px 12px' }}>Categoría</th>
+                        <th style={{ padding: '10px 12px' }}>
+                          Precio Full ($)
+                        </th>
+                        <th style={{ padding: '10px 12px' }}>
+                          Precio Base ($)
+                        </th>
+                        <th style={{ padding: '10px 12px' }}>Stock Actual</th>
                       </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
+                    </thead>
+                    <tbody>
+                      {bombillosMassProducts.length === 0 ? (
+                        <tr>
+                          <td
+                            colSpan="6"
+                            style={{
+                              textAlign: 'center',
+                              padding: '16px',
+                              color: '#6b7280',
+                            }}
+                          >
+                            No hay bombillos registrados.
+                          </td>
+                        </tr>
+                      ) : (
+                        bombillosMassProducts.map((p) => {
+                          const changes = massChanges[p.id] || {};
+                          const currentCode =
+                            changes.code !== undefined ? changes.code : p.code;
+                          const currentDesc =
+                            changes.description !== undefined
+                              ? changes.description
+                              : p.description;
+                          const currentCat =
+                            changes.category !== undefined
+                              ? changes.category
+                              : p.category;
+                          const currentPrice =
+                            changes.price_usd !== undefined
+                              ? changes.price_usd
+                              : p.price_usd;
+                          const currentBasePrice =
+                            changes.base_price !== undefined
+                              ? changes.base_price
+                              : p.base_price ?? '';
+                          const currentStock =
+                            changes.stock_current !== undefined
+                              ? changes.stock_current
+                              : p.stock_current;
+
+                          return (
+                            <tr
+                              key={p.id}
+                              style={{ borderBottom: '1px solid #f1f5f9' }}
+                            >
+                              <td style={{ padding: '8px 12px' }}>
+                                <input
+                                  type="text"
+                                  className={`mass-input ${
+                                    changes.code !== undefined ? 'modified' : ''
+                                  }`}
+                                  value={currentCode}
+                                  onChange={(e) =>
+                                    handleMassFieldChange(
+                                      p.id,
+                                      'code',
+                                      e.target.value
+                                    )
+                                  }
+                                />
+                              </td>
+                              <td style={{ padding: '8px 12px' }}>
+                                <input
+                                  type="text"
+                                  className={`mass-input ${
+                                    changes.description !== undefined
+                                      ? 'modified'
+                                      : ''
+                                  }`}
+                                  value={currentDesc}
+                                  onChange={(e) =>
+                                    handleMassFieldChange(
+                                      p.id,
+                                      'description',
+                                      e.target.value
+                                    )
+                                  }
+                                />
+                              </td>
+                              <td style={{ padding: '8px 12px' }}>
+                                <select
+                                  className={`mass-input ${
+                                    changes.category !== undefined
+                                      ? 'modified'
+                                      : ''
+                                  }`}
+                                  value={currentCat}
+                                  onChange={(e) =>
+                                    handleMassFieldChange(
+                                      p.id,
+                                      'category',
+                                      e.target.value
+                                    )
+                                  }
+                                >
+                                  <option value="bombillos">Bombillos</option>
+                                  <option value="fluidos">Fluidos</option>
+                                </select>
+                              </td>
+                              <td
+                                style={{ padding: '8px 12px', width: '120px' }}
+                              >
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  min="0"
+                                  className={`mass-input ${
+                                    changes.price_usd !== undefined
+                                      ? 'modified'
+                                      : ''
+                                  }`}
+                                  value={currentPrice}
+                                  onChange={(e) =>
+                                    handleMassFieldChange(
+                                      p.id,
+                                      'price_usd',
+                                      e.target.value
+                                    )
+                                  }
+                                />
+                              </td>
+                              <td
+                                style={{ padding: '8px 12px', width: '120px' }}
+                              >
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  min="0"
+                                  className={`mass-input ${
+                                    changes.base_price !== undefined
+                                      ? 'modified'
+                                      : ''
+                                  }`}
+                                  value={currentBasePrice}
+                                  onChange={(e) =>
+                                    handleMassFieldChange(
+                                      p.id,
+                                      'base_price',
+                                      e.target.value
+                                    )
+                                  }
+                                />
+                              </td>
+                              <td
+                                style={{ padding: '8px 12px', width: '100px' }}
+                              >
+                                <input
+                                  type="number"
+                                  min="0"
+                                  className={`mass-input ${
+                                    changes.stock_current !== undefined
+                                      ? 'modified'
+                                      : ''
+                                  }`}
+                                  value={currentStock}
+                                  onChange={(e) =>
+                                    handleMassFieldChange(
+                                      p.id,
+                                      'stock_current',
+                                      e.target.value
+                                    )
+                                  }
+                                />
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Tarjetas Móvil - Bombillos */}
+                <div className="mobile-cards">
+                  {bombillosMassProducts.length === 0 ? (
+                    <div
+                      style={{
+                        textAlign: 'center',
+                        padding: '16px',
+                        color: '#6b7280',
+                      }}
+                    >
+                      No hay bombillos registrados.
+                    </div>
+                  ) : (
+                    bombillosMassProducts.map((p) => {
+                      const changes = massChanges[p.id] || {};
+                      const currentCode =
+                        changes.code !== undefined ? changes.code : p.code;
+                      const currentDesc =
+                        changes.description !== undefined
+                          ? changes.description
+                          : p.description;
+                      const currentCat =
+                        changes.category !== undefined
+                          ? changes.category
+                          : p.category;
+                      const currentPrice =
+                        changes.price_usd !== undefined
+                          ? changes.price_usd
+                          : p.price_usd;
+                      const currentBasePrice =
+                        changes.base_price !== undefined
+                          ? changes.base_price
+                          : p.base_price ?? '';
+                      const currentStock =
+                        changes.stock_current !== undefined
+                          ? changes.stock_current
+                          : p.stock_current;
+
+                      return (
+                        <div key={p.id} className="mobile-card">
+                          <div className="mobile-card-field">
+                            <span className="mobile-card-label">Código</span>
+                            <span className="mobile-card-value">
+                              <input
+                                type="text"
+                                className={
+                                  changes.code !== undefined ? 'modified' : ''
+                                }
+                                value={currentCode}
+                                onChange={(e) =>
+                                  handleMassFieldChange(
+                                    p.id,
+                                    'code',
+                                    e.target.value
+                                  )
+                                }
+                              />
+                            </span>
+                          </div>
+                          <div className="mobile-card-field">
+                            <span className="mobile-card-label">
+                              Descripción
+                            </span>
+                            <span className="mobile-card-value">
+                              <textarea
+                                rows={2}
+                                className={
+                                  changes.description !== undefined
+                                    ? 'modified'
+                                    : ''
+                                }
+                                value={currentDesc}
+                                onChange={(e) =>
+                                  handleMassFieldChange(
+                                    p.id,
+                                    'description',
+                                    e.target.value
+                                  )
+                                }
+                              />
+                            </span>
+                          </div>
+                          <div className="mobile-card-field">
+                            <span className="mobile-card-label">Categoría</span>
+                            <span className="mobile-card-value">
+                              <select
+                                className={
+                                  changes.category !== undefined
+                                    ? 'modified'
+                                    : ''
+                                }
+                                value={currentCat}
+                                onChange={(e) =>
+                                  handleMassFieldChange(
+                                    p.id,
+                                    'category',
+                                    e.target.value
+                                  )
+                                }
+                              >
+                                <option value="bombillos">Bombillos</option>
+                                <option value="fluidos">Fluidos</option>
+                              </select>
+                            </span>
+                          </div>
+                          <div className="mobile-card-field">
+                            <span className="mobile-card-label">
+                              Precio Full ($)
+                            </span>
+                            <span className="mobile-card-value">
+                              <input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                className={
+                                  changes.price_usd !== undefined
+                                    ? 'modified'
+                                    : ''
+                                }
+                                value={currentPrice}
+                                onChange={(e) =>
+                                  handleMassFieldChange(
+                                    p.id,
+                                    'price_usd',
+                                    e.target.value
+                                  )
+                                }
+                              />
+                            </span>
+                          </div>
+                          <div className="mobile-card-field">
+                            <span className="mobile-card-label">
+                              Precio Base ($)
+                            </span>
+                            <span className="mobile-card-value">
+                              <input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                className={
+                                  changes.base_price !== undefined
+                                    ? 'modified'
+                                    : ''
+                                }
+                                value={currentBasePrice}
+                                onChange={(e) =>
+                                  handleMassFieldChange(
+                                    p.id,
+                                    'base_price',
+                                    e.target.value
+                                  )
+                                }
+                              />
+                            </span>
+                          </div>
+                          <div className="mobile-card-field">
+                            <span className="mobile-card-label">
+                              Stock Actual
+                            </span>
+                            <span className="mobile-card-value">
+                              <input
+                                type="number"
+                                min="0"
+                                className={
+                                  changes.stock_current !== undefined
+                                    ? 'modified'
+                                    : ''
+                                }
+                                value={currentStock}
+                                onChange={(e) =>
+                                  handleMassFieldChange(
+                                    p.id,
+                                    'stock_current',
+                                    e.target.value
+                                  )
+                                }
+                              />
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+
+              {/* SECCIÓN 2: FLUIDOS */}
+              <div style={{ marginBottom: '24px' }}>
+                <div
+                  style={{
+                    backgroundColor: '#f8fafc',
+                    padding: '12px 16px',
+                    borderRadius: '8px',
+                    borderLeft: '4px solid #059669',
+                    marginBottom: '16px',
+                  }}
+                >
+                  <h3
+                    style={{
+                      fontSize: '16px',
+                      fontWeight: 'bold',
+                      color: '#1e293b',
+                      margin: 0,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                    }}
+                  >
+                    <Package size={18} color="#059669" /> 2. Fluidos (
+                    {fluidosMassProducts.length})
+                  </h3>
+                </div>
+
+                {/* Tabla de Escritorio - Fluidos */}
+                <div
+                  className="desktop-table"
+                  style={{
+                    overflowX: 'auto',
+                    border: '1px solid #e5e7eb',
+                    borderRadius: '8px',
+                  }}
+                >
+                  <table
+                    style={{
+                      width: '100%',
+                      borderCollapse: 'collapse',
+                      textAlign: 'left',
+                      fontSize: '13px',
+                    }}
+                  >
+                    <thead>
+                      <tr
+                        style={{
+                          backgroundColor: '#f1f5f9',
+                          color: '#334155',
+                          borderBottom: '1px solid #e2e8f0',
+                        }}
+                      >
+                        <th style={{ padding: '10px 12px' }}>Código</th>
+                        <th style={{ padding: '10px 12px' }}>Descripción</th>
+                        <th style={{ padding: '10px 12px' }}>Categoría</th>
+                        <th style={{ padding: '10px 12px' }}>
+                          Precio Full ($)
+                        </th>
+                        <th style={{ padding: '10px 12px' }}>
+                          Precio Base ($)
+                        </th>
+                        <th style={{ padding: '10px 12px' }}>Stock Actual</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {fluidosMassProducts.length === 0 ? (
+                        <tr>
+                          <td
+                            colSpan="6"
+                            style={{
+                              textAlign: 'center',
+                              padding: '16px',
+                              color: '#6b7280',
+                            }}
+                          >
+                            No hay fluidos registrados.
+                          </td>
+                        </tr>
+                      ) : (
+                        fluidosMassProducts.map((p) => {
+                          const changes = massChanges[p.id] || {};
+                          const currentCode =
+                            changes.code !== undefined ? changes.code : p.code;
+                          const currentDesc =
+                            changes.description !== undefined
+                              ? changes.description
+                              : p.description;
+                          const currentCat =
+                            changes.category !== undefined
+                              ? changes.category
+                              : p.category;
+                          const currentPrice =
+                            changes.price_usd !== undefined
+                              ? changes.price_usd
+                              : p.price_usd;
+                          const currentBasePrice =
+                            changes.base_price !== undefined
+                              ? changes.base_price
+                              : p.base_price ?? '';
+                          const currentStock =
+                            changes.stock_current !== undefined
+                              ? changes.stock_current
+                              : p.stock_current;
+
+                          return (
+                            <tr
+                              key={p.id}
+                              style={{ borderBottom: '1px solid #f1f5f9' }}
+                            >
+                              <td style={{ padding: '8px 12px' }}>
+                                <input
+                                  type="text"
+                                  className={`mass-input ${
+                                    changes.code !== undefined ? 'modified' : ''
+                                  }`}
+                                  value={currentCode}
+                                  onChange={(e) =>
+                                    handleMassFieldChange(
+                                      p.id,
+                                      'code',
+                                      e.target.value
+                                    )
+                                  }
+                                />
+                              </td>
+                              <td style={{ padding: '8px 12px' }}>
+                                <input
+                                  type="text"
+                                  className={`mass-input ${
+                                    changes.description !== undefined
+                                      ? 'modified'
+                                      : ''
+                                  }`}
+                                  value={currentDesc}
+                                  onChange={(e) =>
+                                    handleMassFieldChange(
+                                      p.id,
+                                      'description',
+                                      e.target.value
+                                    )
+                                  }
+                                />
+                              </td>
+                              <td style={{ padding: '8px 12px' }}>
+                                <select
+                                  className={`mass-input ${
+                                    changes.category !== undefined
+                                      ? 'modified'
+                                      : ''
+                                  }`}
+                                  value={currentCat}
+                                  onChange={(e) =>
+                                    handleMassFieldChange(
+                                      p.id,
+                                      'category',
+                                      e.target.value
+                                    )
+                                  }
+                                >
+                                  <option value="bombillos">Bombillos</option>
+                                  <option value="fluidos">Fluidos</option>
+                                </select>
+                              </td>
+                              <td
+                                style={{ padding: '8px 12px', width: '120px' }}
+                              >
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  min="0"
+                                  className={`mass-input ${
+                                    changes.price_usd !== undefined
+                                      ? 'modified'
+                                      : ''
+                                  }`}
+                                  value={currentPrice}
+                                  onChange={(e) =>
+                                    handleMassFieldChange(
+                                      p.id,
+                                      'price_usd',
+                                      e.target.value
+                                    )
+                                  }
+                                />
+                              </td>
+                              <td
+                                style={{ padding: '8px 12px', width: '120px' }}
+                              >
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  min="0"
+                                  className={`mass-input ${
+                                    changes.base_price !== undefined
+                                      ? 'modified'
+                                      : ''
+                                  }`}
+                                  value={currentBasePrice}
+                                  onChange={(e) =>
+                                    handleMassFieldChange(
+                                      p.id,
+                                      'base_price',
+                                      e.target.value
+                                    )
+                                  }
+                                />
+                              </td>
+                              <td
+                                style={{ padding: '8px 12px', width: '100px' }}
+                              >
+                                <input
+                                  type="number"
+                                  min="0"
+                                  className={`mass-input ${
+                                    changes.stock_current !== undefined
+                                      ? 'modified'
+                                      : ''
+                                  }`}
+                                  value={currentStock}
+                                  onChange={(e) =>
+                                    handleMassFieldChange(
+                                      p.id,
+                                      'stock_current',
+                                      e.target.value
+                                    )
+                                  }
+                                />
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Tarjetas Móvil - Fluidos */}
+                <div className="mobile-cards">
+                  {fluidosMassProducts.length === 0 ? (
+                    <div
+                      style={{
+                        textAlign: 'center',
+                        padding: '16px',
+                        color: '#6b7280',
+                      }}
+                    >
+                      No hay fluidos registrados.
+                    </div>
+                  ) : (
+                    fluidosMassProducts.map((p) => {
+                      const changes = massChanges[p.id] || {};
+                      const currentCode =
+                        changes.code !== undefined ? changes.code : p.code;
+                      const currentDesc =
+                        changes.description !== undefined
+                          ? changes.description
+                          : p.description;
+                      const currentCat =
+                        changes.category !== undefined
+                          ? changes.category
+                          : p.category;
+                      const currentPrice =
+                        changes.price_usd !== undefined
+                          ? changes.price_usd
+                          : p.price_usd;
+                      const currentBasePrice =
+                        changes.base_price !== undefined
+                          ? changes.base_price
+                          : p.base_price ?? '';
+                      const currentStock =
+                        changes.stock_current !== undefined
+                          ? changes.stock_current
+                          : p.stock_current;
+
+                      return (
+                        <div key={p.id} className="mobile-card">
+                          <div className="mobile-card-field">
+                            <span className="mobile-card-label">Código</span>
+                            <span className="mobile-card-value">
+                              <input
+                                type="text"
+                                className={
+                                  changes.code !== undefined ? 'modified' : ''
+                                }
+                                value={currentCode}
+                                onChange={(e) =>
+                                  handleMassFieldChange(
+                                    p.id,
+                                    'code',
+                                    e.target.value
+                                  )
+                                }
+                              />
+                            </span>
+                          </div>
+                          <div className="mobile-card-field">
+                            <span className="mobile-card-label">
+                              Descripción
+                            </span>
+                            <span className="mobile-card-value">
+                              <textarea
+                                rows={2}
+                                className={
+                                  changes.description !== undefined
+                                    ? 'modified'
+                                    : ''
+                                }
+                                value={currentDesc}
+                                onChange={(e) =>
+                                  handleMassFieldChange(
+                                    p.id,
+                                    'description',
+                                    e.target.value
+                                  )
+                                }
+                              />
+                            </span>
+                          </div>
+                          <div className="mobile-card-field">
+                            <span className="mobile-card-label">Categoría</span>
+                            <span className="mobile-card-value">
+                              <select
+                                className={
+                                  changes.category !== undefined
+                                    ? 'modified'
+                                    : ''
+                                }
+                                value={currentCat}
+                                onChange={(e) =>
+                                  handleMassFieldChange(
+                                    p.id,
+                                    'category',
+                                    e.target.value
+                                  )
+                                }
+                              >
+                                <option value="bombillos">Bombillos</option>
+                                <option value="fluidos">Fluidos</option>
+                              </select>
+                            </span>
+                          </div>
+                          <div className="mobile-card-field">
+                            <span className="mobile-card-label">
+                              Precio Full ($)
+                            </span>
+                            <span className="mobile-card-value">
+                              <input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                className={
+                                  changes.price_usd !== undefined
+                                    ? 'modified'
+                                    : ''
+                                }
+                                value={currentPrice}
+                                onChange={(e) =>
+                                  handleMassFieldChange(
+                                    p.id,
+                                    'price_usd',
+                                    e.target.value
+                                  )
+                                }
+                              />
+                            </span>
+                          </div>
+                          <div className="mobile-card-field">
+                            <span className="mobile-card-label">
+                              Precio Base ($)
+                            </span>
+                            <span className="mobile-card-value">
+                              <input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                className={
+                                  changes.base_price !== undefined
+                                    ? 'modified'
+                                    : ''
+                                }
+                                value={currentBasePrice}
+                                onChange={(e) =>
+                                  handleMassFieldChange(
+                                    p.id,
+                                    'base_price',
+                                    e.target.value
+                                  )
+                                }
+                              />
+                            </span>
+                          </div>
+                          <div className="mobile-card-field">
+                            <span className="mobile-card-label">
+                              Stock Actual
+                            </span>
+                            <span className="mobile-card-value">
+                              <input
+                                type="number"
+                                min="0"
+                                className={
+                                  changes.stock_current !== undefined
+                                    ? 'modified'
+                                    : ''
+                                }
+                                value={currentStock}
+                                onChange={(e) =>
+                                  handleMassFieldChange(
+                                    p.id,
+                                    'stock_current',
+                                    e.target.value
+                                  )
+                                }
+                              />
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* Botón Flotante / Prominente de Guardado Masivo con Contador */}
+          <div
+            style={{
+              position: 'fixed',
+              bottom: '24px',
+              right: '24px',
+              zIndex: 100,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              backgroundColor: '#111827',
+              padding: '12px 20px',
+              borderRadius: '30px',
+              boxShadow: '0 10px 25px rgba(0,0,0,0.3)',
+            }}
+          >
+            <span
+              style={{ color: '#ffffff', fontSize: '13px', fontWeight: '600' }}
+            >
+              {Object.keys(massChanges).length} productos modificados
+            </span>
+            <button
+              onClick={handleSaveAllMassChanges}
+              disabled={!hasUnsavedChanges || massSaving}
+              style={{
+                backgroundColor: hasUnsavedChanges ? '#dc2626' : '#4b5563',
+                color: '#ffffff',
+                border: 'none',
+                padding: '10px 20px',
+                borderRadius: '20px',
+                fontWeight: 'bold',
+                fontSize: '14px',
+                cursor:
+                  hasUnsavedChanges && !massSaving ? 'pointer' : 'not-allowed',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                transition: 'background-color 0.2s',
+              }}
+            >
+              <Save size={18} />
+              {massSaving
+                ? 'Guardando...'
+                : `Guardar Todos los Cambios ${
+                    Object.keys(massChanges).length > 0
+                      ? `(${Object.keys(massChanges).length})`
+                      : ''
+                  }`}
+            </button>
           </div>
         </div>
       )}
 
+      {/* ========================================== */}
+      {/* CONTENIDO DE IMPORTACIÓN/EXPORTACIÓN        */}
+      {/* ========================================== */}
       {activeMainTab === 'import_export' && canManage && (
         <div
           style={{
@@ -3460,6 +2778,7 @@ export default function Inventory() {
               width: '100%',
             }}
           >
+            {/* Tarjeta de Exportación */}
             <div
               style={{
                 backgroundColor: '#f0fdf4',
@@ -3528,6 +2847,7 @@ export default function Inventory() {
               </div>
             </div>
 
+            {/* Tarjeta de Importación */}
             <div
               style={{
                 backgroundColor: '#eff6ff',
@@ -3649,13 +2969,1131 @@ export default function Inventory() {
         </div>
       )}
 
-      {/* RENDERIZAR TODOS LOS MODALES VIA PORTAL */}
-      <ModalNE />
-      <ModalExport />
-      <ModalImport />
-      <ModalAddEdit />
-      <ModalStock />
-      <ModalImage />
+      {/* ========================================== */}
+      {/* MODALES (Exportación, Importación, etc.)    */}
+      {/* ========================================== */}
+
+      {/* Modal de Notas de Entrega Asociadas */}
+      {neModalProduct && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            width: '100vw',
+            height: '100vh',
+            backgroundColor: 'rgba(0,0,0,0.6)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 99999,
+            padding: '16px',
+            boxSizing: 'border-box',
+          }}
+          onClick={() => setNeModalProduct(null)}
+        >
+          <div
+            style={{
+              backgroundColor: '#ffffff',
+              borderRadius: '12px',
+              width: '100%',
+              maxWidth: '500px',
+              maxHeight: '80vh',
+              display: 'flex',
+              flexDirection: 'column',
+              padding: '24px',
+              boxShadow:
+                '0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.2)',
+              boxSizing: 'border-box',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '16px',
+                borderBottom: '1px solid #e5e7eb',
+                paddingBottom: '12px',
+                flexShrink: 0,
+              }}
+            >
+              <h2
+                style={{
+                  fontSize: '18px',
+                  fontWeight: 'bold',
+                  color: '#111827',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  margin: 0,
+                }}
+              >
+                <FileSpreadsheet size={20} color="#1d4ed8" />
+                N.E. Asociadas a: {neModalProduct.code}
+              </h2>
+              <button
+                onClick={() => setNeModalProduct(null)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: '4px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <X size={20} color="#6b7280" />
+              </button>
+            </div>
+
+            {neLoading ? (
+              <div
+                style={{
+                  textAlign: 'center',
+                  padding: '20px',
+                  color: '#6b7280',
+                }}
+              >
+                Cargando notas de entrega...
+              </div>
+            ) : neList.length === 0 ? (
+              <div
+                style={{
+                  textAlign: 'center',
+                  padding: '20px',
+                  color: '#6b7280',
+                  fontStyle: 'italic',
+                }}
+              >
+                Este producto no está asignado a ninguna Nota de Entrega.
+              </div>
+            ) : (
+              <div
+                style={{
+                  overflowY: 'auto',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '8px',
+                  paddingRight: '4px',
+                  flexGrow: 1,
+                }}
+              >
+                {neList.map((ne, index) => (
+                  <div
+                    key={index}
+                    style={{
+                      padding: '10px 12px',
+                      backgroundColor: '#f8fafc',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '6px',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontWeight: '600',
+                        color: '#334155',
+                        fontSize: '14px',
+                      }}
+                    >
+                      N.E. #{ne.transaction_number}
+                    </span>
+                    <FileText size={16} color="#94a3b8" />
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div
+              style={{
+                marginTop: '20px',
+                display: 'flex',
+                justifyContent: 'flex-end',
+                borderTop: '1px solid #e5e7eb',
+                paddingTop: '12px',
+                flexShrink: 0,
+              }}
+            >
+              <button
+                onClick={() => setNeModalProduct(null)}
+                style={{
+                  padding: '8px 16px',
+                  backgroundColor: '#f3f4f6',
+                  color: '#374151',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '6px',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                }}
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Exportación */}
+      {showExportModal && canManage && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            padding: '16px',
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: '#ffffff',
+              borderRadius: '12px',
+              width: '100%',
+              maxWidth: '450px',
+              padding: '24px',
+              boxShadow: '0 10px 25px rgba(0,0,0,0.15)',
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '20px',
+              }}
+            >
+              <h2
+                style={{
+                  fontSize: '18px',
+                  fontWeight: 'bold',
+                  color: '#111827',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                }}
+              >
+                <Download size={20} color="#059669" /> Exportar Inventario
+              </h2>
+              <button
+                type="button"
+                onClick={() => setShowExportModal(false)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                }}
+              >
+                <X size={20} color="#6b7280" />
+              </button>
+            </div>
+            <p
+              style={{
+                fontSize: '14px',
+                color: '#374151',
+                marginBottom: '20px',
+                textAlign: 'center',
+                fontWeight: '600',
+              }}
+            >
+              ¿Desea exportar con imágenes o sin imágenes?
+            </p>
+            <div
+              style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}
+            >
+              <button
+                onClick={() => exportToCSV(false)}
+                disabled={exportProcessing}
+                style={{
+                  padding: '14px 20px',
+                  backgroundColor: '#f0fdf4',
+                  color: '#166534',
+                  border: '2px solid #bbf7d0',
+                  borderRadius: '8px',
+                  fontWeight: '600',
+                  fontSize: '14px',
+                  cursor: exportProcessing ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '10px',
+                  transition: 'all 0.2s',
+                }}
+              >
+                <FileText size={18} />{' '}
+                {exportProcessing ? 'Procesando...' : 'Sin Imágenes (CSV)'}
+              </button>
+              <button
+                onClick={() => exportToCSV(true)}
+                disabled={exportProcessing}
+                style={{
+                  padding: '14px 20px',
+                  backgroundColor: '#eff6ff',
+                  color: '#1e40af',
+                  border: '2px solid #bfdbfe',
+                  borderRadius: '8px',
+                  fontWeight: '600',
+                  fontSize: '14px',
+                  cursor: exportProcessing ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '10px',
+                  transition: 'all 0.2s',
+                }}
+              >
+                <Archive size={18} />{' '}
+                {exportProcessing ? 'Procesando...' : 'Con Imágenes (ZIP)'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Importación */}
+      {showImportModal && canManage && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            padding: '16px',
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: '#ffffff',
+              borderRadius: '12px',
+              width: '100%',
+              maxWidth: '500px',
+              padding: '24px',
+              boxShadow: '0 10px 25px rgba(0,0,0,0.15)',
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '20px',
+              }}
+            >
+              <h2
+                style={{
+                  fontSize: '18px',
+                  fontWeight: 'bold',
+                  color: '#111827',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                }}
+              >
+                <Upload size={20} color="#2563eb" /> Importar Inventario
+              </h2>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowImportModal(false);
+                  setImportFile(null);
+                  setImportWithImages(false);
+                }}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                }}
+              >
+                <X size={20} color="#6b7280" />
+              </button>
+            </div>
+            <p
+              style={{
+                fontSize: '14px',
+                color: '#374151',
+                marginBottom: '20px',
+                textAlign: 'center',
+                fontWeight: '600',
+              }}
+            >
+              ¿Desea importar con imágenes o sin imágenes?
+            </p>
+            <div
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '12px',
+                marginBottom: '20px',
+              }}
+            >
+              <button
+                onClick={() => {
+                  setImportWithImages(false);
+                  document.getElementById('import-file-input').click();
+                }}
+                disabled={importProcessing}
+                style={{
+                  padding: '14px 20px',
+                  backgroundColor:
+                    importWithImages === false && importFile
+                      ? '#f0fdf4'
+                      : '#f9fafb',
+                  color:
+                    importWithImages === false && importFile
+                      ? '#166534'
+                      : '#374151',
+                  border:
+                    importWithImages === false && importFile
+                      ? '2px solid #bbf7d0'
+                      : '2px solid #e5e7eb',
+                  borderRadius: '8px',
+                  fontWeight: '600',
+                  fontSize: '14px',
+                  cursor: importProcessing ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '10px',
+                  transition: 'all 0.2s',
+                }}
+              >
+                <FileText size={18} /> Sin Imágenes (CSV)
+              </button>
+              <button
+                onClick={() => {
+                  setImportWithImages(true);
+                  document.getElementById('import-file-input').click();
+                }}
+                disabled={importProcessing}
+                style={{
+                  padding: '14px 20px',
+                  backgroundColor:
+                    importWithImages === true && importFile
+                      ? '#eff6ff'
+                      : '#1e40af',
+                  color:
+                    importWithImages === true && importFile
+                      ? '#1e40af'
+                      : '#374151',
+                  border:
+                    importWithImages === true && importFile
+                      ? '2px solid #bfdbfe'
+                      : '2px solid #e5e7eb',
+                  borderRadius: '8px',
+                  fontWeight: '600',
+                  fontSize: '14px',
+                  cursor: importProcessing ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '10px',
+                  transition: 'all 0.2s',
+                }}
+              >
+                <Archive size={18} /> Con Imágenes (ZIP)
+              </button>
+            </div>
+            <input
+              type="file"
+              id="import-file-input"
+              accept={importWithImages ? '.zip' : '.csv'}
+              onChange={(e) => {
+                if (e.target.files && e.target.files[0]) {
+                  setImportFile(e.target.files[0]);
+                }
+              }}
+              style={{ display: 'none' }}
+            />
+            {importFile && (
+              <div
+                style={{
+                  padding: '12px',
+                  backgroundColor: '#f0fdf4',
+                  borderRadius: '6px',
+                  marginBottom: '16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                }}
+              >
+                <Check size={16} color="#059669" />
+                <span
+                  style={{
+                    fontSize: '13px',
+                    color: '#166534',
+                    fontWeight: '600',
+                  }}
+                >
+                  Archivo seleccionado: {importFile.name}
+                </span>
+              </div>
+            )}
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'flex-end',
+                gap: '10px',
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => {
+                  setShowImportModal(false);
+                  setImportFile(null);
+                  setImportWithImages(false);
+                }}
+                style={{
+                  padding: '10px 16px',
+                  backgroundColor: '#f3f4f6',
+                  color: '#374151',
+                  border: 'none',
+                  borderRadius: '6px',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                }}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleImportFile}
+                disabled={importProcessing || !importFile}
+                style={{
+                  padding: '10px 20px',
+                  backgroundColor:
+                    importProcessing || !importFile ? '#9ca3af' : '#2563eb',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '6px',
+                  fontWeight: '600',
+                  cursor:
+                    importProcessing || !importFile ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                }}
+              >
+                {importProcessing ? 'Procesando...' : 'Importar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Registro / Edición */}
+      {showAddModal && canManage && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            padding: '16px',
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: '#ffffff',
+              borderRadius: '12px',
+              width: '100%',
+              maxWidth: '500px',
+              padding: '24px',
+              boxShadow: '0 10px 25px rgba(0,0,0,0.15)',
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '20px',
+              }}
+            >
+              <h2
+                style={{
+                  fontSize: '18px',
+                  fontWeight: 'bold',
+                  color: '#111827',
+                }}
+              >
+                {editingProduct
+                  ? 'Editar Producto'
+                  : 'Registrar Nuevo Producto'}
+              </h2>
+              <button
+                type="button"
+                onClick={closeModals}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                }}
+              >
+                <X size={20} color="#6b7280" />
+              </button>
+            </div>
+            <form
+              onSubmit={handleSaveProduct}
+              style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}
+            >
+              <div>
+                <label
+                  style={{
+                    display: 'block',
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    marginBottom: '6px',
+                    color: '#374151',
+                  }}
+                >
+                  Categoría
+                </label>
+                <select
+                  value={formCategory}
+                  onChange={(e) => setFormCategory(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '10px',
+                    borderRadius: '6px',
+                    border: '1px solid #d1d5db',
+                    backgroundColor: '#fff',
+                  }}
+                >
+                  <option value="bombillos">Bombillos</option>
+                  <option value="fluidos">Fluidos</option>
+                </select>
+              </div>
+              <div>
+                <label
+                  style={{
+                    display: 'block',
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    marginBottom: '6px',
+                    color: '#374151',
+                  }}
+                >
+                  Código Único
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Ej. BOM-001"
+                  value={formCode}
+                  onChange={(e) => setFormCode(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '10px',
+                    borderRadius: '6px',
+                    border: '1px solid #d1d5db',
+                    boxSizing: 'border-box',
+                  }}
+                />
+              </div>
+              <div>
+                <label
+                  style={{
+                    display: 'block',
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    marginBottom: '6px',
+                    color: '#374151',
+                  }}
+                >
+                  Descripción y Especificaciones
+                </label>
+                <textarea
+                  required
+                  rows={2}
+                  placeholder="Nombre y detalles del producto..."
+                  value={formDescription}
+                  onChange={(e) => setFormDescription(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '10px',
+                    borderRadius: '6px',
+                    border: '1px solid #d1d5db',
+                    boxSizing: 'border-box',
+                  }}
+                />
+              </div>
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1fr 1fr',
+                  gap: '12px',
+                }}
+              >
+                <div>
+                  <label
+                    style={{
+                      display: 'block',
+                      fontSize: '13px',
+                      fontWeight: '600',
+                      marginBottom: '6px',
+                      color: '#374151',
+                    }}
+                  >
+                    Precio Full ($)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    required
+                    placeholder="0.00"
+                    value={formPrice}
+                    onChange={(e) => setFormPrice(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '10px',
+                      borderRadius: '6px',
+                      border: '1px solid #d1d5db',
+                      boxSizing: 'border-box',
+                    }}
+                  />
+                </div>
+                <div>
+                  <label
+                    style={{
+                      display: 'block',
+                      fontSize: '13px',
+                      fontWeight: '600',
+                      marginBottom: '6px',
+                      color: '#374151',
+                    }}
+                  >
+                    Precio Base ($)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder="0.00"
+                    value={formBasePrice}
+                    onChange={(e) => setFormBasePrice(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '10px',
+                      borderRadius: '6px',
+                      border: '1px solid #d1d5db',
+                      boxSizing: 'border-box',
+                    }}
+                  />
+                </div>
+              </div>
+              {!editingProduct && (
+                <div>
+                  <label
+                    style={{
+                      display: 'block',
+                      fontSize: '13px',
+                      fontWeight: '600',
+                      marginBottom: '6px',
+                      color: '#374151',
+                    }}
+                  >
+                    Stock Inicial
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    required
+                    placeholder="0"
+                    value={formStock}
+                    onChange={(e) => setFormStock(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '10px',
+                      borderRadius: '6px',
+                      border: '1px solid #d1d5db',
+                      boxSizing: 'border-box',
+                    }}
+                  />
+                </div>
+              )}
+              <div>
+                <label
+                  style={{
+                    display: 'block',
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    marginBottom: '6px',
+                    color: '#374151',
+                  }}
+                >
+                  Foto del Producto (Única)
+                </label>
+                {!imagePreview ? (
+                  <label
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '10px',
+                      padding: '12px 16px',
+                      backgroundColor: '#f8fafc',
+                      color: '#111827',
+                      border: '2px dashed #d1d5db',
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      fontWeight: '600',
+                      fontSize: '14px',
+                    }}
+                  >
+                    <Upload size={18} color="#dc2626" />
+                    <span>Seleccionar Imagen...</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      style={{ display: 'none' }}
+                      onChange={(e) => {
+                        if (e.target.files && e.target.files[0]) {
+                          const file = e.target.files[0];
+                          setFormImageFile(file);
+                          setImagePreview(URL.createObjectURL(file));
+                          e.target.value = null;
+                        }
+                      }}
+                    />
+                  </label>
+                ) : (
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '12px',
+                      padding: '8px',
+                      border: '1px solid #e5e7eb',
+                      borderRadius: '8px',
+                      backgroundColor: '#f9fafb',
+                    }}
+                  >
+                    <img
+                      src={imagePreview}
+                      alt="Vista previa"
+                      style={{
+                        width: '60px',
+                        height: '60px',
+                        objectFit: 'cover',
+                        borderRadius: '6px',
+                      }}
+                    />
+                    <div
+                      style={{
+                        flex: 1,
+                        fontSize: '13px',
+                        color: '#374151',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {formImageFile
+                        ? formImageFile.name
+                        : 'Imagen actual del producto'}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFormImageFile(null);
+                        setImagePreview('');
+                        if (editingProduct) {
+                          setEditingProduct({
+                            ...editingProduct,
+                            image_url: null,
+                          });
+                        }
+                      }}
+                      style={{
+                        background: '#fee2e2',
+                        border: 'none',
+                        borderRadius: '50%',
+                        width: '32px',
+                        height: '32px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer',
+                        color: '#b91c1c',
+                      }}
+                    >
+                      <X size={18} />
+                    </button>
+                  </div>
+                )}
+              </div>
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'flex-end',
+                  gap: '12px',
+                  marginTop: '10px',
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={closeModals}
+                  style={{
+                    padding: '10px 16px',
+                    backgroundColor: '#f3f4f6',
+                    color: '#374151',
+                    border: 'none',
+                    borderRadius: '6px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  style={{
+                    padding: '10px 20px',
+                    backgroundColor: '#dc2626',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '6px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Guardar Producto
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Ajuste de Stock */}
+      {adjustingStockProduct && canManage && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            padding: '16px',
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: '#ffffff',
+              borderRadius: '12px',
+              width: '100%',
+              maxWidth: '400px',
+              padding: '24px',
+              boxShadow: '0 10px 25px rgba(0,0,0,0.15)',
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '16px',
+              }}
+            >
+              <h2
+                style={{
+                  fontSize: '16px',
+                  fontWeight: 'bold',
+                  color: '#111827',
+                }}
+              >
+                Ajuste de Inventario
+              </h2>
+              <button
+                type="button"
+                onClick={closeModals}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                }}
+              >
+                <X size={20} color="#6b7280" />
+              </button>
+            </div>
+            <p
+              style={{
+                fontSize: '13px',
+                color: '#6b7280',
+                marginBottom: '16px',
+              }}
+            >
+              Producto: <strong>{adjustingStockProduct.description}</strong>
+              <br />
+              Stock Actual:{' '}
+              <span style={{ color: '#059669', fontWeight: 'bold' }}>
+                {adjustingStockProduct.stock_current} unidades
+              </span>
+            </p>
+            <form
+              onSubmit={handleQuickStockAdjustment}
+              style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}
+            >
+              <div>
+                <label
+                  style={{
+                    display: 'block',
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    marginBottom: '6px',
+                    color: '#374151',
+                  }}
+                >
+                  Tipo de Ajuste
+                </label>
+                <select
+                  value={stockAdjustmentType}
+                  onChange={(e) => setStockAdjustmentType(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '10px',
+                    borderRadius: '6px',
+                    border: '1px solid #d1d5db',
+                  }}
+                >
+                  <option value="add">Incrementar Stock (+)</option>
+                  <option value="subtract">Decrementar Stock (-)</option>
+                  <option value="set">Establecer Cantidad Exacta</option>
+                </select>
+              </div>
+              <div>
+                <label
+                  style={{
+                    display: 'block',
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    marginBottom: '6px',
+                    color: '#374151',
+                  }}
+                >
+                  Cantidad
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  required
+                  placeholder="Ingrese cantidad"
+                  value={stockAdjustmentValue}
+                  onChange={(e) => setStockAdjustmentValue(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '10px',
+                    borderRadius: '6px',
+                    border: '1px solid #d1d5db',
+                    boxSizing: 'border-box',
+                  }}
+                />
+              </div>
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'flex-end',
+                  gap: '10px',
+                  marginTop: '10px',
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={closeModals}
+                  style={{
+                    padding: '8px 14px',
+                    backgroundColor: '#f3f4f6',
+                    color: '#374151',
+                    border: 'none',
+                    borderRadius: '6px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  style={{
+                    padding: '8px 16px',
+                    backgroundColor: '#f59e0b',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '6px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Aplicar Ajuste
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal para Ampliar Imagen */}
+      {selectedImageModal && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0,0,0,0.8)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1100,
+            padding: '16px',
+          }}
+          onClick={() => setSelectedImageModal(null)}
+        >
+          <div
+            style={{ position: 'relative', maxWidth: '90%', maxHeight: '90%' }}
+          >
+            <button
+              type="button"
+              onClick={() => setSelectedImageModal(null)}
+              style={{
+                position: 'absolute',
+                top: '-40px',
+                right: '0',
+                background: 'none',
+                border: 'none',
+                color: '#fff',
+                cursor: 'pointer',
+              }}
+            >
+              <X size={28} />
+            </button>
+            <img
+              src={selectedImageModal}
+              alt="Ampliada"
+              style={{
+                maxWidth: '100%',
+                maxHeight: '80vh',
+                borderRadius: '8px',
+                objectFit: 'contain',
+              }}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
