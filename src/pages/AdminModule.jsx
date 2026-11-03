@@ -329,7 +329,7 @@ export default function AdminModule() {
   const [neTargetUserId, setNeTargetUserId] = useState('');
   const [neClientId, setNeClientId] = useState('');
   const [neCategoria, setNeCategoria] = useState('bombillos');
-  const [neTipoPago, setNeTipoPago] = useState('0');
+  const [neTipoPago, setNeTipoPago] = useState('53.38');
   const [neSearchProduct, setNeSearchProduct] = useState('');
   const [neSelectedProdId, setNeSelectedProdId] = useState('');
   const [neQuantity, setNeQuantity] = useState(1);
@@ -423,6 +423,25 @@ export default function AdminModule() {
   useEffect(() => {
     localStorage.setItem('admin_ne_cart_cache', JSON.stringify(neCart));
   }, [neCart]);
+  useEffect(() => {
+    localStorage.setItem('admin_ne_cart_cache', JSON.stringify(neCart));
+  }, [neCart]);
+
+  // --- NUEVO EFECTO: Recalcular precios del carrito al cambiar el porcentaje de descuento ---
+  useEffect(() => {
+    if (neCart.length > 0) {
+      const newPct = getDiscountPercent(neTipoPago);
+      const recalculated = neCart.map((item) => {
+        const newDiscPrice = Number(item.unit_price_usd) * (1 - newPct / 100);
+        return {
+          ...item,
+          discounted_unit_price_usd: newDiscPrice,
+          total_line_usd: item.quantity * newDiscPrice,
+        };
+      });
+      setNeCart(recalculated);
+    }
+  }, [neTipoPago]);
   // --- EFECTO PARA PERSISTENCIA DE PESTAÑA (D) ---
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
