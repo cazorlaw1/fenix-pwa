@@ -399,6 +399,7 @@ export default function App() {
                     'gerente',
                     'supervisor',
                     'stock',
+                    'vendedor',
                   ]}
                 />
                 <Layout>
