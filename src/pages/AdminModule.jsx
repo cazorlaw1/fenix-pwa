@@ -182,7 +182,7 @@ function SearchableDropdown({
             borderRadius: '6px',
             boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
             marginTop: '4px',
-            maxHeight: '380px',
+            maxHeight: '400px',
             display: 'flex',
             flexDirection: 'column',
           }}
