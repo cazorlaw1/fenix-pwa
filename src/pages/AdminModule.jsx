@@ -322,10 +322,12 @@ export default function AdminModule() {
   const [paymentHistory, setPaymentHistory] = useState([]);
   const [historySearch, setHistorySearch] = useState('');
   const [valesSubTab, setValesSubTab] = useState('vales_lista');
-  const [cobranzaSortField, setCobranzaSortField] = useState('created_at');
+  const [cobranzaSortField, setCobranzaSortField] =
+    useState('transaction_number');
   const [quincenaSortField, setQuincenaSortField] = useState('full_name');
   const [quincenaSortAsc, setQuincenaSortAsc] = useState(true);
   const [cobranzaSortAsc, setCobranzaSortAsc] = useState(false);
+  const [isAgingOpen, setIsAgingOpen] = useState(false);
   const [neTargetUserId, setNeTargetUserId] = useState('');
   const [neClientId, setNeClientId] = useState('');
   const [neCategoria, setNeCategoria] = useState('bombillos');
@@ -454,7 +456,13 @@ export default function AdminModule() {
       setActiveTab(tabFromStorage);
     }
   }, []);
-
+  // Restablecer el ordenamiento predeterminado (Número de mayor a menor) al entrar a Cobranza
+  useEffect(() => {
+    if (activeTab === 'cobranza') {
+      setCobranzaSortField('transaction_number');
+      setCobranzaSortAsc(false); // false = De mayor a menor
+    }
+  }, [activeTab]);
   useEffect(() => {
     localStorage.setItem('admin_active_tab', activeTab);
   }, [activeTab]);
@@ -3954,7 +3962,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
       }}
     >
       {/* --- ESTILOS RESPONSIVOS (E) --- */}
-      <style>{`.admin-tabs-desktop { display: flex; gap: 8px; border-bottom: 2px solid #e5e7eb; margin-bottom: 24px; overflow-x: auto; } .admin-tabs-mobile { display: none; position: relative; margin-bottom: 24px; } .admin-mobile-trigger { width: 100%; padding: 12px 16px; background: #ffffff; border: 1px solid #d1d5db; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; font-weight: 700; color: #111827; font-size: 14px; } .admin-mobile-dropdown { position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: #ffffff; border: 1px solid #d1d5db; border-radius: 8px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); z-index: 1000; overflow: hidden; } .admin-mobile-item { padding: 12px 16px; display: flex; alignItems: center; gap: 10px; cursor: pointer; border-bottom: 1px solid #e5e7eb; color: #4b5563; font-size: 14px; transition: background 0.15s; } .admin-mobile-item:last-child { border-bottom: none; } .admin-mobile-item:hover { background: #fef2f2; } .admin-mobile-item.active { background: #fef2f2; color: #dc2626; font-weight: 700; } .admin-aging-section { background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 14px 16px; margin-bottom: 16px; } .admin-aging-title { font-size: 13px; font-weight: 800; color: #78350f; margin-bottom: 10px; display: flex; alignItems: center; gap: 8px; } .admin-aging-item { display: flex; justify-content: space-between; align-items: center; padding: 6px 10px; background: #ffffff; border: 1px solid #fde68a; border-radius: 6px; margin-bottom: 6px; font-size: 12px; } .admin-aging-item:last-child { margin-bottom: 0; } .admin-days-30 { text-decoration: underline; text-decoration-color: #eab308; text-decoration-thickness: 3px; text-underline-offset: 3px; } .admin-days-45 { text-decoration: underline; text-decoration-color: #f97316; text-decoration-thickness: 3px; text-underline-offset: 3px; } .admin-days-60 { text-decoration: underline; text-decoration-color: #dc2626; text-decoration-thickness: 3px; text-underline-offset: 3px; } .admin-table-desktop { width: 100%; border-collapse: collapse; text-align: left; font-size: 13px; } .admin-mobile-cards { display: none; } .admin-mobile-card { background: #ffffff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px; marginBottom: 10px; boxShadow: 0 1px 2px rgba(0,0,0,0.05); } .admin-mobile-card-header { font-size: 14px; font-weight: 800; color: #111827; border-bottom: 1px solid #e5e7eb; padding-bottom: 8px; margin-bottom: 8px; } .admin-mobile-card-row { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; font-size: 12px; border-bottom: 1px dashed #f3f4f6; } .admin-mobile-card-row:last-child { border-bottom: none; } .admin-mobile-card-label { color: #6b7280; font-weight: 600; font-size: 11px; } .admin-mobile-card-value { color: #111827; font-weight: 600; text-align: right; max-width: 60%; word-break: break-word; } .admin-mobile-card-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; padding-top: 10px; border-top: 1px solid #e5e7eb; } @media (max-width: 768px) { .admin-tabs-desktop { display: none !important; } .admin-tabs-mobile { display: block !important; } .admin-table-desktop { display: none !important; } .admin-mobile-cards { display: block !important; } .admin-mobile-card-actions button { font-size: 10px !important; padding: 5px 8px !important; } .admin-tab-button-desktop { padding: 10px 12px !important; font-size: 12px !important; } .admin-action-btn-mobile { padding: 5px 8px !important; font-size: 10px !important; } } .floating-toast-success { position: fixed !important; top: 24px !important; left: 50% !important; transform: translateX(-50%) !important; z-index: 9999 !important; width: 90% !important; max-width: 500px !important; box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important; } .floating-toast-error { position: fixed !important; top: 24px !important; left: 50% !important; transform: translateX(-50%) !important; z-index: 9999 !important; width: 90% !important; max-width: 500px !important; box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important; }`}</style>
+      <style>{`.admin-tabs-desktop { display: flex; gap: 8px; border-bottom: 2px solid #e5e7eb; margin-bottom: 24px; flex-wrap: wrap; } .admin-tabs-mobile { display: none; position: relative; margin-bottom: 24px; } .admin-mobile-trigger { width: 100%; padding: 12px 16px; background: #ffffff; border: 1px solid #d1d5db; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; font-weight: 700; color: #111827; font-size: 14px; } .admin-mobile-dropdown { position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: #ffffff; border: 1px solid #d1d5db; border-radius: 8px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); z-index: 1000; overflow: hidden; } .admin-mobile-item { padding: 12px 16px; display: flex; alignItems: center; gap: 10px; cursor: pointer; border-bottom: 1px solid #e5e7eb; color: #4b5563; font-size: 14px; transition: background 0.15s; } .admin-mobile-item:last-child { border-bottom: none; } .admin-mobile-item:hover { background: #fef2f2; } .admin-mobile-item.active { background: #fef2f2; color: #dc2626; font-weight: 700; } .admin-aging-section { background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 14px 16px; margin-bottom: 16px; } .admin-aging-title { font-size: 13px; font-weight: 800; color: #78350f; margin-bottom: 10px; display: flex; alignItems: center; gap: 8px; } .admin-aging-item { display: flex; justify-content: space-between; align-items: center; padding: 6px 10px; background: #ffffff; border: 1px solid #fde68a; border-radius: 6px; margin-bottom: 6px; font-size: 12px; } .admin-aging-item:last-child { margin-bottom: 0; } .admin-days-30 { text-decoration: underline; text-decoration-color: #eab308; text-decoration-thickness: 3px; text-underline-offset: 3px; } .admin-days-45 { text-decoration: underline; text-decoration-color: #f97316; text-decoration-thickness: 3px; text-underline-offset: 3px; } .admin-days-60 { text-decoration: underline; text-decoration-color: #dc2626; text-decoration-thickness: 3px; text-underline-offset: 3px; } .admin-table-desktop { width: 100%; border-collapse: collapse; text-align: left; font-size: 13px; } .admin-mobile-cards { display: none; } .admin-mobile-card { background: #ffffff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px; marginBottom: 10px; boxShadow: 0 1px 2px rgba(0,0,0,0.05); } .admin-mobile-card-header { font-size: 14px; font-weight: 800; color: #111827; border-bottom: 1px solid #e5e7eb; padding-bottom: 8px; margin-bottom: 8px; } .admin-mobile-card-row { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; font-size: 12px; border-bottom: 1px dashed #f3f4f6; } .admin-mobile-card-row:last-child { border-bottom: none; } .admin-mobile-card-label { color: #6b7280; font-weight: 600; font-size: 11px; } .admin-mobile-card-value { color: #111827; font-weight: 600; text-align: right; max-width: 60%; word-break: break-word; } .admin-mobile-card-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; padding-top: 10px; border-top: 1px solid #e5e7eb; } @media (max-width: 768px) { .admin-tabs-desktop { display: none !important; } .admin-tabs-mobile { display: block !important; } .admin-table-desktop { display: none !important; } .admin-mobile-cards { display: block !important; } .admin-mobile-card-actions button { font-size: 10px !important; padding: 5px 8px !important; } .admin-tab-button-desktop { padding: 10px 12px !important; font-size: 12px !important; } .admin-action-btn-mobile { padding: 5px 8px !important; font-size: 10px !important; } } .floating-toast-success { position: fixed !important; top: 24px !important; left: 50% !important; transform: translateX(-50%) !important; z-index: 9999 !important; width: 90% !important; max-width: 500px !important; box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important; } .floating-toast-error { position: fixed !important; top: 24px !important; left: 50% !important; transform: translateX(-50%) !important; z-index: 9999 !important; width: 90% !important; max-width: 500px !important; box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important; }`}</style>
       {/* F. NOTIFICACIONES GLOBALES FLOTANTES */}
       {errorMsg && (
         <div
@@ -6491,53 +6499,80 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
             <>
               {agingNotes.length > 0 && (
                 <div className="admin-aging-section">
-                  <div className="admin-aging-title">
-                    <AlertTriangle size={18} color="#d97706" />
-                    Notas de Entrega con Antigüedad Crítica
-                  </div>
-                  {agingNotes.slice(0, 10).map((n) => {
-                    let color = '#eab308';
-                    let label = '30+ días';
-                    if (n.days >= 60) {
-                      color = '#dc2626';
-                      label = '60+ días';
-                    } else if (n.days >= 45) {
-                      color = '#f97316';
-                      label = '45+ días';
-                    }
-                    return (
-                      <div key={n.id} className="admin-aging-item">
-                        <div>
-                          <strong>N.E. #{n.transaction_number}</strong> —{' '}
-                          {n.client?.name || 'Cliente'}
-                        </div>
-                        <div
-                          style={{
-                            color: color,
-                            fontWeight: '800',
-                            fontSize: '12px',
-                          }}
-                        >
-                          {n.days} días · {label}
-                        </div>
-                      </div>
-                    );
-                  })}
-                  {agingNotes.length > 10 && (
+                  <button
+                    type="button"
+                    onClick={() => setIsAgingOpen(!isAgingOpen)}
+                    style={{
+                      width: '100%',
+                      background: 'none',
+                      border: 'none',
+                      padding: 0,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                    }}
+                  >
+                    <div className="admin-aging-title" style={{ margin: 0 }}>
+                      <AlertTriangle size={18} color="#d97706" />
+                      Notas de Entrega con Antigüedad Crítica (
+                      {agingNotes.length})
+                    </div>
+                    {isAgingOpen ? (
+                      <ChevronUp size={18} color="#78350f" />
+                    ) : (
+                      <ChevronDown size={18} color="#78350f" />
+                    )}
+                  </button>
+                  {isAgingOpen && (
                     <div
                       style={{
-                        textAlign: 'center',
-                        fontSize: '11px',
-                        color: '#78350f',
-                        marginTop: '8px',
-                        fontStyle: 'italic',
+                        marginTop: '10px',
+                        maxHeight: '220px',
+                        overflowY: 'auto',
+                        paddingRight: '4px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '6px',
                       }}
                     >
-                      ...y {agingNotes.length - 10} notas más
+                      {agingNotes.map((n) => {
+                        let color = '#eab308';
+                        let label = '30+ días';
+                        if (n.days >= 60) {
+                          color = '#dc2626';
+                          label = '60+ días';
+                        } else if (n.days >= 45) {
+                          color = '#f97316';
+                          label = '45+ días';
+                        }
+                        return (
+                          <div
+                            key={n.id}
+                            className="admin-aging-item"
+                            style={{ marginBottom: 0 }}
+                          >
+                            <div>
+                              <strong>N.E. #{n.transaction_number}</strong> —{' '}
+                              {n.client?.name || 'Cliente'}
+                            </div>
+                            <div
+                              style={{
+                                color: color,
+                                fontWeight: '800',
+                                fontSize: '12px',
+                              }}
+                            >
+                              {n.days} días · {label}
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
                 </div>
               )}
+
               <div
                 style={{
                   display: 'flex',
