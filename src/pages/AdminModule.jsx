@@ -1267,7 +1267,8 @@ export default function AdminModule() {
             '*, seller:seller_id(id, full_name, email, pct_bombillos, pct_fluidos, sueldo_fijo_usd), client:client_id(name)'
           )
           .in('payment_status', ['pendiente', 'abonada', 'cerrada'])
-          .not('status', 'in', '(pendiente,rechazada)') // <--- Usa esta opción para excluir ambos de forma directa
+          .neq('status', 'pendiente')
+          .neq('status', 'rechazada') // <--- AÑADIR ESTA LÍNEA AQUÍ
           .order('created_at', { ascending: false });
         if (error) throw error;
         setCobranzaNotes(data || []);
