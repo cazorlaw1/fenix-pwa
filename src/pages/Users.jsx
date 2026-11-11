@@ -34,21 +34,17 @@ export default function Users() {
   const [assignmentsCountMap, setAssignmentsCountMap] = useState({});
   const [exceptionsCountMap, setExceptionsCountMap] = useState({});
   const [hierarchyConfigMap, setHierarchyConfigMap] = useState({});
-
   const [searchQuery, setSearchQuery] = useState('');
   const [structureSearch, setStructureSearch] = useState('');
   const [profileSearch, setProfileSearch] = useState('');
   const [clientSearch, setClientSearch] = useState('');
-
   const [imageModal, setImageModal] = useState({
     open: false,
     url: '',
     title: 'Documento Adjunto',
   });
-
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const mobileMenuRef = useRef(null);
-
   const [selectedParentUser, setSelectedParentUser] = useState(null);
   const [globalData, setGlobalData] = useState({
     isGlobal: false,
@@ -59,16 +55,24 @@ export default function Users() {
     specificTargets: {},
   });
   const [savingStructure, setSavingStructure] = useState(false);
-
   const [editingProfileId, setEditingProfileId] = useState(null);
   const [profileFormData, setProfileFormData] = useState({});
   const [savingProfile, setSavingProfile] = useState(false);
-
   const avatarInputRefs = useRef({});
   const ciInputRefs = useRef({});
-
   const [clientsList, setClientsList] = useState([]);
   const [loadingClients, setLoadingClients] = useState(false);
+
+  // Estados para archivos en edición de cliente
+  const [editCiFile, setEditCiFile] = useState(null);
+  const [editRifFile, setEditRifFile] = useState(null);
+  const [editAdicionalFile, setEditAdicionalFile] = useState(null);
+  const [uploadingClientFile, setUploadingClientFile] = useState(false);
+
+  // Refs para inputs de archivos
+  const clientCiInputRef = useRef(null);
+  const clientRifInputRef = useRef(null);
+  const clientDocInputRef = useRef(null);
 
   const [clientEditModal, setClientEditModal] = useState({
     open: false,
@@ -76,12 +80,8 @@ export default function Users() {
     formData: {},
   });
   const [savingClient, setSavingClient] = useState(false);
-  const [uploadingClientFile, setUploadingClientFile] = useState(false);
 
-  const clientCiInputRef = useRef(null);
-  const clientRifInputRef = useRef(null);
-  const clientDocInputRef = useRef(null);
-
+  // Estado unificado para creación de cliente (incluye todos los campos de SalesModule)
   const [newClientData, setNewClientData] = useState({
     name: '',
     rif_number: '',
@@ -89,11 +89,16 @@ export default function Users() {
     phone: '',
     city: '',
     state: '',
-    address_detail: '',
+    address_detail: '', // Dirección completa
     is_potential: false,
   });
-  const [creatingClient, setCreatingClient] = useState(false);
 
+  // Estados para archivos en creación de cliente
+  const [newCiFile, setNewCiFile] = useState(null);
+  const [newRifFile, setNewRifFile] = useState(null);
+  const [newAdicionalFile, setNewAdicionalFile] = useState(null);
+
+  const [creatingClient, setCreatingClient] = useState(false);
   const [editingAssignmentId, setEditingAssignmentId] = useState(null);
   const [tempAssignmentUserId, setTempAssignmentUserId] = useState('');
   const [savingAssignment, setSavingAssignment] = useState(false);
@@ -138,6 +143,7 @@ export default function Users() {
       const { data: usersData, error: usersError } = await supabase
         .from('profiles')
         .select('*');
+
       if (usersError) throw usersError;
       setAllUsers(usersData || []);
 
@@ -153,6 +159,7 @@ export default function Users() {
       const { data: assignData, error: assignError } = await supabase
         .from('hierarchy_assignments')
         .select('parent_user_id, target_seller_id, is_exception');
+
       if (!assignError && assignData) {
         const counts = {};
         const excCounts = {};
@@ -182,6 +189,7 @@ export default function Users() {
           `*, profiles:assigned_seller_id(full_name, email, role), sales_orders(id, payment_status, balance_due_usd, seller_id)`
         )
         .order('created_at', { ascending: false });
+
       if (error) throw error;
       setClientsList(data || []);
     } catch (err) {
@@ -198,6 +206,7 @@ export default function Users() {
         .select('*')
         .eq('parent_user_id', parentUser.id)
         .maybeSingle();
+
       const { data: targetRows } = await supabase
         .from('hierarchy_assignments')
         .select('*')
@@ -210,7 +219,6 @@ export default function Users() {
           u.role?.toLowerCase() !== 'stock' &&
           u.role !== 'pendiente'
       );
-
       activeSellersList.forEach((seller) => {
         const found = targetRows?.find((r) => r.target_seller_id === seller.id);
         specificTargets[seller.id] = {
@@ -342,6 +350,7 @@ export default function Users() {
         .from('profiles')
         .update(updateData)
         .eq('id', userId);
+
       if (error) throw error;
       alert('Datos actualizados correctamente');
       fetchUsersAndAssignments();
@@ -392,6 +401,7 @@ export default function Users() {
       const { error: uploadError } = await supabase.storage
         .from(bucket)
         .upload(filePath, file, { upsert: false });
+
       if (uploadError) throw uploadError;
       const { data } = supabase.storage.from(bucket).getPublicUrl(filePath);
       const newUrl = data.publicUrl;
@@ -411,10 +421,12 @@ export default function Users() {
       if (_old_ci_url && _old_ci_url !== updates.ci_url) {
         await deleteOldFile(_old_ci_url, 'documents');
       }
+
       const { error } = await supabase
         .from('profiles')
         .update(updates)
         .eq('id', userId);
+
       if (error) throw error;
       alert('Perfil actualizado correctamente.');
       setEditingProfileId(null);
@@ -426,13 +438,62 @@ export default function Users() {
     }
   };
 
-  const handleCreateClient = async () => {
+  // --- LÓGICA UNIFICADA DE CREACIÓN DE CLIENTE (Basada en SalesModule) ---
+  const validateImageFile = (file) => {
+    if (!file) return true;
+    return file.type.startsWith('image/');
+  };
+
+  const uploadFile = async (file, bucketName, pathFolder) => {
+    if (!file) return null;
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${Date.now()}_${Math.random()
+      .toString(36)
+      .substring(7)}.${fileExt}`;
+    const filePath = `${pathFolder}/${fileName}`;
+    const { error } = await supabase.storage
+      .from(bucketName)
+      .upload(filePath, file);
+    if (error) throw error;
+    const { data } = supabase.storage.from(bucketName).getPublicUrl(filePath);
+    return data.publicUrl;
+  };
+
+  const handleCreateClient = async (e) => {
+    if (e) e.preventDefault(); // Prevenir recarga si se llama desde form
+
     if (!newClientData.name) {
       alert('El nombre del cliente es obligatorio.');
       return;
     }
+
+    // Validación de archivos
+    if (newCiFile && !validateImageFile(newCiFile)) {
+      alert('El archivo de C.I. debe ser una imagen.');
+      return;
+    }
+    if (newRifFile && !validateImageFile(newRifFile)) {
+      alert('El archivo de RIF debe ser una imagen.');
+      return;
+    }
+    if (newAdicionalFile && !validateImageFile(newAdicionalFile)) {
+      alert('El documento adicional debe ser una imagen.');
+      return;
+    }
+
     setCreatingClient(true);
     try {
+      // Subir archivos primero
+      const ciUrl = newCiFile
+        ? await uploadFile(newCiFile, 'documents', 'ci')
+        : null;
+      const rifUrl = newRifFile
+        ? await uploadFile(newRifFile, 'documents', 'rif')
+        : null;
+      const adicUrl = newAdicionalFile
+        ? await uploadFile(newAdicionalFile, 'documents', 'adicional')
+        : null;
+
       const { error } = await supabase.from('clients').insert({
         name: newClientData.name,
         rif_number: newClientData.rif_number || null,
@@ -443,17 +504,29 @@ export default function Users() {
         address_detail: newClientData.address_detail || null,
         is_potential: newClientData.is_potential,
         assigned_seller_id: null,
+        ci_photo_url: ciUrl,
+        rif_photo_url: rifUrl,
+        additional_doc_url: adicUrl,
       });
+
       if (error) throw error;
       alert('Cliente creado exitosamente.');
+
+      // Resetear formulario
       setNewClientData({
         name: '',
         rif_number: '',
         ci_number: '',
         phone: '',
-        address: '',
+        city: '',
+        state: '',
+        address_detail: '',
         is_potential: false,
       });
+      setNewCiFile(null);
+      setNewRifFile(null);
+      setNewAdicionalFile(null);
+
       fetchAllClients();
     } catch (err) {
       alert('Error creando cliente: ' + err.message);
@@ -474,6 +547,7 @@ export default function Users() {
         .from('clients')
         .update({ assigned_seller_id: tempAssignmentUserId || null })
         .eq('id', clientId);
+
       if (error) throw error;
       alert('Asignación actualizada correctamente.');
       setEditingAssignmentId(null);
@@ -520,6 +594,11 @@ export default function Users() {
         name: client.name || '',
         ci_number: client.ci_number || '',
         rif_number: client.rif_number || '',
+        phone: client.phone || '',
+        city: client.city || '',
+        state: client.state || '',
+        address_detail: client.address_detail || '',
+        is_potential: client.is_potential || false,
         ci_photo_url: client.ci_photo_url || '',
         rif_photo_url: client.rif_photo_url || '',
         additional_doc_url: client.additional_doc_url || '',
@@ -528,10 +607,17 @@ export default function Users() {
         _old_additional_doc: client.additional_doc_url || '',
       },
     });
+    // Resetear estados de archivos nuevos
+    setEditCiFile(null);
+    setEditRifFile(null);
+    setEditAdicionalFile(null);
   };
 
   const closeClientEditModal = () => {
     setClientEditModal({ open: false, client: null, formData: {} });
+    setEditCiFile(null);
+    setEditRifFile(null);
+    setEditAdicionalFile(null);
   };
 
   const handleClientFieldChange = (field, value) => {
@@ -544,6 +630,12 @@ export default function Users() {
   const handleClientFileUpload = async (e, field, bucket) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    if (!validateImageFile(file)) {
+      alert('El archivo debe ser una imagen.');
+      return;
+    }
+
     setUploadingClientFile(true);
     try {
       const fileExt = file.name.split('.').pop();
@@ -554,49 +646,22 @@ export default function Users() {
       const { error: uploadError } = await supabase.storage
         .from(bucket)
         .upload(filePath, file, { upsert: false });
+
       if (uploadError) throw uploadError;
       const { data } = supabase.storage.from(bucket).getPublicUrl(filePath);
+
+      // Actualizar estado local del modal inmediatamente para previsualización
       setClientEditModal((prev) => ({
         ...prev,
         formData: { ...prev.formData, [field]: data.publicUrl },
       }));
+
+      // Guardar referencia del archivo nuevo para manejarlo en el guardado final si es necesario
+      // Pero aquí ya tenemos la URL pública, así que el guardado final usará esta URL.
     } catch (err) {
       alert('Error subiendo archivo: ' + err.message);
     } finally {
       setUploadingClientFile(false);
-    }
-  };
-
-  const saveClientChanges = async () => {
-    if (!clientEditModal.client) return;
-    setSavingClient(true);
-    try {
-      const { _old_ci_photo, _old_rif_photo, _old_additional_doc, ...updates } =
-        clientEditModal.formData;
-      if (_old_ci_photo && _old_ci_photo !== updates.ci_photo_url) {
-        await deleteOldFile(_old_ci_photo, 'documents');
-      }
-      if (_old_rif_photo && _old_rif_photo !== updates.rif_photo_url) {
-        await deleteOldFile(_old_rif_photo, 'documents');
-      }
-      if (
-        _old_additional_doc &&
-        _old_additional_doc !== updates.additional_doc_url
-      ) {
-        await deleteOldFile(_old_additional_doc, 'documents');
-      }
-      const { error } = await supabase
-        .from('clients')
-        .update(updates)
-        .eq('id', clientEditModal.client.id);
-      if (error) throw error;
-      alert('Cliente actualizado correctamente.');
-      closeClientEditModal();
-      fetchAllClients();
-    } catch (err) {
-      alert('Error guardando cliente: ' + err.message);
-    } finally {
-      setSavingClient(false);
     }
   };
 
@@ -612,6 +677,46 @@ export default function Users() {
         console.warn('No se pudo eliminar archivo anterior:', error.message);
     } catch (err) {
       console.warn('Error eliminando archivo anterior:', err);
+    }
+  };
+
+  const saveClientChanges = async () => {
+    if (!clientEditModal.client) return;
+    setSavingClient(true);
+    try {
+      const { _old_ci_photo, _old_rif_photo, _old_additional_doc, ...updates } =
+        clientEditModal.formData;
+
+      // Eliminar archivos antiguos solo si han sido sustituidos (la URL cambió)
+      // Nota: Como handleClientFileUpload ya actualiza la URL en formData,
+      // comparamos con los valores "_old" guardados al abrir el modal.
+
+      if (_old_ci_photo && _old_ci_photo !== updates.ci_photo_url) {
+        await deleteOldFile(_old_ci_photo, 'documents');
+      }
+      if (_old_rif_photo && _old_rif_photo !== updates.rif_photo_url) {
+        await deleteOldFile(_old_rif_photo, 'documents');
+      }
+      if (
+        _old_additional_doc &&
+        _old_additional_doc !== updates.additional_doc_url
+      ) {
+        await deleteOldFile(_old_additional_doc, 'documents');
+      }
+
+      const { error } = await supabase
+        .from('clients')
+        .update(updates)
+        .eq('id', clientEditModal.client.id);
+
+      if (error) throw error;
+      alert('Cliente actualizado correctamente.');
+      closeClientEditModal();
+      fetchAllClients();
+    } catch (err) {
+      alert('Error guardando cliente: ' + err.message);
+    } finally {
+      setSavingClient(false);
     }
   };
 
@@ -652,7 +757,6 @@ export default function Users() {
       >
         Gestión de Usuarios
       </h2>
-
       <div className="summary-cards-grid" style={{ marginBottom: '24px' }}>
         <div
           className="summary-card-item"
@@ -754,7 +858,6 @@ export default function Users() {
           </div>
         </div>
       </div>
-
       <div style={{ borderBottom: '1px solid #e5e7eb', marginBottom: '24px' }}>
         <div
           className="desktop-tabs-container"
@@ -872,7 +975,6 @@ export default function Users() {
           )}
         </div>
       </div>
-
       {activeTab === 'admitir' && (
         <div
           style={{
@@ -946,7 +1048,6 @@ export default function Users() {
           )}
         </div>
       )}
-
       {activeTab === 'comisiones' && (
         <div
           style={{
@@ -1040,7 +1141,6 @@ export default function Users() {
           </div>
         </div>
       )}
-
       {activeTab === 'estructura' && !selectedParentUser && (
         <div
           style={{
@@ -1148,7 +1248,6 @@ export default function Users() {
           </div>
         </div>
       )}
-
       {activeTab === 'estructura' && selectedParentUser && (
         <div
           style={{
@@ -1718,7 +1817,6 @@ export default function Users() {
           )}
         </div>
       )}
-
       {activeTab === 'perfiles' && (
         <div
           style={{
@@ -2612,7 +2710,6 @@ export default function Users() {
           </div>
         </div>
       )}
-
       {activeTab === 'clientes' && (
         <div
           style={{
@@ -2657,6 +2754,8 @@ export default function Users() {
               }}
             />
           </div>
+
+          {/* --- FORMULARIO DE CREACIÓN UNIFICADO (Basado en SalesModule) --- */}
           <div
             style={{
               marginBottom: '24px',
@@ -2676,166 +2775,591 @@ export default function Users() {
             >
               Crear Nuevo Cliente
             </h4>
-            <div
-              style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}
-            >
-              <div
-                style={{ display: 'flex', gap: '16px', alignItems: 'center' }}
-              >
-                <label
-                  style={{
-                    fontSize: '12px',
-                    fontWeight: '600',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    cursor: 'pointer',
-                  }}
-                >
-                  <input
-                    type="radio"
-                    name="clientType"
-                    checked={!newClientData.is_potential}
-                    onChange={() =>
-                      setNewClientData({
-                        ...newClientData,
-                        is_potential: false,
-                      })
-                    }
-                  />
-                  Cliente Oficial
-                </label>
-                <label
-                  style={{
-                    fontSize: '12px',
-                    fontWeight: '600',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    cursor: 'pointer',
-                  }}
-                >
-                  <input
-                    type="radio"
-                    name="clientType"
-                    checked={newClientData.is_potential}
-                    onChange={() =>
-                      setNewClientData({ ...newClientData, is_potential: true })
-                    }
-                  />
-                  Cliente Potencial
-                </label>
-              </div>
+            <form onSubmit={handleCreateClient}>
               <div
                 style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                  display: 'flex',
+                  flexDirection: 'column',
                   gap: '12px',
                 }}
               >
-                <input
-                  type="text"
-                  placeholder="Nombre Completo *"
-                  value={newClientData.name}
-                  onChange={(e) =>
-                    setNewClientData({ ...newClientData, name: e.target.value })
-                  }
+                <div
+                  style={{ display: 'flex', gap: '16px', alignItems: 'center' }}
+                >
+                  <label
+                    style={{
+                      fontSize: '12px',
+                      fontWeight: '600',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <input
+                      type="radio"
+                      name="clientTypeNew"
+                      checked={!newClientData.is_potential}
+                      onChange={() =>
+                        setNewClientData({
+                          ...newClientData,
+                          is_potential: false,
+                        })
+                      }
+                    />
+                    Cliente Oficial
+                  </label>
+                  <label
+                    style={{
+                      fontSize: '12px',
+                      fontWeight: '600',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <input
+                      type="radio"
+                      name="clientTypeNew"
+                      checked={newClientData.is_potential}
+                      onChange={() =>
+                        setNewClientData({
+                          ...newClientData,
+                          is_potential: true,
+                        })
+                      }
+                    />
+                    Cliente Potencial
+                  </label>
+                </div>
+                <div
                   style={{
-                    padding: '8px',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '6px',
-                    fontSize: '13px',
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                    gap: '12px',
                   }}
-                />
-                <input
-                  type="text"
-                  placeholder="RIF"
-                  value={newClientData.rif_number}
-                  onChange={(e) =>
-                    setNewClientData({
-                      ...newClientData,
-                      rif_number: e.target.value,
-                    })
-                  }
+                >
+                  <input
+                    type="text"
+                    placeholder="Nombre Completo *"
+                    required
+                    value={newClientData.name}
+                    onChange={(e) =>
+                      setNewClientData({
+                        ...newClientData,
+                        name: e.target.value,
+                      })
+                    }
+                    style={{
+                      padding: '8px',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '6px',
+                      fontSize: '13px',
+                    }}
+                  />
+                  <input
+                    type="text"
+                    placeholder="RIF"
+                    value={newClientData.rif_number}
+                    onChange={(e) =>
+                      setNewClientData({
+                        ...newClientData,
+                        rif_number: e.target.value,
+                      })
+                    }
+                    style={{
+                      padding: '8px',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '6px',
+                      fontSize: '13px',
+                    }}
+                  />
+                  <input
+                    type="text"
+                    placeholder="C.I."
+                    value={newClientData.ci_number}
+                    onChange={(e) =>
+                      setNewClientData({
+                        ...newClientData,
+                        ci_number: e.target.value,
+                      })
+                    }
+                    style={{
+                      padding: '8px',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '6px',
+                      fontSize: '13px',
+                    }}
+                  />
+                  <input
+                    type="text"
+                    placeholder="Teléfono"
+                    value={newClientData.phone}
+                    onChange={(e) =>
+                      setNewClientData({
+                        ...newClientData,
+                        phone: e.target.value,
+                      })
+                    }
+                    style={{
+                      padding: '8px',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '6px',
+                      fontSize: '13px',
+                    }}
+                  />
+                  <input
+                    type="text"
+                    placeholder="Ciudad *"
+                    required
+                    value={newClientData.city}
+                    onChange={(e) =>
+                      setNewClientData({
+                        ...newClientData,
+                        city: e.target.value,
+                      })
+                    }
+                    style={{
+                      padding: '8px',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '6px',
+                      fontSize: '13px',
+                    }}
+                  />
+                  <input
+                    type="text"
+                    placeholder="Estado *"
+                    required
+                    value={newClientData.state}
+                    onChange={(e) =>
+                      setNewClientData({
+                        ...newClientData,
+                        state: e.target.value,
+                      })
+                    }
+                    style={{
+                      padding: '8px',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '6px',
+                      fontSize: '13px',
+                    }}
+                  />
+                  <input
+                    type="text"
+                    placeholder="Dirección Completa *"
+                    required
+                    value={newClientData.address_detail}
+                    onChange={(e) =>
+                      setNewClientData({
+                        ...newClientData,
+                        address_detail: e.target.value,
+                      })
+                    }
+                    style={{
+                      padding: '8px',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '6px',
+                      fontSize: '13px',
+                      gridColumn: '1 / -1',
+                    }}
+                  />
+                </div>
+
+                {/* Sección de Archivos para Creación */}
+                <div style={{ marginTop: '16px' }}>
+                  <h4
+                    style={{
+                      fontSize: '13px',
+                      fontWeight: '700',
+                      marginBottom: '12px',
+                      color: '#111827',
+                    }}
+                  >
+                    Documentos Adjuntos
+                  </h4>
+
+                  <div
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns:
+                        'repeat(auto-fit, minmax(240px, 1fr))',
+                      gap: '12px',
+                    }}
+                  >
+                    {/* --- FOTO C.I. --- */}
+                    <div
+                      style={{
+                        border: `1px dashed ${
+                          newCiFile ? '#10B981' : '#D1D5DB'
+                        }`,
+                        borderRadius: '8px',
+                        padding: '12px',
+                        backgroundColor: newCiFile ? '#F0FDF4' : '#FFFFFF',
+                        transition: 'all 0.2s ease',
+                        position: 'relative',
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          marginBottom: '8px',
+                        }}
+                      >
+                        <span
+                          style={{
+                            fontSize: '12px',
+                            fontWeight: '600',
+                            color: newCiFile ? '#059669' : '#4B5563',
+                          }}
+                        >
+                          Foto C.I.
+                        </span>
+                        {newCiFile && (
+                          <span
+                            style={{
+                              fontSize: '10px',
+                              color: '#059669',
+                              fontWeight: '700',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                            }}
+                          >
+                            ✓ Cargado
+                          </span>
+                        )}
+                      </div>
+
+                      <input
+                        type="file"
+                        id="new_ci_file"
+                        accept="image/*"
+                        onChange={(e) => setNewCiFile(e.target.files[0])}
+                        style={{ display: 'none' }}
+                      />
+
+                      <label
+                        htmlFor="new_ci_file"
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '8px',
+                          padding: '8px',
+                          backgroundColor: newCiFile ? '#FFFFFF' : '#F9FAFB',
+                          border: `1px solid ${
+                            newCiFile ? '#A7F3D0' : '#E5E7EB'
+                          }`,
+                          borderRadius: '6px',
+                          cursor: 'pointer',
+                          fontSize: '12px',
+                          fontWeight: '600',
+                          color: newCiFile ? '#059669' : '#6B7280',
+                          transition: 'all 0.2s',
+                          textAlign: 'center',
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                        }}
+                      >
+                        {newCiFile ? (
+                          <>
+                            <span
+                              style={{
+                                maxWidth: '180px',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                              }}
+                            >
+                              {newCiFile.name}
+                            </span>
+                            <button
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setNewCiFile(null);
+                              }}
+                              style={{
+                                background: 'none',
+                                border: 'none',
+                                cursor: 'pointer',
+                                color: '#DC2626',
+                                padding: '0 4px',
+                              }}
+                              title="Eliminar archivo"
+                            >
+                              ✕
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <Upload size={14} />
+                            Seleccionar Archivo
+                          </>
+                        )}
+                      </label>
+                    </div>
+
+                    {/* --- FOTO RIF --- */}
+                    <div
+                      style={{
+                        border: `1px dashed ${
+                          newRifFile ? '#10B981' : '#D1D5DB'
+                        }`,
+                        borderRadius: '8px',
+                        padding: '12px',
+                        backgroundColor: newRifFile ? '#F0FDF4' : '#FFFFFF',
+                        transition: 'all 0.2s ease',
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          marginBottom: '8px',
+                        }}
+                      >
+                        <span
+                          style={{
+                            fontSize: '12px',
+                            fontWeight: '600',
+                            color: newRifFile ? '#059669' : '#4B5563',
+                          }}
+                        >
+                          Foto RIF
+                        </span>
+                        {newRifFile && (
+                          <span
+                            style={{
+                              fontSize: '10px',
+                              color: '#059669',
+                              fontWeight: '700',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                            }}
+                          >
+                            ✓ Cargado
+                          </span>
+                        )}
+                      </div>
+
+                      <input
+                        type="file"
+                        id="new_rif_file"
+                        accept="image/*"
+                        onChange={(e) => setNewRifFile(e.target.files[0])}
+                        style={{ display: 'none' }}
+                      />
+
+                      <label
+                        htmlFor="new_rif_file"
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '8px',
+                          padding: '8px',
+                          backgroundColor: newRifFile ? '#FFFFFF' : '#F9FAFB',
+                          border: `1px solid ${
+                            newRifFile ? '#A7F3D0' : '#E5E7EB'
+                          }`,
+                          borderRadius: '6px',
+                          cursor: 'pointer',
+                          fontSize: '12px',
+                          fontWeight: '600',
+                          color: newRifFile ? '#059669' : '#6B7280',
+                          transition: 'all 0.2s',
+                          textAlign: 'center',
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                        }}
+                      >
+                        {newRifFile ? (
+                          <>
+                            <span
+                              style={{
+                                maxWidth: '180px',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                              }}
+                            >
+                              {newRifFile.name}
+                            </span>
+                            <button
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setNewRifFile(null);
+                              }}
+                              style={{
+                                background: 'none',
+                                border: 'none',
+                                cursor: 'pointer',
+                                color: '#DC2626',
+                                padding: '0 4px',
+                              }}
+                              title="Eliminar archivo"
+                            >
+                              ✕
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <Upload size={14} />
+                            Seleccionar Archivo
+                          </>
+                        )}
+                      </label>
+                    </div>
+
+                    {/* --- DOC. ADICIONAL --- */}
+                    <div
+                      style={{
+                        border: `1px dashed ${
+                          newAdicionalFile ? '#10B981' : '#D1D5DB'
+                        }`,
+                        borderRadius: '8px',
+                        padding: '12px',
+                        backgroundColor: newAdicionalFile
+                          ? '#F0FDF4'
+                          : '#FFFFFF',
+                        transition: 'all 0.2s ease',
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          marginBottom: '8px',
+                        }}
+                      >
+                        <span
+                          style={{
+                            fontSize: '12px',
+                            fontWeight: '600',
+                            color: newAdicionalFile ? '#059669' : '#4B5563',
+                          }}
+                        >
+                          Doc. Adicional
+                        </span>
+                        {newAdicionalFile && (
+                          <span
+                            style={{
+                              fontSize: '10px',
+                              color: '#059669',
+                              fontWeight: '700',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                            }}
+                          >
+                            ✓ Cargado
+                          </span>
+                        )}
+                      </div>
+
+                      <input
+                        type="file"
+                        id="new_adic_file"
+                        accept="image/*,.pdf"
+                        onChange={(e) => setNewAdicionalFile(e.target.files[0])}
+                        style={{ display: 'none' }}
+                      />
+
+                      <label
+                        htmlFor="new_adic_file"
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '8px',
+                          padding: '8px',
+                          backgroundColor: newAdicionalFile
+                            ? '#FFFFFF'
+                            : '#F9FAFB',
+                          border: `1px solid ${
+                            newAdicionalFile ? '#A7F3D0' : '#E5E7EB'
+                          }`,
+                          borderRadius: '6px',
+                          cursor: 'pointer',
+                          fontSize: '12px',
+                          fontWeight: '600',
+                          color: newAdicionalFile ? '#059669' : '#6B7280',
+                          transition: 'all 0.2s',
+                          textAlign: 'center',
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                        }}
+                      >
+                        {newAdicionalFile ? (
+                          <>
+                            <span
+                              style={{
+                                maxWidth: '180px',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                              }}
+                            >
+                              {newAdicionalFile.name}
+                            </span>
+                            <button
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setNewAdicionalFile(null);
+                              }}
+                              style={{
+                                background: 'none',
+                                border: 'none',
+                                cursor: 'pointer',
+                                color: '#DC2626',
+                                padding: '0 4px',
+                              }}
+                              title="Eliminar archivo"
+                            >
+                              ✕
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <Upload size={14} />
+                            Seleccionar Archivo
+                          </>
+                        )}
+                      </label>
+                    </div>
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={creatingClient}
                   style={{
-                    padding: '8px',
-                    border: '1px solid #d1d5db',
+                    alignSelf: 'flex-start',
+                    backgroundColor: '#000',
+                    color: '#D4AF37',
+                    border: 'none',
+                    padding: '8px 16px',
                     borderRadius: '6px',
-                    fontSize: '13px',
+                    fontWeight: '700',
+                    fontSize: '12px',
+                    cursor: 'pointer',
                   }}
-                />
-                <input
-                  type="text"
-                  placeholder="C.I."
-                  value={newClientData.ci_number}
-                  onChange={(e) =>
-                    setNewClientData({
-                      ...newClientData,
-                      ci_number: e.target.value,
-                    })
-                  }
-                  style={{
-                    padding: '8px',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '6px',
-                    fontSize: '13px',
-                  }}
-                />
-                <input
-                  type="text"
-                  placeholder="Teléfono"
-                  value={newClientData.phone}
-                  onChange={(e) =>
-                    setNewClientData({
-                      ...newClientData,
-                      phone: e.target.value,
-                    })
-                  }
-                  style={{
-                    padding: '8px',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '6px',
-                    fontSize: '13px',
-                  }}
-                />
-                <input
-                  type="text"
-                  placeholder="Dirección"
-                  value={newClientData.address} // <-- Cambiado de address_detail a address
-                  onChange={(e) =>
-                    setNewClientData({
-                      ...newClientData,
-                      address: e.target.value, // <-- Cambiado de address_detail a address
-                    })
-                  }
-                  style={{
-                    padding: '8px',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '6px',
-                    fontSize: '13px',
-                    gridColumn: '1 / -1',
-                  }}
-                />
+                >
+                  {creatingClient ? 'Creando...' : 'Guardar Cliente'}
+                </button>
               </div>
-              <button
-                onClick={handleCreateClient}
-                disabled={creatingClient}
-                style={{
-                  alignSelf: 'flex-start',
-                  backgroundColor: '#000',
-                  color: '#D4AF37',
-                  border: 'none',
-                  padding: '8px 16px',
-                  borderRadius: '6px',
-                  fontWeight: '700',
-                  fontSize: '12px',
-                  cursor: 'pointer',
-                }}
-              >
-                {creatingClient ? 'Creando...' : 'Guardar Cliente'}
-              </button>
-            </div>
+            </form>
           </div>
+
           {loadingClients ? (
             <div
               style={{ padding: '20px', textAlign: 'center', color: '#6b7280' }}
@@ -3527,7 +4051,6 @@ export default function Users() {
           )}
         </div>
       )}
-
       {imageModal.open && (
         <div
           style={{
@@ -3620,6 +4143,7 @@ export default function Users() {
         </div>
       )}
 
+      {/* --- MODAL DE EDICIÓN UNIFICADO (Basado en SalesModule) --- */}
       {clientEditModal.open && clientEditModal.client && (
         <div
           style={{
@@ -3706,6 +4230,55 @@ export default function Users() {
                   }}
                 />
               </div>
+
+              <div
+                style={{
+                  display: 'flex',
+                  gap: '16px',
+                  alignItems: 'center',
+                  marginBottom: '8px',
+                }}
+              >
+                <label
+                  style={{
+                    fontSize: '12px',
+                    fontWeight: '600',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                  }}
+                >
+                  <input
+                    type="radio"
+                    name="editClientType"
+                    checked={!clientEditModal.formData.is_potential}
+                    onChange={() =>
+                      handleClientFieldChange('is_potential', false)
+                    }
+                  />
+                  Cliente Oficial
+                </label>
+                <label
+                  style={{
+                    fontSize: '12px',
+                    fontWeight: '600',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                  }}
+                >
+                  <input
+                    type="radio"
+                    name="editClientType"
+                    checked={clientEditModal.formData.is_potential}
+                    onChange={() =>
+                      handleClientFieldChange('is_potential', true)
+                    }
+                  />
+                  Cliente Potencial
+                </label>
+              </div>
+
               <div
                 style={{
                   display: 'grid',
@@ -3765,7 +4338,113 @@ export default function Users() {
                     }}
                   />
                 </div>
+                <div>
+                  <label
+                    style={{
+                      fontSize: '12px',
+                      fontWeight: '600',
+                      color: '#6b7280',
+                      display: 'block',
+                      marginBottom: '4px',
+                    }}
+                  >
+                    Teléfono
+                  </label>
+                  <input
+                    type="text"
+                    value={clientEditModal.formData.phone}
+                    onChange={(e) =>
+                      handleClientFieldChange('phone', e.target.value)
+                    }
+                    style={{
+                      width: '100%',
+                      padding: '8px',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '6px',
+                    }}
+                  />
+                </div>
+                <div>
+                  <label
+                    style={{
+                      fontSize: '12px',
+                      fontWeight: '600',
+                      color: '#6b7280',
+                      display: 'block',
+                      marginBottom: '4px',
+                    }}
+                  >
+                    Ciudad
+                  </label>
+                  <input
+                    type="text"
+                    value={clientEditModal.formData.city}
+                    onChange={(e) =>
+                      handleClientFieldChange('city', e.target.value)
+                    }
+                    style={{
+                      width: '100%',
+                      padding: '8px',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '6px',
+                    }}
+                  />
+                </div>
+                <div>
+                  <label
+                    style={{
+                      fontSize: '12px',
+                      fontWeight: '600',
+                      color: '#6b7280',
+                      display: 'block',
+                      marginBottom: '4px',
+                    }}
+                  >
+                    Estado
+                  </label>
+                  <input
+                    type="text"
+                    value={clientEditModal.formData.state}
+                    onChange={(e) =>
+                      handleClientFieldChange('state', e.target.value)
+                    }
+                    style={{
+                      width: '100%',
+                      padding: '8px',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '6px',
+                    }}
+                  />
+                </div>
               </div>
+
+              <div>
+                <label
+                  style={{
+                    fontSize: '12px',
+                    fontWeight: '600',
+                    color: '#6b7280',
+                    display: 'block',
+                    marginBottom: '4px',
+                  }}
+                >
+                  Dirección Completa
+                </label>
+                <textarea
+                  rows="2"
+                  value={clientEditModal.formData.address_detail}
+                  onChange={(e) =>
+                    handleClientFieldChange('address_detail', e.target.value)
+                  }
+                  style={{
+                    width: '100%',
+                    padding: '8px',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '6px',
+                  }}
+                />
+              </div>
+
               <div
                 style={{
                   backgroundColor: '#f9fafb',
@@ -3782,7 +4461,7 @@ export default function Users() {
                     color: '#111827',
                   }}
                 >
-                  Documentos Adjuntos
+                  Documentos Adjuntos (Sustituir)
                 </h4>
                 <div
                   style={{
@@ -3791,6 +4470,7 @@ export default function Users() {
                     gap: '12px',
                   }}
                 >
+                  {/* CI */}
                   <div
                     style={{
                       display: 'flex',
@@ -3858,13 +4538,15 @@ export default function Users() {
                         ref={clientCiInputRef}
                         type="file"
                         style={{ display: 'none' }}
-                        accept="image/*,.pdf"
+                        accept="image/*"
                         onChange={(e) =>
                           handleClientFileUpload(e, 'ci_photo_url', 'documents')
                         }
                       />
                     </div>
                   </div>
+
+                  {/* RIF */}
                   <div
                     style={{
                       display: 'flex',
@@ -3932,7 +4614,7 @@ export default function Users() {
                         ref={clientRifInputRef}
                         type="file"
                         style={{ display: 'none' }}
-                        accept="image/*,.pdf"
+                        accept="image/*"
                         onChange={(e) =>
                           handleClientFileUpload(
                             e,
@@ -3943,6 +4625,8 @@ export default function Users() {
                       />
                     </div>
                   </div>
+
+                  {/* Adicional */}
                   <div
                     style={{
                       display: 'flex',
@@ -4064,112 +4748,111 @@ export default function Users() {
           </div>
         </div>
       )}
-
       <style>{`
-        .summary-cards-grid {
-          display: grid;
-          grid-template-columns: repeat(3, 1fr);
-          gap: 12px;
-        }
-        .users-table-container {
-          width: 100%;
-          overflow-x: auto;
-        }
-        .custom-responsive-table {
-          width: 100%;
-          border-collapse: collapse;
-          font-size: 13px;
-          text-align: left;
-        }
-        .mobile-thead {
-          display: none;
-        }
-        .mobile-cell-stacked {
-          display: none;
-        }
-        .desktop-cell-normal {
-          display: table-cell;
-        }
-        @media (max-width: 768px) {
-          .desktop-tabs-container {
-            display: none !important;
-          }
-          .mobile-dropdown-container {
-            display: block !important;
-          }
-          .summary-cards-grid {
-            grid-template-columns: repeat(3, 1fr) !important;
-            gap: 8px !important;
-          }
-          .summary-card-item {
-            padding: 10px 6px !important;
-            text-align: center !important;
-          }
-          .summary-card-item div:nth-child(1) {
-            font-size: 9px !important;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-          }
-          .summary-card-item div:nth-child(2) {
-            font-size: 18px !important;
-            margin-top: 2px !important;
-          }
-          .summary-card-item div:nth-child(3) {
-            font-size: 9px !important;
-            margin-top: 1px !important;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-          }
-          .users-table-container.mobile-cards {
-            overflow-x: hidden !important;
-            background: transparent !important;
-            border: none !important;
-            padding: 0 !important;
-          }
-          .custom-responsive-table {
-            display: block !important;
-          }
-          .desktop-thead {
-            display: none !important;
-          }
-          .mobile-thead {
-            display: none !important;
-          }
-          .custom-responsive-table tbody {
-            display: flex !important;
-            flex-direction: column !important;
-            gap: 12px !important;
-          }
-          .custom-responsive-table tr {
-            display: flex !important;
-            flex-direction: column !important;
-            background-color: #ffffff !important;
-            border: 1px solid #d1d5db !important;
-            border-radius: 8px !important;
-            padding: 14px !important;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-          }
-          .desktop-cell-normal {
-            display: none !important;
-          }
-          .mobile-cell-stacked {
-            display: flex !important;
-            flex-direction: column;
-            gap: 8px;
-            padding: 0 !important;
-          }
-        }
-        @media (min-width: 769px) {
-          .desktop-tabs-container {
-            display: flex !important;
-          }
-          .mobile-dropdown-container {
-            display: none !important;
-          }
-        }
-      `}</style>
+     .summary-cards-grid {
+       display: grid;
+       grid-template-columns: repeat(3, 1fr);
+       gap: 12px;
+     }
+     .users-table-container {
+       width: 100%;
+       overflow-x: auto;
+     }
+     .custom-responsive-table {
+       width: 100%;
+       border-collapse: collapse;
+       font-size: 13px;
+       text-align: left;
+     }
+     .mobile-thead {
+       display: none;
+     }
+     .mobile-cell-stacked {
+       display: none;
+     }
+     .desktop-cell-normal {
+       display: table-cell;
+     }
+     @media (max-width: 768px) {
+       .desktop-tabs-container {
+         display: none !important;
+       }
+       .mobile-dropdown-container {
+         display: block !important;
+       }
+       .summary-cards-grid {
+         grid-template-columns: repeat(3, 1fr) !important;
+         gap: 8px !important;
+       }
+       .summary-card-item {
+         padding: 10px 6px !important;
+         text-align: center !important;
+       }
+       .summary-card-item div:nth-child(1) {
+         font-size: 9px !important;
+         white-space: nowrap;
+         overflow: hidden;
+         text-overflow: ellipsis;
+       }
+       .summary-card-item div:nth-child(2) {
+         font-size: 18px !important;
+         margin-top: 2px !important;
+       }
+       .summary-card-item div:nth-child(3) {
+         font-size: 9px !important;
+         margin-top: 1px !important;
+         white-space: nowrap;
+         overflow: hidden;
+         text-overflow: ellipsis;
+       }
+       .users-table-container.mobile-cards {
+         overflow-x: hidden !important;
+         background: transparent !important;
+         border: none !important;
+         padding: 0 !important;
+       }
+       .custom-responsive-table {
+         display: block !important;
+       }
+       .desktop-thead {
+         display: none !important;
+       }
+       .mobile-thead {
+         display: none !important;
+       }
+       .custom-responsive-table tbody {
+         display: flex !important;
+         flex-direction: column !important;
+         gap: 12px !important;
+       }
+       .custom-responsive-table tr {
+         display: flex !important;
+         flex-direction: column !important;
+         background-color: #ffffff !important;
+         border: 1px solid #d1d5db !important;
+         border-radius: 8px !important;
+         padding: 14px !important;
+         box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+       }
+       .desktop-cell-normal {
+         display: none !important;
+       }
+       .mobile-cell-stacked {
+         display: flex !important;
+         flex-direction: column;
+         gap: 8px;
+         padding: 0 !important;
+       }
+     }
+     @media (min-width: 769px) {
+       .desktop-tabs-container {
+         display: flex !important;
+       }
+       .mobile-dropdown-container {
+         display: none !important;
+       }
+     }
+   `}</style>
     </div>
   );
 }
@@ -4310,7 +4993,7 @@ function StructureUserRow({ user, onSelect }) {
               >
                 Rol
               </span>
-              <span>{user.role}</span>
+              <span>{user.role} </span>
             </div>
             <div>
               <span
