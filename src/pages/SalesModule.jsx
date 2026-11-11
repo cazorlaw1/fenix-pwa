@@ -440,19 +440,37 @@ export default function SalesModule() {
   // 3. ESTADOS: SECCIÓN NOTA DE ENTREGA
   // ---------------------------------------------------------------------------
   const [editModeId, setEditModeId] = useState(null);
-  // Estados para SearchableDropdowns en Crear N.E.
-  const [neClientId, setNeClientId] = useState('');
+  // Estados para SearchableDropdowns en Crear N.E. (con persistencia en caché)
+  const [neClientId, setNeClientId] = useState(() => {
+    return localStorage.getItem('sales_ne_client_cache') || '';
+  });
   const [neSearchProduct, setNeSearchProduct] = useState('');
   const [neSelectedProdId, setNeSelectedProdId] = useState('');
-  const [neCategoria, setNeCategoria] = useState('bombillos');
-  // B. ACTUALIZACIÓN: Modalidad ahora soporta 4 valores
-  const [neTipoPago, setNeTipoPago] = useState('53.38');
+  const [neCategoria, setNeCategoria] = useState(() => {
+    return localStorage.getItem('sales_ne_category_cache') || 'bombillos';
+  });
+  const [neTipoPago, setNeTipoPago] = useState(() => {
+    return localStorage.getItem('sales_ne_payment_cache') || '0';
+  });
   const [neQuantity, setNeQuantity] = useState(1);
   const [neCart, setNeCart] = useState(() => {
     const cachedCart = localStorage.getItem('sales_ne_cart_cache');
     return cachedCart ? JSON.parse(cachedCart) : [];
   });
-  // Guardar automáticamente en caché cada vez que cambie el carrito
+
+  // Guardar automáticamente en caché cada cambio en los campos de la nota
+  useEffect(() => {
+    localStorage.setItem('sales_ne_client_cache', neClientId);
+  }, [neClientId]);
+
+  useEffect(() => {
+    localStorage.setItem('sales_ne_category_cache', neCategoria);
+  }, [neCategoria]);
+
+  useEffect(() => {
+    localStorage.setItem('sales_ne_payment_cache', neTipoPago);
+  }, [neTipoPago]);
+
   useEffect(() => {
     localStorage.setItem('sales_ne_cart_cache', JSON.stringify(neCart));
   }, [neCart]);
@@ -888,12 +906,12 @@ export default function SalesModule() {
   // ---------------------------------------------------------------------------
   const handleSaveClient = async (e) => {
     e.preventDefault();
-    if (!ciFile || !rifFile) {
-      alert('Es obligatorio adjuntar la C.I. y el RIF.');
+    if (ciFile && !validateImageFile(ciFile)) {
+      alert('El archivo de C.I. debe ser una imagen (jpg, png, etc.).');
       return;
     }
-    if (!validateImageFile(ciFile) || !validateImageFile(rifFile)) {
-      alert('Los archivos de C.I. y RIF deben ser imágenes (jpg, png, etc.).');
+    if (rifFile && !validateImageFile(rifFile)) {
+      alert('El archivo de RIF debe ser una imagen (jpg, png, etc.).');
       return;
     }
     if (adicionalFile && !validateImageFile(adicionalFile)) {
@@ -902,8 +920,10 @@ export default function SalesModule() {
     }
     setLoading(true);
     try {
-      const ciUrl = await uploadFile(ciFile, 'documents', 'ci');
-      const rifUrl = await uploadFile(rifFile, 'documents', 'rif');
+      const ciUrl = ciFile ? await uploadFile(ciFile, 'documents', 'ci') : null;
+      const rifUrl = rifFile
+        ? await uploadFile(rifFile, 'documents', 'rif')
+        : null;
       const adicUrl = adicionalFile
         ? await uploadFile(adicionalFile, 'documents', 'adicional')
         : null;
@@ -1263,12 +1283,7 @@ export default function SalesModule() {
 
   const handleSaveConvertion = async (e) => {
     e.preventDefault();
-    if (!convertCiFile || !convertRifFile) {
-      alert(
-        'Es obligatorio adjuntar la C.I. y el RIF para registrar como cliente oficial.'
-      );
-      return;
-    }
+
     if (
       !validateImageFile(convertCiFile) ||
       !validateImageFile(convertRifFile)
@@ -1501,10 +1516,18 @@ export default function SalesModule() {
       });
       setNeCart([]);
       setNeClientId('');
+      setNeCategoria('bombillos');
+      setNeTipoPago('0');
       setNeObservacion('');
       setNeGpsLocation(null);
       setEditModeId(null);
-      localStorage.removeItem('sales_ne_cart_cache'); // <--- AÑADE ESTA LÍNEA AQUÍ
+
+      // Limpiar toda la caché de la nota
+      localStorage.removeItem('sales_ne_cart_cache');
+      localStorage.removeItem('sales_ne_client_cache');
+      localStorage.removeItem('sales_ne_category_cache');
+      localStorage.removeItem('sales_ne_payment_cache');
+
       fetchSalesHistory();
       fetchComisionesYVales();
       fetchEstimatedFolio();
@@ -1818,8 +1841,7 @@ export default function SalesModule() {
       let rowsHtml = '';
       (items || []).forEach((item) => {
         const totalLine =
-          item.total_line_usd ||
-          item.quantity * item.discounted_unit_price_usd;
+          item.total_line_usd || item.quantity * item.discounted_unit_price_usd;
         rowsHtml += `
           <tr>
             <td style="padding: 7px 9px; border-bottom: 1px solid #ddd; font-family: monospace; font-weight: bold; font-size: 13px;">${
@@ -1886,9 +1908,9 @@ export default function SalesModule() {
           <div style="width: 270px; background: #f9fafb; padding: 10px; border: 1px solid #e5e7eb; border-radius: 6px; margin-left: auto; font-size: 13px; margin-bottom: 15px; page-break-inside: avoid;">
             <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
               <span>Total Base:</span>
-              <strong>$${Number(
-                nota.total_base_usd || subTotal
-              ).toFixed(2)}</strong>
+              <strong>$${Number(nota.total_base_usd || subTotal).toFixed(
+                2
+              )}</strong>
             </div>
             <div style="display: flex; justify-content: space-between; margin-bottom: 4px; color: #D97706;">
               <span>Descuento Aplicado (${discountPct}%):</span>
@@ -2036,8 +2058,7 @@ export default function SalesModule() {
       let rowsHtml = '';
       (items || []).forEach((item) => {
         const totalLine =
-          item.total_line_usd ||
-          item.quantity * item.discounted_unit_price_usd;
+          item.total_line_usd || item.quantity * item.discounted_unit_price_usd;
         rowsHtml += `
           <tr>
             <td style="padding: 7px 9px; border-bottom: 1px solid #ddd; font-family: monospace; font-weight: bold; font-size: 13px;">${
@@ -2104,9 +2125,9 @@ export default function SalesModule() {
           <div style="width: 270px; background: #f9fafb; padding: 10px; border: 1px solid #e5e7eb; border-radius: 6px; margin-left: auto; font-size: 13px; margin-bottom: 15px; page-break-inside: avoid;">
             <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
               <span>Total Base:</span>
-              <strong>$${Number(
-                nota.total_base_usd || subTotal
-              ).toFixed(2)}</strong>
+              <strong>$${Number(nota.total_base_usd || subTotal).toFixed(
+                2
+              )}</strong>
             </div>
             <div style="display: flex; justify-content: space-between; margin-bottom: 4px; color: #D97706;">
               <span>Descuento Aplicado (${discountPct}%):</span>
@@ -3064,11 +3085,10 @@ export default function SalesModule() {
                         marginBottom: '4px',
                       }}
                     >
-                      Número de C.I. *
+                      Número de C.I.
                     </label>
                     <input
                       type="text"
-                      required
                       value={clientForm.ci_numero}
                       onChange={(e) =>
                         setClientForm({
@@ -3093,7 +3113,7 @@ export default function SalesModule() {
                         marginBottom: '4px',
                       }}
                     >
-                      Adjuntar Foto C.I. *
+                      Adjuntar Foto C.I.
                     </label>
                     <CustomFileInput
                       id="ci_file"
@@ -3119,11 +3139,10 @@ export default function SalesModule() {
                         marginBottom: '4px',
                       }}
                     >
-                      Número de RIF *
+                      Número de RIF
                     </label>
                     <input
                       type="text"
-                      required
                       value={clientForm.rif_numero}
                       onChange={(e) =>
                         setClientForm({
@@ -3148,7 +3167,7 @@ export default function SalesModule() {
                         marginBottom: '4px',
                       }}
                     >
-                      Adjuntar Foto RIF *
+                      Adjuntar Foto RIF
                     </label>
                     <CustomFileInput
                       id="rif_file"
@@ -3158,6 +3177,14 @@ export default function SalesModule() {
                     />
                   </div>
                 </div>
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                    gap: '12px',
+                    alignItems: 'end',
+                  }}
+                ></div>
                 <div
                   style={{
                     display: 'grid',
@@ -3252,11 +3279,10 @@ export default function SalesModule() {
                       marginBottom: '4px',
                     }}
                   >
-                    Teléfono *
+                    Teléfono
                   </label>
                   <input
                     type="text"
-                    required
                     value={clientForm.telefono}
                     onChange={(e) =>
                       setClientForm({ ...clientForm, telefono: e.target.value })
@@ -4327,11 +4353,10 @@ export default function SalesModule() {
                       marginBottom: '4px',
                     }}
                   >
-                    C.I. Número *
+                    C.I. Número
                   </label>
                   <input
                     type="text"
-                    required
                     value={editClientForm.ci_numero}
                     onChange={(e) =>
                       setEditClientForm({
@@ -4382,11 +4407,10 @@ export default function SalesModule() {
                       marginBottom: '4px',
                     }}
                   >
-                    RIF Número *
+                    RIF Número
                   </label>
                   <input
                     type="text"
-                    required
                     value={editClientForm.rif_numero}
                     onChange={(e) =>
                       setEditClientForm({
@@ -4524,11 +4548,10 @@ export default function SalesModule() {
                     marginBottom: '4px',
                   }}
                 >
-                  Teléfono *
+                  Teléfono
                 </label>
                 <input
                   type="text"
-                  required
                   value={editClientForm.telefono}
                   onChange={(e) =>
                     setEditClientForm({
@@ -4776,11 +4799,10 @@ export default function SalesModule() {
                         marginBottom: '4px',
                       }}
                     >
-                      Teléfono *
+                      Teléfono
                     </label>
                     <input
                       type="text"
-                      required
                       value={potencialForm.telefono}
                       onChange={(e) =>
                         setPotencialForm({
@@ -6113,11 +6135,10 @@ export default function SalesModule() {
                       marginBottom: '4px',
                     }}
                   >
-                    C.I. Número *
+                    C.I. Número
                   </label>
                   <input
                     type="text"
-                    required
                     value={convertForm.ci_numero}
                     onChange={(e) =>
                       setConvertForm({
@@ -6142,7 +6163,7 @@ export default function SalesModule() {
                       marginBottom: '4px',
                     }}
                   >
-                    Foto C.I. *
+                    Foto C.I.
                   </label>
                   <CustomFileInput
                     id="convert_ci"
@@ -6168,11 +6189,10 @@ export default function SalesModule() {
                       marginBottom: '4px',
                     }}
                   >
-                    RIF Número *
+                    RIF Número
                   </label>
                   <input
                     type="text"
-                    required
                     value={convertForm.rif_numero}
                     onChange={(e) =>
                       setConvertForm({
@@ -6197,7 +6217,7 @@ export default function SalesModule() {
                       marginBottom: '4px',
                     }}
                   >
-                    Foto RIF *
+                    Foto RIF
                   </label>
                   <CustomFileInput
                     id="convert_rif"
@@ -6301,11 +6321,10 @@ export default function SalesModule() {
                     marginBottom: '4px',
                   }}
                 >
-                  Teléfono *
+                  Teléfono
                 </label>
                 <input
                   type="text"
-                  required
                   value={convertForm.telefono}
                   onChange={(e) =>
                     setConvertForm({
