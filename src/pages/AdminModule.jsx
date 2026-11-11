@@ -1260,7 +1260,7 @@ export default function AdminModule() {
           .order('created_at', { ascending: false });
         if (error) throw error;
         setPendingNotes(data || []);
-      } } else if (activeTab === 'cobranza') {
+      } else if (activeTab === 'cobranza') {
         const { data, error } = await supabase
           .from('sales_orders')
           .select(
