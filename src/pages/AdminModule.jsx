@@ -328,18 +328,30 @@ export default function AdminModule() {
   const [quincenaSortAsc, setQuincenaSortAsc] = useState(true);
   const [cobranzaSortAsc, setCobranzaSortAsc] = useState(false);
   const [isAgingOpen, setIsAgingOpen] = useState(false);
-  const [neTargetUserId, setNeTargetUserId] = useState('');
-  const [neClientId, setNeClientId] = useState('');
-  const [neCategoria, setNeCategoria] = useState('bombillos');
-  const [neTipoPago, setNeTipoPago] = useState('0');
+  const [neTargetUserId, setNeTargetUserId] = useState(() => {
+    return localStorage.getItem('admin_ne_target_user_id') || '';
+  });
+  const [neClientId, setNeClientId] = useState(() => {
+    return localStorage.getItem('admin_ne_client_id') || '';
+  });
+  const [neCategoria, setNeCategoria] = useState(() => {
+    return localStorage.getItem('admin_ne_categoria') || 'bombillos';
+  });
+  // Por defecto en '0' si no hay nada en caché, tal como solicitaste
+  const [neTipoPago, setNeTipoPago] = useState(() => {
+    return localStorage.getItem('admin_ne_tipo_pago') || '0';
+  });
   const [neSearchProduct, setNeSearchProduct] = useState('');
   const [neSelectedProdId, setNeSelectedProdId] = useState('');
   const [neQuantity, setNeQuantity] = useState(1);
+  const neQuantityInputRef = useRef(null);
   const [neCart, setNeCart] = useState(() => {
     const cachedCart = localStorage.getItem('admin_ne_cart_cache');
     return cachedCart ? JSON.parse(cachedCart) : [];
   });
-  const [neObservacion, setNeObservacion] = useState('');
+  const [neObservacion, setNeObservacion] = useState(() => {
+    return localStorage.getItem('admin_ne_observacion') || '';
+  });
   const [estimatedNextFolio, setEstimatedNextFolio] = useState('');
   const [manualFolioMode, setManualFolioMode] = useState(false);
   const [specificFolioNum, setSpecificFolioNum] = useState('');
@@ -374,9 +386,12 @@ export default function AdminModule() {
   const [editNoteQuantity, setEditNoteQuantity] = useState(1);
   const [editNoteSearchProd, setEditNoteSearchProd] = useState('');
   const [isCobranzaNEModal, setIsCobranzaNEModal] = useState(false);
-  const [neFecha, setNeFecha] = useState(
-    new Date().toISOString().split('T')[0]
-  );
+  const [neFecha, setNeFecha] = useState(() => {
+    return (
+      localStorage.getItem('admin_ne_fecha') ||
+      new Date().toISOString().split('T')[0]
+    );
+  });
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const mobileMenuRef = useRef(null);
   const [manualAbonoForm, setManualAbonoForm] = useState({
@@ -428,6 +443,43 @@ export default function AdminModule() {
   useEffect(() => {
     localStorage.setItem('admin_ne_cart_cache', JSON.stringify(neCart));
   }, [neCart]);
+
+  // --- PERSISTENCIA EN CACHÉ DE TODOS LOS CAMPOS DE CREAR N.E. ---
+  useEffect(() => {
+    localStorage.setItem('admin_ne_target_user_id', neTargetUserId);
+  }, [neTargetUserId]);
+
+  useEffect(() => {
+    localStorage.setItem('admin_ne_client_id', neClientId);
+  }, [neClientId]);
+
+  useEffect(() => {
+    localStorage.setItem('admin_ne_categoria', neCategoria);
+  }, [neCategoria]);
+
+  useEffect(() => {
+    localStorage.setItem('admin_ne_tipo_pago', neTipoPago);
+  }, [neTipoPago]);
+
+  useEffect(() => {
+    localStorage.setItem('admin_ne_fecha', neFecha);
+  }, [neFecha]);
+
+  useEffect(() => {
+    localStorage.setItem('admin_ne_observacion', neObservacion);
+  }, [neObservacion]);
+
+  // --- AUTO-SELECCIONAR CANTIDAD AL ELEGIR UN PRODUCTO ---
+  useEffect(() => {
+    if (neSelectedProdId) {
+      setTimeout(() => {
+        if (neQuantityInputRef.current) {
+          neQuantityInputRef.current.focus();
+          neQuantityInputRef.current.select(); // Selecciona el texto para escribir directo sin hacer clic
+        }
+      }, 50);
+    }
+  }, [neSelectedProdId]);
 
   // --- NUEVO EFECTO: Recalcular precios del carrito al cambiar el porcentaje de descuento ---
   useEffect(() => {
@@ -897,6 +949,8 @@ export default function AdminModule() {
       showToastSuccess(
         `Nota de entrega #${newNota.transaction_number} creada, aprobada y asignada con éxito.`
       );
+
+      // Limpiar estados locales
       setNeCart([]);
       setNeClientId('');
       setNeTargetUserId('');
@@ -904,7 +958,17 @@ export default function AdminModule() {
       setSpecificFolioNum('');
       setManualFolioMode(false);
       setNeFecha(new Date().toISOString().split('T')[0]);
+      setNeTipoPago('0'); // Restablecer el porcentaje predeterminado a '0' tras limpiar
+
+      // Borrar toda la caché del localStorage de Crear N.E.
       localStorage.removeItem('admin_ne_cart_cache');
+      localStorage.removeItem('admin_ne_target_user_id');
+      localStorage.removeItem('admin_ne_client_id');
+      localStorage.removeItem('admin_ne_categoria');
+      localStorage.removeItem('admin_ne_tipo_pago');
+      localStorage.removeItem('admin_ne_fecha');
+      localStorage.removeItem('admin_ne_observacion');
+
       await fetchEstimatedFolio();
       fetchTabData();
       fetchGlobalCreateNeAndCierreData();
@@ -3143,15 +3207,15 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
     }
   };
 
-  const handleRejectNote = async (e) => {
-    e.preventDefault();
+  const handleConfirmReject = async () => {
     if (!rejectModalNote) return;
     try {
+      setLoading(true);
       const { error } = await supabase
         .from('sales_orders')
         .update({
           status: 'rechazada',
-          rejection_reason: rejectReason,
+          rejection_reason: 'Rechazado por administración',
           updated_at: new Date(),
         })
         .eq('id', rejectModalNote.id);
@@ -3170,7 +3234,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                 rejectModalNote.profiles?.full_name,
               clienteNombre:
                 rejectModalNote.client?.name || rejectModalNote.clients?.name,
-              observacion: rejectReason,
+              observacion: 'Rechazado directamente',
             },
           },
         });
@@ -3184,10 +3248,11 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
         setEditingNoteId(null);
       }
       setRejectModalNote(null);
-      setRejectReason('');
       fetchTabData();
     } catch (err) {
       setErrorMsg(err.message || 'Error al rechazar la nota.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -4759,6 +4824,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                   Cantidad
                 </label>
                 <input
+                  ref={neQuantityInputRef}
                   type="number"
                   min="1"
                   value={neQuantity}
@@ -13719,17 +13785,17 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
           </div>
         </div>
       )}
-      {/* MODAL RECHAZO */}
+      {/* MODAL DE CONFIRMACIÓN DE RECHAZO (CAPA SUPERIOR) */}
       {rejectModalNote && (
         <div
           style={{
             position: 'fixed',
             inset: 0,
-            backgroundColor: 'rgba(0,0,0,0.5)',
+            backgroundColor: 'rgba(0,0,0,0.7)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            zIndex: 1000,
+            zIndex: 2000,
             padding: '16px',
           }}
         >
@@ -13740,86 +13806,88 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
               width: '100%',
               maxWidth: '420px',
               padding: '24px',
+              boxShadow: '0 20px 25px -5px rgba(0,0,0,0.3)',
+              border: '1px solid #e5e7eb',
+              textAlign: 'center',
             }}
           >
-            <h2
+            <div
+              style={{
+                width: '48px',
+                height: '48px',
+                borderRadius: '50%',
+                backgroundColor: '#fee2e2',
+                color: '#dc2626',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                margin: '0 auto 16px auto',
+              }}
+            >
+              <XCircle size={28} />
+            </div>
+            <h3
               style={{
                 fontSize: '18px',
                 fontWeight: 'bold',
-                margin: '0 0 16px 0',
+                color: '#111827',
+                marginBottom: '8px',
+                margin: '0 0 8px 0',
               }}
             >
-              Rechazar Nota #{rejectModalNote.transaction_number}
-            </h2>
-            <form
-              onSubmit={handleRejectNote}
-              style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}
+              ¿Rechazar Nota de Entrega?
+            </h3>
+            <p
+              style={{
+                fontSize: '14px',
+                color: '#4b5563',
+                marginBottom: '24px',
+                lineHeight: '1.4',
+              }}
             >
-              <div>
-                <label
-                  style={{
-                    display: 'block',
-                    fontSize: '13px',
-                    fontWeight: '600',
-                    marginBottom: '4px',
-                  }}
-                >
-                  Motivo de rechazo *
-                </label>
-                <textarea
-                  required
-                  rows="3"
-                  value={rejectReason}
-                  onChange={(e) => setRejectReason(e.target.value)}
-                  placeholder="Explique el motivo del rechazo..."
-                  style={{
-                    width: '100%',
-                    padding: '8px',
-                    borderRadius: '6px',
-                    border: '1px solid #d1d5db',
-                    boxSizing: 'border-box',
-                  }}
-                ></textarea>
-              </div>
-              <div
+              ¿Está seguro de que desea rechazar la nota de entrega{' '}
+              <strong style={{ color: '#111827' }}>
+                #{rejectModalNote.transaction_number}
+              </strong>
+              ? Esta acción no se puede deshacer.
+            </p>
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <button
+                type="button"
+                onClick={() => setRejectModalNote(null)}
                 style={{
-                  display: 'flex',
-                  justifyContent: 'flex-end',
-                  gap: '10px',
+                  flex: 1,
+                  padding: '10px 16px',
+                  backgroundColor: '#f3f4f6',
+                  color: '#374151',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '8px',
+                  fontSize: '14px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
                 }}
               >
-                <button
-                  type="button"
-                  onClick={() => {
-                    setRejectModalNote(null);
-                    setRejectReason('');
-                  }}
-                  style={{
-                    padding: '8px 16px',
-                    borderRadius: '6px',
-                    border: '1px solid #d1d5db',
-                    background: '#fff',
-                    cursor: 'pointer',
-                  }}
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  style={{
-                    padding: '8px 16px',
-                    borderRadius: '6px',
-                    border: 'none',
-                    background: '#dc2626',
-                    color: '#fff',
-                    fontWeight: 'bold',
-                    cursor: 'pointer',
-                  }}
-                >
-                  Confirmar Rechazo
-                </button>
-              </div>
-            </form>
+                No
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmReject}
+                disabled={loading}
+                style={{
+                  flex: 1,
+                  padding: '10px 16px',
+                  backgroundColor: '#dc2626',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '14px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                }}
+              >
+                {loading ? 'Procesando...' : 'Sí, Rechazar'}
+              </button>
+            </div>
           </div>
         </div>
       )}
