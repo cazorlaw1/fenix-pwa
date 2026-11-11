@@ -1268,6 +1268,7 @@ export default function AdminModule() {
           )
           .in('payment_status', ['pendiente', 'abonada', 'cerrada'])
           .neq('status', 'pendiente')
+          .neq('status', 'rechazada')
           .order('created_at', { ascending: false });
         if (error) throw error;
         setCobranzaNotes(data || []);
