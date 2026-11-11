@@ -20,7 +20,6 @@ import {
   FileSpreadsheet, // Icono para representar N.E.
   Save,
 } from 'lucide-react';
-
 export default function Inventory() {
   const [activeCategory, setActiveCategory] = useState('bombillos');
   const [activeMainTab, setActiveMainTab] = useState('inventory');
@@ -29,25 +28,20 @@ export default function Inventory() {
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
-
   // Estado para el rol del usuario actual
   const [userRole, setUserRole] = useState(null);
-
   // Estado para el menú dropdown en móvil
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const mobileMenuRef = useRef(null);
-
   // Modales
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
   const [adjustingStockProduct, setAdjustingStockProduct] = useState(null);
   const [selectedImageModal, setSelectedImageModal] = useState(null);
-
   // Modal para ver Notas de Entrega asociadas
   const [neModalProduct, setNeModalProduct] = useState(null);
   const [neList, setNeList] = useState([]);
   const [neLoading, setNeLoading] = useState(false);
-
   // Modales de Importación/Exportación
   const [showExportModal, setShowExportModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
@@ -55,7 +49,6 @@ export default function Inventory() {
   const [importWithImages, setImportWithImages] = useState(false);
   const [exportProcessing, setExportProcessing] = useState(false);
   const [importProcessing, setImportProcessing] = useState(false);
-
   // Formulario de Registro / Edición de Producto
   const [formCode, setFormCode] = useState('');
   const [formDescription, setFormDescription] = useState('');
@@ -65,17 +58,26 @@ export default function Inventory() {
   const [formStock, setFormStock] = useState('');
   const [formImageFile, setFormImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState('');
-
   // Formulario de Ajuste Rápido de Stock
   const [stockAdjustmentValue, setStockAdjustmentValue] = useState('');
   const [stockAdjustmentType, setStockAdjustmentType] = useState('add');
-
   // Estados para Modificación Masiva
   const [massProducts, setMassProducts] = useState([]);
   const [massChanges, setMassChanges] = useState({}); // { [productId]: { field: value } }
   const [massSaving, setMassSaving] = useState(false);
   const [massSearch, setMassSearch] = useState('');
-
+  // NUEVOS ESTADOS PARA MODIFICACIÓN MASIVA (ELIMINACIÓN Y REGISTRO RÁPIDO)
+  const [massDeleteIds, setMassDeleteIds] = useState(new Set());
+  const [quickRegisterProducts, setQuickRegisterProducts] = useState([
+    {
+      code: '',
+      description: '',
+      category: 'bombillos',
+      price_usd: '',
+      base_price: '',
+      stock_current: '',
+    },
+  ]);
   // Obtener el rol del usuario autenticado
   useEffect(() => {
     async function fetchUserRole() {
@@ -99,16 +101,12 @@ export default function Inventory() {
     }
     fetchUserRole();
   }, []);
-
   // Verificar si el usuario tiene permiso de gestión (administrador o stock)
   const canManage = userRole === 'administrador' || userRole === 'stock';
-
   // Verificar si el usuario puede ver N.E. (administrador o tecnico)
   const canViewNE = userRole === 'administrador' || userRole === 'tecnico';
-
   // Verificar si el usuario puede ver la Modificación Masiva (administrador o tecnico)
   const canMassModify = userRole === 'administrador' || userRole === 'tecnico';
-
   // Si no tiene permisos y está en la pestaña restringida, redirigir al inventario
   useEffect(() => {
     if (activeMainTab === 'import_export' && userRole !== null && !canManage) {
@@ -124,7 +122,6 @@ export default function Inventory() {
       setActiveCategory('bombillos');
     }
   }, [userRole, activeMainTab, canManage, canMassModify]);
-
   // Cerrar dropdown al hacer clic fuera
   useEffect(() => {
     function handleClickOutside(event) {
@@ -138,7 +135,6 @@ export default function Inventory() {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
-
   useEffect(() => {
     if (activeMainTab === 'inventory') {
       fetchProducts();
@@ -146,10 +142,8 @@ export default function Inventory() {
       fetchMassProducts();
     }
   }, [activeCategory, activeMainTab]);
-
   // Sistema de alerta beforeunload si hay cambios pendientes en Modificación Masiva
   const hasUnsavedChanges = Object.keys(massChanges).length > 0;
-
   useEffect(() => {
     const handleBeforeUnload = (e) => {
       if (hasUnsavedChanges) {
@@ -160,7 +154,6 @@ export default function Inventory() {
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [hasUnsavedChanges]);
-
   const fetchProducts = async () => {
     setLoading(true);
     try {
@@ -169,7 +162,6 @@ export default function Inventory() {
         .select('*')
         .eq('category', activeCategory)
         .order('created_at', { ascending: false });
-
       if (error) throw error;
       setProducts(data || []);
     } catch (err) {
@@ -179,7 +171,6 @@ export default function Inventory() {
       setLoading(false);
     }
   };
-
   const fetchMassProducts = async () => {
     setLoading(true);
     try {
@@ -188,10 +179,10 @@ export default function Inventory() {
         .select('*')
         .order('category', { ascending: true })
         .order('description', { ascending: true });
-
       if (error) throw error;
       setMassProducts(data || []);
       setMassChanges({});
+      setMassDeleteIds(new Set()); // Resetear selecciones de eliminación
     } catch (err) {
       console.error('Error al cargar productos para modificación masiva:', err);
       setErrorMsg('No se pudo cargar el inventario maestro.');
@@ -199,12 +190,10 @@ export default function Inventory() {
       setLoading(false);
     }
   };
-
   const handleMassFieldChange = (productId, field, value) => {
     setMassChanges((prev) => {
       const productOriginal = massProducts.find((p) => p.id === productId);
       const currentProductChanges = prev[productId] || {};
-
       const originalValue = productOriginal ? productOriginal[field] : '';
       // Si el valor ingresado es igual al original, removemos el cambio de este campo
       if (String(value) === String(originalValue ?? '')) {
@@ -217,7 +206,6 @@ export default function Inventory() {
         }
         return { ...prev, [productId]: updatedProductChanges };
       }
-
       return {
         ...prev,
         [productId]: {
@@ -227,12 +215,116 @@ export default function Inventory() {
       };
     });
   };
+  // Lógica para manejar la selección de eliminación
+  const toggleMassDelete = (productId) => {
+    setMassDeleteIds((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(productId)) {
+        newSet.delete(productId);
+      } else {
+        newSet.add(productId);
+      }
+      return newSet;
+    });
+  };
+  // Lógica para Registro Rápido
+  const handleQuickRegisterChange = (index, field, value) => {
+    const newProducts = [...quickRegisterProducts];
+    newProducts[index][field] = value;
+    setQuickRegisterProducts(newProducts);
+    // Comportamiento Dinámico: Agregar nueva fila si se llena la última
+    if (index === quickRegisterProducts.length - 1) {
+      if (value.trim() !== '') {
+        // Verificar si los campos obligatorios de la fila actual tienen contenido básico para decidir agregar
+        // Agregamos siempre que se escriba en la última fila para flujo continuo
+        setQuickRegisterProducts([
+          ...newProducts,
+          {
+            code: '',
+            description: '',
+            category: 'bombillos',
+            price_usd: '',
+            base_price: '',
+            stock_current: '',
+          },
+        ]);
+      }
+    }
+  };
+  const handleSaveQuickRegister = async () => {
+    // Filtrar productos válidos (con código y descripción)
+    const validProducts = quickRegisterProducts.filter(
+      (p) => p.code.trim() !== '' && p.description.trim() !== ''
+    );
+
+    if (validProducts.length === 0) {
+      setErrorMsg(
+        'Debe ingresar al menos un producto con Código y Descripción.'
+      );
+      return;
+    }
+
+    setMassSaving(true);
+    setErrorMsg('');
+    setSuccessMsg('');
+
+    let successCount = 0;
+    let failCount = 0;
+
+    for (const prod of validProducts) {
+      const insertData = {
+        code: prod.code,
+        description: prod.description,
+        category: prod.category,
+        price_usd: parseFloat(prod.price_usd) || 0,
+        stock_current: parseInt(prod.stock_current) || 0,
+        image_url: null,
+      };
+      if (prod.base_price !== undefined && prod.base_price !== '') {
+        insertData.base_price = parseFloat(prod.base_price) || 0;
+      }
+
+      const { error } = await supabase.from('products').insert([insertData]);
+      if (error) {
+        console.error('Error al insertar producto rápido:', error);
+        failCount++;
+      } else {
+        successCount++;
+      }
+    }
+
+    setMassSaving(false);
+    if (successCount > 0) {
+      setSuccessMsg(
+        `Se registraron exitosamente ${successCount} productos.${
+          failCount > 0 ? ` Hubo ${failCount} errores.` : ''
+        }`
+      );
+      // Resetear formulario pero dejar una fila vacía
+      setQuickRegisterProducts([
+        {
+          code: '',
+          description: '',
+          category: 'bombillos',
+          price_usd: '',
+          base_price: '',
+          stock_current: '',
+        },
+      ]);
+      fetchMassProducts();
+    } else {
+      setErrorMsg('Ocurrió un error al guardar los productos rápidos.');
+    }
+  };
 
   const handleSaveAllMassChanges = async () => {
     const productIdsToUpdate = Object.keys(massChanges);
-    if (productIdsToUpdate.length === 0) return;
+    const productIdsToDelete = Array.from(massDeleteIds);
 
-    // Validación previa de datos
+    if (productIdsToUpdate.length === 0 && productIdsToDelete.length === 0)
+      return;
+
+    // Validación previa de datos para EDICIÓN
     for (const id of productIdsToUpdate) {
       const changes = massChanges[id];
       const prod = massProducts.find((p) => p.id === id);
@@ -248,7 +340,6 @@ export default function Inventory() {
         changes.stock_current !== undefined
           ? parseInt(changes.stock_current)
           : prod.stock_current;
-
       if (
         finalPrice < 0 ||
         (finalBasePrice !== null &&
@@ -272,13 +363,82 @@ export default function Inventory() {
       }
     }
 
+    // Validación previa para ELIMINACIÓN (Verificar N.E. activas)
+    if (productIdsToDelete.length > 0) {
+      // Obtener todos los order_items asociados a estos productos
+      const { data: items, error: itemsError } = await supabase
+        .from('order_items')
+        .select('order_id, product_id')
+        .in('product_id', productIdsToDelete);
+
+      if (itemsError) {
+        setErrorMsg('Error al verificar notas de entrega antes de eliminar.');
+        return;
+      }
+
+      if (items && items.length > 0) {
+        // Identificar qué productos tienen N.E.
+        const productsWithNE = new Set(items.map((item) => item.product_id));
+        const blockedProducts = massProducts
+          .filter((p) => productsWithNE.has(p.id))
+          .map((p) => p.code);
+
+        if (blockedProducts.length > 0) {
+          setErrorMsg(
+            `No se pueden eliminar los siguientes productos porque tienen Notas de Entrega asociadas: ${blockedProducts.join(
+              ', '
+            )}`
+          );
+          return;
+        }
+      }
+
+      // Confirmación de seguridad
+      if (
+        !window.confirm(
+          `¿Estás seguro de que deseas eliminar ${productIdsToDelete.length} productos seleccionados? Esta acción no se puede deshacer.`
+        )
+      ) {
+        return;
+      }
+    }
+
     setMassSaving(true);
     setErrorMsg('');
     setSuccessMsg('');
-
     let successCount = 0;
     let failCount = 0;
 
+    // 1. Ejecutar Eliminaciones
+    for (const id of productIdsToDelete) {
+      // Eliminar referencias en order_items primero (ya validamos que no tengan NE activas, pero por seguridad limpiamos huellas si existieran items huérfanos o cancelados)
+      // Nota: La validación anterior bloquea si HAY items. Si llegamos aquí, es seguro borrar.
+      await supabase.from('order_items').delete().eq('product_id', id);
+
+      // Eliminar imagen si existe
+      const prod = massProducts.find((p) => p.id === id);
+      if (prod && prod.image_url) {
+        try {
+          const urlParts = prod.image_url.split('/');
+          const fileName = urlParts[urlParts.length - 1];
+          if (fileName) {
+            await supabase.storage.from('products').remove([fileName]);
+          }
+        } catch (imgErr) {
+          console.warn('No se pudo eliminar la imagen del storage:', imgErr);
+        }
+      }
+
+      const { error } = await supabase.from('products').delete().eq('id', id);
+      if (error) {
+        console.error(`Error al eliminar producto ID ${id}:`, error);
+        failCount++;
+      } else {
+        successCount++;
+      }
+    }
+
+    // 2. Ejecutar Actualizaciones
     for (const id of productIdsToUpdate) {
       const changes = massChanges[id];
       const updatePayload = {
@@ -293,12 +453,10 @@ export default function Inventory() {
         updatePayload.stock_current = parseInt(
           updatePayload.stock_current || 0
         );
-
       const { error } = await supabase
         .from('products')
         .update(updatePayload)
         .eq('id', id);
-
       if (error) {
         console.error(`Error al actualizar producto ID ${id}:`, error);
         failCount++;
@@ -306,20 +464,18 @@ export default function Inventory() {
         successCount++;
       }
     }
-
     setMassSaving(false);
     if (successCount > 0) {
       setSuccessMsg(
-        `Se actualizaron exitosamente ${successCount} productos.${
+        `Operación completada: ${successCount} productos procesados exitosamente.${
           failCount > 0 ? ` Hubo ${failCount} errores.` : ''
         }`
       );
       fetchMassProducts();
-    } else {
-      setErrorMsg('Ocurrió un error al guardar los cambios masivos.');
+    } else if (failCount > 0) {
+      setErrorMsg('Ocurrieron errores al procesar los cambios masivos.');
     }
   };
-
   const handleTabSwitchAttempt = (targetTab, targetCategory = 'bombillos') => {
     if (hasUnsavedChanges) {
       const confirmLeave = window.confirm(
@@ -338,7 +494,6 @@ export default function Inventory() {
       setActiveCategory(targetCategory);
     }
   };
-
   const handleSaveProduct = async (e) => {
     e.preventDefault();
     setErrorMsg('');
@@ -360,7 +515,6 @@ export default function Inventory() {
       } else if (!imagePreview) {
         imageUrl = null;
       }
-
       if (editingProduct) {
         const updateData = {
           code: formCode,
@@ -404,7 +558,6 @@ export default function Inventory() {
       );
     }
   };
-
   const handleDeleteProduct = async (product) => {
     if (
       !window.confirm(
@@ -428,7 +581,6 @@ export default function Inventory() {
           console.warn('No se pudo eliminar la imagen del storage:', imgErr);
         }
       }
-
       const { error: itemsError } = await supabase
         .from('order_items')
         .delete()
@@ -436,7 +588,6 @@ export default function Inventory() {
       if (itemsError) {
         console.warn('Error al eliminar order_items relacionados:', itemsError);
       }
-
       const { error } = await supabase
         .from('products')
         .delete()
@@ -457,7 +608,6 @@ export default function Inventory() {
       setLoading(false);
     }
   };
-
   const handleQuickStockAdjustment = async (e) => {
     e.preventDefault();
     if (!adjustingStockProduct) return;
@@ -465,7 +615,6 @@ export default function Inventory() {
       let newStock = adjustingStockProduct.stock_current;
       const amount = parseInt(stockAdjustmentValue);
       if (isNaN(amount)) throw new Error('Cantidad inválida');
-
       if (stockAdjustmentType === 'add') {
         newStock += amount;
       } else if (stockAdjustmentType === 'subtract') {
@@ -473,7 +622,6 @@ export default function Inventory() {
       } else if (stockAdjustmentType === 'set') {
         newStock = Math.max(0, amount);
       }
-
       const { error } = await supabase
         .from('products')
         .update({ stock_current: newStock, updated_at: new Date() })
@@ -490,7 +638,6 @@ export default function Inventory() {
       setErrorMsg(err.message || 'Error al ajustar el stock.');
     }
   };
-
   const openEditModal = (product) => {
     setEditingProduct(product);
     setFormCode(product.code);
@@ -503,7 +650,6 @@ export default function Inventory() {
     setFormImageFile(null);
     setShowAddModal(true);
   };
-
   const openNewModal = () => {
     setEditingProduct(null);
     setFormCode('');
@@ -516,7 +662,6 @@ export default function Inventory() {
     setFormImageFile(null);
     setShowAddModal(true);
   };
-
   const closeModals = () => {
     setShowAddModal(false);
     setEditingProduct(null);
@@ -526,7 +671,6 @@ export default function Inventory() {
     setNeModalProduct(null);
     setNeList([]);
   };
-
   const openNeModal = async (product) => {
     setNeModalProduct(product);
     setNeLoading(true);
@@ -536,9 +680,7 @@ export default function Inventory() {
         .from('order_items')
         .select('order_id')
         .eq('product_id', product.id);
-
       if (error) throw error;
-
       if (items && items.length > 0) {
         const orderIds = items.map((item) => item.order_id);
         const { data: orders, error: orderError } = await supabase
@@ -546,7 +688,6 @@ export default function Inventory() {
           .select('transaction_number')
           .in('id', orderIds)
           .order('transaction_number', { ascending: false });
-
         if (orderError) throw orderError;
         setNeList(orders || []);
       }
@@ -557,26 +698,22 @@ export default function Inventory() {
       setNeLoading(false);
     }
   };
-
   const filteredProducts = products.filter(
     (p) =>
       p.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
       p.description.toLowerCase().includes(searchQuery.toLowerCase())
   );
-
   const filteredMassProducts = massProducts.filter(
     (p) =>
       p.code.toLowerCase().includes(massSearch.toLowerCase()) ||
       p.description.toLowerCase().includes(massSearch.toLowerCase())
   );
-
   const bombillosMassProducts = filteredMassProducts.filter(
     (p) => p.category === 'bombillos'
   );
   const fluidosMassProducts = filteredMassProducts.filter(
     (p) => p.category === 'fluidos'
   );
-
   const exportToCSV = async (withImages) => {
     setExportProcessing(true);
     setErrorMsg('');
@@ -586,15 +723,12 @@ export default function Inventory() {
         .from('products')
         .select('*')
         .order('created_at', { ascending: false });
-
       if (error) throw error;
-
       if (!allProducts || allProducts.length === 0) {
         setErrorMsg('No hay productos para exportar.');
         setExportProcessing(false);
         return;
       }
-
       const csvHeaders = [
         'code',
         'description',
@@ -613,13 +747,11 @@ export default function Inventory() {
         p.stock_current || 0,
         p.image_url || '',
       ]);
-
       const csvContent = [csvHeaders, ...csvRows]
         .map((row) =>
           row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(',')
         )
         .join('\n');
-
       if (!withImages) {
         const blob = new Blob(['\ufeff' + csvContent], {
           type: 'text/csv;charset=utf-8;',
@@ -674,7 +806,6 @@ export default function Inventory() {
       setExportProcessing(false);
     }
   };
-
   const importFromCSV = async (csvContent, withImages, zipFile = null) => {
     setImportProcessing(true);
     setErrorMsg('');
@@ -684,11 +815,9 @@ export default function Inventory() {
         .split('\n')
         .map((line) => line.replace(/\r$/, ''))
         .filter((line) => line.trim());
-
       if (lines.length < 2) {
         throw new Error('El archivo CSV está vacío o no tiene datos válidos.');
       }
-
       const headers = lines[0]
         .split(',')
         .map((h) => h.replace(/^"|"$/g, '').trim());
@@ -705,7 +834,6 @@ export default function Inventory() {
           productsToImport.push(product);
         }
       }
-
       if (withImages && zipFile) {
         const zip = await JSZip.loadAsync(zipFile);
         const imageFolder = zip.folder('imagenes');
@@ -734,7 +862,6 @@ export default function Inventory() {
           }
         }
       }
-
       let importedCount = 0;
       let updatedCount = 0;
       for (const product of productsToImport) {
@@ -743,7 +870,6 @@ export default function Inventory() {
           .select('id')
           .eq('code', product.code)
           .single();
-
         if (existingProduct) {
           const updateData = {
             description: product.description,
@@ -803,7 +929,6 @@ export default function Inventory() {
       setImportProcessing(false);
     }
   };
-
   const handleImportFile = async (e) => {
     if (e) e.preventDefault();
     if (!importFile) {
@@ -840,7 +965,6 @@ export default function Inventory() {
       setErrorMsg(err.message || 'Error al procesar el archivo.');
     }
   };
-
   // Opciones del menú (Agregando "Modificación Masiva" para admin y tecnico)
   const menuOptions = [
     {
@@ -878,115 +1002,10 @@ export default function Inventory() {
         ]
       : []),
   ];
-
   return (
     <div style={{ padding: '24px', maxWidth: '1200px', margin: '0 auto' }}>
       {/* Estilos CSS para responsividad y edición masiva */}
-      <style>{`
-        @media (max-width: 768px) {
-          .desktop-tabs { display: none !important; }
-          .mobile-dropdown { display: block !important; }
-          .desktop-table { display: none !important; }
-          .mobile-cards { display: block !important; }
-        }
-        @media (min-width: 769px) {
-          .desktop-tabs { display: flex !important; }
-          .mobile-dropdown { display: none !important; }
-          .desktop-table { display: block !important; }
-          .mobile-cards { display: none !important; }
-        }
-        /* Estilos para tarjetas móviles */
-        .mobile-card {
-          background-color: #ffffff;
-          border-radius: 8px;
-          box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-          padding: 16px;
-          margin-bottom: 12px;
-          border: 1px solid #e5e7eb;
-        }
-        .mobile-card-header {
-          display: flex;
-          align-items: center;
-          gap: 12px;
-          margin-bottom: 12px;
-          padding-bottom: 12px;
-          border-bottom: 1px solid #e5e7eb;
-        }
-        .mobile-card-field {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          padding: 8px 0;
-          border-bottom: 1px solid #f3f4f6;
-          gap: 8px;
-        }
-        .mobile-card-field:last-child {
-          border-bottom: none;
-        }
-        .mobile-card-label {
-          font-size: 12px;
-          font-weight: 600;
-          color: #6b7280;
-          text-transform: uppercase;
-          flex-shrink: 0;
-          width: 100px;
-        }
-        .mobile-card-value {
-          font-size: 14px;
-          color: #111827;
-          font-weight: 500;
-          flex: 1;
-        }
-        .mobile-card-value input, .mobile-card-value textarea, .mobile-card-value select {
-          width: 100%;
-          padding: 6px 8px;
-          border: 1px solid #d1d5db;
-          border-radius: 4px;
-          font-size: 13px;
-          box-sizing: border-box;
-        }
-        .mobile-card-actions {
-          display: flex;
-          gap: 8px;
-          margin-top: 12px;
-          padding-top: 12px;
-          border-top: 1px solid #e5e7eb;
-        }
-        .mobile-card-actions button {
-          flex: 1;
-          padding: 8px;
-          border-radius: 6px;
-          border: 1px solid;
-          cursor: pointer;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 6px;
-          font-size: 12px;
-          font-weight: 600;
-        }
-        .mass-input {
-          width: 100%;
-          padding: 6px 8px;
-          border: 1px solid #d1d5db;
-          border-radius: 4px;
-          font-size: 13px;
-          box-sizing: border-box;
-          background-color: #fff;
-          transition: border-color 0.2s, background-color 0.2s;
-        }
-        .mass-input:focus {
-          outline: none;
-          border-color: #dc2626;
-          box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.1);
-        }
-        .mass-input.modified {
-          background-color: #fef2f2;
-          border-color: #f87171;
-          font-weight: 600;
-        }
-      `}</style>
-
+      <style>{`@media (max-width: 768px) { .desktop-tabs { display: none !important; } .mobile-dropdown { display: block !important; } .desktop-table { display: none !important; } .mobile-cards { display: block !important; } } @media (min-width: 769px) { .desktop-tabs { display: flex !important; } .mobile-dropdown { display: none !important; } .desktop-table { display: block !important; } .mobile-cards { display: none !important; } } /* Estilos para tarjetas móviles */ .mobile-card { background-color: #ffffff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); padding: 16px; margin-bottom: 12px; border: 1px solid #e5e7eb; } .mobile-card-header { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid #e5e7eb; } .mobile-card-field { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #f3f4f6; gap: 8px; } .mobile-card-field:last-child { border-bottom: none; } .mobile-card-label { font-size: 12px; font-weight: 600; color: #6b7280; text-transform: uppercase; flex-shrink: 0; width: 100px; } .mobile-card-value { font-size: 14px; color: #111827; font-weight: 500; flex: 1; } .mobile-card-value input, .mobile-card-value textarea, .mobile-card-value select { width: 100%; padding: 6px 8px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 13px; box-sizing: border-box; } .mobile-card-actions { display: flex; gap: 8px; margin-top: 12px; padding-top: 12px; border-top: 1px solid #e5e7eb; } .mobile-card-actions button { flex: 1; padding: 8px; border-radius: 6px; border: 1px solid; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 12px; font-weight: 600; } .mass-input { width: 100%; padding: 6px 8px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 13px; box-sizing: border-box; background-color: #fff; transition: border-color 0.2s, background-color 0.2s; } .mass-input:focus { outline: none; border-color: #dc2626; box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.1); } .mass-input.modified { background-color: #fef2f2; border-color: #f87171; font-weight: 600; }`}</style>
       {/* Encabezado del Módulo */}
       <div
         style={{
@@ -1037,7 +1056,6 @@ export default function Inventory() {
           </button>
         )}
       </div>
-
       {/* Alertas de Feedback */}
       {errorMsg && (
         <div
@@ -1071,7 +1089,6 @@ export default function Inventory() {
           <Check size={18} /> {successMsg}
         </div>
       )}
-
       {/* ========================================== */}
       {/* MENÚ DE NAVEGACIÓN RESPONSIVO                 */}
       {/* ========================================== */}
@@ -1134,7 +1151,6 @@ export default function Inventory() {
           );
         })}
       </div>
-
       {/* Versión Móvil: Dropdown Compacto */}
       <div
         className="mobile-dropdown"
@@ -1260,7 +1276,6 @@ export default function Inventory() {
           </div>
         )}
       </div>
-
       {/* ========================================== */}
       {/* CONTENIDO DE LA PESTAÑA DE INVENTARIO       */}
       {/* ========================================== */}
@@ -1294,7 +1309,6 @@ export default function Inventory() {
               }}
             />
           </div>
-
           {/* Tabla de Escritorio */}
           <div
             className="desktop-table"
@@ -1569,7 +1583,6 @@ export default function Inventory() {
               </tbody>
             </table>
           </div>
-
           {/* Tarjetas para Móvil */}
           <div className="mobile-cards">
             {loading ? (
@@ -1752,7 +1765,6 @@ export default function Inventory() {
           </div>
         </>
       )}
-
       {/* ========================================== */}
       {/* NUEVA PESTAÑA: "MODIFICACIÓN MASIVA"        */}
       {/* ========================================== */}
@@ -1799,6 +1811,229 @@ export default function Inventory() {
             </div>
           </div>
 
+          {/* SECCIÓN SUPERIOR: REGISTRO RÁPIDO DE PRODUCTOS */}
+          <div
+            style={{
+              backgroundColor: '#f8fafc',
+              border: '1px solid #e2e8f0',
+              borderRadius: '8px',
+              padding: '20px',
+              marginBottom: '32px',
+            }}
+          >
+            <h3
+              style={{
+                fontSize: '16px',
+                fontWeight: 'bold',
+                color: '#1e293b',
+                marginBottom: '16px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+              }}
+            >
+              <Plus size={18} color="#dc2626" /> Registro Rápido de Productos
+            </h3>
+
+            <div style={{ overflowX: 'auto' }}>
+              <table
+                style={{
+                  width: '100%',
+                  borderCollapse: 'collapse',
+                  fontSize: '13px',
+                }}
+              >
+                <thead>
+                  <tr
+                    style={{
+                      backgroundColor: '#f1f5f9',
+                      borderBottom: '1px solid #e2e8f0',
+                    }}
+                  >
+                    <th style={{ padding: '8px', textAlign: 'left' }}>
+                      Código *
+                    </th>
+                    <th style={{ padding: '8px', textAlign: 'left' }}>
+                      Descripción *
+                    </th>
+                    <th style={{ padding: '8px', textAlign: 'left' }}>
+                      Categoría
+                    </th>
+                    <th
+                      style={{
+                        padding: '8px',
+                        textAlign: 'left',
+                        width: '100px',
+                      }}
+                    >
+                      Precio Full
+                    </th>
+                    <th
+                      style={{
+                        padding: '8px',
+                        textAlign: 'left',
+                        width: '100px',
+                      }}
+                    >
+                      Precio Base
+                    </th>
+                    <th
+                      style={{
+                        padding: '8px',
+                        textAlign: 'left',
+                        width: '80px',
+                      }}
+                    >
+                      Stock
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {quickRegisterProducts.map((prod, index) => (
+                    <tr
+                      key={index}
+                      style={{ borderBottom: '1px solid #f1f5f9' }}
+                    >
+                      <td style={{ padding: '6px' }}>
+                        <input
+                          type="text"
+                          className="mass-input"
+                          placeholder="Código"
+                          value={prod.code}
+                          onChange={(e) =>
+                            handleQuickRegisterChange(
+                              index,
+                              'code',
+                              e.target.value
+                            )
+                          }
+                          onBlur={() => {
+                            // Si es la última fila y tiene código, asegurar que haya otra fila disponible
+                            if (
+                              index === quickRegisterProducts.length - 1 &&
+                              prod.code.trim() !== ''
+                            ) {
+                              // La lógica de onChange ya maneja la adición, pero onBlur asegura consistencia
+                            }
+                          }}
+                        />
+                      </td>
+                      <td style={{ padding: '6px' }}>
+                        <input
+                          type="text"
+                          className="mass-input"
+                          placeholder="Descripción"
+                          value={prod.description}
+                          onChange={(e) =>
+                            handleQuickRegisterChange(
+                              index,
+                              'description',
+                              e.target.value
+                            )
+                          }
+                        />
+                      </td>
+                      <td style={{ padding: '6px' }}>
+                        <select
+                          className="mass-input"
+                          value={prod.category}
+                          onChange={(e) =>
+                            handleQuickRegisterChange(
+                              index,
+                              'category',
+                              e.target.value
+                            )
+                          }
+                        >
+                          <option value="bombillos">Bombillos</option>
+                          <option value="fluidos">Fluidos</option>
+                        </select>
+                      </td>
+                      <td style={{ padding: '6px' }}>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          className="mass-input"
+                          placeholder="0.00"
+                          value={prod.price_usd}
+                          onChange={(e) =>
+                            handleQuickRegisterChange(
+                              index,
+                              'price_usd',
+                              e.target.value
+                            )
+                          }
+                        />
+                      </td>
+                      <td style={{ padding: '6px' }}>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          className="mass-input"
+                          placeholder="0.00"
+                          value={prod.base_price}
+                          onChange={(e) =>
+                            handleQuickRegisterChange(
+                              index,
+                              'base_price',
+                              e.target.value
+                            )
+                          }
+                        />
+                      </td>
+                      <td style={{ padding: '6px' }}>
+                        <input
+                          type="number"
+                          min="0"
+                          className="mass-input"
+                          placeholder="0"
+                          value={prod.stock_current}
+                          onChange={(e) =>
+                            handleQuickRegisterChange(
+                              index,
+                              'stock_current',
+                              e.target.value
+                            )
+                          }
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div
+              style={{
+                marginTop: '16px',
+                display: 'flex',
+                justifyContent: 'flex-end',
+              }}
+            >
+              <button
+                onClick={handleSaveQuickRegister}
+                disabled={massSaving}
+                style={{
+                  backgroundColor: '#059669',
+                  color: '#ffffff',
+                  border: 'none',
+                  padding: '10px 20px',
+                  borderRadius: '6px',
+                  fontWeight: '600',
+                  fontSize: '14px',
+                  cursor: massSaving ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                }}
+              >
+                <Save size={16} /> Guardar Lote Actual
+              </button>
+            </div>
+          </div>
+
           {/* Barra de Búsqueda para Modificación Masiva */}
           <div style={{ position: 'relative', marginBottom: '24px' }}>
             <Search
@@ -1828,7 +2063,6 @@ export default function Inventory() {
               }}
             />
           </div>
-
           {loading ? (
             <div
               style={{ textAlign: 'center', padding: '40px', color: '#6b7280' }}
@@ -1863,7 +2097,6 @@ export default function Inventory() {
                     {bombillosMassProducts.length})
                   </h3>
                 </div>
-
                 {/* Tabla de Escritorio - Bombillos */}
                 <div
                   className="desktop-table"
@@ -1889,6 +2122,15 @@ export default function Inventory() {
                           borderBottom: '1px solid #e2e8f0',
                         }}
                       >
+                        <th
+                          style={{
+                            padding: '10px 12px',
+                            textAlign: 'center',
+                            width: '50px',
+                          }}
+                        >
+                          Eliminar
+                        </th>
                         <th style={{ padding: '10px 12px' }}>Código</th>
                         <th style={{ padding: '10px 12px' }}>Descripción</th>
                         <th style={{ padding: '10px 12px' }}>Categoría</th>
@@ -1905,7 +2147,7 @@ export default function Inventory() {
                       {bombillosMassProducts.length === 0 ? (
                         <tr>
                           <td
-                            colSpan="6"
+                            colSpan="7"
                             style={{
                               textAlign: 'center',
                               padding: '16px',
@@ -1918,6 +2160,7 @@ export default function Inventory() {
                       ) : (
                         bombillosMassProducts.map((p) => {
                           const changes = massChanges[p.id] || {};
+                          const isMarkedForDeletion = massDeleteIds.has(p.id);
                           const currentCode =
                             changes.code !== undefined ? changes.code : p.code;
                           const currentDesc =
@@ -1940,12 +2183,33 @@ export default function Inventory() {
                             changes.stock_current !== undefined
                               ? changes.stock_current
                               : p.stock_current;
-
                           return (
                             <tr
                               key={p.id}
-                              style={{ borderBottom: '1px solid #f1f5f9' }}
+                              style={{
+                                borderBottom: '1px solid #f1f5f9',
+                                backgroundColor: isMarkedForDeletion
+                                  ? '#fee2e2'
+                                  : 'transparent',
+                              }}
                             >
+                              <td
+                                style={{
+                                  padding: '8px 12px',
+                                  textAlign: 'center',
+                                }}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={isMarkedForDeletion}
+                                  onChange={() => toggleMassDelete(p.id)}
+                                  style={{
+                                    cursor: 'pointer',
+                                    width: '16px',
+                                    height: '16px',
+                                  }}
+                                />
+                              </td>
                               <td style={{ padding: '8px 12px' }}>
                                 <input
                                   type="text"
@@ -1960,6 +2224,7 @@ export default function Inventory() {
                                       e.target.value
                                     )
                                   }
+                                  disabled={isMarkedForDeletion}
                                 />
                               </td>
                               <td style={{ padding: '8px 12px' }}>
@@ -1978,6 +2243,7 @@ export default function Inventory() {
                                       e.target.value
                                     )
                                   }
+                                  disabled={isMarkedForDeletion}
                                 />
                               </td>
                               <td style={{ padding: '8px 12px' }}>
@@ -1995,6 +2261,7 @@ export default function Inventory() {
                                       e.target.value
                                     )
                                   }
+                                  disabled={isMarkedForDeletion}
                                 >
                                   <option value="bombillos">Bombillos</option>
                                   <option value="fluidos">Fluidos</option>
@@ -2020,6 +2287,7 @@ export default function Inventory() {
                                       e.target.value
                                     )
                                   }
+                                  disabled={isMarkedForDeletion}
                                 />
                               </td>
                               <td
@@ -2042,6 +2310,7 @@ export default function Inventory() {
                                       e.target.value
                                     )
                                   }
+                                  disabled={isMarkedForDeletion}
                                 />
                               </td>
                               <td
@@ -2063,6 +2332,7 @@ export default function Inventory() {
                                       e.target.value
                                     )
                                   }
+                                  disabled={isMarkedForDeletion}
                                 />
                               </td>
                             </tr>
@@ -2072,7 +2342,6 @@ export default function Inventory() {
                     </tbody>
                   </table>
                 </div>
-
                 {/* Tarjetas Móvil - Bombillos */}
                 <div className="mobile-cards">
                   {bombillosMassProducts.length === 0 ? (
@@ -2088,6 +2357,7 @@ export default function Inventory() {
                   ) : (
                     bombillosMassProducts.map((p) => {
                       const changes = massChanges[p.id] || {};
+                      const isMarkedForDeletion = massDeleteIds.has(p.id);
                       const currentCode =
                         changes.code !== undefined ? changes.code : p.code;
                       const currentDesc =
@@ -2110,9 +2380,40 @@ export default function Inventory() {
                         changes.stock_current !== undefined
                           ? changes.stock_current
                           : p.stock_current;
-
                       return (
-                        <div key={p.id} className="mobile-card">
+                        <div
+                          key={p.id}
+                          className="mobile-card"
+                          style={{
+                            backgroundColor: isMarkedForDeletion
+                              ? '#fee2e2'
+                              : '#ffffff',
+                          }}
+                        >
+                          <div
+                            className="mobile-card-field"
+                            style={{
+                              justifyContent: 'flex-start',
+                              gap: '12px',
+                            }}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isMarkedForDeletion}
+                              onChange={() => toggleMassDelete(p.id)}
+                              style={{
+                                cursor: 'pointer',
+                                width: '18px',
+                                height: '18px',
+                              }}
+                            />
+                            <span
+                              className="mobile-card-label"
+                              style={{ width: 'auto' }}
+                            >
+                              Marcar para Eliminar
+                            </span>
+                          </div>
                           <div className="mobile-card-field">
                             <span className="mobile-card-label">Código</span>
                             <span className="mobile-card-value">
@@ -2129,6 +2430,7 @@ export default function Inventory() {
                                     e.target.value
                                   )
                                 }
+                                disabled={isMarkedForDeletion}
                               />
                             </span>
                           </div>
@@ -2152,6 +2454,7 @@ export default function Inventory() {
                                     e.target.value
                                   )
                                 }
+                                disabled={isMarkedForDeletion}
                               />
                             </span>
                           </div>
@@ -2172,6 +2475,7 @@ export default function Inventory() {
                                     e.target.value
                                   )
                                 }
+                                disabled={isMarkedForDeletion}
                               >
                                 <option value="bombillos">Bombillos</option>
                                 <option value="fluidos">Fluidos</option>
@@ -2200,6 +2504,7 @@ export default function Inventory() {
                                     e.target.value
                                   )
                                 }
+                                disabled={isMarkedForDeletion}
                               />
                             </span>
                           </div>
@@ -2225,6 +2530,7 @@ export default function Inventory() {
                                     e.target.value
                                   )
                                 }
+                                disabled={isMarkedForDeletion}
                               />
                             </span>
                           </div>
@@ -2249,6 +2555,7 @@ export default function Inventory() {
                                     e.target.value
                                   )
                                 }
+                                disabled={isMarkedForDeletion}
                               />
                             </span>
                           </div>
@@ -2258,7 +2565,6 @@ export default function Inventory() {
                   )}
                 </div>
               </div>
-
               {/* SECCIÓN 2: FLUIDOS */}
               <div style={{ marginBottom: '24px' }}>
                 <div
@@ -2285,7 +2591,6 @@ export default function Inventory() {
                     {fluidosMassProducts.length})
                   </h3>
                 </div>
-
                 {/* Tabla de Escritorio - Fluidos */}
                 <div
                   className="desktop-table"
@@ -2311,6 +2616,15 @@ export default function Inventory() {
                           borderBottom: '1px solid #e2e8f0',
                         }}
                       >
+                        <th
+                          style={{
+                            padding: '10px 12px',
+                            textAlign: 'center',
+                            width: '50px',
+                          }}
+                        >
+                          Eliminar
+                        </th>
                         <th style={{ padding: '10px 12px' }}>Código</th>
                         <th style={{ padding: '10px 12px' }}>Descripción</th>
                         <th style={{ padding: '10px 12px' }}>Categoría</th>
@@ -2327,7 +2641,7 @@ export default function Inventory() {
                       {fluidosMassProducts.length === 0 ? (
                         <tr>
                           <td
-                            colSpan="6"
+                            colSpan="7"
                             style={{
                               textAlign: 'center',
                               padding: '16px',
@@ -2340,6 +2654,7 @@ export default function Inventory() {
                       ) : (
                         fluidosMassProducts.map((p) => {
                           const changes = massChanges[p.id] || {};
+                          const isMarkedForDeletion = massDeleteIds.has(p.id);
                           const currentCode =
                             changes.code !== undefined ? changes.code : p.code;
                           const currentDesc =
@@ -2362,12 +2677,33 @@ export default function Inventory() {
                             changes.stock_current !== undefined
                               ? changes.stock_current
                               : p.stock_current;
-
                           return (
                             <tr
                               key={p.id}
-                              style={{ borderBottom: '1px solid #f1f5f9' }}
+                              style={{
+                                borderBottom: '1px solid #f1f5f9',
+                                backgroundColor: isMarkedForDeletion
+                                  ? '#fee2e2'
+                                  : 'transparent',
+                              }}
                             >
+                              <td
+                                style={{
+                                  padding: '8px 12px',
+                                  textAlign: 'center',
+                                }}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={isMarkedForDeletion}
+                                  onChange={() => toggleMassDelete(p.id)}
+                                  style={{
+                                    cursor: 'pointer',
+                                    width: '16px',
+                                    height: '16px',
+                                  }}
+                                />
+                              </td>
                               <td style={{ padding: '8px 12px' }}>
                                 <input
                                   type="text"
@@ -2382,6 +2718,7 @@ export default function Inventory() {
                                       e.target.value
                                     )
                                   }
+                                  disabled={isMarkedForDeletion}
                                 />
                               </td>
                               <td style={{ padding: '8px 12px' }}>
@@ -2400,6 +2737,7 @@ export default function Inventory() {
                                       e.target.value
                                     )
                                   }
+                                  disabled={isMarkedForDeletion}
                                 />
                               </td>
                               <td style={{ padding: '8px 12px' }}>
@@ -2417,6 +2755,7 @@ export default function Inventory() {
                                       e.target.value
                                     )
                                   }
+                                  disabled={isMarkedForDeletion}
                                 >
                                   <option value="bombillos">Bombillos</option>
                                   <option value="fluidos">Fluidos</option>
@@ -2442,6 +2781,7 @@ export default function Inventory() {
                                       e.target.value
                                     )
                                   }
+                                  disabled={isMarkedForDeletion}
                                 />
                               </td>
                               <td
@@ -2464,6 +2804,7 @@ export default function Inventory() {
                                       e.target.value
                                     )
                                   }
+                                  disabled={isMarkedForDeletion}
                                 />
                               </td>
                               <td
@@ -2485,6 +2826,7 @@ export default function Inventory() {
                                       e.target.value
                                     )
                                   }
+                                  disabled={isMarkedForDeletion}
                                 />
                               </td>
                             </tr>
@@ -2494,7 +2836,6 @@ export default function Inventory() {
                     </tbody>
                   </table>
                 </div>
-
                 {/* Tarjetas Móvil - Fluidos */}
                 <div className="mobile-cards">
                   {fluidosMassProducts.length === 0 ? (
@@ -2510,6 +2851,7 @@ export default function Inventory() {
                   ) : (
                     fluidosMassProducts.map((p) => {
                       const changes = massChanges[p.id] || {};
+                      const isMarkedForDeletion = massDeleteIds.has(p.id);
                       const currentCode =
                         changes.code !== undefined ? changes.code : p.code;
                       const currentDesc =
@@ -2532,9 +2874,40 @@ export default function Inventory() {
                         changes.stock_current !== undefined
                           ? changes.stock_current
                           : p.stock_current;
-
                       return (
-                        <div key={p.id} className="mobile-card">
+                        <div
+                          key={p.id}
+                          className="mobile-card"
+                          style={{
+                            backgroundColor: isMarkedForDeletion
+                              ? '#fee2e2'
+                              : '#ffffff',
+                          }}
+                        >
+                          <div
+                            className="mobile-card-field"
+                            style={{
+                              justifyContent: 'flex-start',
+                              gap: '12px',
+                            }}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isMarkedForDeletion}
+                              onChange={() => toggleMassDelete(p.id)}
+                              style={{
+                                cursor: 'pointer',
+                                width: '18px',
+                                height: '18px',
+                              }}
+                            />
+                            <span
+                              className="mobile-card-label"
+                              style={{ width: 'auto' }}
+                            >
+                              Marcar para Eliminar
+                            </span>
+                          </div>
                           <div className="mobile-card-field">
                             <span className="mobile-card-label">Código</span>
                             <span className="mobile-card-value">
@@ -2551,6 +2924,7 @@ export default function Inventory() {
                                     e.target.value
                                   )
                                 }
+                                disabled={isMarkedForDeletion}
                               />
                             </span>
                           </div>
@@ -2574,6 +2948,7 @@ export default function Inventory() {
                                     e.target.value
                                   )
                                 }
+                                disabled={isMarkedForDeletion}
                               />
                             </span>
                           </div>
@@ -2594,6 +2969,7 @@ export default function Inventory() {
                                     e.target.value
                                   )
                                 }
+                                disabled={isMarkedForDeletion}
                               >
                                 <option value="bombillos">Bombillos</option>
                                 <option value="fluidos">Fluidos</option>
@@ -2622,6 +2998,7 @@ export default function Inventory() {
                                     e.target.value
                                   )
                                 }
+                                disabled={isMarkedForDeletion}
                               />
                             </span>
                           </div>
@@ -2647,6 +3024,7 @@ export default function Inventory() {
                                     e.target.value
                                   )
                                 }
+                                disabled={isMarkedForDeletion}
                               />
                             </span>
                           </div>
@@ -2671,6 +3049,7 @@ export default function Inventory() {
                                     e.target.value
                                   )
                                 }
+                                disabled={isMarkedForDeletion}
                               />
                             </span>
                           </div>
@@ -2682,7 +3061,6 @@ export default function Inventory() {
               </div>
             </>
           )}
-
           {/* Botón Flotante / Prominente de Guardado Masivo con Contador */}
           <div
             style={{
@@ -2702,13 +3080,19 @@ export default function Inventory() {
             <span
               style={{ color: '#ffffff', fontSize: '13px', fontWeight: '600' }}
             >
-              {Object.keys(massChanges).length} productos modificados
+              {Object.keys(massChanges).length} editados | {massDeleteIds.size}{' '}
+              para eliminar
             </span>
             <button
               onClick={handleSaveAllMassChanges}
-              disabled={!hasUnsavedChanges || massSaving}
+              disabled={
+                (!hasUnsavedChanges && massDeleteIds.size === 0) || massSaving
+              }
               style={{
-                backgroundColor: hasUnsavedChanges ? '#dc2626' : '#4b5563',
+                backgroundColor:
+                  hasUnsavedChanges || massDeleteIds.size > 0
+                    ? '#dc2626'
+                    : '#4b5563',
                 color: '#ffffff',
                 border: 'none',
                 padding: '10px 20px',
@@ -2716,7 +3100,9 @@ export default function Inventory() {
                 fontWeight: 'bold',
                 fontSize: '14px',
                 cursor:
-                  hasUnsavedChanges && !massSaving ? 'pointer' : 'not-allowed',
+                  (hasUnsavedChanges || massDeleteIds.size > 0) && !massSaving
+                    ? 'pointer'
+                    : 'not-allowed',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '8px',
@@ -2724,18 +3110,11 @@ export default function Inventory() {
               }}
             >
               <Save size={18} />
-              {massSaving
-                ? 'Guardando...'
-                : `Guardar Todos los Cambios ${
-                    Object.keys(massChanges).length > 0
-                      ? `(${Object.keys(massChanges).length})`
-                      : ''
-                  }`}
+              {massSaving ? 'Guardando...' : `Guardar Cambios`}
             </button>
           </div>
         </div>
       )}
-
       {/* ========================================== */}
       {/* CONTENIDO DE IMPORTACIÓN/EXPORTACIÓN        */}
       {/* ========================================== */}
@@ -2768,7 +3147,6 @@ export default function Inventory() {
               o sin imágenes.
             </p>
           </div>
-
           <div
             style={{
               display: 'grid',
@@ -2846,7 +3224,6 @@ export default function Inventory() {
                 </button>
               </div>
             </div>
-
             {/* Tarjeta de Importación */}
             <div
               style={{
@@ -2916,7 +3293,6 @@ export default function Inventory() {
               </div>
             </div>
           </div>
-
           <div
             style={{
               padding: '16px',
@@ -2968,11 +3344,9 @@ export default function Inventory() {
           </div>
         </div>
       )}
-
       {/* ========================================== */}
       {/* MODALES (Exportación, Importación, etc.)    */}
       {/* ========================================== */}
-
       {/* Modal de Notas de Entrega Asociadas */}
       {neModalProduct && (
         <div
@@ -3048,7 +3422,6 @@ export default function Inventory() {
                 <X size={20} color="#6b7280" />
               </button>
             </div>
-
             {neLoading ? (
               <div
                 style={{
@@ -3108,7 +3481,6 @@ export default function Inventory() {
                 ))}
               </div>
             )}
-
             <div
               style={{
                 marginTop: '20px',
@@ -3137,7 +3509,6 @@ export default function Inventory() {
           </div>
         </div>
       )}
-
       {/* Modal de Exportación */}
       {showExportModal && canManage && (
         <div
@@ -3256,7 +3627,6 @@ export default function Inventory() {
           </div>
         </div>
       )}
-
       {/* Modal de Importación */}
       {showImportModal && canManage && (
         <div
@@ -3489,7 +3859,6 @@ export default function Inventory() {
           </div>
         </div>
       )}
-
       {/* Modal de Registro / Edición */}
       {showAddModal && canManage && (
         <div
@@ -3878,7 +4247,6 @@ export default function Inventory() {
           </div>
         </div>
       )}
-
       {/* Modal de Ajuste de Stock */}
       {adjustingStockProduct && canManage && (
         <div
@@ -4047,7 +4415,6 @@ export default function Inventory() {
           </div>
         </div>
       )}
-
       {/* Modal para Ampliar Imagen */}
       {selectedImageModal && (
         <div
