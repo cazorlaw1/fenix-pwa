@@ -2745,14 +2745,14 @@ export default function SalesModule() {
       }}
     >
       <style>{`
-  /* --- CORRECCIÓN DE VISIBILIDAD RESPONSIVA --- */
+  /* --- CORRECCIÓN DE VISIBILIDAD RESPONSIVA ESTRICTA --- */
   @media (max-width: 768px) {
     .desktop-tabs { display: none !important; }
     .mobile-menu-container { display: block !important; }
     .desktop-table-container { display: none !important; }
     .desktop-table { display: none !important; }
     .desktop-cards-grid { display: none !important; }
-    .mobile-cards-container { display: flex !important; flex-direction: column; gap: 12px; }
+    .mobile-cards-container { display: flex !important; flex-direction: column; gap: 12px !important; }
     .action-buttons-wrapper { display: flex !important; flex-wrap: nowrap !important; justify-content: stretch !important; align-items: stretch !important; gap: 4px !important; margin-top: 6px !important; padding-top: 8px !important; border-top: 1px solid #E5E7EB !important; }
     .action-buttons-wrapper button { display: inline-flex !important; align-items: center !important; justify-content: center !important; padding: 8px 4px !important; font-size: 9px !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; border-radius: 6px !important; line-height: 1.2 !important; height: auto !important; box-sizing: border-box !important; min-height: 36px !important; width: auto !important; margin-top: 0 !important; }
     .action-buttons-wrapper button:not(:last-child) { flex: 1 !important; min-width: 0 !important; }
@@ -2763,7 +2763,7 @@ export default function SalesModule() {
     .desktop-table-container { display: block !important; }
     .desktop-table { display: block !important; }
     .desktop-cards-grid { display: grid !important; }
-    /* ASEGURA QUE LAS TARJETAS MÓVIL ESTÉN OCULTAS EN ESCRITORIO */
+    /* BLINDAJE ABSOLUTO: Oculta terminantemente las tarjetas móviles en escritorio */
     .mobile-cards-container { display: none !important; } 
   }
 `}</style>
@@ -9182,746 +9182,692 @@ export default function SalesModule() {
         </div>
       )}
 
+      
       {/* A. MODAL DE EDICIÓN DE NOTA DE ENTREGA */}
-      {editNeModal.open && (
+{editNeModal.open && (
+  <div
+    style={{
+      position: 'fixed',
+      inset: 0,
+      backgroundColor: 'rgba(0,0,0,0.6)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 1250,
+      padding: '16px',
+    }}
+  >
+    <div
+      style={{
+        backgroundColor: '#ffffff',
+        border: '2px solid #111827',
+        borderRadius: '12px',
+        width: '100%',
+        maxWidth: '850px',
+        maxHeight: '90vh',
+        overflowY: 'auto',
+        padding: '24px',
+        boxShadow: '0 10px 40px rgba(0,0,0,0.3)',
+        boxSizing: 'border-box',
+      }}
+    >
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: '16px',
+          borderBottom: '2px solid #111827',
+          paddingBottom: '12px',
+        }}
+      >
+        <div>
+          <h2 style={{ fontSize: '18px', fontWeight: '900', margin: 0 }}>
+            Panel Editable - Nota de Entrega #{editNeModal.noteData?.transaction_number}
+          </h2>
+        </div>
+        <button
+          onClick={() => setEditNeModal({ open: false, noteData: null })}
+          style={{
+            background: '#111827',
+            color: '#fff',
+            border: 'none',
+            padding: '6px 12px',
+            borderRadius: '6px',
+            cursor: 'pointer',
+            fontSize: '12px',
+            fontWeight: 'bold',
+          }}
+        >
+          Cerrar Panel
+        </button>
+      </div>
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '16px',
+        }}
+      >
         <div
           style={{
-            position: 'fixed',
-            inset: 0,
-            backgroundColor: 'rgba(0,0,0,0.6)',
+            backgroundColor: '#ffffff',
+            padding: '16px',
+            borderRadius: '12px',
+            border: '1px solid #E5E7EB',
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+            gap: '12px',
+          }}
+        >
+          <div>
+            <label
+              style={{
+                display: 'block',
+                fontSize: '12px',
+                fontWeight: '700',
+                marginBottom: '4px',
+              }}
+            >
+              Cliente
+            </label>
+            <SearchableDropdown
+              options={clients.map((c) => ({
+                value: c.id,
+                label: c.name,
+              }))}
+              value={editNeForm.client_id}
+              onChange={(val) =>
+                setEditNeForm({ ...editNeForm, client_id: val })
+              }
+              placeholder="Seleccionar cliente..."
+            />
+          </div>
+          <div>
+            <label
+              style={{
+                display: 'block',
+                fontSize: '12px',
+                fontWeight: '700',
+                marginBottom: '4px',
+              }}
+            >
+              Categoría *
+            </label>
+            <select
+              value={editNeForm.category}
+              onChange={(e) =>
+                setEditNeForm({ ...editNeForm, category: e.target.value })
+              }
+              style={{
+                width: '100%',
+                padding: '10px 12px',
+                fontSize: '14px',
+                border: '1px solid #D1D5DB',
+                borderRadius: '6px',
+                backgroundColor: '#FFFFFF',
+                boxSizing: 'border-box',
+              }}
+            >
+              <option value="bombillos">Bombillos</option>
+              <option value="fluidos">Fluidos</option>
+            </select>
+          </div>
+          <div>
+            <label
+              style={{
+                display: 'block',
+                fontSize: '12px',
+                fontWeight: '700',
+                marginBottom: '4px',
+              }}
+            >
+              % Descuento (Pago Bs) *
+            </label>
+            <select
+              value={editNeForm.payment_discount}
+              onChange={(e) => {
+                setEditNeForm({
+                  ...editNeForm,
+                  payment_discount: e.target.value,
+                });
+                handleEditNeRecalculatePrices(e.target.value);
+              }}
+              style={{
+                width: '100%',
+                padding: '10px 12px',
+                fontSize: '14px',
+                border: '1px solid #F59E0B',
+                borderRadius: '6px',
+                backgroundColor: '#FEF3C7',
+                color: '#78350F',
+                fontWeight: '700',
+                boxSizing: 'border-box',
+              }}
+            >
+              <option value="53.38">{globalDiscount53}% Pagará en $</option>
+              <option value="23.08">{globalDiscount23}% Pagará en Bs BCV</option>
+              <option value="10">{globalDiscount10}% Descuento Especial</option>
+              <option value="0">{globalDiscount0}% Sin Descuento</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Sección de Selección de Producto */}
+        <div
+          style={{
+            backgroundColor: '#ffffff',
+            padding: '16px',
+            borderRadius: '12px',
+            border: '1px solid #E5E7EB',
             display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1250,
+            flexDirection: 'column',
+            gap: '12px',
+          }}
+        >
+          <h3
+            style={{
+              fontSize: '13px',
+              fontWeight: '900',
+              textTransform: 'uppercase',
+              margin: 0,
+            }}
+          >
+            Agregar Productos
+          </h3>
+
+          <div style={{ width: '100%' }}>
+            <SearchableDropdown
+              options={products
+                .filter(
+                  (p) =>
+                    !p.category ||
+                    p.category.toLowerCase() ===
+                      editNeForm.category.toLowerCase()
+                )
+                .map((p) => {
+                  const descPct = getDiscountPercent(
+                    editNeForm.payment_discount
+                  );
+                  const desc = p.price_usd * (1 - descPct / 100);
+                  return {
+                    value: p.id,
+                    label: `[${p.code}] ${p.description} | Stock: ${
+                      p.stock_current
+                    } | Base: $${p.price_usd.toFixed(
+                      2
+                    )} | Desc: $${desc.toFixed(2)}`,
+                    image_url: p.image_url,
+                  };
+                })}
+              value={editNeSelectedProdId}
+              onChange={setEditNeSelectedProdId}
+              placeholder="-- Seleccionar producto --"
+              imageKey="image_url"
+              onClear={() => setEditNeSelectedProdId('')}
+            />
+          </div>
+
+          {editNeSelectedProdId &&
+            (() => {
+              const selectedProd = products.find(
+                (p) => p.id === editNeSelectedProdId
+              );
+              if (!selectedProd) return null;
+              return (
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    padding: '10px',
+                    backgroundColor: '#f8fafc',
+                    borderRadius: '8px',
+                    border: '1px solid #e2e8f0',
+                  }}
+                >
+                  {selectedProd.image_url ? (
+                    <img
+                      src={selectedProd.image_url}
+                      alt="Producto"
+                      title="Haz clic para ver imagen en grande"
+                      onClick={() =>
+                        setImageModal({
+                          open: true,
+                          url: selectedProd.image_url,
+                          title: `Imagen de ${selectedProd.description}`,
+                          clientId: null,
+                          fieldName: null,
+                          isReadOnlyProduct: true,
+                        })
+                      }
+                      style={{
+                        width: '60px',
+                        height: '60px',
+                        objectFit: 'cover',
+                        borderRadius: '6px',
+                        border: '1px solid #cbd5e1',
+                        cursor: 'pointer',
+                        flexShrink: 0,
+                      }}
+                    />
+                  ) : (
+                    <div
+                      style={{
+                        width: '60px',
+                        height: '60px',
+                        backgroundColor: '#e2e8f0',
+                        borderRadius: '6px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: '10px',
+                        color: '#64748b',
+                        flexShrink: 0,
+                      }}
+                    >
+                      Sin Foto
+                    </div>
+                  )}
+                  <div style={{ flex: 1, minWidth: '0' }}>
+                    <div
+                      style={{
+                        fontSize: '12px',
+                        fontWeight: '700',
+                        color: '#1e293b',
+                        marginBottom: '2px',
+                      }}
+                    >
+                      {selectedProd.code} - {selectedProd.description}
+                    </div>
+                    <div style={{ fontSize: '11px', color: '#64748b' }}>
+                      Stock disponible:{' '}
+                      <strong style={{ color: '#0f172a' }}>
+                        {selectedProd.stock_current} un.
+                      </strong>{' '}
+                      | Precio Base:{' '}
+                      <strong style={{ color: '#059669' }}>
+                        ${Number(selectedProd.price_usd).toFixed(2)}
+                      </strong>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+
+          <div
+            style={{
+              display: 'flex',
+              gap: '10px',
+              alignItems: 'flex-end',
+              justifyContent: 'flex-end',
+            }}
+          >
+            <div style={{ width: '120px' }}>
+              <label
+                style={{
+                  display: 'block',
+                  fontSize: '11px',
+                  fontWeight: '600',
+                  marginBottom: '4px',
+                }}
+              >
+                Cantidad
+              </label>
+              <input
+                type="number"
+                min="1"
+                value={editNeQuantity}
+                onChange={(e) => setEditNeQuantity(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '10px 12px',
+                  fontSize: '14px',
+                  border: '1px solid #D1D5DB',
+                  borderRadius: '6px',
+                  boxSizing: 'border-box',
+                  height: '42px',
+                }}
+              />
+            </div>
+            <button
+              onClick={handleEditNeAddProduct}
+              style={{
+                padding: '10px 20px',
+                backgroundColor: '#DC2626',
+                color: '#FFFFFF',
+                border: 'none',
+                borderRadius: '6px',
+                fontSize: '14px',
+                fontWeight: '700',
+                cursor: 'pointer',
+                height: '42px',
+              }}
+            >
+              Agregar
+            </button>
+          </div>
+        </div>
+
+        <div
+          style={{
+            backgroundColor: '#ffffff',
+            border: '2px solid #111827',
+            borderRadius: '12px',
             padding: '16px',
           }}
         >
           <div
             style={{
-              backgroundColor: '#ffffff',
-              border: '2px solid #111827',
-              borderRadius: '12px',
-              width: '100%',
-              maxWidth: '850px',
-              maxHeight: '90vh',
-              overflowY: 'auto',
-              padding: '24px',
-              boxShadow: '0 10px 40px rgba(0,0,0,0.3)',
-              boxSizing: 'border-box',
+              display: 'flex',
+              justifyContent: 'space-between',
+              borderBottom: '1px solid #E5E7EB',
+              paddingBottom: '12px',
+              marginBottom: '12px',
+              fontSize: '12px',
+              flexWrap: 'wrap',
+              gap: '12px',
             }}
           >
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                marginBottom: '16px',
-                borderBottom: '2px solid #111827',
-                paddingBottom: '12px',
-              }}
-            >
-              <div>
-                <h2 style={{ fontSize: '18px', fontWeight: '900', margin: 0 }}>
-                  Panel Editable - Nota de Entrega #
-                  {editNeModal.noteData?.transaction_number}
-                </h2>
-              </div>
-              <button
-                onClick={() => setEditNeModal({ open: false, noteData: null })}
-                style={{
-                  background: '#111827',
-                  color: '#fff',
-                  border: 'none',
-                  padding: '6px 12px',
-                  borderRadius: '6px',
-                  cursor: 'pointer',
-                  fontSize: '12px',
-                  fontWeight: 'bold',
-                }}
-              >
-                Cerrar Panel
-              </button>
+            <div>
+              <h2 style={{ fontSize: '15px', fontWeight: '900', margin: 0 }}>
+                FENIX AUTO PART C.A
+              </h2>
+              <p style={{ fontWeight: '700', margin: '2px 0' }}>
+                RIF: J-50261925-2
+              </p>
+              <p style={{ margin: '6px 0 0 0' }}>
+                <strong>Cliente: </strong>{' '}
+                {clients.find((c) => c.id === editNeForm.client_id)?.name || '...'}
+              </p>
             </div>
-            <div
+            <div style={{ textAlign: 'right' }}>
+              <p style={{ margin: 0 }}>
+                <strong>Fecha/Hora: </strong>{' '}
+                {new Date(editNeModal.noteData?.created_at).toLocaleString()}
+              </p>
+              <p style={{ margin: '2px 0' }}>
+                <strong>N° Transacción: </strong> #{editNeModal.noteData?.transaction_number}
+              </p>
+            </div>
+          </div>
+
+          {/* TABLA DE ESCRITORIO (Usa desktop-table-container para ocultarse en móvil) */}
+          <div
+            className="desktop-table-container"
+            style={{ width: '100%', overflowX: 'auto', marginBottom: '12px' }}
+          >
+            <table
               style={{
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '16px',
+                width: '100%',
+                minWidth: '700px',
+                borderCollapse: 'collapse',
+                textAlign: 'left',
+                fontSize: '12px',
               }}
             >
-              <div
-                style={{
-                  backgroundColor: '#ffffff',
-                  padding: '16px',
-                  borderRadius: '12px',
-                  border: '1px solid #E5E7EB',
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-                  gap: '12px',
-                }}
-              >
-                <div>
-                  <label
-                    style={{
-                      display: 'block',
-                      fontSize: '12px',
-                      fontWeight: '700',
-                      marginBottom: '4px',
-                    }}
-                  >
-                    Cliente
-                  </label>
-                  <SearchableDropdown
-                    options={clients.map((c) => ({
-                      value: c.id,
-                      label: c.name,
-                    }))}
-                    value={editNeForm.client_id}
-                    onChange={(val) =>
-                      setEditNeForm({ ...editNeForm, client_id: val })
-                    }
-                    placeholder="Seleccionar cliente..."
-                  />
-                </div>
-                <div>
-                  <label
-                    style={{
-                      display: 'block',
-                      fontSize: '12px',
-                      fontWeight: '700',
-                      marginBottom: '4px',
-                    }}
-                  >
-                    Categoría *
-                  </label>
-                  <select
-                    value={editNeForm.category}
-                    onChange={(e) =>
-                      setEditNeForm({ ...editNeForm, category: e.target.value })
-                    }
-                    style={{
-                      width: '100%',
-                      padding: '10px 12px',
-                      fontSize: '14px',
-                      border: '1px solid #D1D5DB',
-                      borderRadius: '6px',
-                      backgroundColor: '#FFFFFF',
-                      boxSizing: 'border-box',
-                    }}
-                  >
-                    <option value="bombillos">Bombillos</option>
-                    <option value="fluidos">Fluidos</option>
-                  </select>
-                </div>
-                <div>
-                  <label
-                    style={{
-                      display: 'block',
-                      fontSize: '12px',
-                      fontWeight: '700',
-                      marginBottom: '4px',
-                    }}
-                  >
-                    % Descuento (Pago Bs) *
-                  </label>
-                  <select
-                    value={editNeForm.payment_discount}
-                    onChange={(e) => {
-                      setEditNeForm({
-                        ...editNeForm,
-                        payment_discount: e.target.value,
-                      });
-                      handleEditNeRecalculatePrices(e.target.value);
-                    }}
-                    style={{
-                      width: '100%',
-                      padding: '10px 12px',
-                      fontSize: '14px',
-                      border: '1px solid #F59E0B',
-                      borderRadius: '6px',
-                      backgroundColor: '#FEF3C7',
-                      color: '#78350F',
-                      fontWeight: '700',
-                      boxSizing: 'border-box',
-                    }}
-                  >
-                    <option value="53.38">
-                      {globalDiscount53}% Pagará en $
-                    </option>
-                    <option value="23.08">
-                      {globalDiscount23}% Pagará en Bs BCV
-                    </option>
-                    <option value="10">
-                      {globalDiscount10}% Descuento Especial
-                    </option>
-                    <option value="0">{globalDiscount0}% Sin Descuento</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Sección de Selección de Producto con Imagen Arriba y Descripción (Panel Editable / Editar N.E.) */}
-              <div
-                style={{
-                  backgroundColor: '#ffffff',
-                  padding: '16px',
-                  borderRadius: '12px',
-                  border: '1px solid #E5E7EB',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '12px',
-                }}
-              >
-                <h3
+              <thead>
+                <tr
                   style={{
-                    fontSize: '13px',
-                    fontWeight: '900',
-                    textTransform: 'uppercase',
-                    margin: 0,
+                    backgroundColor: '#F3F4F6',
+                    borderBottom: '1px solid #D1D5DB',
+                    fontWeight: '700',
                   }}
                 >
-                  Agregar Productos
-                </h3>
-
-                {/* Selector desplegable arriba */}
-                <div style={{ width: '100%' }}>
-                  <SearchableDropdown
-                    options={products
-                      .filter(
-                        (p) =>
-                          !p.category ||
-                          p.category.toLowerCase() ===
-                            editNeForm.category.toLowerCase()
-                      )
-                      .map((p) => {
-                        const descPct = getDiscountPercent(
-                          editNeForm.payment_discount
-                        );
-                        const desc = p.price_usd * (1 - descPct / 100);
-                        return {
-                          value: p.id,
-                          label: `[${p.code}] ${p.description} | Stock: ${
-                            p.stock_current
-                          } | Base: $${p.price_usd.toFixed(
-                            2
-                          )} | Desc: $${desc.toFixed(2)}`,
-                          image_url: p.image_url,
-                        };
-                      })}
-                    value={editNeSelectedProdId}
-                    onChange={setEditNeSelectedProdId}
-                    placeholder="-- Seleccionar producto --"
-                    imageKey="image_url"
-                    onClear={() => setEditNeSelectedProdId('')} // <--- AÑADE ESTA LÍNEA
-                  />
-                </div>
-
-                {/* Visualización de la imagen y breve descripción debajo del selector */}
-                {editNeSelectedProdId &&
-                  (() => {
-                    const selectedProd = products.find(
-                      (p) => p.id === editNeSelectedProdId
-                    );
-                    if (!selectedProd) return null;
-                    return (
-                      <div
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '12px',
-                          padding: '10px',
-                          backgroundColor: '#f8fafc',
-                          borderRadius: '8px',
-                          border: '1px solid #e2e8f0',
-                        }}
-                      >
-                        {selectedProd.image_url ? (
-                          <img
-                            src={selectedProd.image_url}
-                            alt="Producto"
-                            title="Haz clic para ver imagen en grande"
-                            onClick={() =>
-                              setImageModal({
-                                open: true,
-                                url: selectedProd.image_url,
-                                title: `Imagen de ${selectedProd.description}`,
-                                clientId: null,
-                                fieldName: null,
-                                isReadOnlyProduct: true,
-                              })
-                            }
-                            style={{
-                              width: '60px',
-                              height: '60px',
-                              objectFit: 'cover',
-                              borderRadius: '6px',
-                              border: '1px solid #cbd5e1',
-                              cursor: 'pointer',
-                              flexShrink: 0,
-                            }}
-                          />
-                        ) : (
-                          <div
-                            style={{
-                              width: '60px',
-                              height: '60px',
-                              backgroundColor: '#e2e8f0',
-                              borderRadius: '6px',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              fontSize: '10px',
-                              color: '#64748b',
-                              flexShrink: 0,
-                            }}
-                          >
-                            Sin Foto
-                          </div>
-                        )}
-                        <div style={{ flex: 1, minWidth: '0' }}>
-                          <div
-                            style={{
-                              fontSize: '12px',
-                              fontWeight: '700',
-                              color: '#1e293b',
-                              marginBottom: '2px',
-                            }}
-                          >
-                            {selectedProd.code} - {selectedProd.description}
-                          </div>
-                          <div style={{ fontSize: '11px', color: '#64748b' }}>
-                            Stock disponible:{' '}
-                            <strong style={{ color: '#0f172a' }}>
-                              {selectedProd.stock_current} un.
-                            </strong>{' '}
-                            | Precio Base:{' '}
-                            <strong style={{ color: '#059669' }}>
-                              ${Number(selectedProd.price_usd).toFixed(2)}
-                            </strong>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })()}
-
-                {/* Controles de cantidad y botón de agregar */}
-                <div
-                  style={{
-                    display: 'flex',
-                    gap: '10px',
-                    alignItems: 'flex-end',
-                    justifyContent: 'flex-end',
-                  }}
-                >
-                  <div style={{ width: '120px' }}>
-                    <label
-                      style={{
-                        display: 'block',
-                        fontSize: '11px',
-                        fontWeight: '600',
-                        marginBottom: '4px',
-                      }}
-                    >
-                      Cantidad
-                    </label>
-                    <input
-                      type="number"
-                      min="1"
-                      value={editNeQuantity}
-                      onChange={(e) => setEditNeQuantity(e.target.value)}
-                      style={{
-                        width: '100%',
-                        padding: '10px 12px',
-                        fontSize: '14px',
-                        border: '1px solid #D1D5DB',
-                        borderRadius: '6px',
-                        boxSizing: 'border-box',
-                        height: '42px',
-                      }}
-                    />
-                  </div>
-                  <button
-                    onClick={handleEditNeAddProduct}
-                    style={{
-                      padding: '10px 20px',
-                      backgroundColor: '#DC2626',
-                      color: '#FFFFFF',
-                      border: 'none',
-                      borderRadius: '6px',
-                      fontSize: '14px',
-                      fontWeight: '700',
-                      cursor: 'pointer',
-                      height: '42px',
-                    }}
-                  >
-                    Agregar
-                  </button>
-                </div>
-              </div>
-
-              <div
-                style={{
-                  backgroundColor: '#ffffff',
-                  border: '2px solid #111827',
-                  borderRadius: '12px',
-                  padding: '16px',
-                }}
-              >
-                <div
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    borderBottom: '1px solid #E5E7EB',
-                    paddingBottom: '12px',
-                    marginBottom: '12px',
-                    fontSize: '12px',
-                    flexWrap: 'wrap',
-                    gap: '12px',
-                  }}
-                >
-                  <div>
-                    <h2
-                      style={{
-                        fontSize: '15px',
-                        fontWeight: '900',
-                        margin: 0,
-                      }}
-                    >
-                      FENIX AUTO PART C.A
-                    </h2>
-                    <p style={{ fontWeight: '700', margin: '2px 0' }}>
-                      RIF: J-50261925-2
-                    </p>
-                    <p style={{ margin: '6px 0 0 0' }}>
-                      <strong>Cliente: </strong>{' '}
-                      {clients.find((c) => c.id === editNeForm.client_id)
-                        ?.name || '...'}
-                    </p>
-                  </div>
-                  <div style={{ textAlign: 'right' }}>
-                    <p style={{ margin: 0 }}>
-                      <strong>Fecha/Hora: </strong>{' '}
-                      {new Date(
-                        editNeModal.noteData?.created_at
-                      ).toLocaleString()}
-                    </p>
-                    <p style={{ margin: '2px 0' }}>
-                      <strong>N° Transacción: </strong> #
-                      {editNeModal.noteData?.transaction_number}
-                    </p>
-                  </div>
-                </div>
-
-                <div
-                  style={{ width: '100%', overflowX: 'auto' }}
-                  className="admin-table-desktop"
-                >
-                  <table
-                    style={{
-                      width: '100%',
-                      minWidth: '700px',
-                      borderCollapse: 'collapse',
-                      textAlign: 'left',
-                      fontSize: '12px',
-                      marginBottom: '12px',
-                    }}
-                  >
-                    <thead>
-                      <tr
-                        style={{
-                          backgroundColor: '#F3F4F6',
-                          borderBottom: '1px solid #D1D5DB',
-                          fontWeight: '700',
-                        }}
-                      >
-                        <th style={{ padding: '8px' }}>Código</th>
-                        <th style={{ padding: '8px' }}>Descripción</th>
-                        <th style={{ padding: '8px', textAlign: 'center' }}>
-                          Cantidad
-                        </th>
-                        <th style={{ padding: '8px', textAlign: 'right' }}>
-                          Valor Unitario
-                        </th>
-                        <th style={{ padding: '8px', textAlign: 'right' }}>
-                          V. U. con descuento
-                        </th>
-                        <th style={{ padding: '8px', textAlign: 'right' }}>
-                          Valor Total
-                        </th>
-                        <th style={{ padding: '8px', textAlign: 'center' }}>
-                          Eliminar
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {editNeCart.length === 0 ? (
-                        <tr>
-                          <td
-                            colSpan="7"
-                            style={{
-                              padding: '16px',
-                              textAlign: 'center',
-                              color: '#9CA3AF',
-                              fontStyle: 'italic',
-                            }}
-                          >
-                            No hay productos añadidos a la nota de entrega.
-                          </td>
-                        </tr>
-                      ) : (
-                        editNeCart.map((item) => (
-                          <tr
-                            key={item.product_id}
-                            style={{ borderBottom: '1px solid #E5E7EB' }}
-                          >
-                            <td
-                              style={{
-                                padding: '8px',
-                                fontFamily: 'monospace',
-                              }}
-                            >
-                              {item.code}
-                            </td>
-                            <td style={{ padding: '8px', fontWeight: '600' }}>
-                              {item.description}
-                            </td>
-                            <td
-                              style={{
-                                padding: '8px',
-                                textAlign: 'center',
-                              }}
-                            >
-                              {item.quantity}
-                            </td>
-                            <td style={{ padding: '8px', textAlign: 'right' }}>
-                              ${Number(item.unit_price_usd).toFixed(2)}
-                            </td>
-                            <td
-                              style={{
-                                padding: '8px',
-                                textAlign: 'right',
-                                color: '#B45309',
-                              }}
-                            >
-                              $
-                              {Number(item.discounted_unit_price_usd).toFixed(
-                                2
-                              )}
-                            </td>
-                            <td
-                              style={{
-                                padding: '8px',
-                                textAlign: 'right',
-                                fontWeight: '700',
-                              }}
-                            >
-                              ${Number(item.total_line_usd).toFixed(2)}
-                            </td>
-                            <td
-                              style={{
-                                padding: '8px',
-                                textAlign: 'center',
-                              }}
-                            >
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  handleEditNeRemoveItem(item.product_id)
-                                }
-                                style={{
-                                  border: 'none',
-                                  background: 'none',
-                                  cursor: 'pointer',
-                                  color: '#dc2626',
-                                }}
-                              >
-                                <Trash2 size={16} />
-                              </button>
-                            </td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-
-                <div className="admin-mobile-cards">
-                  {editNeCart.length === 0 ? (
-                    <div
+                  <th style={{ padding: '8px' }}>Código</th>
+                  <th style={{ padding: '8px' }}>Descripción</th>
+                  <th style={{ padding: '8px', textAlign: 'center' }}>Cantidad</th>
+                  <th style={{ padding: '8px', textAlign: 'right' }}>Valor Unitario</th>
+                  <th style={{ padding: '8px', textAlign: 'right' }}>V. U. con descuento</th>
+                  <th style={{ padding: '8px', textAlign: 'right' }}>Valor Total</th>
+                  <th style={{ padding: '8px', textAlign: 'center' }}>Eliminar</th>
+                </tr>
+              </thead>
+              <tbody>
+                {editNeCart.length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan="7"
                       style={{
                         padding: '16px',
                         textAlign: 'center',
                         color: '#9CA3AF',
+                        fontStyle: 'italic',
                       }}
                     >
-                      No hay productos.
-                    </div>
-                  ) : (
-                    renderProductCards(editNeCart, true, handleEditNeRemoveItem)
-                  )}
-                </div>
-
-                <div
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'flex-end',
-                    marginBottom: '12px',
-                    fontSize: '12px',
-                  }}
-                >
-                  <div
-                    style={{
-                      width: '300px',
-                      backgroundColor: '#F9FAFB',
-                      padding: '10px',
-                      borderRadius: '8px',
-                      border: '1px solid #E5E7EB',
-                    }}
-                  >
-                    <div
-                      style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        marginBottom: '4px',
-                      }}
+                      No hay productos añadidos a la nota de entrega.
+                    </td>
+                  </tr>
+                ) : (
+                  editNeCart.map((item) => (
+                    <tr
+                      key={item.product_id}
+                      style={{ borderBottom: '1px solid #E5E7EB' }}
                     >
-                      <span>Total sin Descuento: </span>
-                      <strong>
-                        $
-                        {editNeCart
-                          .reduce(
-                            (acc, i) => acc + i.unit_price_usd * i.quantity,
-                            0
-                          )
-                          .toFixed(2)}
-                      </strong>
-                    </div>
-                    <div
-                      style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        marginBottom: '4px',
-                        color: '#B45309',
-                      }}
-                    >
-                      <span>
-                        {getDiscountPercent(editNeForm.payment_discount)}% de
-                        descuento aplicado:{' '}
-                      </span>
-                      <strong>
-                        -$
-                        {(
-                          editNeCart.reduce(
-                            (acc, i) => acc + i.unit_price_usd * i.quantity,
-                            0
-                          ) -
-                          editNeCart.reduce(
-                            (acc, i) => acc + i.total_line_usd,
-                            0
-                          )
-                        ).toFixed(2)}
-                      </strong>
-                    </div>
-                    <div
-                      style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        borderTop: '1px solid #D1D5DB',
-                        paddingTop: '4px',
-                        fontSize: '13px',
-                        fontWeight: '900',
-                      }}
-                    >
-                      <span>Precio Final: </span>
-                      <span style={{ color: '#059669' }}>
-                        $
-                        {editNeCart
-                          .reduce((acc, i) => acc + i.total_line_usd, 0)
-                          .toFixed(2)}
-                      </span>
-                    </div>
-                  </div>
-                </div>
+                      <td style={{ padding: '8px', fontFamily: 'monospace' }}>
+                        {item.code}
+                      </td>
+                      <td style={{ padding: '8px', fontWeight: '600' }}>
+                        {item.description}
+                      </td>
+                      <td style={{ padding: '8px', textAlign: 'center' }}>
+                        {item.quantity}
+                      </td>
+                      <td style={{ padding: '8px', textAlign: 'right' }}>
+                        ${Number(item.unit_price_usd).toFixed(2)}
+                      </td>
+                      <td
+                        style={{
+                          padding: '8px',
+                          textAlign: 'right',
+                          color: '#B45309',
+                        }}
+                      >
+                        ${Number(item.discounted_unit_price_usd).toFixed(2)}
+                      </td>
+                      <td
+                        style={{
+                          padding: '8px',
+                          textAlign: 'right',
+                          fontWeight: '700',
+                        }}
+                      >
+                        ${Number(item.total_line_usd).toFixed(2)}
+                      </td>
+                      <td style={{ padding: '8px', textAlign: 'center' }}>
+                        <button
+                          type="button"
+                          onClick={() => handleEditNeRemoveItem(item.product_id)}
+                          style={{
+                            border: 'none',
+                            background: 'none',
+                            cursor: 'pointer',
+                            color: '#dc2626',
+                          }}
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
 
-                <div style={{ marginBottom: '12px' }}>
-                  <label
-                    style={{
-                      display: 'block',
-                      fontSize: '12px',
-                      fontWeight: '700',
-                      marginBottom: '4px',
-                    }}
-                  >
-                    Observación:
-                  </label>
-                  <textarea
-                    rows="2"
-                    value={editNeForm.observation}
-                    onChange={(e) =>
-                      setEditNeForm({
-                        ...editNeForm,
-                        observation: e.target.value,
-                      })
-                    }
-                    style={{
-                      width: '100%',
-                      padding: '6px 8px',
-                      fontSize: '12px',
-                      border: '1px solid #D1D5DB',
-                      borderRadius: '6px',
-                      boxSizing: 'border-box',
-                    }}
-                  ></textarea>
-                </div>
+          {/* TARJETAS MÓVIL (Usa mobile-cards-container para ocultarse en escritorio) */}
+          <div className="mobile-cards-container">
+            {editNeCart.length === 0 ? (
+              <div
+                style={{
+                  padding: '16px',
+                  textAlign: 'center',
+                  color: '#9CA3AF',
+                }}
+              >
+                No hay productos.
+              </div>
+            ) : (
+              renderProductCards(editNeCart, true, handleEditNeRemoveItem)
+            )}
+          </div>
 
-                <div
-                  style={{
-                    backgroundColor: '#F3F4F6',
-                    padding: '10px',
-                    borderRadius: '6px',
-                    fontSize: '10px',
-                    color: '#4B5563',
-                    lineHeight: '1.4',
-                    marginBottom: '12px',
-                    textAlign: 'justify',
-                  }}
-                >
-                  <strong>Términos y condiciones: </strong> {globalTerms}
-                </div>
-
-                <div
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    flexWrap: 'wrap',
-                    gap: '12px',
-                    borderTop: '1px solid #e5e7eb',
-                    paddingTop: '16px',
-                  }}
-                >
-                  <button
-                    type="button"
-                    onClick={handleSaveEditedNe}
-                    disabled={loading}
-                    style={{
-                      padding: '10px 16px',
-                      backgroundColor: '#111827',
-                      color: '#ffffff',
-                      border: 'none',
-                      borderRadius: '8px',
-                      fontSize: '12px',
-                      fontWeight: '700',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    Guardar y Enviar a Aprobación
-                  </button>
-                </div>
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'flex-end',
+              marginBottom: '12px',
+              fontSize: '12px',
+            }}
+          >
+            <div
+              style={{
+                width: '300px',
+                backgroundColor: '#F9FAFB',
+                padding: '10px',
+                borderRadius: '8px',
+                border: '1px solid #E5E7EB',
+              }}
+            >
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  marginBottom: '4px',
+                }}
+              >
+                <span>Total sin Descuento: </span>
+                <strong>
+                  $
+                  {editNeCart
+                    .reduce((acc, i) => acc + i.unit_price_usd * i.quantity, 0)
+                    .toFixed(2)}
+                </strong>
+              </div>
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  marginBottom: '4px',
+                  color: '#B45309',
+                }}
+              >
+                <span>
+                  {getDiscountPercent(editNeForm.payment_discount)}% de descuento
+                  aplicado:{' '}
+                </span>
+                <strong>
+                  -$
+                  {(
+                    editNeCart.reduce(
+                      (acc, i) => acc + i.unit_price_usd * i.quantity,
+                      0
+                    ) -
+                    editNeCart.reduce((acc, i) => acc + i.total_line_usd, 0)
+                  ).toFixed(2)}
+                </strong>
+              </div>
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  borderTop: '1px solid #D1D5DB',
+                  paddingTop: '4px',
+                  fontSize: '13px',
+                  fontWeight: '900',
+                }}
+              >
+                <span>Precio Final: </span>
+                <span style={{ color: '#059669' }}>
+                  $
+                  {editNeCart
+                    .reduce((acc, i) => acc + i.total_line_usd, 0)
+                    .toFixed(2)}
+                </span>
               </div>
             </div>
           </div>
+
+          <div style={{ marginBottom: '12px' }}>
+            <label
+              style={{
+                display: 'block',
+                fontSize: '12px',
+                fontWeight: '700',
+                marginBottom: '4px',
+              }}
+            >
+              Observación:
+            </label>
+            <textarea
+              rows="2"
+              value={editNeForm.observation}
+              onChange={(e) =>
+                setEditNeForm({
+                  ...editNeForm,
+                  observation: e.target.value,
+                })
+              }
+              style={{
+                width: '100%',
+                padding: '6px 8px',
+                fontSize: '12px',
+                border: '1px solid #D1D5DB',
+                borderRadius: '6px',
+                boxSizing: 'border-box',
+              }}
+            ></textarea>
+          </div>
+
+          <div
+            style={{
+              backgroundColor: '#F3F4F6',
+              padding: '10px',
+              borderRadius: '6px',
+              fontSize: '10px',
+              color: '#4B5563',
+              lineHeight: '1.4',
+              marginBottom: '12px',
+              textAlign: 'justify',
+            }}
+          >
+            <strong>Términos y condiciones: </strong> {globalTerms}
+          </div>
+
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              gap: '12px',
+              borderTop: '1px solid #e5e7eb',
+              paddingTop: '16px',
+            }}
+          >
+            <button
+              type="button"
+              onClick={handleSaveEditedNe}
+              disabled={loading}
+              style={{
+                padding: '10px 16px',
+                backgroundColor: '#111827',
+                color: '#ffffff',
+                border: 'none',
+                borderRadius: '8px',
+                fontSize: '12px',
+                fontWeight: '700',
+                cursor: 'pointer',
+              }}
+            >
+              Guardar y Enviar a Aprobación
+            </button>
+          </div>
         </div>
-      )}
+      </div>
+    </div>
+  </div>
+)}
 
       {/* MODAL ABONO */}
       {abonoNotifModal.open && (
