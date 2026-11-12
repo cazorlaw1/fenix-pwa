@@ -4249,7 +4249,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                         marginBottom: '4px',
                       }}
                     >
-                      % Descuento (Pago $ - 53.38)
+                      % Descuento Exclusivo Divisas
                     </label>
                     <input
                       type="number"
@@ -4276,7 +4276,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                         marginBottom: '4px',
                       }}
                     >
-                      % Descuento (Pago Bs - 23.08)
+                      % Descuento S. Consulta
                     </label>
                     <input
                       type="number"
@@ -4303,7 +4303,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                         marginBottom: '4px',
                       }}
                     >
-                      % Descuento (10)
+                      % Descuento
                     </label>
                     <input
                       type="number"
@@ -4330,7 +4330,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                         marginBottom: '4px',
                       }}
                     >
-                      % Descuento (0)
+                      0% Precio Full
                     </label>
                     <input
                       type="number"

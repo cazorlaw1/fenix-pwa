@@ -1298,7 +1298,7 @@ export default function Users() {
                 marginBottom: '8px',
               }}
             >
-              ¿Es Global (is_global)?
+              ¿Es Global?
             </label>
             <select
               value={globalData.isGlobal ? 'Si' : 'No'}
@@ -1338,7 +1338,7 @@ export default function Users() {
                     marginBottom: '8px',
                   }}
                 >
-                  ¿Hay Excepciones (has_exceptions)?
+                  ¿Hay Excepciones?
                 </label>
                 <select
                   value={globalData.hasExceptions ? 'Si' : 'No'}
@@ -1514,7 +1514,7 @@ export default function Users() {
                   marginBottom: '12px',
                 }}
               >
-                Seleccionar Vendedores Específicos (`target_seller_id`)
+                Seleccionar Vendedores Específicos
               </h4>
               <div className="users-table-container mobile-cards">
                 <table
