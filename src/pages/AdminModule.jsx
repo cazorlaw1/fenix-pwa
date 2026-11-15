@@ -352,6 +352,10 @@ export default function AdminModule() {
   const [neObservacion, setNeObservacion] = useState(() => {
     return localStorage.getItem('admin_ne_observacion') || '';
   });
+  // NUEVO ESTADO PARA DESCUENTO ESPECIAL EN CREAR N.E.
+  const [neSpecialDiscount, setNeSpecialDiscount] = useState(() => {
+    return localStorage.getItem('admin_ne_special_discount') || '0';
+  });
   const [estimatedNextFolio, setEstimatedNextFolio] = useState('');
   const [manualFolioMode, setManualFolioMode] = useState(false);
   const [specificFolioNum, setSpecificFolioNum] = useState('');
@@ -378,6 +382,7 @@ export default function AdminModule() {
     useState('53.38');
   const [editNoteObservation, setEditNoteObservation] = useState('');
   const [editNoteItems, setEditNoteItems] = useState([]);
+  const [editNoteSpecialDiscount, setEditNoteSpecialDiscount] = useState('0'); // <--- NUEVO
   const [editNoteClientId, setEditNoteClientId] = useState('');
   const [editNoteTargetUserId, setEditNoteTargetUserId] = useState('');
   const [editNoteFecha, setEditNoteFecha] = useState('');
@@ -468,6 +473,11 @@ export default function AdminModule() {
   useEffect(() => {
     localStorage.setItem('admin_ne_observacion', neObservacion);
   }, [neObservacion]);
+
+  // NUEVO EFFECT DE CACHÉ
+  useEffect(() => {
+    localStorage.setItem('admin_ne_special_discount', neSpecialDiscount);
+  }, [neSpecialDiscount]);
 
   // --- AUTO-SELECCIONAR CANTIDAD AL ELEGIR UN PRODUCTO ---
   useEffect(() => {
@@ -877,7 +887,17 @@ export default function AdminModule() {
     (acc, i) => acc + i.unit_price_usd * i.quantity,
     0
   );
-  const precioFinalNe = neCart.reduce((acc, i) => acc + i.total_line_usd, 0);
+  const subtotalConDescuentoNe = neCart.reduce(
+    (acc, i) => acc + i.total_line_usd,
+    0
+  );
+
+  // CÁLCULO DEL DESCUENTO ESPECIAL Y PRECIO FINAL DEFINITIVO
+  const parsedSpecialDiscountNe = Number(neSpecialDiscount) || 0;
+  const precioFinalNe = Math.max(
+    0,
+    subtotalConDescuentoNe - parsedSpecialDiscountNe
+  );
   const montoAhorradoNe = totalSinDescuentoNe - precioFinalNe;
 
   const handleCreateDirectNE = async (e) => {
@@ -899,6 +919,7 @@ export default function AdminModule() {
         payment_discount: neTipoPago,
         total_base_usd: totalSinDescuentoNe,
         discount_amount_usd: montoAhorradoNe,
+        special_discount_usd: parsedSpecialDiscountNe, // <--- NUEVO CAMPO
         final_price_usd: precioFinalNe,
         total_paid_usd: 0.0,
         balance_due_usd: precioFinalNe,
@@ -955,6 +976,8 @@ export default function AdminModule() {
       setNeClientId('');
       setNeTargetUserId('');
       setNeObservacion('');
+      setNeSpecialDiscount('0');
+      localStorage.removeItem('admin_ne_special_discount');
       setSpecificFolioNum('');
       setManualFolioMode(false);
       setNeFecha(new Date().toISOString().split('T')[0]);
@@ -2347,6 +2370,16 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                 2
               )}</strong>
             </div>
+            ${
+              Number(nota.special_discount_usd || 0) > 0
+                ? `<div style="display: flex; justify-content: space-between; margin-bottom: 4px; color: #B45309;">
+                    <span>Descuento Especial:</span>
+                    <strong>-$${Number(nota.special_discount_usd).toFixed(
+                      2
+                    )}</strong>
+                  </div>`
+                : ''
+            }
             <div style="display: flex; justify-content: space-between; border-top: 1px solid #ccc; padding-top: 4px; font-weight: bold; font-size: 15px; color: #DC2626;">
               <span>Precio Final:</span>
               <span>$${Number(nota.final_price_usd || subTotal).toFixed(
@@ -2653,6 +2686,16 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                   2
                 )}</strong>
               </div>
+              ${
+                Number(nota.special_discount_usd || 0) > 0
+                  ? `<div style="display: flex; justify-content: space-between; margin-bottom: 4px; color: #B45309;">
+                      <span>Descuento Especial:</span>
+                      <strong>-$${Number(nota.special_discount_usd).toFixed(
+                        2
+                      )}</strong>
+                    </div>`
+                  : ''
+              }
               <div style="display: flex; justify-content: space-between; border-top: 1px solid #ccc; padding-top: 4px; font-weight: bold; font-size: 15px; color: #DC2626;">
                 <span>Precio Final:</span>
                 <span>$${Number(nota.final_price_usd || subTotal).toFixed(
@@ -3291,6 +3334,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
       setEditNoteCategory(note.category || 'bombillos');
       setEditNotePaymentDiscount(String(note.payment_discount || '53.38'));
       setEditNoteObservation(note.observation || '');
+      setEditNoteSpecialDiscount(String(note.special_discount_usd || '0')); // <--- NUEVO
       setEditNoteItems(mappedItems);
       setEditNoteClientId(note.client_id || '');
       setEditNoteTargetUserId(note.seller_id || '');
@@ -3396,11 +3440,16 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
         (acc, item) => acc + item.unit_price_usd * item.quantity,
         0
       );
-      const finalPrice = editNoteItems.reduce(
+      const subtotalConDesc = editNoteItems.reduce(
         (acc, item) => acc + item.total_line_usd,
         0
       );
-      const discountAmount = Math.max(0, totalBase - finalPrice);
+      const discountAmount = Math.max(0, totalBase - subtotalConDesc);
+
+      // NUEVO CÁLCULO CON EL DESCUENTO ESPECIAL
+      const parsedEditSpecial = Number(editNoteSpecialDiscount) || 0;
+      const finalPrice = Math.max(0, subtotalConDesc - parsedEditSpecial);
+
       const { error: updateErr } = await supabase
         .from('sales_orders')
         .update({
@@ -3408,6 +3457,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
           payment_discount: editNotePaymentDiscount,
           total_base_usd: totalBase,
           discount_amount_usd: discountAmount,
+          special_discount_usd: parsedEditSpecial, // <--- NUEVO
           final_price_usd: finalPrice,
           balance_due_usd: finalPrice - Number(note.total_paid_usd || 0),
           observation: editNoteObservation,
@@ -5146,9 +5196,9 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
             >
               <div
                 style={{
-                  width: '300px',
+                  width: '320px',
                   backgroundColor: '#F9FAFB',
-                  padding: '10px',
+                  padding: '12px',
                   borderRadius: '8px',
                   border: '1px solid #E5E7EB',
                 }}
@@ -5157,7 +5207,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                   style={{
                     display: 'flex',
                     justifyContent: 'space-between',
-                    marginBottom: '4px',
+                    marginBottom: '6px',
                     color: '#374151',
                   }}
                 >
@@ -5168,7 +5218,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                   style={{
                     display: 'flex',
                     justifyContent: 'space-between',
-                    marginBottom: '4px',
+                    marginBottom: '6px',
                     color: '#374151',
                   }}
                 >
@@ -5184,7 +5234,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                   style={{
                     display: 'flex',
                     justifyContent: 'space-between',
-                    marginBottom: '4px',
+                    marginBottom: '6px',
                   }}
                 >
                   <span>Total sin Descuento: </span>
@@ -5194,21 +5244,58 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                   style={{
                     display: 'flex',
                     justifyContent: 'space-between',
-                    marginBottom: '4px',
+                    marginBottom: '6px',
                     color: '#B45309',
                   }}
                 >
                   <span>
                     {getDiscountPercent(neTipoPago)}% de descuento aplicado:{' '}
                   </span>
-                  <strong>-${montoAhorradoNe.toFixed(2)}</strong>
+                  <strong>
+                    -$
+                    {(totalSinDescuentoNe - subtotalConDescuentoNe).toFixed(2)}
+                  </strong>
                 </div>
+
+                {/* NUEVO CAMPO DE INPUT PARA DESCUENTO ESPECIAL ADICIONAL */}
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    marginBottom: '8px',
+                    borderTop: '1px dashed #D1D5DB',
+                    paddingTop: '6px',
+                  }}
+                >
+                  <span style={{ fontWeight: 'bold', color: '#B45309' }}>
+                    Descuento Especial ($):
+                  </span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={neSpecialDiscount}
+                    onChange={(e) => setNeSpecialDiscount(e.target.value)}
+                    style={{
+                      width: '90px',
+                      padding: '4px 6px',
+                      textAlign: 'right',
+                      border: '1px solid #F59E0B',
+                      borderRadius: '4px',
+                      fontWeight: 'bold',
+                      backgroundColor: '#FEF3C7',
+                      color: '#78350F',
+                    }}
+                  />
+                </div>
+
                 <div
                   style={{
                     display: 'flex',
                     justifyContent: 'space-between',
                     borderTop: '1px solid #D1D5DB',
-                    paddingTop: '4px',
+                    paddingTop: '6px',
                     fontSize: '13px',
                     fontWeight: '900',
                   }}
@@ -6368,9 +6455,9 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                     >
                       <div
                         style={{
-                          width: '300px',
+                          width: '320px',
                           backgroundColor: '#F9FAFB',
-                          padding: '10px',
+                          padding: '12px',
                           borderRadius: '8px',
                           border: '1px solid #E5E7EB',
                         }}
@@ -6379,7 +6466,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                           style={{
                             display: 'flex',
                             justifyContent: 'space-between',
-                            marginBottom: '4px',
+                            marginBottom: '6px',
                           }}
                         >
                           <span>Total sin Descuento: </span>
@@ -6389,7 +6476,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                           style={{
                             display: 'flex',
                             justifyContent: 'space-between',
-                            marginBottom: '4px',
+                            marginBottom: '6px',
                             color: '#B45309',
                           }}
                         >
@@ -6397,21 +6484,66 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                             {getDiscountPercent(editNotePaymentDiscount)}% de
                             descuento aplicado:{' '}
                           </span>
-                          <strong>-${editMontoAhorrado.toFixed(2)}</strong>
+                          <strong>
+                            -${(editTotalSinDesc - editPrecioFinal).toFixed(2)}
+                          </strong>
                         </div>
+
+                        {/* NUEVO INPUT DE DESCUENTO ESPECIAL EN EDICIÓN */}
+                        <div
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            marginBottom: '8px',
+                            borderTop: '1px dashed #D1D5DB',
+                            paddingTop: '6px',
+                          }}
+                        >
+                          <span
+                            style={{ fontWeight: 'bold', color: '#B45309' }}
+                          >
+                            Descuento Especial ($):
+                          </span>
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={editNoteSpecialDiscount}
+                            onChange={(e) =>
+                              setEditNoteSpecialDiscount(e.target.value)
+                            }
+                            style={{
+                              width: '90px',
+                              padding: '4px 6px',
+                              textAlign: 'right',
+                              border: '1px solid #F59E0B',
+                              borderRadius: '4px',
+                              fontWeight: 'bold',
+                              backgroundColor: '#FEF3C7',
+                              color: '#78350F',
+                            }}
+                          />
+                        </div>
+
                         <div
                           style={{
                             display: 'flex',
                             justifyContent: 'space-between',
                             borderTop: '1px solid #D1D5DB',
-                            paddingTop: '4px',
+                            paddingTop: '6px',
                             fontSize: '13px',
                             fontWeight: '900',
                           }}
                         >
                           <span>Precio Final: </span>
                           <span style={{ color: '#059669' }}>
-                            ${editPrecioFinal.toFixed(2)}
+                            $
+                            {Math.max(
+                              0,
+                              editPrecioFinal -
+                                (Number(editNoteSpecialDiscount) || 0)
+                            ).toFixed(2)}
                           </span>
                         </div>
                       </div>
@@ -8565,9 +8697,9 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                     >
                       <div
                         style={{
-                          width: '300px',
+                          width: '320px',
                           backgroundColor: '#F9FAFB',
-                          padding: '10px',
+                          padding: '12px',
                           borderRadius: '8px',
                           border: '1px solid #E5E7EB',
                         }}
@@ -8576,7 +8708,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                           style={{
                             display: 'flex',
                             justifyContent: 'space-between',
-                            marginBottom: '4px',
+                            marginBottom: '6px',
                             color: '#374151',
                           }}
                         >
@@ -8587,7 +8719,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                           style={{
                             display: 'flex',
                             justifyContent: 'space-between',
-                            marginBottom: '4px',
+                            marginBottom: '6px',
                             color: '#374151',
                           }}
                         >
@@ -8603,7 +8735,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                           style={{
                             display: 'flex',
                             justifyContent: 'space-between',
-                            marginBottom: '4px',
+                            marginBottom: '6px',
                           }}
                         >
                           <span>Total sin Descuento: </span>
@@ -8613,7 +8745,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                           style={{
                             display: 'flex',
                             justifyContent: 'space-between',
-                            marginBottom: '4px',
+                            marginBottom: '6px',
                             color: '#B45309',
                           }}
                         >
@@ -8621,21 +8753,66 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                             {getDiscountPercent(editNotePaymentDiscount)}% de
                             descuento aplicado:{' '}
                           </span>
-                          <strong>-${editMontoAhorrado.toFixed(2)}</strong>
+                          <strong>
+                            -${(editTotalSinDesc - editPrecioFinal).toFixed(2)}
+                          </strong>
                         </div>
+
+                        {/* NUEVO INPUT DE DESCUENTO ESPECIAL EN EDICIÓN (COBRANZA) */}
+                        <div
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            marginBottom: '8px',
+                            borderTop: '1px dashed #D1D5DB',
+                            paddingTop: '6px',
+                          }}
+                        >
+                          <span
+                            style={{ fontWeight: 'bold', color: '#B45309' }}
+                          >
+                            Descuento Especial ($):
+                          </span>
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={editNoteSpecialDiscount}
+                            onChange={(e) =>
+                              setEditNoteSpecialDiscount(e.target.value)
+                            }
+                            style={{
+                              width: '90px',
+                              padding: '4px 6px',
+                              textAlign: 'right',
+                              border: '1px solid #F59E0B',
+                              borderRadius: '4px',
+                              fontWeight: 'bold',
+                              backgroundColor: '#FEF3C7',
+                              color: '#78350F',
+                            }}
+                          />
+                        </div>
+
                         <div
                           style={{
                             display: 'flex',
                             justifyContent: 'space-between',
                             borderTop: '1px solid #D1D5DB',
-                            paddingTop: '4px',
+                            paddingTop: '6px',
                             fontSize: '13px',
                             fontWeight: '900',
                           }}
                         >
                           <span>Precio Final: </span>
                           <span style={{ color: '#059669' }}>
-                            ${editPrecioFinal.toFixed(2)}
+                            $
+                            {Math.max(
+                              0,
+                              editPrecioFinal -
+                                (Number(editNoteSpecialDiscount) || 0)
+                            ).toFixed(2)}
                           </span>
                         </div>
                       </div>
