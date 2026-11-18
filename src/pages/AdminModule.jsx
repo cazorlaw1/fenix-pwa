@@ -3446,9 +3446,24 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
       );
       const discountAmount = Math.max(0, totalBase - subtotalConDesc);
 
-      // NUEVO CÁLCULO CON EL DESCUENTO ESPECIAL
       const parsedEditSpecial = Number(editNoteSpecialDiscount) || 0;
       const finalPrice = Math.max(0, subtotalConDesc - parsedEditSpecial);
+
+      // --- CÁLCULO ROBUSTO CON TOLERANCIA DE CÉNTIMOS (EVITA ERRORES DE REDONDEO) ---
+      const totalPaid = Number(note.total_paid_usd || 0);
+      const rawBalance = finalPrice - totalPaid;
+      // Si el saldo es menor a 1 céntimo (ej: 0.00 o negativo por recálculo), lo fijamos en 0
+      const newBalanceDue =
+        rawBalance <= 0.01 ? 0 : Number(rawBalance.toFixed(2));
+
+      // Forzamos 'cerrada' si el saldo resultante es 0, de lo contrario evaluamos si tiene abonos
+      const newPaymentStatus =
+        newBalanceDue === 0
+          ? 'cerrada'
+          : totalPaid > 0
+          ? 'abonada'
+          : 'pendiente';
+      // -----------------------------------------------------------------------------
 
       const { error: updateErr } = await supabase
         .from('sales_orders')
@@ -3457,14 +3472,15 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
           payment_discount: editNotePaymentDiscount,
           total_base_usd: totalBase,
           discount_amount_usd: discountAmount,
-          special_discount_usd: parsedEditSpecial, // <--- NUEVO
-          final_price_usd: finalPrice,
-          balance_due_usd: finalPrice - Number(note.total_paid_usd || 0),
+          special_discount_usd: parsedEditSpecial,
+          final_price_usd: Number(finalPrice.toFixed(2)),
+          balance_due_usd: newBalanceDue,
+          payment_status: newPaymentStatus,
+          closed_at: newBalanceDue === 0 ? new Date().toISOString() : null,
+          updated_at: new Date().toISOString(),
           observation: editNoteObservation,
-          updated_at: new Date(),
           client_id: editNoteClientId,
           seller_id: editNoteTargetUserId,
-          // Se agrega 'T00:00:00' para evitar el desfase de zona horaria
           created_at: new Date(`${editNoteFecha}T00:00:00`).toISOString(),
         })
         .eq('id', note.id);
@@ -3509,7 +3525,9 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
         }
       }
       showToastSuccess(
-        `Nota N° ${note.transaction_number} actualizada correctamente.`
+        `Nota N° ${
+          note.transaction_number
+        } actualizada y estado sincronizado a ${newPaymentStatus.toUpperCase()}.`
       );
       setEditingNoteId(null);
       fetchTabData();
