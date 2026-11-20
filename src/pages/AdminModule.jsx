@@ -416,6 +416,8 @@ export default function AdminModule() {
     reference_number: '',
   });
   const [manualAbonoFile, setManualAbonoFile] = useState(null);
+  const [isSubmittingAbono, setIsSubmittingAbono] = useState(false);
+  const isSubmittingAbonoRef = useRef(false);
   const [abonoFecha, setAbonoFecha] = useState(
     new Date().toISOString().split('T')[0]
   );
@@ -3084,10 +3086,12 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
   const handleRegisterManualAbono = async (e) => {
     e.preventDefault();
     if (!abonoModalNote) return;
+    if (isSubmittingAbonoRef.current) return;
     const fileToUpload = manualAbonoFile;
     const montoNum = parseFloat(manualAbonoForm.amount_usd);
     const metodo = String(manualAbonoForm.payment_method || '').trim();
     const isEfectivo = metodo === 'Efectivo $';
+    const isZelle = metodo === 'Zelle';
     const refNum = String(manualAbonoForm.reference_number || '').trim();
 
     if (!manualAbonoForm.payment_date) {
@@ -3099,10 +3103,18 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
     if (!metodo) {
       return alert('Debe seleccionar un método de recepción.');
     }
-    if (!isEfectivo && !/^\d{4}$/.test(refNum)) {
-      return alert(
-        'Debe ingresar exactamente los últimos 4 dígitos numéricos de la referencia.'
-      );
+    if (!isEfectivo) {
+      if (isZelle) {
+        if (!/^[a-zA-Z0-9]{4}$/.test(refNum)) {
+          return alert(
+            'Para Zelle debe ingresar exactamente los últimos 4 caracteres alfanuméricos del número de confirmación.'
+          );
+        }
+      } else if (!/^\d{4}$/.test(refNum)) {
+        return alert(
+          'Debe ingresar exactamente los últimos 4 dígitos numéricos de la referencia.'
+        );
+      }
     }
     if (!fileToUpload) {
       return alert(
@@ -3112,31 +3124,33 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
       );
     }
 
-    if (refNum !== '') {
-      try {
-        const { data: duplicates, error: dupErr } = await supabase
-          .from('payments_independent_history')
-          .select('payment_date')
-          .eq('reference_number', refNum)
-          .eq('amount_usd', montoNum)
-          .limit(1);
-        if (!dupErr && duplicates && duplicates.length > 0) {
-          const dupDate = new Date(
-            duplicates[0].payment_date
-          ).toLocaleDateString();
-          const continueAnyway = window.confirm(
-            `⚠️ ATENCIÓN: Este pago parece estar duplicado. Ya existe un registro con Monto: $${montoNum.toFixed(
-              2
-            )} y Referencia: "${refNum}" fechado el ${dupDate}. ¿Desea continuar guardando este abono de todas formas?`
-          );
-          if (!continueAnyway) return;
-        }
-      } catch (err) {
-        console.error('Error verificando duplicados:', err);
-      }
-    }
+    isSubmittingAbonoRef.current = true;
+    setIsSubmittingAbono(true);
+    setLoading(true);
     try {
-      setLoading(true);
+      if (refNum !== '') {
+        try {
+          const { data: duplicates, error: dupErr } = await supabase
+            .from('payments_independent_history')
+            .select('payment_date')
+            .eq('reference_number', refNum)
+            .eq('amount_usd', montoNum)
+            .limit(1);
+          if (!dupErr && duplicates && duplicates.length > 0) {
+            const dupDate = new Date(
+              duplicates[0].payment_date
+            ).toLocaleDateString();
+            const continueAnyway = window.confirm(
+              `⚠️ ATENCIÓN: Este pago parece estar duplicado. Ya existe un registro con Monto: $${montoNum.toFixed(
+                2
+              )} y Referencia: "${refNum}" fechado el ${dupDate}. ¿Desea continuar guardando este abono de todas formas?`
+            );
+            if (!continueAnyway) return;
+          }
+        } catch (err) {
+          console.error('Error verificando duplicados:', err);
+        }
+      }
       const { data: userData } = await supabase.auth.getUser();
       let receiptUrl = null;
       if (fileToUpload) {
@@ -3251,6 +3265,8 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
     } catch (err) {
       setErrorMsg(err.message || 'Error al registrar el abono manual.');
     } finally {
+      isSubmittingAbonoRef.current = false;
+      setIsSubmittingAbono(false);
       setLoading(false);
     }
   };
@@ -14030,13 +14046,18 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                   value={manualAbonoForm.payment_method}
                   onChange={(e) => {
                     const val = e.target.value;
+                    let nextRef = manualAbonoForm.reference_number;
+                    if (val === 'Efectivo $') {
+                      nextRef = '';
+                    } else if (val !== 'Zelle') {
+                      nextRef = String(nextRef || '')
+                        .replace(/\D/g, '')
+                        .slice(0, 4);
+                    }
                     setManualAbonoForm({
                       ...manualAbonoForm,
                       payment_method: val,
-                      reference_number:
-                        val === 'Efectivo $'
-                          ? ''
-                          : manualAbonoForm.reference_number,
+                      reference_number: nextRef,
                     });
                   }}
                   style={{
@@ -14066,26 +14087,39 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                 >
                   {manualAbonoForm.payment_method === 'Efectivo $'
                     ? 'N° Referencia (Opcional en Efectivo)'
+                    : manualAbonoForm.payment_method === 'Zelle'
+                    ? 'N° Confirmación Zelle (Últimos 4 caracteres) *'
                     : 'N° Referencia (Últimos 4 dígitos) *'}
                 </label>
                 <input
                   type="text"
-                  inputMode="numeric"
+                  inputMode={
+                    manualAbonoForm.payment_method === 'Zelle'
+                      ? 'text'
+                      : 'numeric'
+                  }
                   maxLength={4}
                   required={manualAbonoForm.payment_method !== 'Efectivo $'}
                   value={manualAbonoForm.reference_number}
                   onChange={(e) => {
-                    const digits = e.target.value
-                      .replace(/\D/g, '')
-                      .slice(0, 4);
+                    const raw = e.target.value;
+                    const formatted =
+                      manualAbonoForm.payment_method === 'Zelle'
+                        ? raw
+                            .replace(/[^a-zA-Z0-9]/g, '')
+                            .toUpperCase()
+                            .slice(0, 4)
+                        : raw.replace(/\D/g, '').slice(0, 4);
                     setManualAbonoForm({
                       ...manualAbonoForm,
-                      reference_number: digits,
+                      reference_number: formatted,
                     });
                   }}
                   placeholder={
                     manualAbonoForm.payment_method === 'Efectivo $'
                       ? 'Opcional en efectivo'
+                      : manualAbonoForm.payment_method === 'Zelle'
+                      ? 'Últimos 4 caracteres de confirmación (Ej: A1B2)'
                       : 'Últimos 4 dígitos (Ej: 1234)'
                   }
                   style={{
@@ -14167,31 +14201,38 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
               >
                 <button
                   type="button"
+                  disabled={loading || isSubmittingAbono}
                   onClick={() => setAbonoModalNote(null)}
                   style={{
                     padding: '8px 16px',
                     borderRadius: '6px',
                     border: '1px solid #d1d5db',
                     background: '#fff',
-                    cursor: 'pointer',
+                    cursor:
+                      loading || isSubmittingAbono ? 'not-allowed' : 'pointer',
                   }}
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  disabled={loading}
+                  disabled={loading || isSubmittingAbono}
                   style={{
                     padding: '8px 16px',
                     borderRadius: '6px',
                     border: 'none',
-                    background: '#059669',
+                    background:
+                      loading || isSubmittingAbono ? '#9ca3af' : '#059669',
                     color: '#fff',
                     fontWeight: 'bold',
-                    cursor: 'pointer',
+                    cursor:
+                      loading || isSubmittingAbono ? 'not-allowed' : 'pointer',
+                    opacity: loading || isSubmittingAbono ? 0.7 : 1,
                   }}
                 >
-                  Guardar Abono
+                  {loading || isSubmittingAbono
+                    ? 'Guardando...'
+                    : 'Guardar Abono'}
                 </button>
               </div>
             </form>

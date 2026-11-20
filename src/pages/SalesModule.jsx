@@ -517,6 +517,7 @@ export default function SalesModule() {
   // Bloqueo Anti-Spam
   const [valesLocked, setValesLocked] = useState(false);
   const [notifLocked, setNotifLocked] = useState(false);
+  const abonoSubmittingRef = useRef(false);
 
   // Modal de Edición de Nota de Entrega
   const [editNeModal, setEditNeModal] = useState({
@@ -2591,10 +2592,11 @@ export default function SalesModule() {
     e.preventDefault();
     if (!abonoNotifModal.notaId) return;
 
-    if (notifLocked) return;
+    if (abonoSubmittingRef.current || notifLocked) return;
 
     const metodo = String(abonoForm.payment_method || '').trim();
     const isEfectivo = metodo === 'Efectivo $';
+    const isZelle = metodo === 'Zelle';
     const refNum = String(abonoForm.reference_number || '').trim();
     const montoCheck = parseFloat(abonoForm.amount_usd);
 
@@ -2610,11 +2612,20 @@ export default function SalesModule() {
       alert('Debe seleccionar un método de recepción.');
       return;
     }
-    if (!isEfectivo && !/^\d{4}$/.test(refNum)) {
-      alert(
-        'Debe ingresar exactamente los últimos 4 dígitos numéricos de la referencia.'
-      );
-      return;
+    if (!isEfectivo) {
+      if (isZelle) {
+        if (!/^[a-zA-Z0-9]{4}$/.test(refNum)) {
+          alert(
+            'Para Zelle debe ingresar exactamente los últimos 4 caracteres alfanuméricos del número de confirmación.'
+          );
+          return;
+        }
+      } else if (!/^\d{4}$/.test(refNum)) {
+        alert(
+          'Debe ingresar exactamente los últimos 4 dígitos numéricos de la referencia.'
+        );
+        return;
+      }
     }
 
     const fileToUpload = abonoFiles[abonoNotifModal.notaId];
@@ -2631,8 +2642,8 @@ export default function SalesModule() {
       return;
     }
 
+    abonoSubmittingRef.current = true;
     setNotifLocked(true);
-    setTimeout(() => setNotifLocked(false), 5000);
     setLoading(true);
     try {
       const montoNum = parseFloat(abonoForm.amount_usd);
@@ -2706,6 +2717,8 @@ export default function SalesModule() {
         text: err.message || 'Error al registrar la notificación de abono.',
       });
     } finally {
+      abonoSubmittingRef.current = false;
+      setNotifLocked(false);
       setLoading(false);
     }
   };
@@ -10307,11 +10320,18 @@ export default function SalesModule() {
                   value={abonoForm.payment_method}
                   onChange={(e) => {
                     const val = e.target.value;
+                    let nextRef = abonoForm.reference_number;
+                    if (val === 'Efectivo $') {
+                      nextRef = '';
+                    } else if (val !== 'Zelle') {
+                      nextRef = String(nextRef || '')
+                        .replace(/\D/g, '')
+                        .slice(0, 4);
+                    }
                     setAbonoForm({
                       ...abonoForm,
                       payment_method: val,
-                      reference_number:
-                        val === 'Efectivo $' ? '' : abonoForm.reference_number,
+                      reference_number: nextRef,
                     });
                   }}
                   style={{
@@ -10340,26 +10360,37 @@ export default function SalesModule() {
                 >
                   {abonoForm.payment_method === 'Efectivo $'
                     ? 'N° Referencia (Opcional en Efectivo)'
+                    : abonoForm.payment_method === 'Zelle'
+                    ? 'N° Confirmación Zelle (Últimos 4 caracteres) *'
                     : 'N° Referencia (Últimos 4 dígitos) *'}
                 </label>
                 <input
                   type="text"
-                  inputMode="numeric"
+                  inputMode={
+                    abonoForm.payment_method === 'Zelle' ? 'text' : 'numeric'
+                  }
                   maxLength={4}
                   required={abonoForm.payment_method !== 'Efectivo $'}
                   value={abonoForm.reference_number}
                   onChange={(e) => {
-                    const digits = e.target.value
-                      .replace(/\D/g, '')
-                      .slice(0, 4);
+                    const raw = e.target.value;
+                    const formatted =
+                      abonoForm.payment_method === 'Zelle'
+                        ? raw
+                            .replace(/[^a-zA-Z0-9]/g, '')
+                            .toUpperCase()
+                            .slice(0, 4)
+                        : raw.replace(/\D/g, '').slice(0, 4);
                     setAbonoForm({
                       ...abonoForm,
-                      reference_number: digits,
+                      reference_number: formatted,
                     });
                   }}
                   placeholder={
                     abonoForm.payment_method === 'Efectivo $'
                       ? 'Opcional en efectivo'
+                      : abonoForm.payment_method === 'Zelle'
+                      ? 'Últimos 4 caracteres de confirmación (Ej: A1B2)'
                       : 'Últimos 4 dígitos (Ej: 1234)'
                   }
                   style={{
@@ -10437,6 +10468,7 @@ export default function SalesModule() {
               >
                 <button
                   type="button"
+                  disabled={notifLocked || loading}
                   onClick={() =>
                     setAbonoNotifModal({ open: false, notaId: null })
                   }
@@ -10445,7 +10477,7 @@ export default function SalesModule() {
                     backgroundColor: '#F3F4F6',
                     border: '1px solid #D1D5DB',
                     borderRadius: '6px',
-                    cursor: 'pointer',
+                    cursor: notifLocked || loading ? 'not-allowed' : 'pointer',
                     fontWeight: '700',
                   }}
                 >
@@ -10453,17 +10485,22 @@ export default function SalesModule() {
                 </button>
                 <button
                   type="submit"
+                  disabled={notifLocked || loading}
                   style={{
                     padding: '6px 12px',
-                    backgroundColor: '#111827',
+                    backgroundColor:
+                      notifLocked || loading ? '#9CA3AF' : '#111827',
                     color: '#FFFFFF',
                     border: 'none',
                     borderRadius: '6px',
-                    cursor: 'pointer',
+                    cursor: notifLocked || loading ? 'not-allowed' : 'pointer',
                     fontWeight: '700',
+                    opacity: notifLocked || loading ? 0.7 : 1,
                   }}
                 >
-                  Registrar Notificación
+                  {notifLocked || loading
+                    ? 'Enviando...'
+                    : 'Registrar Notificación'}
                 </button>
               </div>
             </form>
