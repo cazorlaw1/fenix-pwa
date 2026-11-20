@@ -48,7 +48,7 @@ function SearchableDropdown({
   labelKey = 'label',
   valueKey = 'value',
   imageKey = 'image_url',
-  onClear, // NUEVO: Prop para limpiar la selección
+  onClear, // Prop para limpiar la selección
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState('');
@@ -295,13 +295,14 @@ function SearchableDropdown({
     </div>
   );
 }
+
 export default function SalesModule() {
   const { user, role } = useAuth();
   // Referencias para el menú móvil
   const mobileMenuRef = useRef(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  // --- A. PERSISTENCIA Y NAVEGACIÓN DE PESTAÑAS ---
+  // --- PERSISTENCIA Y NAVEGACIÓN DE PESTAÑAS ---
   const getInitialSubMenu = () => {
     const params = new URLSearchParams(window.location.search);
     const urlTab = params.get('tab');
@@ -360,11 +361,11 @@ export default function SalesModule() {
     fieldName: null,
   });
 
-  // --- ESTADOS PARA CONFIGURACIÓN GLOBAL Y FOLIO (ACTUALIZADO PARA 4 MODALIDADES) ---
+  // --- ESTADOS PARA CONFIGURACIÓN GLOBAL Y FOLIO ---
   const [globalDiscount53, setGlobalDiscount53] = useState(53.38);
   const [globalDiscount23, setGlobalDiscount23] = useState(23.08);
-  const [globalDiscount10, setGlobalDiscount10] = useState(10); // Nueva modalidad
-  const [globalDiscount0, setGlobalDiscount0] = useState(0); // Nueva modalidad
+  const [globalDiscount10, setGlobalDiscount10] = useState(10);
+  const [globalDiscount0, setGlobalDiscount0] = useState(0);
   const [globalTerms, setGlobalTerms] = useState('Cargando términos...');
   const [estimatedNextFolio, setEstimatedNextFolio] = useState('...');
   const [userSettlementHistory, setUserSettlementHistory] = useState([]);
@@ -440,7 +441,6 @@ export default function SalesModule() {
   // 3. ESTADOS: SECCIÓN NOTA DE ENTREGA
   // ---------------------------------------------------------------------------
   const [editModeId, setEditModeId] = useState(null);
-  // Estados para SearchableDropdowns en Crear N.E. (con persistencia en caché)
   const [neClientId, setNeClientId] = useState(() => {
     return localStorage.getItem('sales_ne_client_cache') || '';
   });
@@ -474,7 +474,8 @@ export default function SalesModule() {
   useEffect(() => {
     localStorage.setItem('sales_ne_cart_cache', JSON.stringify(neCart));
   }, [neCart]);
-  // NUEVO: Efecto para recalcular precios del carrito al cambiar el tipo de pago/descuento
+
+  // Recalcular precios del carrito al cambiar el tipo de pago/descuento
   useEffect(() => {
     if (neCart.length > 0) {
       const nuevoPct = getDiscountPercent(neTipoPago);
@@ -506,22 +507,18 @@ export default function SalesModule() {
   const [abonoForm, setAbonoForm] = useState({
     payment_date: new Date().toISOString().split('T')[0],
     amount_usd: '',
-    payment_method: 'Pago Móvil',
+    payment_method: '',
     reference_number: '',
     user_note: '',
   });
   const [abonoFiles, setAbonoFiles] = useState({});
-  // Nuevo estado para historial de vales independientes
   const [independentValesHistory, setIndependentValesHistory] = useState([]);
 
-  // ---------------------------------------------------------------------------
-  // NUEVOS ESTADOS PARA REQUERIMIENTOS
-  // ---------------------------------------------------------------------------
-  // B. Bloqueo Anti-Spam
+  // Bloqueo Anti-Spam
   const [valesLocked, setValesLocked] = useState(false);
   const [notifLocked, setNotifLocked] = useState(false);
 
-  // A. Modal de Edición de Nota de Entrega
+  // Modal de Edición de Nota de Entrega
   const [editNeModal, setEditNeModal] = useState({
     open: false,
     noteData: null,
@@ -536,8 +533,9 @@ export default function SalesModule() {
   const [editNeSearchProd, setEditNeSearchProd] = useState('');
   const [editNeSelectedProdId, setEditNeSelectedProdId] = useState('');
   const [editNeQuantity, setEditNeQuantity] = useState(1);
+  const [editNeOriginalQuantities, setEditNeOriginalQuantities] = useState({});
 
-  // D. Estado para Vales Independientes
+  // Estado para Vales Independientes
   const [independentValeForm, setIndependentValeForm] = useState({
     monto: '',
     motivo: '',
@@ -550,7 +548,7 @@ export default function SalesModule() {
     if (message.text) {
       const timer = setTimeout(() => {
         setMessage({ type: '', text: '' });
-      }, 2000);
+      }, 2500);
       return () => clearTimeout(timer);
     }
   }, [message]);
@@ -603,12 +601,10 @@ export default function SalesModule() {
 
   const fetchEstimatedFolio = async () => {
     try {
-      // Intentamos consultar directamente el siguiente valor de la secuencia de PostgreSQL
       const { data, error } = await supabase.rpc('get_next_sales_order_folio');
       if (!error && data) {
         setEstimatedNextFolio(String(data));
       } else {
-        // Fallback si la función RPC no existe aún
         const { data: ordData } = await supabase
           .from('sales_orders')
           .select('transaction_number');
@@ -804,6 +800,7 @@ export default function SalesModule() {
       console.error('Error obteniendo comisiones/vales:', err);
     }
   };
+
   // Función para cargar historial de vales independientes
   const fetchIndependentValesHistory = async () => {
     try {
@@ -811,7 +808,7 @@ export default function SalesModule() {
         .from('vales')
         .select('*')
         .eq('seller_id', user?.id)
-        .is('order_id', null) // Solo vales sin N.E. asociada
+        .is('order_id', null)
         .order('created_at', { ascending: false });
 
       if (!error && data) {
@@ -821,6 +818,7 @@ export default function SalesModule() {
       console.error('Error cargando historial de vales:', err);
     }
   };
+
   const sellerProfile = sellersList.find((s) => s.id === user?.id);
   const currentSellerName =
     sellerProfile?.full_name ||
@@ -828,10 +826,6 @@ export default function SalesModule() {
     user?.user_metadata?.full_name ||
     'Vendedor Registrado';
   const currentUserRole = sellerProfile?.role || role || 'vendedor';
-
-  const now = new Date();
-  const currentMonth = now.getMonth() + 1;
-  const currentYear = now.getFullYear();
 
   const totalNeFromHistory = salesHistory.reduce(
     (acc, n) => acc + (Number(n.final_price_usd) || 0),
@@ -852,7 +846,7 @@ export default function SalesModule() {
   const fixedSalary = Number(sellerProfile?.sueldo_fijo_usd || 0);
 
   // ---------------------------------------------------------------------------
-  // HELPER GPS & STORAGE
+  // HELPER GPS & STORAGE (CON SOPORTE NATIVO IPHONE / IOS / SAFARI)
   // ---------------------------------------------------------------------------
   const getDeviceLocation = (callback) => {
     if (!navigator.geolocation) {
@@ -873,14 +867,29 @@ export default function SalesModule() {
 
   const uploadFile = async (file, bucketName, pathFolder) => {
     if (!file) return null;
-    const fileExt = file.name.split('.').pop();
+    const fileExt = (file.name.split('.').pop() || 'jpg').toLowerCase();
     const fileName = `${Date.now()}_${Math.random()
       .toString(36)
       .substring(7)}.${fileExt}`;
     const filePath = `${pathFolder}/${fileName}`;
+
+    // Compatibilidad iOS / Safari: leer bytes reales en memoria para evitar "No content provided"
+    const arrayBuffer = await file.arrayBuffer();
+    if (!arrayBuffer || arrayBuffer.byteLength === 0) {
+      throw new Error(
+        'No se pudo leer la imagen seleccionada en el dispositivo. Intente seleccionarla nuevamente.'
+      );
+    }
+    const contentType =
+      file.type || `image/${fileExt === 'jpg' ? 'jpeg' : fileExt}`;
+    const fileBlob = new Blob([arrayBuffer], { type: contentType });
+
     const { error } = await supabase.storage
       .from(bucketName)
-      .upload(filePath, file);
+      .upload(filePath, fileBlob, {
+        contentType,
+        upsert: false,
+      });
     if (error) throw error;
     const { data } = supabase.storage.from(bucketName).getPublicUrl(filePath);
     return data.publicUrl;
@@ -898,7 +907,9 @@ export default function SalesModule() {
 
   const validateImageFile = (file) => {
     if (!file) return true;
-    return file.type.startsWith('image/');
+    if (file.type && file.type.startsWith('image/')) return true;
+    // En iOS/Safari file.type a veces viene vacío; validar también por extensión
+    return /\.(jpe?g|png|gif|webp|heic|heif)$/i.test(file.name || '');
   };
 
   // ---------------------------------------------------------------------------
@@ -1337,7 +1348,6 @@ export default function SalesModule() {
   // ---------------------------------------------------------------------------
   // MANEJADORES: NOTA DE ENTREGA & DESCARGA/ENVÍO PDF
   // ---------------------------------------------------------------------------
-  // B. FUNCIÓN AUXILIAR PARA OBTENER PORCENTAJE DINÁMICO
   const getDiscountPercent = (type) => {
     switch (String(type)) {
       case '53.38':
@@ -1369,17 +1379,14 @@ export default function SalesModule() {
     const qty = Number(neQuantity);
     if (qty <= 0) return alert('Cantidad debe ser mayor a 0');
 
-    // --- VALIDACIÓN DE STOCK ROBUSTA ---
+    // Validación de stock
     const currentStock = Number(prod.stock_current || 0);
-
-    // 1. Verificar si hay stock disponible
     if (currentStock <= 0) {
       return alert(
         `El producto "${prod.description}" no tiene stock disponible.`
       );
     }
 
-    // 2. Verificar stock considerando lo que YA está en el carrito
     const inCart = neCart.find((item) => item.product_id === prod.id);
     const currentInCart = inCart ? inCart.quantity : 0;
 
@@ -1388,9 +1395,7 @@ export default function SalesModule() {
         `Stock insuficiente.\nDisponible: ${currentStock}\nEn carrito: ${currentInCart}\nSolicitado: ${qty}`
       );
     }
-    // ------------------------------------
 
-    // B. RECÁLCULO DINÁMICO AL AGREGAR
     const valorUnitario = prod.price_usd;
     const vuConDescuento = valorUnitario * (1 - porcentajeDescuento / 100);
 
@@ -1442,6 +1447,27 @@ export default function SalesModule() {
       return alert('Debe extraer la ubicación GPS para enviar la propuesta.');
     setLoading(true);
     try {
+      // Verificar stock actual antes de crear la nota
+      if (!editModeId) {
+        for (const item of neCart) {
+          const { data: prodCheck } = await supabase
+            .from('products')
+            .select('description, stock_current')
+            .eq('id', item.product_id)
+            .single();
+          if (
+            prodCheck &&
+            Number(prodCheck.stock_current || 0) < Number(item.quantity || 0)
+          ) {
+            alert(
+              `Stock insuficiente para "${prodCheck.description}". Disponible: ${prodCheck.stock_current}, Solicitado: ${item.quantity}`
+            );
+            setLoading(false);
+            return;
+          }
+        }
+      }
+
       const payload = {
         client_id: neClientId,
         seller_id: user?.id,
@@ -1492,7 +1518,31 @@ export default function SalesModule() {
         discounted_unit_price_usd: item.discounted_unit_price_usd,
         total_line_usd: item.total_line_usd,
       }));
-      await supabase.from('order_items').insert(detalles);
+      const { error: itemsErr } = await supabase
+        .from('order_items')
+        .insert(detalles);
+      if (itemsErr) throw itemsErr;
+
+      // Descontar inmediatamente del inventario al crear la nota en estado pendiente
+      if (!editModeId) {
+        for (const item of neCart) {
+          const { data: prodData } = await supabase
+            .from('products')
+            .select('stock_current')
+            .eq('id', item.product_id)
+            .single();
+          if (prodData) {
+            const newStock = Math.max(
+              0,
+              Number(prodData.stock_current || 0) - Number(item.quantity || 0)
+            );
+            await supabase
+              .from('products')
+              .update({ stock_current: newStock })
+              .eq('id', item.product_id);
+          }
+        }
+      }
 
       try {
         await notificarAdminNuevaNota({
@@ -1512,7 +1562,7 @@ export default function SalesModule() {
         type: 'success',
         text: editModeId
           ? 'Nota de Entrega editada correctamente.'
-          : 'Nota de Entrega enviada a revisión con coordenadas GPS guardadas.',
+          : 'Nota de Entrega enviada a revisión y artículos descontados del inventario.',
       });
       setNeCart([]);
       setNeClientId('');
@@ -1522,7 +1572,6 @@ export default function SalesModule() {
       setNeGpsLocation(null);
       setEditModeId(null);
 
-      // Limpiar toda la caché de la nota
       localStorage.removeItem('sales_ne_cart_cache');
       localStorage.removeItem('sales_ne_client_cache');
       localStorage.removeItem('sales_ne_category_cache');
@@ -1531,6 +1580,7 @@ export default function SalesModule() {
       fetchSalesHistory();
       fetchComisionesYVales();
       fetchEstimatedFolio();
+      fetchProducts();
       setNeTab('historial');
     } catch (err) {
       setMessage({ type: 'error', text: err.message });
@@ -1540,12 +1590,11 @@ export default function SalesModule() {
   };
 
   // ---------------------------------------------------------------------------
-  // A. LÓGICA DE EDICIÓN MEDIANTE MODAL
+  // LÓGICA DE EDICIÓN MEDIANTE MODAL CON AJUSTE DE INVENTARIO POR DIFERENCIA
   // ---------------------------------------------------------------------------
   const handleOpenEditNeModal = async (nota) => {
     try {
       setLoading(true);
-      // Cargar items de la orden
       const { data: items, error } = await supabase
         .from('order_items')
         .select('*, products(code, description)')
@@ -1572,6 +1621,11 @@ export default function SalesModule() {
         payment_discount: String(nota.payment_discount || '53.38'),
         observation: nota.observation || '',
       });
+      const origMap = {};
+      mappedItems.forEach((it) => {
+        origMap[it.product_id] = Number(it.quantity || 0);
+      });
+      setEditNeOriginalQuantities(origMap);
       setEditNeCart(mappedItems);
       setEditNeModal({ open: true, noteData: nota });
     } catch (err) {
@@ -1598,6 +1652,34 @@ export default function SalesModule() {
     setEditNeCart(recalculated);
   };
 
+  const handleUpdateEditNeQuantity = (product_id, newQty) => {
+    const qty = Number(newQty);
+    if (isNaN(qty) || qty <= 0) return;
+    const prod = products.find((p) => p.id === product_id);
+    if (prod) {
+      const origQty = Number(editNeOriginalQuantities[product_id] || 0);
+      const maxAvailable = Number(prod.stock_current || 0) + origQty;
+      if (qty > maxAvailable) {
+        alert(
+          `Stock insuficiente para "${prod.description}".\nDisponible en inventario: ${prod.stock_current}\nMáximo permitido en esta nota: ${maxAvailable}`
+        );
+        return;
+      }
+    }
+    setEditNeCart(
+      editNeCart.map((item) => {
+        if (item.product_id === product_id) {
+          return {
+            ...item,
+            quantity: qty,
+            total_line_usd: qty * Number(item.discounted_unit_price_usd),
+          };
+        }
+        return item;
+      })
+    );
+  };
+
   const handleEditNeAddProduct = () => {
     if (!editNeSelectedProdId) return;
     const prod = products.find((p) => p.id === editNeSelectedProdId);
@@ -1605,10 +1687,19 @@ export default function SalesModule() {
     const qty = Number(editNeQuantity);
     if (qty <= 0) return alert('La cantidad debe ser mayor a 0');
 
+    const existingIdx = editNeCart.findIndex((i) => i.product_id === prod.id);
+    const currentInCart =
+      existingIdx > -1 ? Number(editNeCart[existingIdx].quantity || 0) : 0;
+    const origQty = Number(editNeOriginalQuantities[prod.id] || 0);
+    const maxAvailable = Number(prod.stock_current || 0) + origQty;
+    if (currentInCart + qty > maxAvailable) {
+      return alert(
+        `Stock insuficiente para "${prod.description}".\nDisponible en inventario: ${prod.stock_current}\nEn nota actual: ${currentInCart}\nMáximo permitido: ${maxAvailable}`
+      );
+    }
+
     const descPct = getDiscountPercent(editNeForm.payment_discount);
     const vuConDesc = Number(prod.price_usd) * (1 - descPct / 100);
-
-    const existingIdx = editNeCart.findIndex((i) => i.product_id === prod.id);
     if (existingIdx > -1) {
       const updated = [...editNeCart];
       const newQty = updated[existingIdx].quantity + qty;
@@ -1657,7 +1748,56 @@ export default function SalesModule() {
     try {
       setLoading(true);
 
-      // Actualizar cabecera de la orden y CAMBIAR ESTADO A PENDIENTE
+      // 1. Obtener cantidades anteriores en BD y calcular deltas de inventario
+      const { data: oldItems, error: oldItemsErr } = await supabase
+        .from('order_items')
+        .select('product_id, quantity')
+        .eq('order_id', editNeModal.noteData.id);
+      if (oldItemsErr) throw oldItemsErr;
+
+      const oldQtyMap = {};
+      (oldItems || []).forEach((it) => {
+        oldQtyMap[it.product_id] =
+          (oldQtyMap[it.product_id] || 0) + Number(it.quantity || 0);
+      });
+      const newQtyMap = {};
+      editNeCart.forEach((it) => {
+        newQtyMap[it.product_id] =
+          (newQtyMap[it.product_id] || 0) + Number(it.quantity || 0);
+      });
+      const allProdIds = Array.from(
+        new Set([...Object.keys(oldQtyMap), ...Object.keys(newQtyMap)])
+      );
+
+      // Validar stock disponible antes de aplicar cambios cuando aumenta la cantidad
+      const stockUpdates = [];
+      for (const pid of allProdIds) {
+        const oldQ = oldQtyMap[pid] || 0;
+        const newQ = newQtyMap[pid] || 0;
+        const delta = newQ - oldQ; // > 0 si se requieren más unidades del stock
+        if (delta !== 0) {
+          const { data: prodData, error: prodErr } = await supabase
+            .from('products')
+            .select('description, stock_current')
+            .eq('id', pid)
+            .single();
+          if (prodErr) throw prodErr;
+          const currentStock = Number(prodData.stock_current || 0);
+          if (delta > 0 && currentStock < delta) {
+            alert(
+              `Stock insuficiente para "${prodData.description}".\nDisponible en inventario: ${currentStock}\nAdicional requerido: ${delta}`
+            );
+            setLoading(false);
+            return;
+          }
+          stockUpdates.push({
+            product_id: pid,
+            newStock: Math.max(0, currentStock - delta),
+          });
+        }
+      }
+
+      // 2. Actualizar cabecera de la orden y cambiar estado a pendiente
       const { error: updateErr } = await supabase
         .from('sales_orders')
         .update({
@@ -1670,14 +1810,14 @@ export default function SalesModule() {
           balance_due_usd:
             finalPrice - Number(editNeModal.noteData.total_paid_usd || 0),
           observation: editNeForm.observation,
-          status: 'pendiente', // Requisito A: Cambiar estado a pendiente
+          status: 'pendiente',
           updated_at: new Date(),
         })
         .eq('id', editNeModal.noteData.id);
 
       if (updateErr) throw updateErr;
 
-      // Eliminar items antiguos
+      // 3. Eliminar items antiguos e insertar nuevos
       const { error: delErr } = await supabase
         .from('order_items')
         .delete()
@@ -1685,7 +1825,6 @@ export default function SalesModule() {
 
       if (delErr) throw delErr;
 
-      // Insertar nuevos items
       if (editNeCart.length > 0) {
         const rowsToInsert = editNeCart.map((item) => ({
           order_id: editNeModal.noteData.id,
@@ -1701,14 +1840,23 @@ export default function SalesModule() {
         if (insErr) throw insErr;
       }
 
+      // 4. Aplicar deltas de inventario en products
+      for (const upd of stockUpdates) {
+        await supabase
+          .from('products')
+          .update({ stock_current: upd.newStock })
+          .eq('id', upd.product_id);
+      }
+
       setMessage({
         type: 'success',
-        text: 'Nota de Entrega editada y enviada a aprobación.',
+        text: 'Nota de Entrega editada, inventario actualizado y enviada a aprobación.',
       });
       setEditNeModal({ open: false, noteData: null });
       fetchSalesHistory();
       fetchComisionesYVales();
       fetchIndependentValesHistory();
+      fetchProducts();
     } catch (err) {
       setMessage({
         type: 'error',
@@ -1720,7 +1868,6 @@ export default function SalesModule() {
   };
 
   const handleEditNE = async (nota) => {
-    // Redirección antigua eliminada. Ahora abre modal.
     handleOpenEditNeModal(nota);
   };
 
@@ -1741,25 +1888,25 @@ export default function SalesModule() {
     }
     setLoading(true);
     try {
-      if (nota.status === 'aprobada') {
-        const { data: items, error: itemsErr } = await supabase
-          .from('order_items')
-          .select('product_id, quantity')
-          .eq('order_id', nota.id);
-        if (!itemsErr && items) {
-          for (const item of items) {
-            const { data: prodData } = await supabase
+      // Revertir inventario al eliminar manualmente cualquier nota (pendiente, rechazada, aprobada, etc.)
+      const { data: items, error: itemsErr } = await supabase
+        .from('order_items')
+        .select('product_id, quantity')
+        .eq('order_id', nota.id);
+      if (!itemsErr && items) {
+        for (const item of items) {
+          const { data: prodData } = await supabase
+            .from('products')
+            .select('stock_current')
+            .eq('id', item.product_id)
+            .single();
+          if (prodData) {
+            const restoredStock =
+              Number(prodData.stock_current || 0) + Number(item.quantity || 0);
+            await supabase
               .from('products')
-              .select('stock_current')
-              .eq('id', item.product_id)
-              .single();
-            if (prodData) {
-              const restoredStock = prodData.stock_current + item.quantity;
-              await supabase
-                .from('products')
-                .update({ stock_current: restoredStock })
-                .eq('id', item.product_id);
-            }
+              .update({ stock_current: restoredStock })
+              .eq('id', item.product_id);
           }
         }
       }
@@ -1770,11 +1917,12 @@ export default function SalesModule() {
       if (error) throw error;
       setMessage({
         type: 'success',
-        text: 'Nota de Entrega eliminada correctamente.',
+        text: 'Nota de Entrega eliminada y stock restaurado correctamente.',
       });
       fetchSalesHistory();
       fetchComisionesYVales();
       fetchEstimatedFolio();
+      fetchProducts();
     } catch (err) {
       setMessage({
         type: 'error',
@@ -2272,6 +2420,7 @@ export default function SalesModule() {
       setLoading(false);
     }
   };
+
   const handlePrintCapturedInvoicePDF = async (histItem) => {
     try {
       setLoading(true);
@@ -2304,16 +2453,14 @@ export default function SalesModule() {
     }
   };
 
-  // C. Lógica de Vale Independiente
+  // Lógica de Vale Independiente
   const handleSolicitarValeIndependiente = async (e) => {
     e.preventDefault();
 
-    // Validación básica
     if (!independentValeForm.monto || Number(independentValeForm.monto) <= 0) {
       return alert('Ingrese un monto válido');
     }
 
-    // B. Bloqueo Anti-Spam (5 segundos)
     if (valesLocked) return;
     setValesLocked(true);
     setTimeout(() => setValesLocked(false), 5000);
@@ -2332,7 +2479,6 @@ export default function SalesModule() {
 
       if (error) throw error;
 
-      // Notificación opcional al admin
       try {
         await supabase.functions.invoke('send-notification', {
           body: {
@@ -2354,10 +2500,9 @@ export default function SalesModule() {
         text: 'Solicitud de vale independiente enviada correctamente.',
       });
 
-      // Limpiar formulario, recargar comisiones y actualizar el historial al instante
       setIndependentValeForm({ monto: '', motivo: '' });
       fetchComisionesYVales();
-      fetchIndependentValesHistory(); // <-- ESTA LÍNEA ACTUALIZA EL HISTORIAL AUTOMÁTICAMENTE
+      fetchIndependentValesHistory();
     } catch (err) {
       console.error(err);
       setMessage({ type: 'error', text: err.message });
@@ -2367,21 +2512,18 @@ export default function SalesModule() {
   };
 
   const handleSolicitarVale = async () => {
-    // Mantenido por compatibilidad si se llama desde otro lado, pero redirige lógica
     if (!valeModal.monto || Number(valeModal.monto) <= 0)
       return alert('Ingrese un monto válido');
 
-    // B. Bloqueo Anti-Spam
     if (valesLocked) return;
     setValesLocked(true);
     setTimeout(() => setValesLocked(false), 5000);
 
     setLoading(true);
     try {
-      // C. Vale Independiente (ignoramos notaId si viene, o lo usamos solo para referencia textual si se desea, pero DB es null)
       const { error } = await supabase.from('vales').insert([
         {
-          order_id: null, // Independiente
+          order_id: null,
           seller_id: user?.id,
           estimated_commission_usd: 0,
           requested_amount_usd: Number(valeModal.monto),
@@ -2401,7 +2543,6 @@ export default function SalesModule() {
             },
           },
         });
-        console.log('✅ Correo de solicitud de vale enviado al administrador');
       } catch (notifErr) {
         console.warn(
           'Error enviando correo de vale (no bloqueante):',
@@ -2429,7 +2570,7 @@ export default function SalesModule() {
         payment_date:
           existing.payment_date || new Date().toISOString().split('T')[0],
         amount_usd: existing.amount_usd || '',
-        payment_method: existing.payment_method || 'Pago Móvil',
+        payment_method: existing.payment_method || '',
         reference_number: existing.reference_number || '',
         user_note: existing.user_note || '',
       });
@@ -2437,7 +2578,7 @@ export default function SalesModule() {
       setAbonoForm({
         payment_date: new Date().toISOString().split('T')[0],
         amount_usd: '',
-        payment_method: 'Pago Móvil',
+        payment_method: '',
         reference_number: '',
         user_note: '',
       });
@@ -2450,20 +2591,48 @@ export default function SalesModule() {
     e.preventDefault();
     if (!abonoNotifModal.notaId) return;
 
-    // B. Bloqueo Anti-Spam
     if (notifLocked) return;
-    setNotifLocked(true);
-    setTimeout(() => setNotifLocked(false), 5000);
+
+    const metodo = String(abonoForm.payment_method || '').trim();
+    const isEfectivo = metodo === 'Efectivo $';
+    const refNum = String(abonoForm.reference_number || '').trim();
+    const montoCheck = parseFloat(abonoForm.amount_usd);
+
+    if (!abonoForm.payment_date) {
+      alert('La fecha del pago es obligatoria.');
+      return;
+    }
+    if (isNaN(montoCheck) || montoCheck <= 0) {
+      alert('Ingrese un monto válido.');
+      return;
+    }
+    if (!metodo) {
+      alert('Debe seleccionar un método de recepción.');
+      return;
+    }
+    if (!isEfectivo && !/^\d{4}$/.test(refNum)) {
+      alert(
+        'Debe ingresar exactamente los últimos 4 dígitos numéricos de la referencia.'
+      );
+      return;
+    }
 
     const fileToUpload = abonoFiles[abonoNotifModal.notaId];
     if (!fileToUpload) {
-      alert('Es obligatorio adjuntar una foto del billete o recibo.');
+      alert(
+        isEfectivo
+          ? 'Es obligatorio adjuntar una foto de los billetes.'
+          : 'Es obligatorio adjuntar el comprobante de pago.'
+      );
       return;
     }
     if (!validateImageFile(fileToUpload)) {
       alert('El comprobante debe ser una imagen.');
       return;
     }
+
+    setNotifLocked(true);
+    setTimeout(() => setNotifLocked(false), 5000);
     setLoading(true);
     try {
       const montoNum = parseFloat(abonoForm.amount_usd);
@@ -2525,7 +2694,7 @@ export default function SalesModule() {
       setAbonoForm({
         payment_date: new Date().toISOString().split('T')[0],
         amount_usd: '',
-        payment_method: 'Pago Móvil',
+        payment_method: '',
         reference_number: '',
         user_note: '',
       });
@@ -2667,8 +2836,8 @@ export default function SalesModule() {
     { id: 'historial_ventas', label: 'Historial de Ventas', icon: History },
   ];
 
-  // E. FUNCIÓN AUXILIAR PARA RENDERIZAR TARJETAS DE PRODUCTOS EN MÓVIL
-  const renderProductCards = (items, isEditable, onRemove) => {
+  // FUNCIÓN AUXILIAR PARA RENDERIZAR TARJETAS DE PRODUCTOS EN MÓVIL
+  const renderProductCards = (items, isEditable, onRemove, onQtyChange) => {
     return items.map((item, idx) => (
       <div
         key={item.product_id || idx}
@@ -2722,8 +2891,25 @@ export default function SalesModule() {
             <strong>{item.code}</strong>
           </div>
           <div style={{ textAlign: 'right' }}>
-            <span style={{ color: '#6b7280' }}>Cant: </span>{' '}
-            <strong>{item.quantity}</strong>
+            <span style={{ color: '#6b7280' }}>Cant: </span>
+            {isEditable && onQtyChange ? (
+              <input
+                type="number"
+                min="1"
+                value={item.quantity}
+                onChange={(e) => onQtyChange(item.product_id, e.target.value)}
+                style={{
+                  width: '55px',
+                  padding: '2px 4px',
+                  textAlign: 'center',
+                  border: '1px solid #D1D5DB',
+                  borderRadius: '4px',
+                  fontWeight: '700',
+                }}
+              />
+            ) : (
+              <strong>{item.quantity}</strong>
+            )}
           </div>
           <div>
             <span style={{ color: '#6b7280' }}>P. Unit: </span>{' '}
@@ -2783,7 +2969,6 @@ export default function SalesModule() {
     .desktop-table-container { display: block !important; }
     .desktop-table { display: block !important; }
     .desktop-cards-grid { display: grid !important; }
-    /* BLINDAJE ABSOLUTO: Oculta terminantemente las tarjetas móviles en escritorio */
     .mobile-cards-container { display: none !important; } 
   }
 `}</style>
@@ -3198,14 +3383,6 @@ export default function SalesModule() {
                     />
                   </div>
                 </div>
-                <div
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-                    gap: '12px',
-                    alignItems: 'end',
-                  }}
-                ></div>
                 <div
                   style={{
                     display: 'grid',
@@ -3723,7 +3900,7 @@ export default function SalesModule() {
                             onClick={() => handleOpenEditClient(c)}
                             style={{
                               flex: 1,
-                              minWidth: '0', // Importante para evitar desbordamiento
+                              minWidth: '0',
                               width: '100%',
                               padding: '8px',
                               backgroundColor: '#F3F4F6',
@@ -4170,7 +4347,6 @@ export default function SalesModule() {
                   Descargar
                 </a>
 
-                {/* Ocultamos el botón "Sustituir" si proviene de la selección de inventario de productos */}
                 {!imageModal.isReadOnlyProduct && (
                   <label
                     style={{
@@ -6465,7 +6641,6 @@ export default function SalesModule() {
               {editModeId ? 'Editando N.E.' : 'Crear N.E.'}
             </button>
 
-            {/* C. Nueva Pestaña Solicitar Vale */}
             <button
               onClick={() => setNeTab('solicitar_vale')}
               style={{
@@ -6824,7 +6999,7 @@ export default function SalesModule() {
                     onChange={setNeSelectedProdId}
                     placeholder="-- Seleccionar producto --"
                     imageKey="image_url"
-                    onClear={() => setNeSelectedProdId('')} // <--- AÑADE ESTA LÍNEA
+                    onClear={() => setNeSelectedProdId('')}
                   />
                 </div>
 
@@ -7020,7 +7195,7 @@ export default function SalesModule() {
                   </div>
                 </div>
 
-                {/* Tabla de Productos para Escritorio (Oculta en Móvil) */}
+                {/* Tabla de Productos para Escritorio */}
                 <div
                   className="desktop-table-container"
                   style={{
@@ -7333,7 +7508,7 @@ export default function SalesModule() {
             </div>
           )}
 
-          {/* C. Pestaña Solicitar Vale Independiente */}
+          {/* Pestaña Solicitar Vale Independiente */}
           {neTab === 'solicitar_vale' && (
             <div
               style={{
@@ -7861,18 +8036,10 @@ export default function SalesModule() {
                       const isAprobada = nota.status === 'aprobada';
                       const isCerrada = nota.payment_status === 'cerrada';
                       const totalAbonado = Number(nota.total_paid_usd) || 0;
-                      const valeAsociado =
-                        nota.vales && nota.vales.length > 0
-                          ? nota.vales[0]
-                          : null;
-                      const valeEstado = valeAsociado
-                        ? valeAsociado.status
-                        : null;
                       const pendingNotif = paymentNotificationsMap[nota.id];
                       const hasPendingNotif =
                         pendingNotif && pendingNotif.status === 'pending';
 
-                      // E. Obtener porcentaje dinámico para visualización
                       const discountPct = getDiscountPercent(
                         nota.payment_discount
                       );
@@ -7899,7 +8066,6 @@ export default function SalesModule() {
                             gap: '12px',
                           }}
                         >
-                          {/* Header */}
                           <div
                             style={{
                               display: 'flex',
@@ -7956,7 +8122,6 @@ export default function SalesModule() {
                             </div>
                           </div>
 
-                          {/* Info Grid */}
                           <div
                             style={{
                               display: 'grid',
@@ -7995,8 +8160,14 @@ export default function SalesModule() {
                                   fontWeight: '900',
                                   backgroundColor: isAprobada
                                     ? '#DCFCE7'
+                                    : nota.status === 'rechazada'
+                                    ? '#FEE2E2'
                                     : '#FEF3C7',
-                                  color: isAprobada ? '#15803D' : '#B45309',
+                                  color: isAprobada
+                                    ? '#15803D'
+                                    : nota.status === 'rechazada'
+                                    ? '#DC2626'
+                                    : '#B45309',
                                 }}
                               >
                                 {nota.status}
@@ -8024,7 +8195,6 @@ export default function SalesModule() {
                               </span>
                             </div>
 
-                            {/* E. Visualización del Porcentaje */}
                             <div style={{ gridColumn: '1 / -1' }}>
                               <span
                                 style={{ fontWeight: '700', color: '#4B5563' }}
@@ -8046,7 +8216,6 @@ export default function SalesModule() {
                             </div>
                           </div>
 
-                          {/* Finanzas */}
                           <div
                             style={{
                               backgroundColor: '#F9FAFB',
@@ -8092,7 +8261,6 @@ export default function SalesModule() {
                             </div>
                           </div>
 
-                          {/* Acciones Intermedias */}
                           <div
                             style={{
                               display: 'flex',
@@ -8148,7 +8316,6 @@ export default function SalesModule() {
                             )}
                           </div>
 
-                          {/* Botones Principales */}
                           <div
                             className="action-buttons-wrapper"
                             style={{
@@ -8275,18 +8442,10 @@ export default function SalesModule() {
                       const isAprobada = nota.status === 'aprobada';
                       const isCerrada = nota.payment_status === 'cerrada';
                       const totalAbonado = Number(nota.total_paid_usd) || 0;
-                      const valeAsociado =
-                        nota.vales && nota.vales.length > 0
-                          ? nota.vales[0]
-                          : null;
-                      const valeEstado = valeAsociado
-                        ? valeAsociado.status
-                        : null;
                       const pendingNotif = paymentNotificationsMap[nota.id];
                       const hasPendingNotif =
                         pendingNotif && pendingNotif.status === 'pending';
 
-                      // E. Visualización Dinámica
                       const discountPct = getDiscountPercent(
                         nota.payment_discount
                       );
@@ -8398,8 +8557,14 @@ export default function SalesModule() {
                                   fontWeight: '900',
                                   backgroundColor: isAprobada
                                     ? '#DCFCE7'
+                                    : nota.status === 'rechazada'
+                                    ? '#FEE2E2'
                                     : '#FEF3C7',
-                                  color: isAprobada ? '#15803D' : '#B45309',
+                                  color: isAprobada
+                                    ? '#15803D'
+                                    : nota.status === 'rechazada'
+                                    ? '#DC2626'
+                                    : '#B45309',
                                 }}
                               >
                                 {nota.status}
@@ -8428,7 +8593,6 @@ export default function SalesModule() {
                             </div>
                           </div>
 
-                          {/* E. Visualización del Porcentaje en Móvil */}
                           <div style={{ fontSize: '12px' }}>
                             <span
                               style={{ fontWeight: '700', color: '#4B5563' }}
@@ -8652,7 +8816,6 @@ export default function SalesModule() {
 
       {activeSubMenu === 'historial_ventas' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          {/* Encabezado y Buscador */}
           <div
             style={{
               display: 'flex',
@@ -8709,7 +8872,6 @@ export default function SalesModule() {
             </div>
           </div>
 
-          {/* Contenedor Principal de Datos */}
           <div
             style={{
               backgroundColor: '#ffffff',
@@ -8730,7 +8892,6 @@ export default function SalesModule() {
               </div>
             ) : (
               <>
-                {/* 1. TABLA DESKTOP (Se muestra únicamente en versión escritorio) */}
                 <div
                   className="desktop-table"
                   style={{
@@ -8886,7 +9047,6 @@ export default function SalesModule() {
                   </table>
                 </div>
 
-                {/* 2. TARJETAS MÓVIL (Se muestran únicamente en versión móvil) */}
                 <div
                   className="mobile-cards-container"
                   style={{ padding: '12px' }}
@@ -8905,7 +9065,6 @@ export default function SalesModule() {
                         gap: '12px',
                       }}
                     >
-                      {/* Header */}
                       <div
                         style={{
                           borderBottom: '1px solid #E5E7EB',
@@ -8934,7 +9093,6 @@ export default function SalesModule() {
                           {item.id}
                         </span>
                       </div>
-                      {/* Info Grid */}
                       <div
                         style={{
                           display: 'grid',
@@ -8968,7 +9126,6 @@ export default function SalesModule() {
                           ${item.totalNeAmount.toFixed(2)}
                         </div>
                       </div>
-                      {/* Montos Destacados */}
                       <div
                         style={{
                           backgroundColor: '#F9FAFB',
@@ -9026,7 +9183,6 @@ export default function SalesModule() {
                           </span>
                         </div>
                       </div>
-                      {/* Acciones */}
                       <div
                         className="action-buttons-wrapper"
                         style={{
@@ -9202,7 +9358,7 @@ export default function SalesModule() {
         </div>
       )}
 
-      {/* A. MODAL DE EDICIÓN DE NOTA DE ENTREGA */}
+      {/* MODAL DE EDICIÓN DE NOTA DE ENTREGA */}
       {editNeModal.open && (
         <div
           style={{
@@ -9624,7 +9780,7 @@ export default function SalesModule() {
                   </div>
                 </div>
 
-                {/* TABLA DE ESCRITORIO (Usa desktop-table-container para ocultarse en móvil) */}
+                {/* TABLA DE ESCRITORIO */}
                 <div
                   className="desktop-table-container"
                   style={{
@@ -9702,7 +9858,25 @@ export default function SalesModule() {
                               {item.description}
                             </td>
                             <td style={{ padding: '8px', textAlign: 'center' }}>
-                              {item.quantity}
+                              <input
+                                type="number"
+                                min="1"
+                                value={item.quantity}
+                                onChange={(e) =>
+                                  handleUpdateEditNeQuantity(
+                                    item.product_id,
+                                    e.target.value
+                                  )
+                                }
+                                style={{
+                                  width: '65px',
+                                  padding: '4px',
+                                  textAlign: 'center',
+                                  border: '1px solid #D1D5DB',
+                                  borderRadius: '4px',
+                                  fontWeight: '600',
+                                }}
+                              />
                             </td>
                             <td style={{ padding: '8px', textAlign: 'right' }}>
                               ${Number(item.unit_price_usd).toFixed(2)}
@@ -9751,7 +9925,7 @@ export default function SalesModule() {
                   </table>
                 </div>
 
-                {/* TARJETAS MÓVIL (Usa mobile-cards-container para ocultarse en escritorio) */}
+                {/* TARJETAS MÓVIL */}
                 <div className="mobile-cards-container">
                   {editNeCart.length === 0 ? (
                     <div
@@ -9764,7 +9938,12 @@ export default function SalesModule() {
                       No hay productos.
                     </div>
                   ) : (
-                    renderProductCards(editNeCart, true, handleEditNeRemoveItem)
+                    renderProductCards(
+                      editNeCart,
+                      true,
+                      handleEditNeRemoveItem,
+                      handleUpdateEditNeQuantity
+                    )
                   )}
                 </div>
 
@@ -9830,7 +10009,6 @@ export default function SalesModule() {
                       </strong>
                     </div>
 
-                    {/* DESCUENTO ESPECIAL DE SOLO LECTURA EN MODAL DE EDICIÓN */}
                     {Number(editNeModal.noteData?.special_discount_usd || 0) >
                       0 && (
                       <div
@@ -10067,7 +10245,7 @@ export default function SalesModule() {
                     marginBottom: '4px',
                   }}
                 >
-                  Fecha del Pago
+                  Fecha del Pago *
                 </label>
                 <input
                   type="date"
@@ -10125,13 +10303,17 @@ export default function SalesModule() {
                   Método de Recepción *
                 </label>
                 <select
+                  required
                   value={abonoForm.payment_method}
-                  onChange={(e) =>
+                  onChange={(e) => {
+                    const val = e.target.value;
                     setAbonoForm({
                       ...abonoForm,
-                      payment_method: e.target.value,
-                    })
-                  }
+                      payment_method: val,
+                      reference_number:
+                        val === 'Efectivo $' ? '' : abonoForm.reference_number,
+                    });
+                  }}
                   style={{
                     width: '100%',
                     padding: '6px 8px',
@@ -10140,6 +10322,7 @@ export default function SalesModule() {
                     backgroundColor: '#FFFFFF',
                   }}
                 >
+                  <option value="">-- Seleccionar método --</option>
                   <option value="Efectivo $">Efectivo ($)</option>
                   <option value="Binance">Binance</option>
                   <option value="Zelle">Zelle</option>
@@ -10155,18 +10338,30 @@ export default function SalesModule() {
                     marginBottom: '4px',
                   }}
                 >
-                  N° Referencia / Comprobante
+                  {abonoForm.payment_method === 'Efectivo $'
+                    ? 'N° Referencia (Opcional en Efectivo)'
+                    : 'N° Referencia (Últimos 4 dígitos) *'}
                 </label>
                 <input
                   type="text"
+                  inputMode="numeric"
+                  maxLength={4}
+                  required={abonoForm.payment_method !== 'Efectivo $'}
                   value={abonoForm.reference_number}
-                  onChange={(e) =>
+                  onChange={(e) => {
+                    const digits = e.target.value
+                      .replace(/\D/g, '')
+                      .slice(0, 4);
                     setAbonoForm({
                       ...abonoForm,
-                      reference_number: e.target.value,
-                    })
+                      reference_number: digits,
+                    });
+                  }}
+                  placeholder={
+                    abonoForm.payment_method === 'Efectivo $'
+                      ? 'Opcional en efectivo'
+                      : 'Últimos 4 dígitos (Ej: 1234)'
                   }
-                  placeholder="Ej. Ref #123456"
                   style={{
                     width: '100%',
                     padding: '6px 8px',
@@ -10185,7 +10380,9 @@ export default function SalesModule() {
                     color: '#DC2626',
                   }}
                 >
-                  Adjuntar Comprobante (Foto/Billete) *
+                  {abonoForm.payment_method === 'Efectivo $'
+                    ? 'Adjuntar Foto de los Billetes *'
+                    : 'Adjuntar Comprobante *'}
                 </label>
                 <CustomFileInput
                   id={`abono_file_${abonoNotifModal.notaId}`}
@@ -10196,7 +10393,11 @@ export default function SalesModule() {
                     }))
                   }
                   file={abonoFiles[abonoNotifModal.notaId]}
-                  labelText="Subir foto del billete o recibo"
+                  labelText={
+                    abonoForm.payment_method === 'Efectivo $'
+                      ? 'Subir foto de los billetes'
+                      : 'Subir foto del comprobante'
+                  }
                 />
               </div>
               <div>

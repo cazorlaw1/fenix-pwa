@@ -300,6 +300,13 @@ export default function AdminModule() {
   const [pendingNotes, setPendingNotes] = useState([]);
   const [cobranzaNotes, setCobranzaNotes] = useState([]);
   const [paymentNotifications, setPaymentNotifications] = useState([]);
+  const [pendingCounts, setPendingCounts] = useState({
+    vales: 0,
+    ne: 0,
+    abonos: 0,
+  });
+  const [isPendingNotifOpen, setIsPendingNotifOpen] = useState(false);
+  const pendingNotifRef = useRef(null);
   const [vales, setVales] = useState([]);
   const [penalties, setPenalties] = useState([]);
   const [liquidaciones, setLiquidaciones] = useState([]);
@@ -382,6 +389,9 @@ export default function AdminModule() {
     useState('53.38');
   const [editNoteObservation, setEditNoteObservation] = useState('');
   const [editNoteItems, setEditNoteItems] = useState([]);
+  const [editNoteOriginalQuantities, setEditNoteOriginalQuantities] = useState(
+    {}
+  );
   const [editNoteSpecialDiscount, setEditNoteSpecialDiscount] = useState('0'); // <--- NUEVO
   const [editNoteClientId, setEditNoteClientId] = useState('');
   const [editNoteTargetUserId, setEditNoteTargetUserId] = useState('');
@@ -402,7 +412,7 @@ export default function AdminModule() {
   const [manualAbonoForm, setManualAbonoForm] = useState({
     payment_date: new Date().toISOString().split('T')[0],
     amount_usd: '',
-    payment_method: 'Pago Móvil',
+    payment_method: '',
     reference_number: '',
   });
   const [manualAbonoFile, setManualAbonoFile] = useState(null);
@@ -442,9 +452,6 @@ export default function AdminModule() {
     startDate: '',
     endDate: '',
   });
-  useEffect(() => {
-    localStorage.setItem('admin_ne_cart_cache', JSON.stringify(neCart));
-  }, [neCart]);
   useEffect(() => {
     localStorage.setItem('admin_ne_cart_cache', JSON.stringify(neCart));
   }, [neCart]);
@@ -537,6 +544,12 @@ export default function AdminModule() {
         !mobileMenuRef.current.contains(event.target)
       ) {
         setIsMobileMenuOpen(false);
+      }
+      if (
+        pendingNotifRef.current &&
+        !pendingNotifRef.current.contains(event.target)
+      ) {
+        setIsPendingNotifOpen(false);
       }
     }
     document.addEventListener('mousedown', handleClickOutsideMenu);
@@ -808,6 +821,17 @@ export default function AdminModule() {
   const handleUpdateEditItemQuantity = (product_id, newQty) => {
     const qty = Number(newQty);
     if (isNaN(qty) || qty <= 0) return;
+    const prod = editNoteProductsList.find((p) => p.id === product_id);
+    if (prod) {
+      const origQty = Number(editNoteOriginalQuantities[product_id] || 0);
+      const maxAvailable = Number(prod.stock_current || 0) + origQty;
+      if (qty > maxAvailable) {
+        alert(
+          `Stock insuficiente para "${prod.description}".\nDisponible en inventario: ${prod.stock_current}\nMáximo permitido en esta nota: ${maxAvailable}`
+        );
+        return;
+      }
+    }
     setEditNoteItems(
       editNoteItems.map((item) => {
         if (item.product_id === product_id) {
@@ -1248,9 +1272,36 @@ export default function AdminModule() {
     }
   };
 
+  const fetchPendingCounts = async () => {
+    try {
+      const [valesRes, neRes, abonosRes] = await Promise.all([
+        supabase
+          .from('vales')
+          .select('id', { count: 'exact', head: true })
+          .eq('status', 'pendiente'),
+        supabase
+          .from('sales_orders')
+          .select('id', { count: 'exact', head: true })
+          .eq('status', 'pendiente'),
+        supabase
+          .from('seller_payment_notifications')
+          .select('id', { count: 'exact', head: true })
+          .eq('status', 'pending'),
+      ]);
+      setPendingCounts({
+        vales: valesRes.count || 0,
+        ne: neRes.count || 0,
+        abonos: abonosRes.count || 0,
+      });
+    } catch (err) {
+      console.error('Error cargando conteo de pendientes:', err);
+    }
+  };
+
   const fetchTabData = async () => {
     setLoading(true);
     setErrorMsg('');
+    fetchPendingCounts();
     try {
       const { data: hConfig } = await supabase
         .from('hierarchy_config')
@@ -1279,7 +1330,7 @@ export default function AdminModule() {
           .select(
             '*, seller:seller_id(id, full_name, email, pct_bombillos, pct_fluidos, sueldo_fijo_usd), client:client_id(name)'
           )
-          .eq('status', 'pendiente')
+          .in('status', ['pendiente', 'rechazada'])
           .order('created_at', { ascending: false });
         if (error) throw error;
         setPendingNotes(data || []);
@@ -1643,11 +1694,6 @@ export default function AdminModule() {
     });
 
     // 2. Órdenes Respaldadas (Hierarchy Settlement Backups)
-    // Nota: En un entorno real, aquí haríamos un fetch específico a la tabla backups si no estuviera cargada.
-    // Para este ejemplo, asumimos que fetchTabData carga lo necesario o que la lógica híbrida se basa en lo disponible.
-    // Si tuviéramos un estado 'hierarchyBackupsList', lo filtraríamos aquí.
-    // Como no tenemos ese estado explícito en el código original proporcionado, nos basamos en las órdenes activas
-    // y las liquidadas que aún existen en BD (liquidatedNotesList).
     const liquidatedSubordinateOrders = liquidatedNotesList.filter((o) => {
       const orderSellerId = o.seller_id || o.seller?.id;
       return targetSellerIds.includes(String(orderSellerId));
@@ -1851,24 +1897,11 @@ export default function AdminModule() {
       penaltyChargeMethod
     );
 
-    const hasActivity =
-      userNotes.length > 0 ||
-      userVales.length > 0 ||
-      details.hierarchyData.subordinateOrdersCount > 0 ||
-      details.sueldoFijoOriginal > 0;
-
-    if (!hasActivity) {
-      // Opcional: Podrías querer permitir abrirlo igual para ver ceros
-    }
     setSettlementModalData(details);
   };
 
   // --- D. FUNCIÓN AUXILIAR: IDENTIFICAR BENEFICIARIOS PENDIENTES ---
   const getPendingHierarchicalBeneficiaries = async (orderId) => {
-    // Esta función identifica quiénes faltan por liquidar para una nota específica
-    // Basado en la jerarquía configurada y las facturas existentes en settlement_invoices
-
-    // 1. Obtener la orden
     const { data: order } = await supabase
       .from('sales_orders')
       .select('*, seller:seller_id(id)')
@@ -1880,20 +1913,11 @@ export default function AdminModule() {
     const sellerId = order.seller_id || order.seller?.id;
     const pendingNames = [];
 
-    // 2. Recorrer la jerarquía hacia arriba
-    // Buscamos padres directos en hierarchy_assignments o configs globales
-    // Simplificación: Revisamos todos los usuarios que tengan a este seller (o sus superiores) como subordinados
-
-    // Para hacerlo robusto sin recursión compleja en frontend, verificamos los usuarios con roles superiores
-    // que tengan configurada la jerarquía hacia este vendedor.
-
     const potentialParents = sellersList.filter((s) =>
       ['supervisor', 'gerente', 'administrador'].includes(s.role)
     );
 
     for (const parent of potentialParents) {
-      // Verificar si este padre tiene relación jerárquica con el vendedor de la orden
-      // (Ya sea directa o global)
       const config = hierarchyConfigsMap[parent.id];
       const specificAssign = hierarchyAssignmentsList.find(
         (a) =>
@@ -1914,7 +1938,6 @@ export default function AdminModule() {
       }
 
       if (isBeneficiary) {
-        // 3. Verificar si ya fue liquidado en este ciclo
         const { data: existingInvoice } = await supabase
           .from('settlement_invoices')
           .select('id')
@@ -1951,7 +1974,6 @@ export default function AdminModule() {
       );
 
       for (const note of notesToDelete) {
-        // Barrido en cascada silencioso (sin confirmación)
         await supabase.from('order_items').delete().eq('order_id', note.id);
         await supabase.from('order_payments').delete().eq('order_id', note.id);
         await supabase
@@ -2102,12 +2124,10 @@ export default function AdminModule() {
 
       if (noteIdsToProcess.length > 0) {
         for (const noteId of noteIdsToProcess) {
-          // Verificamos si aún quedan beneficiarios por liquidar esta nota específica
           const pendingBeneficiaries =
             await getPendingHierarchicalBeneficiaries(noteId);
 
           if (pendingBeneficiaries.length === 0) {
-            // ✅ ES EL ÚLTIMO BENEFICIARIO: Eliminar completamente la nota y sus dependencias
             await supabase.from('order_items').delete().eq('order_id', noteId);
             await supabase
               .from('order_payments')
@@ -2119,15 +2139,12 @@ export default function AdminModule() {
               .eq('order_id', noteId);
             await supabase.from('vales').delete().eq('order_id', noteId);
             await supabase.from('penalties').delete().eq('order_id', noteId);
-            // Limpiamos los respaldos de esta nota específica (opcional, pero mantiene la BD limpia)
             await supabase
               .from('hierarchy_settlement_backups')
               .delete()
               .eq('subordinate_order_id', noteId);
-            // Finalmente, eliminamos la orden
             await supabase.from('sales_orders').delete().eq('id', noteId);
           } else {
-            // ⚠️ NO ES EL ÚLTIMO: Cambiar estado a 'liquidada' para que aparezca en la pestaña "N.E. Jerárquicas Pendientes"
             await supabase
               .from('sales_orders')
               .update({ status: 'liquidada', updated_at: new Date() })
@@ -2171,7 +2188,6 @@ export default function AdminModule() {
       );
       setSettlementModalData(null);
 
-      // Recargar datos: esto actualiza la lista y renderiza correctamente las tarjetas móviles
       await fetchTabData();
       setQuincenaSubView('liquidar');
     } catch (err) {
@@ -2772,26 +2788,25 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
     try {
       setLoading(true);
 
-      // 1. Revertir Inventario
-      if (note.status === 'aprobada' || note.status === 'liquidada') {
-        const { data: items, error: itemsErr } = await supabase
-          .from('order_items')
-          .select('product_id, quantity')
-          .eq('order_id', note.id);
-        if (!itemsErr && items) {
-          for (const item of items) {
-            const { data: prodData } = await supabase
+      // 1. Revertir Inventario (aplica a cualquier estado: pendiente, rechazada, aprobada o liquidada)
+      const { data: items, error: itemsErr } = await supabase
+        .from('order_items')
+        .select('product_id, quantity')
+        .eq('order_id', note.id);
+      if (!itemsErr && items) {
+        for (const item of items) {
+          const { data: prodData } = await supabase
+            .from('products')
+            .select('stock_current')
+            .eq('id', item.product_id)
+            .single();
+          if (prodData) {
+            const restoredStock =
+              Number(prodData.stock_current || 0) + Number(item.quantity || 0);
+            await supabase
               .from('products')
-              .select('stock_current')
-              .eq('id', item.product_id)
-              .single();
-            if (prodData) {
-              const restoredStock = prodData.stock_current + item.quantity;
-              await supabase
-                .from('products')
-                .update({ stock_current: restoredStock })
-                .eq('id', item.product_id);
-            }
+              .update({ stock_current: restoredStock })
+              .eq('id', item.product_id);
           }
         }
       }
@@ -3071,44 +3086,88 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
     if (!abonoModalNote) return;
     const fileToUpload = manualAbonoFile;
     const montoNum = parseFloat(manualAbonoForm.amount_usd);
+    const metodo = String(manualAbonoForm.payment_method || '').trim();
+    const isEfectivo = metodo === 'Efectivo $';
     const refNum = String(manualAbonoForm.reference_number || '').trim();
+
+    if (!manualAbonoForm.payment_date) {
+      return alert('La fecha del pago es obligatoria.');
+    }
     if (isNaN(montoNum) || montoNum <= 0) {
       return alert('Ingrese un monto válido.');
     }
-    try {
-      const { data: duplicates, error: dupErr } = await supabase
-        .from('payments_independent_history')
-        .select('payment_date')
-        .eq('reference_number', refNum)
-        .eq('amount_usd', montoNum)
-        .limit(1);
-      if (!dupErr && duplicates && duplicates.length > 0) {
-        const dupDate = new Date(
-          duplicates[0].payment_date
-        ).toLocaleDateString();
-        const continueAnyway = window.confirm(
-          `⚠️ ATENCIÓN: Este pago parece estar duplicado. Ya existe un registro con Monto: $${montoNum.toFixed(
-            2
-          )} y Referencia: "${refNum}" fechado el ${dupDate}. ¿Desea continuar guardando este abono de todas formas?`
-        );
-        if (!continueAnyway) return;
+    if (!metodo) {
+      return alert('Debe seleccionar un método de recepción.');
+    }
+    if (!isEfectivo && !/^\d{4}$/.test(refNum)) {
+      return alert(
+        'Debe ingresar exactamente los últimos 4 dígitos numéricos de la referencia.'
+      );
+    }
+    if (!fileToUpload) {
+      return alert(
+        isEfectivo
+          ? 'Es obligatorio adjuntar una foto de los billetes.'
+          : 'Es obligatorio adjuntar el comprobante de pago.'
+      );
+    }
+
+    if (refNum !== '') {
+      try {
+        const { data: duplicates, error: dupErr } = await supabase
+          .from('payments_independent_history')
+          .select('payment_date')
+          .eq('reference_number', refNum)
+          .eq('amount_usd', montoNum)
+          .limit(1);
+        if (!dupErr && duplicates && duplicates.length > 0) {
+          const dupDate = new Date(
+            duplicates[0].payment_date
+          ).toLocaleDateString();
+          const continueAnyway = window.confirm(
+            `⚠️ ATENCIÓN: Este pago parece estar duplicado. Ya existe un registro con Monto: $${montoNum.toFixed(
+              2
+            )} y Referencia: "${refNum}" fechado el ${dupDate}. ¿Desea continuar guardando este abono de todas formas?`
+          );
+          if (!continueAnyway) return;
+        }
+      } catch (err) {
+        console.error('Error verificando duplicados:', err);
       }
-    } catch (err) {
-      console.error('Error verificando duplicados:', err);
     }
     try {
       setLoading(true);
       const { data: userData } = await supabase.auth.getUser();
       let receiptUrl = null;
       if (fileToUpload) {
-        const fileExt = fileToUpload.name.split('.').pop();
+        const fileExt = (
+          fileToUpload.name.split('.').pop() || 'jpg'
+        ).toLowerCase();
         const fileName = `${Date.now()}_${Math.random()
           .toString(36)
           .substring(7)}.${fileExt}`;
         const filePath = `abonos/${fileName}`;
+
+        // Compatibilidad iOS / Safari: leer bytes en memoria para evitar "No content provided"
+        const arrayBuffer = await fileToUpload.arrayBuffer();
+        if (!arrayBuffer || arrayBuffer.byteLength === 0) {
+          throw new Error(
+            'No se pudo leer el archivo seleccionado en el dispositivo. Intente seleccionarlo nuevamente.'
+          );
+        }
+        const contentType =
+          fileToUpload.type ||
+          (fileExt === 'pdf'
+            ? 'application/pdf'
+            : `image/${fileExt === 'jpg' ? 'jpeg' : fileExt}`);
+        const fileBlob = new Blob([arrayBuffer], { type: contentType });
+
         const { error: uploadErr } = await supabase.storage
           .from('visits')
-          .upload(filePath, fileToUpload);
+          .upload(filePath, fileBlob, {
+            contentType,
+            upsert: false,
+          });
         if (uploadErr) throw uploadErr;
         const { data: publicUrlData } = supabase.storage
           .from('visits')
@@ -3182,7 +3241,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
       setManualAbonoForm({
         payment_date: new Date().toISOString().split('T')[0],
         amount_usd: '',
-        payment_method: 'Pago Móvil',
+        payment_method: '',
         reference_number: '',
       });
       setManualAbonoFile(null);
@@ -3334,6 +3393,11 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
       setEditNoteCategory(note.category || 'bombillos');
       setEditNotePaymentDiscount(String(note.payment_discount || '53.38'));
       setEditNoteObservation(note.observation || '');
+      const origMap = {};
+      mappedItems.forEach((it) => {
+        origMap[it.product_id] = Number(it.quantity || 0);
+      });
+      setEditNoteOriginalQuantities(origMap);
       setEditNoteSpecialDiscount(String(note.special_discount_usd || '0')); // <--- NUEVO
       setEditNoteItems(mappedItems);
       setEditNoteClientId(note.client_id || '');
@@ -3376,11 +3440,21 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
       alert('La cantidad debe ser mayor a 0');
       return;
     }
-    const descPct = getDiscountPercent(editNotePaymentDiscount);
-    const vuConDesc = Number(prod.price_usd) * (1 - descPct / 100);
     const existingIdx = editNoteItems.findIndex(
       (i) => i.product_id === prod.id
     );
+    const currentInCart =
+      existingIdx > -1 ? Number(editNoteItems[existingIdx].quantity || 0) : 0;
+    const origQty = Number(editNoteOriginalQuantities[prod.id] || 0);
+    const maxAvailable = Number(prod.stock_current || 0) + origQty;
+    if (currentInCart + qty > maxAvailable) {
+      alert(
+        `Stock insuficiente para "${prod.description}".\nDisponible en inventario: ${prod.stock_current}\nEn nota actual: ${currentInCart}\nMáximo permitido: ${maxAvailable}`
+      );
+      return;
+    }
+    const descPct = getDiscountPercent(editNotePaymentDiscount);
+    const vuConDesc = Number(prod.price_usd) * (1 - descPct / 100);
     if (existingIdx > -1) {
       const updated = [...editNoteItems];
       const newQty = updated[existingIdx].quantity + qty;
@@ -3420,20 +3494,47 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
         .from('order_items')
         .select('product_id, quantity')
         .eq('order_id', note.id);
-      if (!oldItemsErr && oldItems && note.status === 'aprobada') {
-        for (const oldItem of oldItems) {
-          const { data: prodData } = await supabase
+      if (oldItemsErr) throw oldItemsErr;
+
+      // Calcular diferencias de inventario (aplica para pendiente, rechazada, aprobada, liquidada)
+      const oldQtyMap = {};
+      (oldItems || []).forEach((it) => {
+        oldQtyMap[it.product_id] =
+          (oldQtyMap[it.product_id] || 0) + Number(it.quantity || 0);
+      });
+      const newQtyMap = {};
+      editNoteItems.forEach((it) => {
+        newQtyMap[it.product_id] =
+          (newQtyMap[it.product_id] || 0) + Number(it.quantity || 0);
+      });
+      const allProdIds = Array.from(
+        new Set([...Object.keys(oldQtyMap), ...Object.keys(newQtyMap)])
+      );
+
+      const stockUpdates = [];
+      for (const pid of allProdIds) {
+        const oldQ = oldQtyMap[pid] || 0;
+        const newQ = newQtyMap[pid] || 0;
+        const delta = newQ - oldQ; // > 0 si aumenta la cantidad en la nota
+        if (delta !== 0) {
+          const { data: prodData, error: prodErr } = await supabase
             .from('products')
-            .select('stock_current')
-            .eq('id', oldItem.product_id)
+            .select('description, stock_current')
+            .eq('id', pid)
             .single();
-          if (prodData) {
-            const restoredStock = prodData.stock_current + oldItem.quantity;
-            await supabase
-              .from('products')
-              .update({ stock_current: restoredStock })
-              .eq('id', oldItem.product_id);
+          if (prodErr) throw prodErr;
+          const currentStock = Number(prodData.stock_current || 0);
+          if (delta > 0 && currentStock < delta) {
+            alert(
+              `Stock insuficiente para "${prodData.description}".\nDisponible en inventario: ${currentStock}\nAdicional requerido: ${delta}`
+            );
+            setLoading(false);
+            return;
           }
+          stockUpdates.push({
+            product_id: pid,
+            newStock: Math.max(0, currentStock - delta),
+          });
         }
       }
       const totalBase = editNoteItems.reduce(
@@ -3504,25 +3605,13 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
           .from('order_items')
           .insert(rowsToInsert);
         if (insErr) throw insErr;
-        if (note.status === 'aprobada') {
-          for (const newItem of editNoteItems) {
-            const { data: prodData } = await supabase
-              .from('products')
-              .select('stock_current')
-              .eq('id', newItem.product_id)
-              .single();
-            if (prodData) {
-              const newStock = Math.max(
-                0,
-                prodData.stock_current - newItem.quantity
-              );
-              await supabase
-                .from('products')
-                .update({ stock_current: newStock })
-                .eq('id', newItem.product_id);
-            }
-          }
-        }
+      }
+      // Aplicar ajustes de inventario calculados por diferencia
+      for (const upd of stockUpdates) {
+        await supabase
+          .from('products')
+          .update({ stock_current: upd.newStock })
+          .eq('id', upd.product_id);
       }
       showToastSuccess(
         `Nota N° ${
@@ -4167,6 +4256,283 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
             Aprobación de operaciones, gestión de cobranza unificada y cierres
             financieros.
           </p>
+        </div>
+        <div
+          ref={pendingNotifRef}
+          style={{
+            position: 'relative',
+            display: 'flex',
+            alignItems: 'center',
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => setIsPendingNotifOpen((prev) => !prev)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              padding: '8px 14px',
+              backgroundColor:
+                pendingCounts.vales + pendingCounts.ne + pendingCounts.abonos >
+                0
+                  ? '#FEF2F2'
+                  : '#F9FAFB',
+              border: `1px solid ${
+                pendingCounts.vales + pendingCounts.ne + pendingCounts.abonos >
+                0
+                  ? '#FECACA'
+                  : '#E5E7EB'
+              }`,
+              borderRadius: '10px',
+              cursor: 'pointer',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+              flexWrap: 'wrap',
+            }}
+          >
+            <div
+              style={{
+                position: 'relative',
+                display: 'flex',
+                alignItems: 'center',
+              }}
+            >
+              <Bell
+                size={18}
+                color={
+                  pendingCounts.vales +
+                    pendingCounts.ne +
+                    pendingCounts.abonos >
+                  0
+                    ? '#DC2626'
+                    : '#4B5563'
+                }
+              />
+              {pendingCounts.vales + pendingCounts.ne + pendingCounts.abonos >
+                0 && (
+                <span
+                  style={{
+                    position: 'absolute',
+                    top: '-6px',
+                    right: '-6px',
+                    backgroundColor: '#DC2626',
+                    color: '#FFFFFF',
+                    borderRadius: '9999px',
+                    fontSize: '10px',
+                    fontWeight: '900',
+                    minWidth: '16px',
+                    height: '16px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '0 4px',
+                  }}
+                >
+                  {pendingCounts.vales +
+                    pendingCounts.ne +
+                    pendingCounts.abonos}
+                </span>
+              )}
+            </div>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                fontSize: '12px',
+                fontWeight: '700',
+                color: '#111827',
+                flexWrap: 'wrap',
+              }}
+            >
+              <span
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleTabChange('vales_penalizaciones');
+                  setValesSubTab('vales_lista');
+                  setIsPendingNotifOpen(false);
+                }}
+                style={{
+                  backgroundColor:
+                    pendingCounts.vales > 0 ? '#FEE2E2' : '#E5E7EB',
+                  color: pendingCounts.vales > 0 ? '#B91C1C' : '#4B5563',
+                  padding: '3px 8px',
+                  borderRadius: '6px',
+                }}
+              >
+                Vales pendientes: {pendingCounts.vales}
+              </span>
+              <span
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleTabChange('aprobaciones');
+                  setIsPendingNotifOpen(false);
+                }}
+                style={{
+                  backgroundColor: pendingCounts.ne > 0 ? '#FEF3C7' : '#E5E7EB',
+                  color: pendingCounts.ne > 0 ? '#B45309' : '#4B5563',
+                  padding: '3px 8px',
+                  borderRadius: '6px',
+                }}
+              >
+                N.E. Pendientes: {pendingCounts.ne}
+              </span>
+              <span
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleTabChange('cobranza');
+                  setCobranzaInternalTab('control_ne');
+                  setIsPendingNotifOpen(false);
+                }}
+                style={{
+                  backgroundColor:
+                    pendingCounts.abonos > 0 ? '#DBEAFE' : '#E5E7EB',
+                  color: pendingCounts.abonos > 0 ? '#1D4ED8' : '#4B5563',
+                  padding: '3px 8px',
+                  borderRadius: '6px',
+                }}
+              >
+                Abonos Pendientes: {pendingCounts.abonos}
+              </span>
+            </div>
+          </button>
+
+          {isPendingNotifOpen && (
+            <div
+              style={{
+                position: 'absolute',
+                top: 'calc(100% + 8px)',
+                right: 0,
+                width: '260px',
+                backgroundColor: '#FFFFFF',
+                border: '1px solid #E5E7EB',
+                borderRadius: '10px',
+                boxShadow: '0 10px 25px rgba(0,0,0,0.12)',
+                zIndex: 1100,
+                padding: '10px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '6px',
+              }}
+            >
+              <div
+                style={{
+                  fontSize: '11px',
+                  fontWeight: '800',
+                  color: '#6B7280',
+                  textTransform: 'uppercase',
+                  paddingBottom: '6px',
+                  borderBottom: '1px solid #F3F4F6',
+                }}
+              >
+                Resumen de Pendientes
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  handleTabChange('vales_penalizaciones');
+                  setValesSubTab('vales_lista');
+                  setIsPendingNotifOpen(false);
+                }}
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  padding: '8px 10px',
+                  backgroundColor: '#F9FAFB',
+                  border: '1px solid #E5E7EB',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontSize: '12px',
+                  fontWeight: '700',
+                  color: '#111827',
+                }}
+              >
+                <span>Vales pendientes</span>
+                <span
+                  style={{
+                    backgroundColor:
+                      pendingCounts.vales > 0 ? '#DC2626' : '#9CA3AF',
+                    color: '#FFFFFF',
+                    borderRadius: '9999px',
+                    padding: '2px 8px',
+                    fontSize: '11px',
+                  }}
+                >
+                  {pendingCounts.vales}
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  handleTabChange('aprobaciones');
+                  setIsPendingNotifOpen(false);
+                }}
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  padding: '8px 10px',
+                  backgroundColor: '#F9FAFB',
+                  border: '1px solid #E5E7EB',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontSize: '12px',
+                  fontWeight: '700',
+                  color: '#111827',
+                }}
+              >
+                <span>N.E. Pendientes</span>
+                <span
+                  style={{
+                    backgroundColor:
+                      pendingCounts.ne > 0 ? '#D97706' : '#9CA3AF',
+                    color: '#FFFFFF',
+                    borderRadius: '9999px',
+                    padding: '2px 8px',
+                    fontSize: '11px',
+                  }}
+                >
+                  {pendingCounts.ne}
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  handleTabChange('cobranza');
+                  setCobranzaInternalTab('control_ne');
+                  setIsPendingNotifOpen(false);
+                }}
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  padding: '8px 10px',
+                  backgroundColor: '#F9FAFB',
+                  border: '1px solid #E5E7EB',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontSize: '12px',
+                  fontWeight: '700',
+                  color: '#111827',
+                }}
+              >
+                <span>Abonos Pendientes</span>
+                <span
+                  style={{
+                    backgroundColor:
+                      pendingCounts.abonos > 0 ? '#2563EB' : '#9CA3AF',
+                    color: '#FFFFFF',
+                    borderRadius: '9999px',
+                    padding: '2px 8px',
+                    fontSize: '11px',
+                  }}
+                >
+                  {pendingCounts.abonos}
+                </span>
+              </button>
+            </div>
+          )}
         </div>
       </div>
       {/* --- MENÚ ESCRITORIO (E) --- */}
@@ -5418,6 +5784,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                   <th style={{ padding: '12px 16px' }}>Modalidad</th>
                   <th style={{ padding: '12px 16px' }}>Categoría</th>
                   <th style={{ padding: '12px 16px' }}>Total ($)</th>
+                  <th style={{ padding: '12px 16px' }}>Estado</th>
                   <th style={{ padding: '12px 16px' }}>GPS</th>
                   <th style={{ padding: '12px 16px', textAlign: 'center' }}>
                     Acciones
@@ -5428,7 +5795,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                 {loading && !editingNoteId ? (
                   <tr>
                     <td
-                      colSpan="10"
+                      colSpan="11"
                       style={{ textAlign: 'center', padding: '20px' }}
                     >
                       Cargando solicitudes...
@@ -5437,7 +5804,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                 ) : pendingNotes.length === 0 ? (
                   <tr>
                     <td
-                      colSpan="10"
+                      colSpan="11"
                       style={{
                         textAlign: 'center',
                         padding: '20px',
@@ -5551,6 +5918,28 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                           ${Number(note.final_price_usd).toFixed(2)}
                         </td>
                         <td style={{ padding: '12px 16px' }}>
+                          <span
+                            style={{
+                              fontSize: '12px',
+                              fontWeight: '700',
+                              padding: '3px 10px',
+                              borderRadius: '12px',
+                              backgroundColor:
+                                note.status === 'rechazada'
+                                  ? '#fee2e2'
+                                  : '#fef3c7',
+                              color:
+                                note.status === 'rechazada'
+                                  ? '#dc2626'
+                                  : '#d97706',
+                            }}
+                          >
+                            {note.status === 'rechazada'
+                              ? 'Rechazada'
+                              : 'Pendiente'}
+                          </span>
+                        </td>
+                        <td style={{ padding: '12px 16px' }}>
                           {hasCoords ? (
                             <div
                               style={{
@@ -5626,18 +6015,33 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                             >
                               <CheckCircle size={16} color="#059669" />
                             </button>
+                            {note.status !== 'rechazada' && (
+                              <button
+                                onClick={() => setRejectModalNote(note)}
+                                title="Rechazar"
+                                style={{
+                                  padding: '6px',
+                                  backgroundColor: '#fee2e2',
+                                  border: 'none',
+                                  borderRadius: '4px',
+                                  cursor: 'pointer',
+                                }}
+                              >
+                                <XCircle size={16} color="#dc2626" />
+                              </button>
+                            )}
                             <button
-                              onClick={() => setRejectModalNote(note)}
-                              title="Rechazar"
+                              onClick={() => handleDeleteNoteComplete(note)}
+                              title="Eliminar Nota"
                               style={{
                                 padding: '6px',
-                                backgroundColor: '#fee2e2',
-                                border: 'none',
+                                backgroundColor: '#fef2f2',
+                                border: '1px solid #fecaca',
                                 borderRadius: '4px',
                                 cursor: 'pointer',
                               }}
                             >
-                              <XCircle size={16} color="#dc2626" />
+                              <Trash2 size={16} color="#b91c1c" />
                             </button>
                           </div>
                         </td>
@@ -5730,6 +6134,31 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                           ${Number(note.final_price_usd).toFixed(2)}
                         </span>
                       </div>
+                      <div className="admin-mobile-card-row">
+                        <span className="admin-mobile-card-label">Estado</span>
+                        <span className="admin-mobile-card-value">
+                          <span
+                            style={{
+                              fontSize: '11px',
+                              fontWeight: '700',
+                              padding: '2px 8px',
+                              borderRadius: '10px',
+                              backgroundColor:
+                                note.status === 'rechazada'
+                                  ? '#fee2e2'
+                                  : '#fef3c7',
+                              color:
+                                note.status === 'rechazada'
+                                  ? '#dc2626'
+                                  : '#d97706',
+                            }}
+                          >
+                            {note.status === 'rechazada'
+                              ? 'Rechazada'
+                              : 'Pendiente'}
+                          </span>
+                        </span>
+                      </div>
                       <div className="admin-mobile-card-actions">
                         <button
                           onClick={() => handleOpenEditNEPanel(note, false)}
@@ -5783,21 +6212,39 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                         >
                           Aprobar
                         </button>
+                        {note.status !== 'rechazada' && (
+                          <button
+                            onClick={() => setRejectModalNote(note)}
+                            className="admin-action-btn-mobile"
+                            style={{
+                              padding: '6px 12px',
+                              backgroundColor: '#fee2e2',
+                              color: '#dc2626',
+                              border: 'none',
+                              borderRadius: '4px',
+                              fontSize: '11px',
+                              fontWeight: '600',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            Rechazar
+                          </button>
+                        )}
                         <button
-                          onClick={() => setRejectModalNote(note)}
+                          onClick={() => handleDeleteNoteComplete(note)}
                           className="admin-action-btn-mobile"
                           style={{
                             padding: '6px 12px',
-                            backgroundColor: '#fee2e2',
-                            color: '#dc2626',
-                            border: 'none',
+                            backgroundColor: '#fef2f2',
+                            color: '#b91c1c',
+                            border: '1px solid #fecaca',
                             borderRadius: '4px',
                             fontSize: '11px',
                             fontWeight: '600',
                             cursor: 'pointer',
                           }}
                         >
-                          Rechazar
+                          Eliminar
                         </button>
                       </div>
                     </div>
@@ -6654,25 +7101,27 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                         >
                           <CheckCircle size={16} /> Aprobar Nota
                         </button>
-                        <button
-                          type="button"
-                          onClick={() => setRejectModalNote(editingNote)}
-                          style={{
-                            padding: '10px 20px',
-                            backgroundColor: '#dc2626',
-                            color: '#ffffff',
-                            border: 'none',
-                            borderRadius: '8px',
-                            fontSize: '12px',
-                            fontWeight: '700',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '6px',
-                          }}
-                        >
-                          <XCircle size={16} /> Rechazar Nota
-                        </button>
+                        {editingNote.status !== 'rechazada' && (
+                          <button
+                            type="button"
+                            onClick={() => setRejectModalNote(editingNote)}
+                            style={{
+                              padding: '10px 20px',
+                              backgroundColor: '#dc2626',
+                              color: '#ffffff',
+                              border: 'none',
+                              borderRadius: '8px',
+                              fontSize: '12px',
+                              fontWeight: '700',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                            }}
+                          >
+                            <XCircle size={16} /> Rechazar Nota
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -7149,7 +7598,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                                           .toISOString()
                                           .split('T')[0],
                                         amount_usd: '',
-                                        payment_method: 'Pago Móvil',
+                                        payment_method: '',
                                         reference_number: '',
                                       });
                                       setManualAbonoFile(null);
@@ -7444,7 +7893,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                                       .toISOString()
                                       .split('T')[0],
                                     amount_usd: '',
-                                    payment_method: 'Pago Móvil',
+                                    payment_method: '',
                                     reference_number: '',
                                   });
                                   setManualAbonoFile(null);
@@ -11745,7 +12194,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                 </div>
               </div>
             )}
-            {/* TABLAS DETALLADAS (Notas Propias y Jerarquía) - Se mantienen igual que antes */}
+            {/* TABLAS DETALLADAS (Notas Propias y Jerarquía) */}
             <h3
               style={{
                 fontSize: '13px',
@@ -13511,7 +13960,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                     marginBottom: '4px',
                   }}
                 >
-                  Fecha del Pago
+                  Fecha del Pago *
                 </label>
                 <input
                   type="date"
@@ -13541,7 +13990,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                     marginBottom: '4px',
                   }}
                 >
-                  Monto Recibido ($)
+                  Monto Recibido ($) *
                 </label>
                 <input
                   type="number"
@@ -13574,23 +14023,31 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                     marginBottom: '4px',
                   }}
                 >
-                  Método de Recepción
+                  Método de Recepción *
                 </label>
                 <select
+                  required
                   value={manualAbonoForm.payment_method}
-                  onChange={(e) =>
+                  onChange={(e) => {
+                    const val = e.target.value;
                     setManualAbonoForm({
                       ...manualAbonoForm,
-                      payment_method: e.target.value,
-                    })
-                  }
+                      payment_method: val,
+                      reference_number:
+                        val === 'Efectivo $'
+                          ? ''
+                          : manualAbonoForm.reference_number,
+                    });
+                  }}
                   style={{
                     width: '100%',
                     padding: '8px',
                     borderRadius: '6px',
                     border: '1px solid #d1d5db',
+                    backgroundColor: '#ffffff',
                   }}
                 >
+                  <option value="">-- Seleccionar método --</option>
                   <option value="Efectivo $">Efectivo ($)</option>
                   <option value="Binance">Binance</option>
                   <option value="Zelle">Zelle</option>
@@ -13607,18 +14064,30 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                     marginBottom: '4px',
                   }}
                 >
-                  N° Referencia / Comprobante
+                  {manualAbonoForm.payment_method === 'Efectivo $'
+                    ? 'N° Referencia (Opcional en Efectivo)'
+                    : 'N° Referencia (Últimos 4 dígitos) *'}
                 </label>
                 <input
                   type="text"
+                  inputMode="numeric"
+                  maxLength={4}
+                  required={manualAbonoForm.payment_method !== 'Efectivo $'}
                   value={manualAbonoForm.reference_number}
-                  onChange={(e) =>
+                  onChange={(e) => {
+                    const digits = e.target.value
+                      .replace(/\D/g, '')
+                      .slice(0, 4);
                     setManualAbonoForm({
                       ...manualAbonoForm,
-                      reference_number: e.target.value,
-                    })
+                      reference_number: digits,
+                    });
+                  }}
+                  placeholder={
+                    manualAbonoForm.payment_method === 'Efectivo $'
+                      ? 'Opcional en efectivo'
+                      : 'Últimos 4 dígitos (Ej: 1234)'
                   }
-                  placeholder="Ej. Ref #123456"
                   style={{
                     width: '100%',
                     padding: '8px',
@@ -13635,9 +14104,12 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                     fontSize: '13px',
                     fontWeight: '600',
                     marginBottom: '4px',
+                    color: '#dc2626',
                   }}
                 >
-                  Adjuntar Comprobante (Opcional)
+                  {manualAbonoForm.payment_method === 'Efectivo $'
+                    ? 'Adjuntar Foto de los Billetes *'
+                    : 'Adjuntar Comprobante *'}
                 </label>
                 <input
                   type="file"
