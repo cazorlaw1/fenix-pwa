@@ -8340,27 +8340,31 @@ export default function SalesModule() {
                               justifyContent: 'space-between',
                             }}
                           >
-                            <button
-                              onClick={() => handleEditNE(nota)}
-                              style={{
-                                padding: '6px',
-                                backgroundColor: '#F3F4F6',
-                                color: '#4F46E5',
-                                border: '1px solid #D1D5DB',
-                                borderRadius: '6px',
-                                fontSize: '11px',
-                                fontWeight: '700',
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '4px',
-                                flex: 1,
-                                justifyContent: 'center',
-                              }}
-                            >
-                              <Edit style={{ width: '13px', height: '13px' }} />{' '}
-                              Editar
-                            </button>
+                            {!isAprobada && (
+                              <button
+                                onClick={() => handleEditNE(nota)}
+                                style={{
+                                  padding: '6px',
+                                  backgroundColor: '#F3F4F6',
+                                  color: '#4F46E5',
+                                  border: '1px solid #D1D5DB',
+                                  borderRadius: '6px',
+                                  fontSize: '11px',
+                                  fontWeight: '700',
+                                  cursor: 'pointer',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                  flex: 1,
+                                  justifyContent: 'center',
+                                }}
+                              >
+                                <Edit
+                                  style={{ width: '13px', height: '13px' }}
+                                />{' '}
+                                Editar
+                              </button>
+                            )}
                             <button
                               disabled={!isAprobada || loading}
                               onClick={() => handleDownloadPDF(nota)}
@@ -8733,25 +8737,29 @@ export default function SalesModule() {
                               justifyContent: 'space-between',
                             }}
                           >
-                            <button
-                              onClick={() => handleEditNE(nota)}
-                              style={{
-                                padding: '4px 8px',
-                                backgroundColor: '#F3F4F6',
-                                color: '#4F46E5',
-                                border: '1px solid #D1D5DB',
-                                borderRadius: '6px',
-                                fontSize: '11px',
-                                fontWeight: '700',
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '4px',
-                              }}
-                            >
-                              <Edit style={{ width: '13px', height: '13px' }} />{' '}
-                              Editar
-                            </button>
+                            {!isAprobada && (
+                              <button
+                                onClick={() => handleEditNE(nota)}
+                                style={{
+                                  padding: '4px 8px',
+                                  backgroundColor: '#F3F4F6',
+                                  color: '#4F46E5',
+                                  border: '1px solid #D1D5DB',
+                                  borderRadius: '6px',
+                                  fontSize: '11px',
+                                  fontWeight: '700',
+                                  cursor: 'pointer',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                }}
+                              >
+                                <Edit
+                                  style={{ width: '13px', height: '13px' }}
+                                />{' '}
+                                Editar
+                              </button>
+                            )}
                             <button
                               disabled={!isAprobada || loading}
                               onClick={() => handleDownloadPDF(nota)}
