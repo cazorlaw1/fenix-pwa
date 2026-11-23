@@ -14,6 +14,311 @@ import {
   Search,
 } from 'lucide-react';
 
+const VENEZUELA_ESTADOS_CIUDADES = {
+  Amazonas: [
+    'Puerto Ayacucho',
+    'San Fernando de Atabapo',
+    'Maroa',
+    'San Carlos de Río Negro',
+    'La Esmeralda',
+    'Isla Ratón',
+    'San Juan de Manapiare',
+  ],
+  Anzoátegui: [
+    'Barcelona',
+    'Puerto La Cruz',
+    'Lechería',
+    'Guanta',
+    'El Tigre',
+    'Anaco',
+    'Cantaura',
+    'Puerto Píritu',
+    'Clarines',
+    'Pariaguán',
+    'San José de Guanipa',
+    'Aragua de Barcelona',
+    'Boca de Uchire',
+    'Soledad',
+    'Valle de Guanape',
+    'Onoto',
+  ],
+  Apure: [
+    'San Fernando de Apure',
+    'Guasdualito',
+    'Achaguas',
+    'Biruaca',
+    'Elorza',
+    'Bruzual',
+    'Mantecal',
+    'San Juan de Payara',
+    'Puerto Páez',
+  ],
+  Aragua: [
+    'Maracay',
+    'Turmero',
+    'La Victoria',
+    'Cagua',
+    'Villa de Cura',
+    'El Limón',
+    'Palo Negro',
+    'Santa Rita',
+    'San Mateo',
+    'Las Tejerías',
+    'Colonia Tovar',
+    'San Sebastián de los Reyes',
+    'San Casimiro',
+    'Camatagua',
+    'Barbacoas',
+    'Choroní',
+    'Ocumare de la Costa',
+    'Magdaleno',
+    'Tocorón',
+  ],
+  Barinas: [
+    'Barinas',
+    'Socopó',
+    'Barinitas',
+    'Santa Bárbara',
+    'Sabaneta',
+    'Ciudad Bolivia',
+    'Libertad',
+    'Barrancas',
+    'Obispos',
+    'Arismendi',
+  ],
+  Bolívar: [
+    'Ciudad Guayana',
+    'Puerto Ordaz',
+    'San Félix',
+    'Ciudad Bolívar',
+    'Upata',
+    'Caicara del Orinoco',
+    'Santa Elena de Uairén',
+    'Guasipati',
+    'Tumeremo',
+    'El Callao',
+    'Maripa',
+    'El Palmar',
+  ],
+  Carabobo: [
+    'Valencia',
+    'Puerto Cabello',
+    'Guacara',
+    'Naguanagua',
+    'San Diego',
+    'Los Guayos',
+    'Tocuyito',
+    'Mariara',
+    'Güigüe',
+    'Bejuma',
+    'Miranda',
+    'Montalbán',
+    'Morón',
+    'San Joaquín',
+  ],
+  Cojedes: [
+    'San Carlos',
+    'Tinaquillo',
+    'Tinaco',
+    'El Baúl',
+    'Las Vegas',
+    'El Pao',
+    'Macapo',
+    'Cojedes',
+  ],
+  'Delta Amacuro': ['Tucupita', 'Pedernales', 'Curiapo', 'Sierra Imataca'],
+  'Distrito Capital': ['Caracas'],
+  Falcón: [
+    'Coro',
+    'Punto Fijo',
+    'Judibana',
+    'Tucacas',
+    'Chichiriviche',
+    'Dabajuro',
+    'Churuguara',
+    'La Vela de Coro',
+    'Puerto Cumarebo',
+    'Mene de Mauroa',
+    'Santa Cruz de Bucaral',
+    'Mirimire',
+    'Pueblo Nuevo',
+  ],
+  Guárico: [
+    'San Juan de los Morros',
+    'Valle de la Pascua',
+    'Calabozo',
+    'Zaraza',
+    'Altagracia de Orituco',
+    'Tucupido',
+    'El Socorro',
+    'Camaguán',
+    'Las Mercedes del Llano',
+    'Chaguaramas',
+    'Ortiz',
+  ],
+  'La Guaira': [
+    'La Guaira',
+    'Maiquetía',
+    'Catia La Mar',
+    'Caraballeda',
+    'Macuto',
+    'Naiguatá',
+    'Carayaca',
+    'El Junko',
+  ],
+  Lara: [
+    'Barquisimeto',
+    'Cabudare',
+    'Carora',
+    'El Tocuyo',
+    'Quíbor',
+    'Duaca',
+    'Siquisique',
+    'Sarare',
+    'Cubiro',
+    'Sanare',
+  ],
+  Mérida: [
+    'Mérida',
+    'El Vigía',
+    'Ejido',
+    'Tovar',
+    'Lagunillas',
+    'Mucuchíes',
+    'Timotes',
+    'Bailadores',
+    'Santa Cruz de Mora',
+    'Nueva Bolivia',
+    'Santo Domingo',
+    'Tabay',
+  ],
+  Miranda: [
+    'Los Teques',
+    'Guarenas',
+    'Guatire',
+    'Charallave',
+    'Ocumare del Tuy',
+    'Santa Teresa del Tuy',
+    'Cúa',
+    'Higuerote',
+    'Río Chico',
+    'San Antonio de los Altos',
+    'Carrizal',
+    'Baruta',
+    'Chacao',
+    'Petare',
+    'Caucagua',
+    'San Francisco de Yare',
+    'Tacarigua',
+  ],
+  Monagas: [
+    'Maturín',
+    'Punta de Mata',
+    'Caripito',
+    'Temblador',
+    'Caripe',
+    'Aragua de Maturín',
+    'Caicara de Maturín',
+    'Quiriquire',
+    'Barrancas del Orinoco',
+    'Aguasay',
+  ],
+  'Nueva Esparta': [
+    'Porlamar',
+    'La Asunción',
+    'Pampatar',
+    'Juan Griego',
+    'El Valle del Espíritu Santo',
+    'San Juan Bautista',
+    'Punta de Piedras',
+    'Santa Ana',
+    'Boca del Río',
+    'Altagracia',
+  ],
+  Portuguesa: [
+    'Guanare',
+    'Acarigua',
+    'Araure',
+    'Turén',
+    'Biscucuy',
+    'Ospino',
+    'Píritu',
+    'Agua Blanca',
+    'Boconoíto',
+    'Guanarito',
+  ],
+  Sucre: [
+    'Cumaná',
+    'Carúpano',
+    'Güiria',
+    'Cumanacoa',
+    'Cariaco',
+    'Río Caribe',
+    'Araya',
+    'Irapa',
+    'Tunapuy',
+    'Casanay',
+    'Marigüitar',
+  ],
+  Táchira: [
+    'San Cristóbal',
+    'Táriba',
+    'San Antonio del Táchira',
+    'Rubio',
+    'La Grita',
+    'Ureña',
+    'Colón',
+    'Michelena',
+    'Palmira',
+    'Capacho',
+    'Santa Ana del Táchira',
+    'Abejales',
+    'Lobatera',
+    'Cordero',
+  ],
+  Trujillo: [
+    'Valera',
+    'Trujillo',
+    'Boconó',
+    'Sabana de Mendoza',
+    'Betijoque',
+    'Escuque',
+    'Carache',
+    'Motatán',
+    'Pampán',
+    'Pampanito',
+    'Monay',
+  ],
+  Yaracuy: [
+    'San Felipe',
+    'Yaritagua',
+    'Chivacoa',
+    'Nirgua',
+    'Cocorote',
+    'Urachiche',
+    'Aroa',
+    'Boraure',
+    'Sabana de Parra',
+    'Guama',
+  ],
+  Zulia: [
+    'Maracaibo',
+    'Cabimas',
+    'Ciudad Ojeda',
+    'Machiques',
+    'Santa Bárbara del Zulia',
+    'San Francisco',
+    'Los Puertos de Altagracia',
+    'Villa del Rosario',
+    'Mene Grande',
+    'Bachaquero',
+    'La Concepción',
+    'Sinamaica',
+    'Casigua El Cubo',
+    'Encontrados',
+  ],
+};
+
 export default function Users() {
   const getInitialTab = () => {
     if (typeof window !== 'undefined') {
@@ -481,6 +786,37 @@ export default function Users() {
       return;
     }
 
+    const normalizedCi = (newClientData.ci_number || '').trim().toLowerCase();
+    const normalizedRif = (newClientData.rif_number || '').trim().toLowerCase();
+
+    if (normalizedCi) {
+      const existingCiClient = clientsList.find(
+        (c) => (c.ci_number || '').trim().toLowerCase() === normalizedCi
+      );
+      if (existingCiClient) {
+        alert(
+          `Esta C.I. (${newClientData.ci_number.trim()}) ya la tiene el cliente "${
+            existingCiClient.name
+          }".`
+        );
+        return;
+      }
+    }
+
+    if (normalizedRif) {
+      const existingRifClient = clientsList.find(
+        (c) => (c.rif_number || '').trim().toLowerCase() === normalizedRif
+      );
+      if (existingRifClient) {
+        alert(
+          `Este RIF (${newClientData.rif_number.trim()}) ya lo tiene el cliente "${
+            existingRifClient.name
+          }".`
+        );
+        return;
+      }
+    }
+
     setCreatingClient(true);
     try {
       // Subir archivos primero
@@ -655,9 +991,6 @@ export default function Users() {
         ...prev,
         formData: { ...prev.formData, [field]: data.publicUrl },
       }));
-
-      // Guardar referencia del archivo nuevo para manejarlo en el guardado final si es necesario
-      // Pero aquí ya tenemos la URL pública, así que el guardado final usará esta URL.
     } catch (err) {
       alert('Error subiendo archivo: ' + err.message);
     } finally {
@@ -682,14 +1015,50 @@ export default function Users() {
 
   const saveClientChanges = async () => {
     if (!clientEditModal.client) return;
+
+    const normalizedCi = (clientEditModal.formData.ci_number || '')
+      .trim()
+      .toLowerCase();
+    const normalizedRif = (clientEditModal.formData.rif_number || '')
+      .trim()
+      .toLowerCase();
+
+    if (normalizedCi) {
+      const existingCiClient = clientsList.find(
+        (c) =>
+          c.id !== clientEditModal.client.id &&
+          (c.ci_number || '').trim().toLowerCase() === normalizedCi
+      );
+      if (existingCiClient) {
+        alert(
+          `Esta C.I. (${clientEditModal.formData.ci_number.trim()}) ya la tiene el cliente "${
+            existingCiClient.name
+          }".`
+        );
+        return;
+      }
+    }
+
+    if (normalizedRif) {
+      const existingRifClient = clientsList.find(
+        (c) =>
+          c.id !== clientEditModal.client.id &&
+          (c.rif_number || '').trim().toLowerCase() === normalizedRif
+      );
+      if (existingRifClient) {
+        alert(
+          `Este RIF (${clientEditModal.formData.rif_number.trim()}) ya lo tiene el cliente "${
+            existingRifClient.name
+          }".`
+        );
+        return;
+      }
+    }
+
     setSavingClient(true);
     try {
       const { _old_ci_photo, _old_rif_photo, _old_additional_doc, ...updates } =
         clientEditModal.formData;
-
-      // Eliminar archivos antiguos solo si han sido sustituidos (la URL cambió)
-      // Nota: Como handleClientFileUpload ya actualiza la URL en formData,
-      // comparamos con los valores "_old" guardados al abrir el modal.
 
       if (_old_ci_photo && _old_ci_photo !== updates.ci_photo_url) {
         await deleteOldFile(_old_ci_photo, 'documents');
@@ -1874,7 +2243,7 @@ export default function Users() {
                   <th style={{ padding: '10px' }}>Foto</th>
                   <th style={{ padding: '10px' }}>Nombre</th>
                   <th style={{ padding: '10px' }}>C.I.</th>
-                  <th style={{ padding: '10px' }}>Ciudad</th>
+                  <th style={{ padding: '10px' }}>Estado</th>
                   <th style={{ padding: '10px' }}>Documento CI</th>
                   <th style={{ padding: '10px' }}>Acción</th>
                 </tr>
@@ -2040,8 +2409,7 @@ export default function Users() {
                             className="desktop-cell-normal"
                             style={{ padding: '10px' }}
                           >
-                            <input
-                              type="text"
+                            <select
                               value={profileFormData.city}
                               onChange={(e) =>
                                 handleProfileFieldChange('city', e.target.value)
@@ -2051,8 +2419,26 @@ export default function Users() {
                                 padding: '4px',
                                 border: '1px solid #ccc',
                                 borderRadius: '4px',
+                                backgroundColor: '#ffffff',
                               }}
-                            />
+                            >
+                              <option value="">Seleccionar Estado</option>
+                              {profileFormData.city &&
+                                !VENEZUELA_ESTADOS_CIUDADES[
+                                  profileFormData.city
+                                ] && (
+                                  <option value={profileFormData.city}>
+                                    {profileFormData.city}
+                                  </option>
+                                )}
+                              {Object.keys(VENEZUELA_ESTADOS_CIUDADES).map(
+                                (estado) => (
+                                  <option key={estado} value={estado}>
+                                    {estado}
+                                  </option>
+                                )
+                              )}
+                            </select>
                           </td>
                           <td
                             className="desktop-cell-normal"
@@ -2295,9 +2681,7 @@ export default function Users() {
                                   borderRadius: '4px',
                                 }}
                               />
-                              <input
-                                type="text"
-                                placeholder="Ciudad"
+                              <select
                                 value={profileFormData.city}
                                 onChange={(e) =>
                                   handleProfileFieldChange(
@@ -2309,8 +2693,26 @@ export default function Users() {
                                   padding: '8px',
                                   border: '1px solid #ccc',
                                   borderRadius: '4px',
+                                  backgroundColor: '#ffffff',
                                 }}
-                              />
+                              >
+                                <option value="">Seleccionar Estado</option>
+                                {profileFormData.city &&
+                                  !VENEZUELA_ESTADOS_CIUDADES[
+                                    profileFormData.city
+                                  ] && (
+                                    <option value={profileFormData.city}>
+                                      {profileFormData.city}
+                                    </option>
+                                  )}
+                                {Object.keys(VENEZUELA_ESTADOS_CIUDADES).map(
+                                  (estado) => (
+                                    <option key={estado} value={estado}>
+                                      {estado}
+                                    </option>
+                                  )
+                                )}
+                              </select>
                               <div
                                 style={{
                                   display: 'flex',
@@ -2652,7 +3054,7 @@ export default function Users() {
                               }}
                             >
                               <div>CI: {user.ci || '-'}</div>
-                              <div>Ciudad: {user.city || '-'}</div>
+                              <div>Estado: {user.city || '-'}</div>
                               <div>
                                 Doc:{' '}
                                 {user.ci_url ? (
@@ -2741,7 +3143,7 @@ export default function Users() {
             </h3>
             <input
               type="text"
-              placeholder="Buscar cliente..."
+              placeholder="Buscar cliente, CI, RIF o asignado..."
               value={clientSearch}
               onChange={(e) => setClientSearch(e.target.value)}
               style={{
@@ -2909,10 +3311,34 @@ export default function Users() {
                       fontSize: '13px',
                     }}
                   />
-                  <input
-                    type="text"
-                    placeholder="Ciudad *"
+                  <select
                     required
+                    value={newClientData.state}
+                    onChange={(e) =>
+                      setNewClientData({
+                        ...newClientData,
+                        state: e.target.value,
+                        city: '',
+                      })
+                    }
+                    style={{
+                      padding: '8px',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '6px',
+                      fontSize: '13px',
+                      backgroundColor: '#ffffff',
+                    }}
+                  >
+                    <option value="">Estado *</option>
+                    {Object.keys(VENEZUELA_ESTADOS_CIUDADES).map((estado) => (
+                      <option key={estado} value={estado}>
+                        {estado}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    required
+                    disabled={!newClientData.state}
                     value={newClientData.city}
                     onChange={(e) =>
                       setNewClientData({
@@ -2925,26 +3351,24 @@ export default function Users() {
                       border: '1px solid #d1d5db',
                       borderRadius: '6px',
                       fontSize: '13px',
+                      backgroundColor: newClientData.state
+                        ? '#ffffff'
+                        : '#f3f4f6',
                     }}
-                  />
-                  <input
-                    type="text"
-                    placeholder="Estado *"
-                    required
-                    value={newClientData.state}
-                    onChange={(e) =>
-                      setNewClientData({
-                        ...newClientData,
-                        state: e.target.value,
-                      })
-                    }
-                    style={{
-                      padding: '8px',
-                      border: '1px solid #d1d5db',
-                      borderRadius: '6px',
-                      fontSize: '13px',
-                    }}
-                  />
+                  >
+                    <option value="">
+                      {newClientData.state
+                        ? 'Ciudad *'
+                        : 'Seleccione un Estado primero *'}
+                    </option>
+                    {(
+                      VENEZUELA_ESTADOS_CIUDADES[newClientData.state] || []
+                    ).map((ciudad) => (
+                      <option key={ciudad} value={ciudad}>
+                        {ciudad}
+                      </option>
+                    ))}
+                  </select>
                   <input
                     type="text"
                     placeholder="Dirección Completa *"
@@ -3379,7 +3803,7 @@ export default function Users() {
                   >
                     <th style={{ padding: '10px' }}>Nombre / CI / RIF</th>
                     <th style={{ padding: '10px' }}>Datos Adjuntos</th>
-                    <th style={{ padding: '10px' }}>Registrado Por</th>
+                    <th style={{ padding: '10px' }}>Cliente Asignado</th>
                     <th style={{ padding: '10px', textAlign: 'center' }}>
                       N.E. Pendientes
                     </th>
@@ -3405,18 +3829,18 @@ export default function Users() {
                 </thead>
                 <tbody>
                   {clientsList
-                    .filter(
-                      (c) =>
-                        c.name
-                          ?.toLowerCase()
-                          .includes(clientSearch.toLowerCase()) ||
-                        c.ci_number
-                          ?.toLowerCase()
-                          .includes(clientSearch.toLowerCase()) ||
-                        c.rif_number
-                          ?.toLowerCase()
-                          .includes(clientSearch.toLowerCase())
-                    )
+                    .filter((c) => {
+                      const q = clientSearch.toLowerCase();
+                      const assignedName = (
+                        c.profiles?.full_name || 'Sin Asignar'
+                      ).toLowerCase();
+                      return (
+                        c.name?.toLowerCase().includes(q) ||
+                        c.ci_number?.toLowerCase().includes(q) ||
+                        c.rif_number?.toLowerCase().includes(q) ||
+                        assignedName.includes(q)
+                      );
+                    })
                     .map((client) => {
                       const isPotential = client.is_potential;
                       const nePendientes = (client.sales_orders || []).filter(
@@ -3787,7 +4211,7 @@ export default function Users() {
                                     display: 'block',
                                   }}
                                 >
-                                  Asignado a:
+                                  Cliente Asignado:
                                 </span>
                                 {editingAssignmentId === client.id ? (
                                   <div
@@ -4374,21 +4798,44 @@ export default function Users() {
                       marginBottom: '4px',
                     }}
                   >
-                    Ciudad
+                    Estado
                   </label>
-                  <input
-                    type="text"
-                    value={clientEditModal.formData.city}
-                    onChange={(e) =>
-                      handleClientFieldChange('city', e.target.value)
-                    }
+                  <select
+                    value={clientEditModal.formData.state}
+                    onChange={(e) => {
+                      const newState = e.target.value;
+                      setClientEditModal((prev) => ({
+                        ...prev,
+                        formData: {
+                          ...prev.formData,
+                          state: newState,
+                          city: '',
+                        },
+                      }));
+                    }}
                     style={{
                       width: '100%',
                       padding: '8px',
                       border: '1px solid #d1d5db',
                       borderRadius: '6px',
+                      backgroundColor: '#fff',
                     }}
-                  />
+                  >
+                    <option value="">Seleccionar Estado</option>
+                    {clientEditModal.formData.state &&
+                      !VENEZUELA_ESTADOS_CIUDADES[
+                        clientEditModal.formData.state
+                      ] && (
+                        <option value={clientEditModal.formData.state}>
+                          {clientEditModal.formData.state}
+                        </option>
+                      )}
+                    {Object.keys(VENEZUELA_ESTADOS_CIUDADES).map((estado) => (
+                      <option key={estado} value={estado}>
+                        {estado}
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 <div>
                   <label
@@ -4400,21 +4847,49 @@ export default function Users() {
                       marginBottom: '4px',
                     }}
                   >
-                    Estado
+                    Ciudad
                   </label>
-                  <input
-                    type="text"
-                    value={clientEditModal.formData.state}
+                  <select
+                    disabled={!clientEditModal.formData.state}
+                    value={clientEditModal.formData.city}
                     onChange={(e) =>
-                      handleClientFieldChange('state', e.target.value)
+                      handleClientFieldChange('city', e.target.value)
                     }
                     style={{
                       width: '100%',
                       padding: '8px',
                       border: '1px solid #d1d5db',
                       borderRadius: '6px',
+                      backgroundColor: clientEditModal.formData.state
+                        ? '#fff'
+                        : '#f3f4f6',
                     }}
-                  />
+                  >
+                    <option value="">
+                      {clientEditModal.formData.state
+                        ? 'Seleccionar Ciudad'
+                        : 'Seleccione un Estado primero'}
+                    </option>
+                    {clientEditModal.formData.city &&
+                      !(
+                        VENEZUELA_ESTADOS_CIUDADES[
+                          clientEditModal.formData.state
+                        ] || []
+                      ).includes(clientEditModal.formData.city) && (
+                        <option value={clientEditModal.formData.city}>
+                          {clientEditModal.formData.city}
+                        </option>
+                      )}
+                    {(
+                      VENEZUELA_ESTADOS_CIUDADES[
+                        clientEditModal.formData.state
+                      ] || []
+                    ).map((ciudad) => (
+                      <option key={ciudad} value={ciudad}>
+                        {ciudad}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
 

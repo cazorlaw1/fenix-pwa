@@ -23,10 +23,11 @@ export default function Login() {
         body: {
           type: 'new_user',
           payload: {
-            usuarioNombre: userProfile.full_name || userProfile.email.split('@')[0],
-            usuarioEmail: userProfile.email
-          }
-        }
+            usuarioNombre:
+              userProfile.full_name || userProfile.email.split('@')[0],
+            usuarioEmail: userProfile.email,
+          },
+        },
       });
     } catch (err) {
       console.error('Error enviando notificación de nuevo usuario:', err);
@@ -49,12 +50,12 @@ export default function Login() {
           },
         });
         if (error) throw error;
-        
+
         if (data?.user) {
           // ✅ NUEVO: Llamar a la notificación inmediatamente después del registro exitoso
           await notifyNewUser({
             email: email,
-            full_name: fullName
+            full_name: fullName,
           });
 
           setMessage(
@@ -96,7 +97,8 @@ export default function Login() {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: 'https://hxlwrlzucnpdqofxjelg.supabase.co/auth/v1/callback',
+          redirectTo:
+            'https://hxlwrlzucnpdqofxjelg.supabase.co/auth/v1/callback',
           queryParams: {
             access_type: 'offline',
             prompt: 'consent',
@@ -114,7 +116,9 @@ export default function Login() {
   const handleResetPassword = async (e) => {
     e.preventDefault();
     if (!email) {
-      setMessage('Por favor, escribe tu correo electrónico para recuperar la contraseña.');
+      setMessage(
+        'Por favor, escribe tu correo electrónico para recuperar la contraseña.'
+      );
       return;
     }
 
@@ -128,7 +132,9 @@ export default function Login() {
 
       if (error) throw error;
 
-      setMessage('¡Listo! Revisa tu correo electrónico. Te hemos enviado un enlace para restablecer tu contraseña.');
+      setMessage(
+        '¡Listo! Revisa tu correo electrónico. Te hemos enviado un enlace para restablecer tu contraseña.'
+      );
     } catch (err) {
       setMessage(err.message || 'Error al enviar el correo de recuperación.');
     } finally {
@@ -260,7 +266,11 @@ export default function Login() {
                   textAlign: 'left',
                 }}
               >
-                {isForgotPassword ? 'RECUPERAR' : isRegistering ? 'REGISTRO' : 'INICIAR SESIÓN'}
+                {isForgotPassword
+                  ? 'RECUPERAR'
+                  : isRegistering
+                  ? 'REGISTRO'
+                  : 'INICIAR SESIÓN'}
               </h1>
               <p
                 style={{
@@ -278,7 +288,7 @@ export default function Login() {
                 . Gestión de repuestos automotrices.
               </p>
             </div>
-            
+
             <div
               className="login-logo-container"
               style={{
@@ -335,7 +345,7 @@ export default function Login() {
                 </div>
               </div>
             </div>
-            
+
             <div>
               <p
                 style={{
@@ -398,7 +408,9 @@ export default function Login() {
                       textTransform: 'uppercase',
                       cursor: 'pointer',
                       color: isRegistering ? '#D4AF37' : '#9ca3af',
-                      borderBottom: isRegistering ? '2px solid #D4AF37' : 'none',
+                      borderBottom: isRegistering
+                        ? '2px solid #D4AF37'
+                        : 'none',
                       paddingBottom: '4px',
                     }}
                   >
@@ -437,7 +449,9 @@ export default function Login() {
                       textTransform: 'uppercase',
                       cursor: 'pointer',
                       color: !isRegistering ? '#D4AF37' : '#9ca3af',
-                      borderBottom: !isRegistering ? '2px solid #D4AF37' : 'none',
+                      borderBottom: !isRegistering
+                        ? '2px solid #D4AF37'
+                        : 'none',
                       paddingBottom: '4px',
                     }}
                   >
@@ -453,9 +467,15 @@ export default function Login() {
                       fontSize: '12px',
                       textAlign: 'center',
                       borderRadius: '10px',
-                      backgroundColor: message.includes('¡Listo!') ? '#f0fdf4' : '#fef2f2',
-                      color: message.includes('¡Listo!') ? '#166534' : '#b91c1c',
-                      border: `1px solid ${message.includes('¡Listo!') ? '#bbf7d0' : '#fecaca'}`,
+                      backgroundColor: message.includes('¡Listo!')
+                        ? '#f0fdf4'
+                        : '#fef2f2',
+                      color: message.includes('¡Listo!')
+                        ? '#166534'
+                        : '#b91c1c',
+                      border: `1px solid ${
+                        message.includes('¡Listo!') ? '#bbf7d0' : '#fecaca'
+                      }`,
                     }}
                   >
                     {message}
@@ -706,7 +726,11 @@ export default function Login() {
                   }}
                 >
                   <span
-                    style={{ height: '1px', backgroundColor: '#e5e7eb', flex: 1 }}
+                    style={{
+                      height: '1px',
+                      backgroundColor: '#e5e7eb',
+                      flex: 1,
+                    }}
                   ></span>
                   <span
                     style={{
@@ -719,7 +743,11 @@ export default function Login() {
                     O
                   </span>
                   <span
-                    style={{ height: '1px', backgroundColor: '#e5e7eb', flex: 1 }}
+                    style={{
+                      height: '1px',
+                      backgroundColor: '#e5e7eb',
+                      flex: 1,
+                    }}
                   ></span>
                 </div>
 
@@ -755,7 +783,11 @@ export default function Login() {
                     <img
                       src="https://www.svgrepo.com/show/475656/google-color.svg"
                       alt="Google"
-                      style={{ width: '18px', height: '18px', display: 'block' }}
+                      style={{
+                        width: '18px',
+                        height: '18px',
+                        display: 'block',
+                      }}
                     />
                     <span>
                       {isRegistering
@@ -779,11 +811,25 @@ export default function Login() {
                 }}
               >
                 <div style={{ textAlign: 'center' }}>
-                  <h3 style={{ fontSize: '15px', color: '#000000', margin: '0 0 6px 0' }}>
+                  <h3
+                    style={{
+                      fontSize: '15px',
+                      color: '#000000',
+                      margin: '0 0 6px 0',
+                    }}
+                  >
                     Restablecer acceso
                   </h3>
-                  <p style={{ fontSize: '12px', color: '#6b7280', margin: 0, lineHeight: '1.4' }}>
-                    Ingresa tu correo y te enviaremos un enlace seguro para crear una nueva contraseña.
+                  <p
+                    style={{
+                      fontSize: '12px',
+                      color: '#6b7280',
+                      margin: 0,
+                      lineHeight: '1.4',
+                    }}
+                  >
+                    Ingresa tu correo y te enviaremos un enlace seguro para
+                    crear una nueva contraseña.
                   </p>
                 </div>
 
@@ -794,16 +840,29 @@ export default function Login() {
                       fontSize: '12px',
                       textAlign: 'center',
                       borderRadius: '10px',
-                      backgroundColor: message.includes('¡Listo!') ? '#f0fdf4' : '#fef2f2',
-                      color: message.includes('¡Listo!') ? '#166534' : '#b91c1c',
-                      border: `1px solid ${message.includes('¡Listo!') ? '#bbf7d0' : '#fecaca'}`,
+                      backgroundColor: message.includes('¡Listo!')
+                        ? '#f0fdf4'
+                        : '#fef2f2',
+                      color: message.includes('¡Listo!')
+                        ? '#166534'
+                        : '#b91c1c',
+                      border: `1px solid ${
+                        message.includes('¡Listo!') ? '#bbf7d0' : '#fecaca'
+                      }`,
                     }}
                   >
                     {message}
                   </div>
                 )}
 
-                <form onSubmit={handleResetPassword} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                <form
+                  onSubmit={handleResetPassword}
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '14px',
+                  }}
+                >
                   <div
                     style={{
                       display: 'flex',
