@@ -995,44 +995,23 @@ export default function Vendedores({ currentUser }) {
           monthlyOrders.forEach((o) => {
             const price = Number(o.final_price_usd || 0);
             facturadoNotasMes += price;
-
-            if (o.payment_status === 'cerrada') {
-              const cat = (o.category || 'bombillos').toLowerCase();
-              if (cat === 'fluidos') {
-                fluidosCount++;
-                fluidosBruto += price;
-              } else {
-                bombillosCount++;
-                bombillosBruto += price;
-              }
-            }
           });
 
-          // ===== "POR COBRAR" (Comisiones de notas cerradas de TODOS los meses y registros) =====
+          // ===== "POR COBRAR" Y RESUMEN DE COMISIONES (Todas las notas cerradas hasta el momento, sin filtro de mes) =====
           let totalComisionesHistoricasCerradas = 0;
           userOrders.forEach((o) => {
             if (o.payment_status === 'cerrada') {
               const price = Number(o.final_price_usd || 0);
               const cat = (o.category || 'bombillos').toLowerCase();
               if (cat === 'fluidos') {
+                fluidosCount++;
+                fluidosBruto += price;
                 totalComisionesHistoricasCerradas += price * (pctFluidos / 100);
               } else {
+                bombillosCount++;
+                bombillosBruto += price;
                 totalComisionesHistoricasCerradas +=
                   price * (pctBombillos / 100);
-              }
-            }
-          });
-
-          // Comisiones solo para el mes en curso
-          let comisionesMesCerradas = 0;
-          monthlyOrders.forEach((o) => {
-            if (o.payment_status === 'cerrada') {
-              const price = Number(o.final_price_usd || 0);
-              const cat = (o.category || 'bombillos').toLowerCase();
-              if (cat === 'fluidos') {
-                comisionesMesCerradas += price * (pctFluidos / 100);
-              } else {
-                comisionesMesCerradas += price * (pctBombillos / 100);
               }
             }
           });
@@ -1110,7 +1089,7 @@ export default function Vendedores({ currentUser }) {
             displayFacturado,
             displayPorCobrar,
             liquidadoGanancias,
-            comisionTotalUSD: comisionesMesCerradas,
+            comisionTotalUSD: totalComisionesHistoricasCerradas,
             bombillosCount,
             fluidosCount,
             bombillosBruto,
@@ -1794,8 +1773,16 @@ export default function Vendedores({ currentUser }) {
         {activeTab === 'comisiones' && (
           <KpiCard
             title="Total Comisiones ($)"
-            value={`$${stats.comisiones.toFixed(2)}`}
-            sub="De órdenes cerradas"
+            value={
+              selectedMonth === currentRealMonth
+                ? `$${stats.comisiones.toFixed(2)}`
+                : 'N/A'
+            }
+            sub={
+              selectedMonth === currentRealMonth
+                ? 'Todas las órdenes cerradas'
+                : 'Ir al mes actual'
+            }
             color="#D4AF37"
             border="#D4AF37"
           />
@@ -5401,7 +5388,7 @@ export default function Vendedores({ currentUser }) {
                       color: '#111827',
                     }}
                   >
-                    Resumen de Comisiones por Vendedor ({selectedMonth})
+                    Resumen de Comisiones por Vendedor
                   </h3>
                   <p
                     style={{
@@ -5410,245 +5397,315 @@ export default function Vendedores({ currentUser }) {
                       color: '#4b5563',
                     }}
                   >
-                    Cálculo de comisiones basado en las notas de entrega
-                    cerradas del mes calendario seleccionado.
+                    Cálculo detallado individual basado en todas las notas de
+                    entrega cerradas hasta el momento (sin filtro de mes).
                   </p>
                 </div>
 
-                <MobileSortBar
-                  tabla="comisiones"
-                  sortConfig={sortConfig.comisiones}
-                  onSort={handleSort}
-                  options={[
-                    { key: 'full_name', label: 'Nombre' },
-                    { key: 'pctBombillos', label: '% Asignado' },
-                    { key: 'bombillosBruto', label: 'Bombillos ($)' },
-                    { key: 'fluidosBruto', label: 'Fluidos ($)' },
-                    { key: 'comisionTotalUSD', label: 'Comisión Total ($)' },
-                  ]}
-                />
-
-                <table
-                  className="custom-responsive-table"
-                  style={{
-                    width: '100%',
-                    borderCollapse: 'collapse',
-                    fontSize: '13px',
-                    textAlign: 'left',
-                  }}
-                >
-                  <thead className="desktop-thead">
-                    <tr
+                {selectedMonth !== currentRealMonth ? (
+                  <div
+                    style={{
+                      padding: '32px 20px',
+                      textAlign: 'center',
+                      backgroundColor: '#fffbeb',
+                      border: '1px solid #fde68a',
+                      borderRadius: '10px',
+                      color: '#78350f',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: '12px',
+                    }}
+                  >
+                    <AlertTriangle size={28} color="#d97706" />
+                    <div style={{ fontSize: '14px', fontWeight: '800' }}>
+                      Para consultar el Resumen de Comisiones debes ir al mes
+                      actual ({currentRealMonth}).
+                    </div>
+                    <div style={{ fontSize: '12px', color: '#92400e' }}>
+                      Esta sección muestra el acumulado vigente de todas las
+                      notas cerradas hasta el momento.
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedMonth(currentRealMonth)}
                       style={{
-                        backgroundColor: '#f9fafb',
-                        borderBottom: '1px solid #e5e7eb',
-                        color: '#4b5563',
+                        backgroundColor: '#111827',
+                        color: '#D4AF37',
+                        border: 'none',
+                        padding: '8px 16px',
+                        borderRadius: '6px',
+                        fontWeight: '700',
+                        fontSize: '12px',
+                        cursor: 'pointer',
                       }}
                     >
-                      <SortableHeader
-                        label="Nombre"
-                        sortKey="full_name"
-                        tabla="comisiones"
-                        sortConfig={sortConfig.comisiones}
-                        onSort={handleSort}
-                      />
-                      <SortableHeader
-                        label="% Asignado"
-                        sortKey="pctBombillos"
-                        tabla="comisiones"
-                        sortConfig={sortConfig.comisiones}
-                        onSort={handleSort}
-                      />
-                      <th style={{ padding: '10px', textAlign: 'center' }}>
-                        Bombillos (Cnt / $)
-                      </th>
-                      <th style={{ padding: '10px', textAlign: 'center' }}>
-                        Fluidos (Cnt / $)
-                      </th>
-                      <SortableHeader
-                        label="Comisión Total ($)"
-                        sortKey="comisionTotalUSD"
-                        tabla="comisiones"
-                        sortConfig={sortConfig.comisiones}
-                        onSort={handleSort}
-                        align="right"
-                      />
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {sortedVendedoresComisiones.length === 0 ? (
-                      <tr>
-                        <td
-                          colSpan="5"
+                      Ir al Mes Actual ({currentRealMonth})
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <MobileSortBar
+                      tabla="comisiones"
+                      sortConfig={sortConfig.comisiones}
+                      onSort={handleSort}
+                      options={[
+                        { key: 'full_name', label: 'Nombre' },
+                        { key: 'pctBombillos', label: '% Asignado' },
+                        { key: 'bombillosBruto', label: 'Bombillos ($)' },
+                        { key: 'fluidosBruto', label: 'Fluidos ($)' },
+                        {
+                          key: 'comisionTotalUSD',
+                          label: 'Comisión Total ($)',
+                        },
+                      ]}
+                    />
+
+                    <table
+                      className="custom-responsive-table"
+                      style={{
+                        width: '100%',
+                        borderCollapse: 'collapse',
+                        fontSize: '13px',
+                        textAlign: 'left',
+                      }}
+                    >
+                      <thead className="desktop-thead">
+                        <tr
                           style={{
-                            padding: '24px',
-                            textAlign: 'center',
+                            backgroundColor: '#f9fafb',
+                            borderBottom: '1px solid #e5e7eb',
                             color: '#4b5563',
                           }}
                         >
-                          No hay comisiones registradas en este período.
-                        </td>
-                      </tr>
-                    ) : (
-                      sortedVendedoresComisiones.map((v) => (
-                        <tr
-                          key={v.id}
-                          className="responsive-table-row"
-                          style={{ borderBottom: '1px solid #e5e7eb' }}
-                        >
-                          <td
-                            className="desktop-cell-normal"
-                            style={{
-                              padding: '10px',
-                              fontWeight: '600',
-                              color: '#111827',
-                            }}
-                          >
-                            {v.full_name || 'Sin Nombre'}
-                          </td>
-                          <td
-                            className="desktop-cell-normal"
-                            style={{
-                              padding: '10px',
-                              fontSize: '12px',
-                              color: '#111827',
-                            }}
-                          >
-                            {v.pctAsignado}
-                          </td>
-                          <td
-                            className="desktop-cell-normal"
-                            style={{ padding: '10px', textAlign: 'center' }}
-                          >
-                            <div
-                              style={{ fontWeight: '700', color: '#111827' }}
-                            >
-                              {v.bombillosCount} un.
-                            </div>
-                            <div style={{ fontSize: '11px', color: '#4b5563' }}>
-                              ${v.bombillosBruto.toLocaleString()}
-                            </div>
-                          </td>
-                          <td
-                            className="desktop-cell-normal"
-                            style={{ padding: '10px', textAlign: 'center' }}
-                          >
-                            <div
-                              style={{ fontWeight: '700', color: '#111827' }}
-                            >
-                              {v.fluidosCount} un.
-                            </div>
-                            <div style={{ fontSize: '11px', color: '#4b5563' }}>
-                              ${v.fluidosBruto.toLocaleString()}
-                            </div>
-                          </td>
-                          <td
-                            className="desktop-cell-normal"
-                            style={{
-                              padding: '10px',
-                              textAlign: 'right',
-                              fontWeight: '800',
-                              color: '#111827',
-                            }}
-                          >
-                            ${v.comisionTotalUSD.toFixed(2)}
-                          </td>
-                          <td
-                            className="mobile-cell-stacked"
-                            style={{ display: 'none' }}
-                          >
-                            <div
+                          <SortableHeader
+                            label="Nombre"
+                            sortKey="full_name"
+                            tabla="comisiones"
+                            sortConfig={sortConfig.comisiones}
+                            onSort={handleSort}
+                          />
+                          <SortableHeader
+                            label="% Asignado"
+                            sortKey="pctBombillos"
+                            tabla="comisiones"
+                            sortConfig={sortConfig.comisiones}
+                            onSort={handleSort}
+                          />
+                          <th style={{ padding: '10px', textAlign: 'center' }}>
+                            Bombillos (Cnt / $)
+                          </th>
+                          <th style={{ padding: '10px', textAlign: 'center' }}>
+                            Fluidos (Cnt / $)
+                          </th>
+                          <SortableHeader
+                            label="Comisión Total ($)"
+                            sortKey="comisionTotalUSD"
+                            tabla="comisiones"
+                            sortConfig={sortConfig.comisiones}
+                            onSort={handleSort}
+                            align="right"
+                          />
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {sortedVendedoresComisiones.length === 0 ? (
+                          <tr>
+                            <td
+                              colSpan="5"
                               style={{
-                                display: 'flex',
-                                justifyContent: 'space-between',
-                                alignItems: 'center',
-                                borderBottom: '1px solid #e5e7eb',
-                                paddingBottom: '6px',
+                                padding: '24px',
+                                textAlign: 'center',
+                                color: '#4b5563',
                               }}
                             >
-                              <span
+                              No hay comisiones registradas hasta el momento.
+                            </td>
+                          </tr>
+                        ) : (
+                          sortedVendedoresComisiones.map((v) => (
+                            <tr
+                              key={v.id}
+                              className="responsive-table-row"
+                              style={{ borderBottom: '1px solid #e5e7eb' }}
+                            >
+                              <td
+                                className="desktop-cell-normal"
                                 style={{
-                                  fontWeight: '800',
-                                  fontSize: '14px',
+                                  padding: '10px',
+                                  fontWeight: '600',
                                   color: '#111827',
                                 }}
                               >
                                 {v.full_name || 'Sin Nombre'}
-                              </span>
-                              <span
+                              </td>
+                              <td
+                                className="desktop-cell-normal"
                                 style={{
-                                  fontSize: '11px',
-                                  backgroundColor: '#f3f4f6',
-                                  padding: '2px 6px',
-                                  borderRadius: '4px',
-                                  fontWeight: '600',
-                                  color: '#4b5563',
+                                  padding: '10px',
+                                  fontSize: '12px',
+                                  color: '#111827',
                                 }}
                               >
                                 {v.pctAsignado}
-                              </span>
-                            </div>
-                            <div
-                              style={{
-                                display: 'flex',
-                                justifyContent: 'space-between',
-                                fontSize: '12px',
-                              }}
-                            >
-                              <span
-                                style={{ color: '#4b5563', fontWeight: '600' }}
+                              </td>
+                              <td
+                                className="desktop-cell-normal"
+                                style={{ padding: '10px', textAlign: 'center' }}
                               >
-                                Bombillos (Cnt / $):
-                              </span>
-                              <span style={{ color: '#111827' }}>
-                                {v.bombillosCount} un. / $
-                                {v.bombillosBruto.toLocaleString()}
-                              </span>
-                            </div>
-                            <div
-                              style={{
-                                display: 'flex',
-                                justifyContent: 'space-between',
-                                fontSize: '12px',
-                              }}
-                            >
-                              <span
-                                style={{ color: '#4b5563', fontWeight: '600' }}
+                                <div
+                                  style={{
+                                    fontWeight: '700',
+                                    color: '#111827',
+                                  }}
+                                >
+                                  {v.bombillosCount} un.
+                                </div>
+                                <div
+                                  style={{ fontSize: '11px', color: '#4b5563' }}
+                                >
+                                  ${v.bombillosBruto.toLocaleString()}
+                                </div>
+                              </td>
+                              <td
+                                className="desktop-cell-normal"
+                                style={{ padding: '10px', textAlign: 'center' }}
                               >
-                                Fluidos (Cnt / $):
-                              </span>
-                              <span style={{ color: '#111827' }}>
-                                {v.fluidosCount} un. / $
-                                {v.fluidosBruto.toLocaleString()}
-                              </span>
-                            </div>
-                            <div
-                              style={{
-                                display: 'flex',
-                                justifyContent: 'space-between',
-                                fontSize: '13px',
-                                borderTop: '1px solid #e5e7eb',
-                                paddingTop: '6px',
-                                marginTop: '4px',
-                              }}
-                            >
-                              <span
-                                style={{ color: '#111827', fontWeight: '700' }}
-                              >
-                                Comisión Total ($):
-                              </span>
-                              <span
-                                style={{ color: '#dc2626', fontWeight: '800' }}
+                                <div
+                                  style={{
+                                    fontWeight: '700',
+                                    color: '#111827',
+                                  }}
+                                >
+                                  {v.fluidosCount} un.
+                                </div>
+                                <div
+                                  style={{ fontSize: '11px', color: '#4b5563' }}
+                                >
+                                  ${v.fluidosBruto.toLocaleString()}
+                                </div>
+                              </td>
+                              <td
+                                className="desktop-cell-normal"
+                                style={{
+                                  padding: '10px',
+                                  textAlign: 'right',
+                                  fontWeight: '800',
+                                  color: '#111827',
+                                }}
                               >
                                 ${v.comisionTotalUSD.toFixed(2)}
-                              </span>
-                            </div>
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
+                              </td>
+                              <td
+                                className="mobile-cell-stacked"
+                                style={{ display: 'none' }}
+                              >
+                                <div
+                                  style={{
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'center',
+                                    borderBottom: '1px solid #e5e7eb',
+                                    paddingBottom: '6px',
+                                  }}
+                                >
+                                  <span
+                                    style={{
+                                      fontWeight: '800',
+                                      fontSize: '14px',
+                                      color: '#111827',
+                                    }}
+                                  >
+                                    {v.full_name || 'Sin Nombre'}
+                                  </span>
+                                  <span
+                                    style={{
+                                      fontSize: '11px',
+                                      backgroundColor: '#f3f4f6',
+                                      padding: '2px 6px',
+                                      borderRadius: '4px',
+                                      fontWeight: '600',
+                                      color: '#4b5563',
+                                    }}
+                                  >
+                                    {v.pctAsignado}
+                                  </span>
+                                </div>
+                                <div
+                                  style={{
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    fontSize: '12px',
+                                  }}
+                                >
+                                  <span
+                                    style={{
+                                      color: '#4b5563',
+                                      fontWeight: '600',
+                                    }}
+                                  >
+                                    Bombillos (Cnt / $):
+                                  </span>
+                                  <span style={{ color: '#111827' }}>
+                                    {v.bombillosCount} un. / $
+                                    {v.bombillosBruto.toLocaleString()}
+                                  </span>
+                                </div>
+                                <div
+                                  style={{
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    fontSize: '12px',
+                                  }}
+                                >
+                                  <span
+                                    style={{
+                                      color: '#4b5563',
+                                      fontWeight: '600',
+                                    }}
+                                  >
+                                    Fluidos (Cnt / $):
+                                  </span>
+                                  <span style={{ color: '#111827' }}>
+                                    {v.fluidosCount} un. / $
+                                    {v.fluidosBruto.toLocaleString()}
+                                  </span>
+                                </div>
+                                <div
+                                  style={{
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    fontSize: '13px',
+                                    borderTop: '1px solid #e5e7eb',
+                                    paddingTop: '6px',
+                                    marginTop: '4px',
+                                  }}
+                                >
+                                  <span
+                                    style={{
+                                      color: '#111827',
+                                      fontWeight: '700',
+                                    }}
+                                  >
+                                    Comisión Total ($):
+                                  </span>
+                                  <span
+                                    style={{
+                                      color: '#dc2626',
+                                      fontWeight: '800',
+                                    }}
+                                  >
+                                    ${v.comisionTotalUSD.toFixed(2)}
+                                  </span>
+                                </div>
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </>
+                )}
               </div>
             )}
           </>
