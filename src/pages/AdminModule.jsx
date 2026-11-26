@@ -496,8 +496,7 @@ export default function AdminModule() {
   const [manualAbonoClientNotes, setManualAbonoClientNotes] = useState([]);
   const [manualAbonoSelections, setManualAbonoSelections] = useState({});
   const [manualAbonoClientCredit, setManualAbonoClientCredit] = useState(0);
-  const [manualAbonoHighAmountModal, setManualAbonoHighAmountModal] =
-    useState(false);
+  const [manualAbonoHighAmountModal, setManualAbonoHighAmountModal] = useState(false);
   const [historyDetailModal, setHistoryDetailModal] = useState(null);
   const [historyDeleteModal, setHistoryDeleteModal] = useState({
     open: false,
@@ -1008,9 +1007,7 @@ export default function AdminModule() {
           const req = Number(item.quantity || 0);
           if (!liveP || avail < req) {
             insufficient.push(
-              `• ${
-                item.description || liveP?.description || 'Producto'
-              }: Disponible ${avail}, Solicitado ${req}`
+              `• ${item.description || liveP?.description || 'Producto'}: Disponible ${avail}, Solicitado ${req}`
             );
           }
         }
@@ -1332,10 +1329,7 @@ export default function AdminModule() {
 
   const revertHistoryRecordsInDB = async (records) => {
     for (const record of records) {
-      await supabase
-        .from('order_payments')
-        .delete()
-        .eq('history_id', record.id);
+      await supabase.from('order_payments').delete().eq('history_id', record.id);
       if (record.original_notif_id) {
         await supabase
           .from('order_payments')
@@ -1348,7 +1342,10 @@ export default function AdminModule() {
       for (const b of breakdown) {
         if (b?.vale_id) {
           await supabase.from('vales').delete().eq('id', b.vale_id);
-        } else if (Number(b?.commission_discount_usd || 0) > 0 && b?.order_id) {
+        } else if (
+          Number(b?.commission_discount_usd || 0) > 0 &&
+          b?.order_id
+        ) {
           let valeDelQuery = supabase
             .from('vales')
             .delete()
@@ -1383,15 +1380,15 @@ export default function AdminModule() {
           b.previous_special_discount_usd !== null
             ? Number(b.previous_special_discount_usd)
             : Number(ord.special_discount_usd || 0);
-        const baseTotal = Number(ord.total_base_usd || b.total_base_usd || 0);
+        const baseTotal = Number(
+          ord.total_base_usd || b.total_base_usd || 0
+        );
         const pct = getDiscountPercent(restoredDiscountKey);
         const restoredFinal =
           baseTotal > 0
             ? Math.max(
                 0,
-                Number(
-                  (baseTotal * (1 - pct / 100) - restoredSpecial).toFixed(2)
-                )
+                Number((baseTotal * (1 - pct / 100) - restoredSpecial).toFixed(2))
               )
             : Number(
                 b.previous_final_price_usd !== undefined
@@ -1470,14 +1467,9 @@ export default function AdminModule() {
         existingCount = existingOrders ? existingOrders.length : 0;
       }
       const hasCommissionVales = breakdown.some(
-        (b) =>
-          Boolean(b?.vale_id) || Number(b?.commission_discount_usd || 0) > 0
+        (b) => Boolean(b?.vale_id) || Number(b?.commission_discount_usd || 0) > 0
       );
-      if (
-        existingCount > 0 ||
-        Number(item.credit_delta_usd || 0) !== 0 ||
-        hasCommissionVales
-      ) {
+      if (existingCount > 0 || Number(item.credit_delta_usd || 0) !== 0 || hasCommissionVales) {
         setHistoryDeleteModal({
           open: true,
           mode: 'single',
@@ -1501,9 +1493,7 @@ export default function AdminModule() {
           .delete()
           .eq('id', item.id);
         if (error) throw error;
-        showToastSuccess(
-          'Registro y archivo adjunto eliminados del histórico.'
-        );
+        showToastSuccess('Registro y archivo adjunto eliminados del histórico.');
         await fetchIndependentPaymentsHistory();
       }
     } catch (err) {
@@ -1516,7 +1506,9 @@ export default function AdminModule() {
   const handleConfirmBulkDelete = async () => {
     try {
       setLoading(true);
-      let query = supabase.from('payments_independent_history').select('*');
+      let query = supabase
+        .from('payments_independent_history')
+        .select('*');
       if (bulkDeleteModal.mode === 'range') {
         if (!bulkDeleteModal.startDate || !bulkDeleteModal.endDate) {
           alert('Seleccione fechas de inicio y fin.');
@@ -1560,8 +1552,7 @@ export default function AdminModule() {
         (r) =>
           Array.isArray(r.notes_breakdown) &&
           r.notes_breakdown.some(
-            (b) =>
-              Boolean(b?.vale_id) || Number(b?.commission_discount_usd || 0) > 0
+            (b) => Boolean(b?.vale_id) || Number(b?.commission_discount_usd || 0) > 0
           )
       );
       if (existingCount > 0 || hasCreditDeltas || hasCommissionVales) {
@@ -2181,8 +2172,7 @@ export default function AdminModule() {
     });
 
     const resolveOrderMode = (orderId, inlineOrder) => {
-      if (inlineOrder?.payment_discount)
-        return String(inlineOrder.payment_discount);
+      if (inlineOrder?.payment_discount) return String(inlineOrder.payment_discount);
       if (!orderId) return '53.38';
       const found =
         userNotes.find((o) => String(o.id) === String(orderId)) ||
@@ -3310,10 +3300,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
     const totalAsignado = Number(
       notesList
         .filter((item) => item.selected !== false)
-        .reduce(
-          (acc, item) => acc + Number(parseFloat(item.applied_amount_usd) || 0),
-          0
-        )
+        .reduce((acc, item) => acc + Number(parseFloat(item.applied_amount_usd) || 0), 0)
         .toFixed(2)
     );
     const saldoRestanteCliente = Math.max(
@@ -3345,10 +3332,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
           otherAssigned += Number(parseFloat(n.applied_amount_usd) || 0);
         }
       });
-      const maxPool = Math.max(
-        0,
-        Number((totalDisponible - otherAssigned).toFixed(2))
-      );
+      const maxPool = Math.max(0, Number((totalDisponible - otherAssigned).toFixed(2)));
 
       if (field === 'selected') {
         target.selected = Boolean(value);
@@ -3401,8 +3385,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
           const numVal = parseFloat(value);
           if (!isNaN(numVal) && numVal >= 0) {
             const maxAllowed = Math.min(preview.newDebt, maxPool);
-            const finalVal =
-              numVal > maxAllowed ? maxAllowed.toFixed(2) : value;
+            const finalVal = numVal > maxAllowed ? maxAllowed.toFixed(2) : value;
             target.applied_amount_usd = finalVal;
             target.pay_full_debt =
               (parseFloat(finalVal) || 0) >= preview.newDebt - 0.009 &&
@@ -3411,15 +3394,9 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
         }
       } else if (field === 'use_commission_discount') {
         if (value) {
-          const appliedCash = Number(
-            parseFloat(target.applied_amount_usd) || 0
-          );
-          const missing = Math.max(
-            0,
-            Number((preview.newDebt - appliedCash).toFixed(2))
-          );
-          target.commission_discount_usd =
-            missing > 0 ? missing.toFixed(2) : '0.00';
+          const appliedCash = Number(parseFloat(target.applied_amount_usd) || 0);
+          const missing = Math.max(0, Number((preview.newDebt - appliedCash).toFixed(2)));
+          target.commission_discount_usd = missing > 0 ? missing.toFixed(2) : '0.00';
         } else {
           target.commission_discount_usd = '';
         }
@@ -3427,15 +3404,9 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
         if (value !== '') {
           const numVal = parseFloat(value);
           if (!isNaN(numVal) && numVal >= 0) {
-            const appliedCash = Number(
-              parseFloat(target.applied_amount_usd) || 0
-            );
-            const maxMissing = Math.max(
-              0,
-              Number((preview.newDebt - appliedCash).toFixed(2))
-            );
-            target.commission_discount_usd =
-              numVal > maxMissing ? maxMissing.toFixed(2) : value;
+            const appliedCash = Number(parseFloat(target.applied_amount_usd) || 0);
+            const maxMissing = Math.max(0, Number((preview.newDebt - appliedCash).toFixed(2)));
+            target.commission_discount_usd = numVal > maxMissing ? maxMissing.toFixed(2) : value;
           }
         }
       } else {
@@ -3451,15 +3422,9 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
           }
         }
         if (target.use_commission_discount) {
-          const appliedCash = Number(
-            parseFloat(target.applied_amount_usd) || 0
-          );
-          const missing = Math.max(
-            0,
-            Number((preview.newDebt - appliedCash).toFixed(2))
-          );
-          target.commission_discount_usd =
-            missing > 0 ? missing.toFixed(2) : '0.00';
+          const appliedCash = Number(parseFloat(target.applied_amount_usd) || 0);
+          const missing = Math.max(0, Number((preview.newDebt - appliedCash).toFixed(2)));
+          target.commission_discount_usd = missing > 0 ? missing.toFixed(2) : '0.00';
         }
       }
 
@@ -3473,8 +3438,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
           0,
           Number((preview.newDebt - appliedCash).toFixed(2))
         );
-        target.commission_discount_usd =
-          missing > 0 ? missing.toFixed(2) : '0.00';
+        target.commission_discount_usd = missing > 0 ? missing.toFixed(2) : '0.00';
       }
 
       const updated = [...prev];
@@ -3530,21 +3494,33 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
       }
 
       setLoading(true);
-      const duplicate = paymentsHistoricalList.find(
-        (p) =>
-          Math.abs(Number(p.amount_usd) - montoNum) < 0.01 &&
-          String(p.reference_number || '')
-            .trim()
-            .toLowerCase() === refNum.toLowerCase()
-      );
-      if (duplicate || duplicateWarning) {
+      const bsNumForDup = Number(parseFloat(notif.amount_bs) || 0);
+      const duplicate = isEfectivo
+        ? null
+        : paymentsHistoricalList.find((p) => {
+            const refMatches =
+              refNum !== '' &&
+              String(p.reference_number || '')
+                .trim()
+                .toLowerCase() === refNum.toLowerCase();
+            if (!refMatches) return false;
+            if (isBsMethod) {
+              return (
+                bsNumForDup > 0 &&
+                Math.abs(Number(p.amount_bs || 0) - bsNumForDup) < 0.01
+              );
+            }
+            return Math.abs(Number(p.amount_usd || 0) - montoNum) < 0.01;
+          });
+      if (!isEfectivo && (duplicate || duplicateWarning)) {
         const dupDateText = duplicate
           ? new Date(duplicate.payment_date).toLocaleDateString()
           : duplicateWarning?.date;
+        const dupAmountLabel = isBsMethod
+          ? `${bsNumForDup.toFixed(2)} Bs`
+          : `$${montoNum.toFixed(2)}`;
         const confirmDup = window.confirm(
-          `⚠️ PAGO DUPLICADO DETECTADO Ya existe un pago con Monto: $${montoNum.toFixed(
-            2
-          )} y Referencia: "${refNum}" registrado el ${dupDateText}. ¿Desea continuar aprobando este pago duplicado de todas formas?`
+          `⚠️ PAGO DUPLICADO DETECTADO Ya existe un pago con Monto: ${dupAmountLabel} y Referencia: "${refNum}" registrado el ${dupDateText}. ¿Desea continuar aprobando este pago duplicado de todas formas?`
         );
         if (!confirmDup) {
           setLoading(false);
@@ -3582,9 +3558,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
       const finalBreakdown = [];
       for (const item of notifReviewNotes) {
         if (item.selected === false) continue;
-        const applied = Number(
-          (parseFloat(item.applied_amount_usd) || 0).toFixed(2)
-        );
+        const applied = Number((parseFloat(item.applied_amount_usd) || 0).toFixed(2));
         const commDisc = item.use_commission_discount
           ? Number((parseFloat(item.commission_discount_usd) || 0).toFixed(2))
           : 0;
@@ -3600,16 +3574,14 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
           alert(
             `La suma de abono + descuento de comisión para la N.E. #${
               item.transaction_number
-            } ($${(applied + commDisc).toFixed(
+            } ($${(applied + commDisc).toFixed(2)}) supera su deuda actual ($${preview.newDebt.toFixed(
               2
-            )}) supera su deuda actual ($${preview.newDebt.toFixed(2)}).`
+            )}).`
           );
           setLoading(false);
           return;
         }
-        const newTotalPaid = Number(
-          (preview.paid + applied + commDisc).toFixed(2)
-        );
+        const newTotalPaid = Number((preview.paid + applied + commDisc).toFixed(2));
         const newBalance = Math.max(
           0,
           Number((preview.newFinal - newTotalPaid).toFixed(2))
@@ -3650,9 +3622,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
       }
 
       if (finalBreakdown.length === 0) {
-        alert(
-          'Debe haber al menos una nota con monto mayor a $0.00 para aprobar.'
-        );
+        alert('Debe haber al menos una nota con monto mayor a $0.00 para aprobar.');
         setLoading(false);
         return;
       }
@@ -3667,9 +3637,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
       const foliosSummary = finalBreakdown
         .map((b) => b.transaction_number || 'S/N')
         .join(', ');
-      const creditDelta = Number(
-        (saldoRestanteCliente - saldoAnterior).toFixed(2)
-      );
+      const creditDelta = Number((saldoRestanteCliente - saldoAnterior).toFixed(2));
 
       const { data: insertedHist, error: histErr } = await supabase
         .from('payments_independent_history')
@@ -3712,49 +3680,44 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
 
       for (const b of finalBreakdown) {
         if (b.applied_amount_usd > 0) {
-          const { error: payErr } = await supabase
-            .from('order_payments')
-            .insert([
-              {
-                order_id: b.order_id,
-                history_id: insertedHist?.id || null,
-                notif_id: notif.id,
-                payment_date: notif.payment_date || getLocalTodayDate(),
-                amount_usd: b.applied_amount_usd,
-                exchange_rate:
-                  notif.exchange_rate !== undefined &&
-                  notif.exchange_rate !== null
-                    ? Number(notif.exchange_rate)
-                    : null,
-                amount_bs:
-                  notif.amount_bs !== undefined && notif.amount_bs !== null
-                    ? Number(notif.amount_bs)
-                    : null,
-                origin_bank: notif.origin_bank || null,
-                destination_bank: notif.destination_bank || null,
-                payment_method: notif.payment_method || 'Pago Móvil',
-                reference_number: refNum || 'Aprobado de Notif.',
-                created_by: userData?.user?.id,
-              },
-            ]);
+          const { error: payErr } = await supabase.from('order_payments').insert([
+            {
+              order_id: b.order_id,
+              history_id: insertedHist?.id || null,
+              notif_id: notif.id,
+              payment_date: notif.payment_date || getLocalTodayDate(),
+              amount_usd: b.applied_amount_usd,
+              exchange_rate:
+                notif.exchange_rate !== undefined && notif.exchange_rate !== null
+                  ? Number(notif.exchange_rate)
+                  : null,
+              amount_bs:
+                notif.amount_bs !== undefined && notif.amount_bs !== null
+                  ? Number(notif.amount_bs)
+                  : null,
+              origin_bank: notif.origin_bank || null,
+              destination_bank: notif.destination_bank || null,
+              payment_method: notif.payment_method || 'Pago Móvil',
+              reference_number: refNum || 'Aprobado de Notif.',
+              created_by: userData?.user?.id,
+            },
+          ]);
           if (payErr) throw payErr;
         }
         if (b.commission_discount_usd > 0) {
-          const { error: commPayErr } = await supabase
-            .from('order_payments')
-            .insert([
-              {
-                order_id: b.order_id,
-                history_id: insertedHist?.id || null,
-                notif_id: notif.id,
-                payment_date:
-                  notif.payment_date || new Date().toISOString().split('T')[0],
-                amount_usd: b.commission_discount_usd,
-                payment_method: 'Descuento Comisión Vendedor',
-                reference_number: `DESC-NE-${b.transaction_number}`,
-                created_by: userData?.user?.id,
-              },
-            ]);
+          const { error: commPayErr } = await supabase.from('order_payments').insert([
+            {
+              order_id: b.order_id,
+              history_id: insertedHist?.id || null,
+              notif_id: notif.id,
+              payment_date:
+                notif.payment_date || new Date().toISOString().split('T')[0],
+              amount_usd: b.commission_discount_usd,
+              payment_method: 'Descuento Comisión Vendedor',
+              reference_number: `DESC-NE-${b.transaction_number}`,
+              created_by: userData?.user?.id,
+            },
+          ]);
           if (commPayErr) throw commPayErr;
           if (b.seller_id) {
             const { data: createdVale, error: valeErr } = await supabase
@@ -3813,12 +3776,8 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
           payment_date: notif.payment_date,
           payment_method: metodo,
           amount_usd: montoNum,
-          exchange_rate: isBsMethod
-            ? Number(parseFloat(notif.exchange_rate) || 0)
-            : null,
-          amount_bs: isBsMethod
-            ? Number(parseFloat(notif.amount_bs) || 0)
-            : null,
+          exchange_rate: isBsMethod ? Number(parseFloat(notif.exchange_rate) || 0) : null,
+          amount_bs: isBsMethod ? Number(parseFloat(notif.amount_bs) || 0) : null,
           origin_bank: isBsMethod ? notif.origin_bank || null : null,
           destination_bank: isBsMethod ? notif.destination_bank || null : null,
           reference_number: refNum,
@@ -3858,9 +3817,9 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
       }
 
       showToastSuccess(
-        `Abono de $${montoNum.toFixed(2)} aprobado (${
-          finalBreakdown.length
-        } N.E.) y archivado en histórico.`
+        `Abono de $${montoNum.toFixed(
+          2
+        )} aprobado (${finalBreakdown.length} N.E.) y archivado en histórico.`
       );
       setViewNotifModalData(null);
       setNotifReviewNotes([]);
@@ -3909,26 +3868,38 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
     setDuplicateWarning(null);
     try {
       const montoNum = Number(notif.amount_usd) || 0;
+      const bsNum = Number(notif.amount_bs) || 0;
+      const metodo = String(notif.payment_method || '').trim();
+      const isEfectivo = metodo === 'Efectivo $';
+      const isBsMethod =
+        metodo === 'Pago Móvil' || metodo === 'Transferencia Bs';
       const refNum = String(notif.reference_number || '').trim();
-      if (refNum) {
-        const { data, error } = await supabase
+      if (!isEfectivo && refNum) {
+        let dupQuery = supabase
           .from('payments_independent_history')
           .select(
-            'payment_date, amount_usd, reference_number, receipt_image_url, client_name, transaction_folio'
+            'payment_date, amount_usd, amount_bs, reference_number, receipt_image_url, client_name, transaction_folio'
           )
-          .eq('reference_number', refNum)
-          .eq('amount_usd', montoNum)
-          .limit(1);
-        if (!error && data && data.length > 0) {
-          const dup = data[0];
-          setDuplicateWarning({
-            date: new Date(dup.payment_date).toLocaleDateString(),
-            amount: dup.amount_usd,
-            ref: dup.reference_number,
-            receipt_image_url: dup.receipt_image_url || null,
-            client_name: dup.client_name || '',
-            transaction_folio: dup.transaction_folio || '',
-          });
+          .eq('reference_number', refNum);
+        if (isBsMethod && bsNum > 0) {
+          dupQuery = dupQuery.eq('amount_bs', bsNum);
+        } else if (!isBsMethod) {
+          dupQuery = dupQuery.eq('amount_usd', montoNum);
+        }
+        if (!isBsMethod || bsNum > 0) {
+          const { data, error } = await dupQuery.limit(1);
+          if (!error && data && data.length > 0) {
+            const dup = data[0];
+            setDuplicateWarning({
+              date: new Date(dup.payment_date).toLocaleDateString(),
+              amount: isBsMethod ? dup.amount_bs : dup.amount_usd,
+              isBs: isBsMethod,
+              ref: dup.reference_number,
+              receipt_image_url: dup.receipt_image_url || null,
+              client_name: dup.client_name || '',
+              transaction_folio: dup.transaction_folio || '',
+            });
+          }
         }
       }
 
@@ -3997,7 +3968,15 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
         if (item.order_id) rawMap[item.order_id] = item;
       });
 
-      const preparedNotes = rawItems.map((item) => {
+      const preparedNotes = rawItems
+        .filter((item) => {
+          const liveOrd = ordersMap[item.order_id] || notif.order || {};
+          return (
+            liveOrd.payment_status !== 'cerrada' &&
+            Number(liveOrd.balance_due_usd || 0) > 0.009
+          );
+        })
+        .map((item) => {
         const liveOrd = ordersMap[item.order_id] || notif.order || {};
         const prevDiscountKey = String(
           liveOrd.payment_discount || item.original_payment_discount || '53.38'
@@ -4023,9 +4002,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
           applied_payment_discount: proposedDiscountKey,
           previous_special_discount_usd: prevSpecial,
           applied_special_discount_usd: String(prevSpecial),
-          previous_discount_amount_usd: Number(
-            liveOrd.discount_amount_usd || 0
-          ),
+          previous_discount_amount_usd: Number(liveOrd.discount_amount_usd || 0),
           previous_final_price_usd: Number(
             liveOrd.final_price_usd || item.previous_final_price_usd || 0
           ),
@@ -4040,10 +4017,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
             Number(item.applied_amount_usd || 0).toFixed(2)
           ),
           pay_full_debt: Boolean(item.pay_full_debt),
-          use_commission_discount: Boolean(
-            item.use_commission_discount &&
-              Number(item.commission_discount_usd || 0) > 0
-          ),
+          use_commission_discount: Boolean(item.use_commission_discount && Number(item.commission_discount_usd || 0) > 0),
           commission_discount_usd:
             Number(item.commission_discount_usd || 0) > 0
               ? Number(item.commission_discount_usd).toFixed(2)
@@ -4124,6 +4098,12 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
   };
 
   const handleOpenManualAbonoModal = async (note) => {
+    if (
+      note.payment_status === 'cerrada' ||
+      Number(note.balance_due_usd || 0) <= 0.009
+    ) {
+      return alert('Esta nota ya está cerrada y no puede recibir abonos.');
+    }
     setAbonoModalNote(note);
     setManualAbonoForm({
       payment_date: '',
@@ -4182,9 +4162,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
   };
 
   const getManualAbonoSummary = () => {
-    const saldoAnterior = Number(
-      Number(manualAbonoClientCredit || 0).toFixed(2)
-    );
+    const saldoAnterior = Number(Number(manualAbonoClientCredit || 0).toFixed(2));
     const abonoActual = Number(
       (parseFloat(manualAbonoForm.amount_usd) || 0).toFixed(2)
     );
@@ -4270,8 +4248,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
           const numVal = parseFloat(value);
           if (!isNaN(numVal) && numVal >= 0) {
             const maxAllowed = Math.min(preview.newDebt, maxPool);
-            const finalVal =
-              numVal > maxAllowed ? maxAllowed.toFixed(2) : value;
+            const finalVal = numVal > maxAllowed ? maxAllowed.toFixed(2) : value;
             updated.applied_amount_usd = finalVal;
             updated.pay_full_debt =
               (parseFloat(finalVal) || 0) >= preview.newDebt - 0.009 &&
@@ -4281,15 +4258,9 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
       } else if (field === 'use_commission_discount') {
         updated.selected = true;
         if (value) {
-          const appliedCash = Number(
-            parseFloat(updated.applied_amount_usd) || 0
-          );
-          const missing = Math.max(
-            0,
-            Number((preview.newDebt - appliedCash).toFixed(2))
-          );
-          updated.commission_discount_usd =
-            missing > 0 ? missing.toFixed(2) : '0.00';
+          const appliedCash = Number(parseFloat(updated.applied_amount_usd) || 0);
+          const missing = Math.max(0, Number((preview.newDebt - appliedCash).toFixed(2)));
+          updated.commission_discount_usd = missing > 0 ? missing.toFixed(2) : '0.00';
         } else {
           updated.commission_discount_usd = '';
         }
@@ -4299,15 +4270,9 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
         if (value !== '') {
           const numVal = parseFloat(value);
           if (!isNaN(numVal) && numVal >= 0) {
-            const appliedCash = Number(
-              parseFloat(updated.applied_amount_usd) || 0
-            );
-            const maxMissing = Math.max(
-              0,
-              Number((preview.newDebt - appliedCash).toFixed(2))
-            );
-            updated.commission_discount_usd =
-              numVal > maxMissing ? maxMissing.toFixed(2) : value;
+            const appliedCash = Number(parseFloat(updated.applied_amount_usd) || 0);
+            const maxMissing = Math.max(0, Number((preview.newDebt - appliedCash).toFixed(2)));
+            updated.commission_discount_usd = numVal > maxMissing ? maxMissing.toFixed(2) : value;
           }
         }
       } else if (updated.selected) {
@@ -4318,20 +4283,13 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
           const numVal = parseFloat(updated.applied_amount_usd) || 0;
           const maxAllowed = Math.min(preview.newDebt, maxPool);
           if (numVal > maxAllowed) {
-            updated.applied_amount_usd =
-              maxAllowed > 0 ? maxAllowed.toFixed(2) : '';
+            updated.applied_amount_usd = maxAllowed > 0 ? maxAllowed.toFixed(2) : '';
           }
         }
         if (updated.use_commission_discount) {
-          const appliedCash = Number(
-            parseFloat(updated.applied_amount_usd) || 0
-          );
-          const missing = Math.max(
-            0,
-            Number((preview.newDebt - appliedCash).toFixed(2))
-          );
-          updated.commission_discount_usd =
-            missing > 0 ? missing.toFixed(2) : '0.00';
+          const appliedCash = Number(parseFloat(updated.applied_amount_usd) || 0);
+          const missing = Math.max(0, Number((preview.newDebt - appliedCash).toFixed(2)));
+          updated.commission_discount_usd = missing > 0 ? missing.toFixed(2) : '0.00';
         }
       }
 
@@ -4345,8 +4303,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
           0,
           Number((preview.newDebt - appliedCash).toFixed(2))
         );
-        updated.commission_discount_usd =
-          missing > 0 ? missing.toFixed(2) : '0.00';
+        updated.commission_discount_usd = missing > 0 ? missing.toFixed(2) : '0.00';
       }
 
       return { ...prev, [nota.id]: updated };
@@ -4371,9 +4328,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
     for (const nota of manualAbonoClientNotes) {
       const sel = manualAbonoSelections[nota.id];
       if (!sel?.selected) continue;
-      const applied = Number(
-        (parseFloat(sel.applied_amount_usd) || 0).toFixed(2)
-      );
+      const applied = Number((parseFloat(sel.applied_amount_usd) || 0).toFixed(2));
       const commDisc = sel.use_commission_discount
         ? Number((parseFloat(sel.commission_discount_usd) || 0).toFixed(2))
         : 0;
@@ -4394,15 +4349,13 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
         alert(
           `La suma de abono + descuento de comisión para la N.E. #${
             nota.transaction_number
-          } ($${(applied + commDisc).toFixed(
+          } ($${(applied + commDisc).toFixed(2)}) supera su deuda ($${preview.newDebt.toFixed(
             2
-          )}) supera su deuda ($${preview.newDebt.toFixed(2)}).`
+          )}).`
         );
         return;
       }
-      const newTotalPaid = Number(
-        (preview.paid + applied + commDisc).toFixed(2)
-      );
+      const newTotalPaid = Number((preview.paid + applied + commDisc).toFixed(2));
       const newBalance = Math.max(
         0,
         Number((preview.newFinal - newTotalPaid).toFixed(2))
@@ -4414,9 +4367,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
         transaction_number: nota.transaction_number,
         total_base_usd: preview.base,
         previous_payment_discount: String(nota.payment_discount || '53.38'),
-        applied_payment_discount: String(
-          sel.applied_payment_discount || '53.38'
-        ),
+        applied_payment_discount: String(sel.applied_payment_discount || '53.38'),
         previous_special_discount_usd: Number(nota.special_discount_usd || 0),
         applied_special_discount_usd: preview.special,
         previous_discount_amount_usd: Number(nota.discount_amount_usd || 0),
@@ -4455,24 +4406,37 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
     setIsSubmittingAbono(true);
     setLoading(true);
     try {
-      if (refNum !== '') {
+      const manualMetodo = String(manualAbonoForm.payment_method || '').trim();
+      const manualIsEfectivo = manualMetodo === 'Efectivo $';
+      const manualIsBs =
+        manualMetodo === 'Pago Móvil' || manualMetodo === 'Transferencia Bs';
+      const manualBsNum = Number(parseFloat(manualAbonoForm.amount_bs) || 0);
+
+      if (!manualIsEfectivo && refNum !== '') {
         try {
-          const { data: duplicates, error: dupErr } = await supabase
+          let dupQuery = supabase
             .from('payments_independent_history')
             .select('payment_date')
-            .eq('reference_number', refNum)
-            .eq('amount_usd', montoNum)
-            .limit(1);
-          if (!dupErr && duplicates && duplicates.length > 0) {
-            const dupDate = new Date(
-              duplicates[0].payment_date
-            ).toLocaleDateString();
-            const continueAnyway = window.confirm(
-              `⚠️ ATENCIÓN: Este pago parece estar duplicado. Ya existe un registro con Monto: $${montoNum.toFixed(
-                2
-              )} y Referencia: "${refNum}" fechado el ${dupDate}. ¿Desea continuar guardando este abono de todas formas?`
-            );
-            if (!continueAnyway) return;
+            .eq('reference_number', refNum);
+          if (manualIsBs && manualBsNum > 0) {
+            dupQuery = dupQuery.eq('amount_bs', manualBsNum);
+          } else if (!manualIsBs) {
+            dupQuery = dupQuery.eq('amount_usd', montoNum);
+          }
+          if (!manualIsBs || manualBsNum > 0) {
+            const { data: duplicates, error: dupErr } = await dupQuery.limit(1);
+            if (!dupErr && duplicates && duplicates.length > 0) {
+              const dupDate = new Date(
+                duplicates[0].payment_date
+              ).toLocaleDateString();
+              const amtLabel = manualIsBs
+                ? `${manualBsNum.toFixed(2)} Bs`
+                : `$${montoNum.toFixed(2)}`;
+              const continueAnyway = window.confirm(
+                `⚠️ ATENCIÓN: Este pago parece estar duplicado. Ya existe un registro con Monto: ${amtLabel} y Referencia: "${refNum}" fechado el ${dupDate}. ¿Desea continuar guardando este abono de todas formas?`
+              );
+              if (!continueAnyway) return;
+            }
           }
         } catch (err) {
           console.error('Error verificando duplicados:', err);
@@ -4572,55 +4536,51 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
 
       for (const b of finalBreakdown) {
         if (b.applied_amount_usd > 0) {
-          const { error: payErr } = await supabase
-            .from('order_payments')
-            .insert([
-              {
-                order_id: b.order_id,
-                history_id: insertedHist?.id || null,
-                payment_date: manualAbonoForm.payment_date,
-                amount_usd: b.applied_amount_usd,
-                exchange_rate:
-                  manualAbonoForm.payment_method === 'Pago Móvil' ||
-                  manualAbonoForm.payment_method === 'Transferencia Bs'
-                    ? Number(parseFloat(manualAbonoForm.exchange_rate) || 0)
-                    : null,
-                amount_bs:
-                  manualAbonoForm.payment_method === 'Pago Móvil' ||
-                  manualAbonoForm.payment_method === 'Transferencia Bs'
-                    ? Number(parseFloat(manualAbonoForm.amount_bs) || 0)
-                    : null,
-                origin_bank:
-                  manualAbonoForm.payment_method === 'Pago Móvil' ||
-                  manualAbonoForm.payment_method === 'Transferencia Bs'
-                    ? manualAbonoForm.origin_bank || null
-                    : null,
-                destination_bank:
-                  manualAbonoForm.payment_method === 'Pago Móvil' ||
-                  manualAbonoForm.payment_method === 'Transferencia Bs'
-                    ? manualAbonoForm.destination_bank || null
-                    : null,
-                payment_method: manualAbonoForm.payment_method,
-                reference_number: refNum,
-                created_by: userData?.user?.id,
-              },
-            ]);
+          const { error: payErr } = await supabase.from('order_payments').insert([
+            {
+              order_id: b.order_id,
+              history_id: insertedHist?.id || null,
+              payment_date: manualAbonoForm.payment_date,
+              amount_usd: b.applied_amount_usd,
+              exchange_rate:
+                manualAbonoForm.payment_method === 'Pago Móvil' ||
+                manualAbonoForm.payment_method === 'Transferencia Bs'
+                  ? Number(parseFloat(manualAbonoForm.exchange_rate) || 0)
+                  : null,
+              amount_bs:
+                manualAbonoForm.payment_method === 'Pago Móvil' ||
+                manualAbonoForm.payment_method === 'Transferencia Bs'
+                  ? Number(parseFloat(manualAbonoForm.amount_bs) || 0)
+                  : null,
+              origin_bank:
+                manualAbonoForm.payment_method === 'Pago Móvil' ||
+                manualAbonoForm.payment_method === 'Transferencia Bs'
+                  ? manualAbonoForm.origin_bank || null
+                  : null,
+              destination_bank:
+                manualAbonoForm.payment_method === 'Pago Móvil' ||
+                manualAbonoForm.payment_method === 'Transferencia Bs'
+                  ? manualAbonoForm.destination_bank || null
+                  : null,
+              payment_method: manualAbonoForm.payment_method,
+              reference_number: refNum,
+              created_by: userData?.user?.id,
+            },
+          ]);
           if (payErr) throw payErr;
         }
         if (b.commission_discount_usd > 0) {
-          const { error: commPayErr } = await supabase
-            .from('order_payments')
-            .insert([
-              {
-                order_id: b.order_id,
-                history_id: insertedHist?.id || null,
-                payment_date: manualAbonoForm.payment_date,
-                amount_usd: b.commission_discount_usd,
-                payment_method: 'Descuento Comisión Vendedor',
-                reference_number: `DESC-NE-${b.transaction_number}`,
-                created_by: userData?.user?.id,
-              },
-            ]);
+          const { error: commPayErr } = await supabase.from('order_payments').insert([
+            {
+              order_id: b.order_id,
+              history_id: insertedHist?.id || null,
+              payment_date: manualAbonoForm.payment_date,
+              amount_usd: b.commission_discount_usd,
+              payment_method: 'Descuento Comisión Vendedor',
+              reference_number: `DESC-NE-${b.transaction_number}`,
+              created_by: userData?.user?.id,
+            },
+          ]);
           if (commPayErr) throw commPayErr;
           if (b.seller_id) {
             const { data: createdVale, error: valeErr } = await supabase
@@ -4687,9 +4647,9 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
       }
 
       showToastSuccess(
-        `Abono manual registrado (${
-          finalBreakdown.length
-        } N.E.). Saldo a favor del cliente: $${saldoRestanteCliente.toFixed(2)}`
+        `Abono manual registrado (${finalBreakdown.length} N.E.). Saldo a favor del cliente: $${saldoRestanteCliente.toFixed(
+          2
+        )}`
       );
       setAbonoModalNote(null);
       setManualAbonoForm({
@@ -9097,15 +9057,10 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                                 }}
                               >
                                 {(() => {
-                                  const paidAmt = Number(
-                                    note.total_paid_usd || 0
-                                  );
-                                  const balAmt = Number(
-                                    note.balance_due_usd || 0
-                                  );
+                                  const paidAmt = Number(note.total_paid_usd || 0);
+                                  const balAmt = Number(note.balance_due_usd || 0);
                                   const effectiveStatus =
-                                    note.payment_status === 'cerrada' ||
-                                    balAmt <= 0.009
+                                    note.payment_status === 'cerrada' || balAmt <= 0.009
                                       ? 'cerrada'
                                       : paidAmt <= 0.009
                                       ? 'pendiente'
@@ -9199,11 +9154,9 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                                     Ver Notif.
                                   </button>
                                 )}
-                                {note.payment_status !== 'cerrada' && (
+                                {note.payment_status !== 'cerrada' && Number(note.balance_due_usd || 0) > 0.009 && (
                                   <button
-                                    onClick={() =>
-                                      handleOpenManualAbonoModal(note)
-                                    }
+                                    onClick={() => handleOpenManualAbonoModal(note)}
                                     style={{
                                       width: '88px',
                                       padding: '5px 6px',
@@ -9507,7 +9460,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                                 Ver Notif.
                               </button>
                             )}
-                            {note.payment_status !== 'cerrada' && (
+                            {note.payment_status !== 'cerrada' && Number(note.balance_due_usd || 0) > 0.009 && (
                               <button
                                 onClick={() => handleOpenManualAbonoModal(note)}
                                 className="admin-action-btn-mobile"
@@ -9820,13 +9773,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                               textAlign: 'center',
                             }}
                           >
-                            <div
-                              style={{
-                                display: 'flex',
-                                gap: '6px',
-                                justifyContent: 'center',
-                              }}
-                            >
+                            <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
                               <button
                                 onClick={() => setHistoryDetailModal(item)}
                                 style={{
@@ -9843,9 +9790,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                                 Detalle
                               </button>
                               <button
-                                onClick={() =>
-                                  handleRequestDeleteSingleHistory(item)
-                                }
+                                onClick={() => handleRequestDeleteSingleHistory(item)}
                                 style={{
                                   padding: '5px 8px',
                                   backgroundColor: '#fee2e2',
@@ -9981,9 +9926,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                             Ver Detalle
                           </button>
                           <button
-                            onClick={() =>
-                              handleRequestDeleteSingleHistory(item)
-                            }
+                            onClick={() => handleRequestDeleteSingleHistory(item)}
                             className="admin-action-btn-mobile"
                             style={{
                               padding: '5px 8px',
@@ -14070,38 +14013,38 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                             '53.38'
                         );
                         return (
-                          <tr
-                            key={`vale-${v.id}`}
-                            style={{ borderBottom: '1px solid #e5e7eb' }}
+                        <tr
+                          key={`vale-${v.id}`}
+                          style={{ borderBottom: '1px solid #e5e7eb' }}
+                        >
+                          <td style={{ padding: '8px' }}>
+                            {new Date(v.created_at).toLocaleDateString()}
+                          </td>
+                          <td style={{ padding: '8px', fontWeight: 'bold' }}>
+                            {v.order_id
+                              ? `Descuento de la nota ${neNum || 'asociada'}`
+                              : 'Vale Independiente'}
+                          </td>
+                          <td
+                            style={{
+                              padding: '8px',
+                              textAlign: 'center',
+                              fontWeight: 'bold',
+                            }}
                           >
-                            <td style={{ padding: '8px' }}>
-                              {new Date(v.created_at).toLocaleDateString()}
-                            </td>
-                            <td style={{ padding: '8px', fontWeight: 'bold' }}>
-                              {v.order_id
-                                ? `Descuento de la nota ${neNum || 'asociada'}`
-                                : 'Vale Independiente'}
-                            </td>
-                            <td
-                              style={{
-                                padding: '8px',
-                                textAlign: 'center',
-                                fontWeight: 'bold',
-                              }}
-                            >
-                              {getDiscountPercent(valeMode)}%
-                            </td>
-                            <td
-                              style={{
-                                padding: '8px',
-                                textAlign: 'right',
-                                fontWeight: 'bold',
-                                color: '#dc2626',
-                              }}
-                            >
-                              -${Number(v.requested_amount_usd).toFixed(2)}
-                            </td>
-                          </tr>
+                            {getDiscountPercent(valeMode)}%
+                          </td>
+                          <td
+                            style={{
+                              padding: '8px',
+                              textAlign: 'right',
+                              fontWeight: 'bold',
+                              color: '#dc2626',
+                            }}
+                          >
+                            -${Number(v.requested_amount_usd).toFixed(2)}
+                          </td>
+                        </tr>
                         );
                       })}
                       {settlementModalData.penalties?.map((pen) => {
@@ -14981,9 +14924,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                         —{' '}
                         {Array.isArray(notif.notes_breakdown) &&
                         notif.notes_breakdown.length > 0
-                          ? `${
-                              notif.notes_breakdown.length
-                            } N.E. (#${notif.notes_breakdown
+                          ? `${notif.notes_breakdown.length} N.E. (#${notif.notes_breakdown
                               .map((b) => b.transaction_number || 'S/N')
                               .join(', #')})`
                           : `N.E. #${notif.order?.transaction_number || 'S/N'}`}
@@ -15023,1336 +14964,1152 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
         </div>
       </div>
       {/* MODAL VER DETALLE NOTIFICACIÓN */}
-      {viewNotifModalData &&
-        (() => {
-          const {
-            saldoAnterior,
-            abonoActual,
-            totalDisponible,
-            totalAsignado,
-            saldoRestanteCliente,
-          } = getNotifTotalsSummary(
-            viewNotifModalData,
-            notifReviewNotes,
-            notifClientCredit
-          );
-          const clientDisplay =
-            viewNotifModalData.client?.name ||
-            viewNotifModalData.client_name ||
-            viewNotifModalData.order?.client?.name ||
-            'N/A';
+      {viewNotifModalData && (() => {
+        const {
+          saldoAnterior,
+          abonoActual,
+          totalDisponible,
+          totalAsignado,
+          saldoRestanteCliente,
+        } = getNotifTotalsSummary(
+          viewNotifModalData,
+          notifReviewNotes,
+          notifClientCredit
+        );
+        const clientDisplay =
+          viewNotifModalData.client?.name ||
+          viewNotifModalData.client_name ||
+          viewNotifModalData.order?.client?.name ||
+          'N/A';
 
-          return (
+        return (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0,0,0,0.6)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1500,
+            padding: '16px',
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: duplicateWarning ? '#fef2f2' : '#ffffff',
+              border: duplicateWarning ? '2px solid #dc2626' : 'none',
+              borderRadius: '12px',
+              width: '100%',
+              maxWidth: '760px',
+              maxHeight: '90vh',
+              overflowY: 'auto',
+              padding: '24px',
+              boxShadow: '0 10px 40px rgba(0,0,0,0.3)',
+            }}
+          >
             <div
               style={{
-                position: 'fixed',
-                inset: 0,
-                backgroundColor: 'rgba(0,0,0,0.6)',
                 display: 'flex',
+                justifyContent: 'space-between',
                 alignItems: 'center',
-                justifyContent: 'center',
-                zIndex: 1500,
-                padding: '16px',
+                marginBottom: '16px',
+                borderBottom: duplicateWarning
+                  ? '1px solid #fecaca'
+                  : '1px solid #e5e7eb',
+                paddingBottom: '12px',
               }}
             >
-              <div
+              <h3
                 style={{
-                  backgroundColor: duplicateWarning ? '#fef2f2' : '#ffffff',
-                  border: duplicateWarning ? '2px solid #dc2626' : 'none',
-                  borderRadius: '12px',
-                  width: '100%',
-                  maxWidth: '760px',
-                  maxHeight: '90vh',
-                  overflowY: 'auto',
-                  padding: '24px',
-                  boxShadow: '0 10px 40px rgba(0,0,0,0.3)',
+                  margin: 0,
+                  fontSize: '16px',
+                  fontWeight: '900',
+                  color: duplicateWarning ? '#991b1b' : '#111827',
                 }}
               >
+                Revisión Detallada de Abono
+              </h3>
+              <button
+                onClick={() => {
+                  setViewNotifModalData(null);
+                  setNotifReviewNotes([]);
+                  setDuplicateWarning(null);
+                }}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+            {duplicateWarning && (
+              <div
+                style={{
+                  backgroundColor: '#fee2e2',
+                  border: '1px solid #fca5a5',
+                  borderRadius: '6px',
+                  padding: '12px',
+                  marginBottom: '16px',
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: '10px',
+                }}
+              >
+                <style>{`@keyframes apifenixPulseWarn { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.35); } }`}</style>
                 <div
                   style={{
+                    width: '28px',
+                    height: '28px',
+                    flexShrink: 0,
                     display: 'flex',
-                    justifyContent: 'space-between',
                     alignItems: 'center',
-                    marginBottom: '16px',
-                    borderBottom: duplicateWarning
-                      ? '1px solid #fecaca'
-                      : '1px solid #e5e7eb',
-                    paddingBottom: '12px',
+                    justifyContent: 'center',
                   }}
                 >
-                  <h3
+                  <span
                     style={{
-                      margin: 0,
-                      fontSize: '16px',
-                      fontWeight: '900',
-                      color: duplicateWarning ? '#991b1b' : '#111827',
+                      display: 'inline-block',
+                      fontSize: '18px',
+                      lineHeight: 1,
+                      animation: 'apifenixPulseWarn 1.1s ease-in-out infinite',
                     }}
                   >
-                    Revisión Detallada de Abono
-                  </h3>
-                  <button
-                    onClick={() => {
-                      setViewNotifModalData(null);
-                      setNotifReviewNotes([]);
-                      setDuplicateWarning(null);
-                    }}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    <X size={20} />
-                  </button>
+                    ⚠️
+                  </span>
                 </div>
-                {duplicateWarning && (
-                  <div
-                    style={{
-                      backgroundColor: '#fee2e2',
-                      border: '1px solid #fca5a5',
-                      borderRadius: '6px',
-                      padding: '12px',
-                      marginBottom: '16px',
-                      display: 'flex',
-                      alignItems: 'flex-start',
-                      gap: '10px',
-                    }}
-                  >
-                    <style>{`@keyframes apifenixPulseWarn { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.35); } }`}</style>
-                    <div
-                      style={{
-                        width: '28px',
-                        height: '28px',
-                        flexShrink: 0,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                      }}
-                    >
-                      <span
-                        style={{
-                          display: 'inline-block',
-                          fontSize: '18px',
-                          lineHeight: 1,
-                          animation:
-                            'apifenixPulseWarn 1.1s ease-in-out infinite',
-                        }}
-                      >
-                        ⚠️
-                      </span>
-                    </div>
-                    <div
-                      style={{ fontSize: '12px', color: '#991b1b', flex: 1 }}
-                    >
-                      <strong>PAGO DUPLICADO DETECTADO</strong>
-                      <p style={{ margin: '4px 0 6px 0' }}>
-                        Ya existe un pago con este monto y referencia registrado
-                        el <strong>{duplicateWarning.date}</strong>
-                        {duplicateWarning.client_name
-                          ? ` (${duplicateWarning.client_name} — Folio #${
-                              duplicateWarning.transaction_folio || 'N/A'
-                            })`
-                          : ''}
-                        .
-                      </p>
-                      {duplicateWarning.receipt_image_url ? (
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setImagePreviewModal(
-                              duplicateWarning.receipt_image_url
-                            )
-                          }
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '6px',
-                            padding: '5px 10px',
-                            backgroundColor: '#FFFFFF',
-                            color: '#DC2626',
-                            border: '1px solid #FCA5A5',
-                            borderRadius: '6px',
-                            fontSize: '11px',
-                            fontWeight: '700',
-                            cursor: 'pointer',
-                          }}
-                        >
-                          <ImageIcon size={13} /> Ver Comprobante Duplicado
-                        </button>
-                      ) : (
-                        <span style={{ fontSize: '11px', fontStyle: 'italic' }}>
-                          El registro previo no tiene comprobante adjunto.
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {(() => {
-                  const isBsMethod =
-                    viewNotifModalData.payment_method === 'Pago Móvil' ||
-                    viewNotifModalData.payment_method === 'Transferencia Bs';
-                  return (
-                    <>
-                      <div
-                        style={{
-                          display: 'grid',
-                          gridTemplateColumns:
-                            'repeat(auto-fit, minmax(155px, 1fr))',
-                          gap: '12px',
-                          fontSize: '13px',
-                          backgroundColor: '#F9FAFB',
-                          padding: '12px',
-                          borderRadius: '8px',
-                          border: '1px solid #E5E7EB',
-                          marginBottom: '14px',
-                        }}
-                      >
-                        <div>
-                          <span
-                            style={{
-                              color: '#6b7280',
-                              fontSize: '11px',
-                              display: 'block',
-                            }}
-                          >
-                            CLIENTE
-                          </span>
-                          <strong>{clientDisplay}</strong>
-                        </div>
-                        <div>
-                          <span
-                            style={{
-                              color: '#6b7280',
-                              fontSize: '11px',
-                              display: 'block',
-                            }}
-                          >
-                            VENDEDOR
-                          </span>
-                          <strong>
-                            {viewNotifModalData.seller?.full_name || 'N/A'}
-                          </strong>
-                        </div>
-
-                        <div>
-                          <span
-                            style={{
-                              color: '#6b7280',
-                              fontSize: '11px',
-                              display: 'block',
-                            }}
-                          >
-                            FECHA PAGO
-                          </span>
-                          {notifEditMode ? (
-                            <input
-                              type="date"
-                              max={getLocalTodayDate()}
-                              value={viewNotifModalData.payment_date || ''}
-                              onChange={(e) =>
-                                setViewNotifModalData({
-                                  ...viewNotifModalData,
-                                  payment_date: e.target.value,
-                                })
-                              }
-                              style={{
-                                width: '100%',
-                                padding: '5px 6px',
-                                borderRadius: '6px',
-                                border: '1px solid #D1D5DB',
-                                fontSize: '12px',
-                                boxSizing: 'border-box',
-                              }}
-                            />
-                          ) : (
-                            <strong>
-                              {viewNotifModalData.payment_date || 'N/A'}
-                            </strong>
-                          )}
-                        </div>
-
-                        <div>
-                          <span
-                            style={{
-                              color: '#6b7280',
-                              fontSize: '11px',
-                              display: 'block',
-                            }}
-                          >
-                            MÉTODO
-                          </span>
-                          {notifEditMode ? (
-                            <select
-                              value={viewNotifModalData.payment_method || ''}
-                              onChange={(e) => {
-                                const val = e.target.value;
-                                const nextIsBs =
-                                  val === 'Pago Móvil' ||
-                                  val === 'Transferencia Bs';
-                                let nextRef =
-                                  viewNotifModalData.reference_number || '';
-                                if (val === 'Efectivo $') {
-                                  nextRef = '';
-                                } else if (val !== 'Zelle') {
-                                  nextRef = String(nextRef)
-                                    .replace(/\D/g, '')
-                                    .slice(0, 4);
-                                }
-                                setViewNotifModalData({
-                                  ...viewNotifModalData,
-                                  payment_method: val,
-                                  reference_number: nextRef,
-                                  exchange_rate: nextIsBs
-                                    ? viewNotifModalData.exchange_rate || ''
-                                    : null,
-                                  amount_bs: nextIsBs
-                                    ? viewNotifModalData.amount_bs || ''
-                                    : null,
-                                  origin_bank: nextIsBs
-                                    ? viewNotifModalData.origin_bank || ''
-                                    : null,
-                                  destination_bank: nextIsBs
-                                    ? viewNotifModalData.destination_bank || ''
-                                    : null,
-                                  amount_usd: nextIsBs
-                                    ? Number(viewNotifModalData.exchange_rate) >
-                                        0 &&
-                                      Number(viewNotifModalData.amount_bs) > 0
-                                      ? (
-                                          Number(viewNotifModalData.amount_bs) /
-                                          Number(
-                                            viewNotifModalData.exchange_rate
-                                          )
-                                        ).toFixed(2)
-                                      : ''
-                                    : viewNotifModalData.amount_usd,
-                                });
-                              }}
-                              style={{
-                                width: '100%',
-                                padding: '5px 6px',
-                                borderRadius: '6px',
-                                border: '1px solid #D1D5DB',
-                                fontSize: '12px',
-                                backgroundColor: '#FFFFFF',
-                              }}
-                            >
-                              <option value="">-- Método --</option>
-                              <option value="Efectivo $">Efectivo ($)</option>
-                              <option value="Binance">Binance</option>
-                              <option value="Zelle">Zelle</option>
-                              <option value="Pago Móvil">
-                                Pago Móvil (Bs)
-                              </option>
-                              <option value="Transferencia Bs">
-                                Transferencia Bs
-                              </option>
-                            </select>
-                          ) : (
-                            <strong>
-                              {viewNotifModalData.payment_method || 'N/A'}
-                            </strong>
-                          )}
-                        </div>
-
-                        {isBsMethod && (
-                          <>
-                            <div>
-                              <span
-                                style={{
-                                  color: '#6b7280',
-                                  fontSize: '11px',
-                                  display: 'block',
-                                }}
-                              >
-                                TASA (Bs/$)
-                              </span>
-                              {notifEditMode ? (
-                                <input
-                                  type="number"
-                                  step="0.01"
-                                  min="0.01"
-                                  value={viewNotifModalData.exchange_rate || ''}
-                                  onChange={(e) => {
-                                    const tasaRaw = e.target.value;
-                                    const tasaNum = parseFloat(tasaRaw);
-                                    const bsNum = parseFloat(
-                                      viewNotifModalData.amount_bs
-                                    );
-                                    const calcUsd =
-                                      tasaNum > 0 && bsNum > 0
-                                        ? (bsNum / tasaNum).toFixed(2)
-                                        : '';
-                                    setViewNotifModalData({
-                                      ...viewNotifModalData,
-                                      exchange_rate: tasaRaw,
-                                      amount_usd: calcUsd,
-                                    });
-                                  }}
-                                  style={{
-                                    width: '100%',
-                                    padding: '5px 6px',
-                                    borderRadius: '6px',
-                                    border: '1px solid #D1D5DB',
-                                    fontSize: '12px',
-                                    boxSizing: 'border-box',
-                                  }}
-                                />
-                              ) : (
-                                <strong style={{ color: '#1E40AF' }}>
-                                  {Number(
-                                    viewNotifModalData.exchange_rate || 0
-                                  ).toFixed(2)}{' '}
-                                  Bs/$
-                                </strong>
-                              )}
-                            </div>
-                            <div>
-                              <span
-                                style={{
-                                  color: '#6b7280',
-                                  fontSize: '11px',
-                                  display: 'block',
-                                }}
-                              >
-                                MONTO EN Bs
-                              </span>
-                              {notifEditMode ? (
-                                <input
-                                  type="number"
-                                  step="0.01"
-                                  min="0.01"
-                                  value={viewNotifModalData.amount_bs || ''}
-                                  onChange={(e) => {
-                                    const bsRaw = e.target.value;
-                                    const bsNum = parseFloat(bsRaw);
-                                    const tasaNum = parseFloat(
-                                      viewNotifModalData.exchange_rate
-                                    );
-                                    const calcUsd =
-                                      tasaNum > 0 && bsNum > 0
-                                        ? (bsNum / tasaNum).toFixed(2)
-                                        : '';
-                                    setViewNotifModalData({
-                                      ...viewNotifModalData,
-                                      amount_bs: bsRaw,
-                                      amount_usd: calcUsd,
-                                    });
-                                  }}
-                                  style={{
-                                    width: '100%',
-                                    padding: '5px 6px',
-                                    borderRadius: '6px',
-                                    border: '1px solid #D1D5DB',
-                                    fontSize: '12px',
-                                    boxSizing: 'border-box',
-                                  }}
-                                />
-                              ) : (
-                                <strong style={{ color: '#1E40AF' }}>
-                                  {Number(
-                                    viewNotifModalData.amount_bs || 0
-                                  ).toFixed(2)}{' '}
-                                  Bs
-                                </strong>
-                              )}
-                            </div>
-                            <div>
-                              <span
-                                style={{
-                                  color: '#6b7280',
-                                  fontSize: '11px',
-                                  display: 'block',
-                                }}
-                              >
-                                CUENTA ORIGEN
-                              </span>
-                              {notifEditMode ? (
-                                <select
-                                  value={viewNotifModalData.origin_bank || ''}
-                                  onChange={(e) =>
-                                    setViewNotifModalData({
-                                      ...viewNotifModalData,
-                                      origin_bank: e.target.value,
-                                    })
-                                  }
-                                  style={{
-                                    width: '100%',
-                                    padding: '5px 6px',
-                                    borderRadius: '6px',
-                                    border: '1px solid #D1D5DB',
-                                    fontSize: '11px',
-                                    backgroundColor: '#FFFFFF',
-                                  }}
-                                >
-                                  <option value="">-- Banco origen --</option>
-                                  {VENEZUELAN_BANKS.map((b) => (
-                                    <option key={`v-orig-${b}`} value={b}>
-                                      {b}
-                                    </option>
-                                  ))}
-                                </select>
-                              ) : (
-                                <strong>
-                                  {viewNotifModalData.origin_bank || 'N/A'}
-                                </strong>
-                              )}
-                            </div>
-                            <div>
-                              <span
-                                style={{
-                                  color: '#6b7280',
-                                  fontSize: '11px',
-                                  display: 'block',
-                                }}
-                              >
-                                CUENTA DESTINO
-                              </span>
-                              {notifEditMode ? (
-                                <select
-                                  value={
-                                    viewNotifModalData.destination_bank || ''
-                                  }
-                                  onChange={(e) =>
-                                    setViewNotifModalData({
-                                      ...viewNotifModalData,
-                                      destination_bank: e.target.value,
-                                    })
-                                  }
-                                  style={{
-                                    width: '100%',
-                                    padding: '5px 6px',
-                                    borderRadius: '6px',
-                                    border: '1px solid #D1D5DB',
-                                    fontSize: '11px',
-                                    backgroundColor: '#FFFFFF',
-                                  }}
-                                >
-                                  <option value="">-- Banco destino --</option>
-                                  {VENEZUELAN_BANKS.map((b) => (
-                                    <option key={`v-dest-${b}`} value={b}>
-                                      {b}
-                                    </option>
-                                  ))}
-                                </select>
-                              ) : (
-                                <strong>
-                                  {viewNotifModalData.destination_bank || 'N/A'}
-                                </strong>
-                              )}
-                            </div>
-                          </>
-                        )}
-
-                        <div>
-                          <span
-                            style={{
-                              color: '#6b7280',
-                              fontSize: '11px',
-                              display: 'block',
-                            }}
-                          >
-                            MONTO PAGO ($)
-                          </span>
-                          {notifEditMode && !isBsMethod ? (
-                            <input
-                              type="number"
-                              step="0.01"
-                              min="0.01"
-                              value={viewNotifModalData.amount_usd || ''}
-                              onChange={(e) =>
-                                setViewNotifModalData({
-                                  ...viewNotifModalData,
-                                  amount_usd: e.target.value,
-                                })
-                              }
-                              style={{
-                                width: '100%',
-                                padding: '5px 6px',
-                                borderRadius: '6px',
-                                border: '1px solid #D1D5DB',
-                                fontSize: '12px',
-                                fontWeight: '700',
-                                boxSizing: 'border-box',
-                              }}
-                            />
-                          ) : (
-                            <strong
-                              style={{
-                                fontSize: '15px',
-                                color: duplicateWarning ? '#dc2626' : '#059669',
-                              }}
-                            >
-                              ${abonoActual.toFixed(2)}
-                            </strong>
-                          )}
-                        </div>
-
-                        <div>
-                          <span
-                            style={{
-                              color: '#6b7280',
-                              fontSize: '11px',
-                              display: 'block',
-                            }}
-                          >
-                            N° REFERENCIA
-                          </span>
-                          {notifEditMode ? (
-                            <input
-                              type="text"
-                              inputMode={
-                                viewNotifModalData.payment_method === 'Zelle'
-                                  ? 'text'
-                                  : 'numeric'
-                              }
-                              maxLength={4}
-                              value={viewNotifModalData.reference_number || ''}
-                              onChange={(e) => {
-                                const raw = e.target.value;
-                                const formatted =
-                                  viewNotifModalData.payment_method === 'Zelle'
-                                    ? raw
-                                        .replace(/[^a-zA-Z0-9]/g, '')
-                                        .toUpperCase()
-                                        .slice(0, 4)
-                                    : raw.replace(/\D/g, '').slice(0, 4);
-                                setViewNotifModalData({
-                                  ...viewNotifModalData,
-                                  reference_number: formatted,
-                                });
-                              }}
-                              placeholder={
-                                viewNotifModalData.payment_method ===
-                                'Efectivo $'
-                                  ? 'Opcional'
-                                  : '4 car.'
-                              }
-                              style={{
-                                width: '100%',
-                                padding: '5px 6px',
-                                borderRadius: '6px',
-                                border: '1px solid #D1D5DB',
-                                fontSize: '12px',
-                                fontFamily: 'monospace',
-                                boxSizing: 'border-box',
-                              }}
-                            />
-                          ) : (
-                            <strong
-                              style={{
-                                fontFamily: 'monospace',
-                                color: duplicateWarning ? '#dc2626' : '#111827',
-                              }}
-                            >
-                              {viewNotifModalData.reference_number || 'S/R'}
-                            </strong>
-                          )}
-                        </div>
-                      </div>
-                      {notifEditMode && (
-                        <div style={{ marginBottom: '12px' }}>
-                          <span
-                            style={{
-                              color: '#6b7280',
-                              fontSize: '11px',
-                              display: 'block',
-                              marginBottom: '4px',
-                            }}
-                          >
-                            NOTA / OBSERVACIÓN
-                          </span>
-                          <input
-                            type="text"
-                            value={viewNotifModalData.user_note || ''}
-                            onChange={(e) =>
-                              setViewNotifModalData({
-                                ...viewNotifModalData,
-                                user_note: e.target.value,
-                              })
-                            }
-                            placeholder="Observación del abono..."
-                            style={{
-                              width: '100%',
-                              padding: '6px 8px',
-                              borderRadius: '6px',
-                              border: '1px solid #D1D5DB',
-                              fontSize: '12px',
-                              boxSizing: 'border-box',
-                            }}
-                          />
-                        </div>
-                      )}
-                    </>
-                  );
-                })()}
-
-                {(viewNotifModalData.user_note ||
-                  viewNotifModalData.receipt_image_url) && (
-                  <div
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      flexWrap: 'wrap',
-                      gap: '10px',
-                      marginBottom: '14px',
-                      padding: '10px 12px',
-                      backgroundColor: '#FFFBEB',
-                      border: '1px solid #FDE68A',
-                      borderRadius: '8px',
-                      fontSize: '12px',
-                    }}
-                  >
-                    <div>
-                      {viewNotifModalData.user_note && (
-                        <span>
-                          <strong>Nota del vendedor:</strong> "
-                          {viewNotifModalData.user_note}"
-                        </span>
-                      )}
-                    </div>
-                    {viewNotifModalData.receipt_image_url && (
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setImagePreviewModal(
-                            viewNotifModalData.receipt_image_url
-                          )
-                        }
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '6px',
-                          padding: '6px 12px',
-                          backgroundColor: '#eff6ff',
-                          color: '#1d4ed8',
-                          border: '1px solid #bfdbfe',
-                          borderRadius: '6px',
-                          fontSize: '12px',
-                          fontWeight: '600',
-                          cursor: 'pointer',
-                        }}
-                      >
-                        <ImageIcon size={14} /> Ver Comprobante
-                      </button>
-                    )}
-                  </div>
-                )}
-
-                <div
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
-                    gap: '8px',
-                    padding: '10px 12px',
-                    backgroundColor: '#F8FAFC',
-                    border: '1px solid #CBD5E1',
-                    borderRadius: '8px',
-                    marginBottom: '14px',
-                    fontSize: '12px',
-                  }}
-                >
-                  <div>
-                    <div
-                      style={{
-                        fontSize: '10px',
-                        color: '#64748B',
-                        fontWeight: '700',
-                      }}
-                    >
-                      SALDO ANTERIOR
-                    </div>
-                    <strong style={{ fontSize: '15px', color: '#059669' }}>
-                      ${saldoAnterior.toFixed(2)}
-                    </strong>
-                  </div>
-                  <div>
-                    <div
-                      style={{
-                        fontSize: '10px',
-                        color: '#64748B',
-                        fontWeight: '700',
-                      }}
-                    >
-                      ABONO ACTUAL
-                    </div>
-                    <strong style={{ fontSize: '15px', color: '#0F172A' }}>
-                      ${abonoActual.toFixed(2)}
-                    </strong>
-                  </div>
-                  <div>
-                    <div
-                      style={{
-                        fontSize: '10px',
-                        color: '#64748B',
-                        fontWeight: '700',
-                      }}
-                    >
-                      TOTAL DISPONIBLE
-                    </div>
-                    <strong style={{ fontSize: '15px', color: '#1E40AF' }}>
-                      ${totalDisponible.toFixed(2)}
-                    </strong>
-                  </div>
-                  <div>
-                    <div
-                      style={{
-                        fontSize: '10px',
-                        color: '#64748B',
-                        fontWeight: '700',
-                      }}
-                    >
-                      ASIGNADO A NOTAS
-                    </div>
-                    <strong style={{ fontSize: '15px', color: '#2563EB' }}>
-                      ${totalAsignado.toFixed(2)}
-                    </strong>
-                  </div>
-                  <div>
-                    <div
-                      style={{
-                        fontSize: '10px',
-                        color: '#64748B',
-                        fontWeight: '700',
-                      }}
-                    >
-                      SALDO A GUARDAR
-                    </div>
-                    <strong
-                      style={{
-                        fontSize: '15px',
-                        color: saldoRestanteCliente > 0 ? '#16A34A' : '#64748B',
-                      }}
-                    >
-                      ${saldoRestanteCliente.toFixed(2)}
-                    </strong>
-                  </div>
-                </div>
-
-                {saldoRestanteCliente > 0.009 && (
-                  <div
-                    style={{
-                      backgroundColor: '#ECFDF5',
-                      border: '1px solid #6EE7B7',
-                      color: '#065F46',
-                      padding: '8px 12px',
-                      borderRadius: '6px',
-                      fontSize: '12px',
-                      fontWeight: '700',
-                      marginBottom: '12px',
-                    }}
-                  >
-                    ℹ️ Quedará un saldo pendiente/a favor del cliente de{' '}
-                    <strong>${saldoRestanteCliente.toFixed(2)}</strong> sin
-                    asignar al aprobar este abono.
-                  </div>
-                )}
-
-                <div
-                  style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '10px',
-                  }}
-                >
-                  <div
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      flexWrap: 'wrap',
-                      gap: '8px',
-                    }}
-                  >
-                    <div
-                      style={{
-                        fontSize: '13px',
-                        fontWeight: '800',
-                        color: '#111827',
-                      }}
-                    >
-                      {notifEditMode
-                        ? `Todas las notas abiertas del cliente (${notifReviewNotes.length})`
-                        : `Notas incluidas en la solicitud (${
-                            notifReviewNotes.filter((n) => n.selected !== false)
-                              .length
-                          })`}
-                    </div>
+                <div style={{ fontSize: '12px', color: '#991b1b', flex: 1 }}>
+                  <strong>PAGO DUPLICADO DETECTADO</strong>
+                  <p style={{ margin: '4px 0 6px 0' }}>
+                    Ya existe un pago con este monto y referencia registrado el{' '}
+                    <strong>{duplicateWarning.date}</strong>
+                    {duplicateWarning.client_name
+                      ? ` (${duplicateWarning.client_name} — Folio #${duplicateWarning.transaction_folio || 'N/A'})`
+                      : ''}.
+                  </p>
+                  {duplicateWarning.receipt_image_url ? (
                     <button
                       type="button"
-                      onClick={() => setNotifEditMode((prev) => !prev)}
+                      onClick={() =>
+                        setImagePreviewModal(duplicateWarning.receipt_image_url)
+                      }
                       style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
                         padding: '5px 10px',
-                        backgroundColor: notifEditMode ? '#111827' : '#EFF6FF',
-                        color: notifEditMode ? '#FFFFFF' : '#1D4ED8',
-                        border: '1px solid #BFDBFE',
+                        backgroundColor: '#FFFFFF',
+                        color: '#DC2626',
+                        border: '1px solid #FCA5A5',
                         borderRadius: '6px',
                         fontSize: '11px',
                         fontWeight: '700',
                         cursor: 'pointer',
                       }}
                     >
-                      {notifEditMode
-                        ? '✓ Editando Solicitud'
-                        : '✏️ Editar Solicitud (Ver todas las notas)'}
+                      <ImageIcon size={13} /> Ver Comprobante Duplicado
                     </button>
-                  </div>
-                  {notifReviewNotes
-                    .filter((item) => notifEditMode || item.selected !== false)
-                    .map((item) => {
-                      const preview = computeAdminNotePreview(
-                        item.total_base_usd,
-                        item.applied_payment_discount,
-                        item.applied_special_discount_usd,
-                        item.previous_total_paid_usd,
-                        item.previous_final_price_usd
-                      );
-                      const appliedNum = Number(
-                        parseFloat(item.applied_amount_usd) || 0
-                      );
-                      const commNum = item.use_commission_discount
-                        ? Number(parseFloat(item.commission_discount_usd) || 0)
-                        : 0;
-                      const remainingAfter = Math.max(
-                        0,
-                        Number(
-                          (preview.newDebt - appliedNum - commNum).toFixed(2)
-                        )
-                      );
-                      const willClose =
-                        appliedNum + commNum > 0 && remainingAfter <= 0.009;
-
-                      return (
-                        <div
-                          key={item.order_id}
-                          style={{
-                            border: '1px solid #D1D5DB',
-                            borderRadius: '8px',
-                            padding: '12px',
-                            backgroundColor: '#FFFFFF',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: '10px',
-                          }}
-                        >
-                          <div
-                            style={{
-                              display: 'flex',
-                              justifyContent: 'space-between',
-                              alignItems: 'center',
-                              flexWrap: 'wrap',
-                              gap: '8px',
-                            }}
-                          >
-                            <label
-                              style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '8px',
-                                fontSize: '14px',
-                                fontWeight: '900',
-                                color: '#111827',
-                                cursor: notifEditMode ? 'pointer' : 'default',
-                              }}
-                            >
-                              {notifEditMode && (
-                                <input
-                                  type="checkbox"
-                                  checked={item.selected !== false}
-                                  onChange={(e) =>
-                                    handleUpdateNotifReviewNote(
-                                      item.order_id,
-                                      'selected',
-                                      e.target.checked
-                                    )
-                                  }
-                                />
-                              )}
-                              N.E. #{item.transaction_number}
-                            </label>
-                            <span
-                              style={{
-                                padding: '3px 8px',
-                                borderRadius: '999px',
-                                fontSize: '11px',
-                                fontWeight: '700',
-                                backgroundColor: willClose
-                                  ? '#DCFCE7'
-                                  : '#DBEAFE',
-                                color: willClose ? '#166534' : '#1E40AF',
-                              }}
-                            >
-                              {willClose
-                                ? '✓ Cerrará la Nota'
-                                : 'Quedará Abonada'}
-                            </span>
-                          </div>
-
-                          <div
-                            style={{
-                              display: 'grid',
-                              gridTemplateColumns:
-                                'repeat(auto-fit, minmax(120px, 1fr))',
-                              gap: '8px',
-                              fontSize: '12px',
-                              backgroundColor: '#F9FAFB',
-                              padding: '8px',
-                              borderRadius: '6px',
-                            }}
-                          >
-                            <div>
-                              <span style={{ color: '#6B7280' }}>
-                                Total Base:
-                              </span>{' '}
-                              <strong>${preview.base.toFixed(2)}</strong>
-                            </div>
-                            <div>
-                              <span style={{ color: '#6B7280' }}>
-                                Nuevo Final:
-                              </span>{' '}
-                              <strong>${preview.newFinal.toFixed(2)}</strong>
-                            </div>
-                            <div>
-                              <span style={{ color: '#6B7280' }}>
-                                Ya Abonado:
-                              </span>{' '}
-                              <strong style={{ color: '#2563EB' }}>
-                                ${preview.paid.toFixed(2)}
-                              </strong>
-                            </div>
-                            <div>
-                              <span style={{ color: '#6B7280' }}>
-                                Deuda Previa:
-                              </span>{' '}
-                              <strong style={{ color: '#DC2626' }}>
-                                ${preview.newDebt.toFixed(2)}
-                              </strong>
-                            </div>
-                            <div>
-                              <span style={{ color: '#6B7280' }}>
-                                Faltaría:
-                              </span>{' '}
-                              <strong
-                                style={{
-                                  color: willClose ? '#16A34A' : '#B45309',
-                                }}
-                              >
-                                ${remainingAfter.toFixed(2)}
-                              </strong>
-                            </div>
-                          </div>
-
-                          <div
-                            style={{
-                              display: 'grid',
-                              gridTemplateColumns:
-                                'repeat(auto-fit, minmax(160px, 1fr))',
-                              gap: '10px',
-                              alignItems: 'end',
-                            }}
-                          >
-                            <div>
-                              <label
-                                style={{
-                                  display: 'block',
-                                  fontSize: '11px',
-                                  fontWeight: '700',
-                                  marginBottom: '4px',
-                                }}
-                              >
-                                % Descuento (Editable Admin)
-                              </label>
-                              <select
-                                value={item.applied_payment_discount}
-                                onChange={(e) =>
-                                  handleUpdateNotifReviewNote(
-                                    item.order_id,
-                                    'applied_payment_discount',
-                                    e.target.value
-                                  )
-                                }
-                                style={{
-                                  width: '100%',
-                                  padding: '6px 8px',
-                                  fontSize: '12px',
-                                  border: '1px solid #F59E0B',
-                                  borderRadius: '6px',
-                                  backgroundColor: '#FEF3C7',
-                                  color: '#78350F',
-                                  fontWeight: '700',
-                                }}
-                              >
-                                <option value="53.38">
-                                  {globalDiscount53}% Pagará en $
-                                </option>
-                                <option value="23.08">
-                                  {globalDiscount23}% Pagará en Bs BCV
-                                </option>
-                                <option value="10">
-                                  {globalDiscount10}% Descuento Especial
-                                </option>
-                                <option value="0">
-                                  {globalDiscount0}% Sin Descuento
-                                </option>
-                              </select>
-                            </div>
-
-                            <div>
-                              <label
-                                style={{
-                                  display: 'block',
-                                  fontSize: '11px',
-                                  fontWeight: '700',
-                                  marginBottom: '4px',
-                                  color: '#7C3AED',
-                                }}
-                              >
-                                Descuento Especial ($) — Solo Admin
-                              </label>
-                              <input
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                value={item.applied_special_discount_usd}
-                                onChange={(e) =>
-                                  handleUpdateNotifReviewNote(
-                                    item.order_id,
-                                    'applied_special_discount_usd',
-                                    e.target.value
-                                  )
-                                }
-                                placeholder="0.00"
-                                style={{
-                                  width: '100%',
-                                  padding: '6px 8px',
-                                  borderRadius: '6px',
-                                  border: '1px solid #DDD6FE',
-                                  backgroundColor: '#F5F3FF',
-                                  fontSize: '12px',
-                                  boxSizing: 'border-box',
-                                }}
-                              />
-                            </div>
-
-                            <div>
-                              <label
-                                style={{
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '6px',
-                                  fontSize: '11px',
-                                  fontWeight: '700',
-                                  marginBottom: '4px',
-                                  cursor: 'pointer',
-                                }}
-                              >
-                                <input
-                                  type="checkbox"
-                                  checked={Boolean(item.pay_full_debt)}
-                                  onChange={(e) =>
-                                    handleUpdateNotifReviewNote(
-                                      item.order_id,
-                                      'pay_full_debt',
-                                      e.target.checked
-                                    )
-                                  }
-                                />
-                                Abonar toda la deuda
-                              </label>
-                              <input
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                value={item.applied_amount_usd}
-                                onChange={(e) =>
-                                  handleUpdateNotifReviewNote(
-                                    item.order_id,
-                                    'applied_amount_usd',
-                                    e.target.value
-                                  )
-                                }
-                                placeholder="Monto ($)"
-                                style={{
-                                  width: '100%',
-                                  padding: '6px 8px',
-                                  borderRadius: '6px',
-                                  border: '1px solid #D1D5DB',
-                                  fontSize: '12px',
-                                  boxSizing: 'border-box',
-                                }}
-                              />
-                            </div>
-                          </div>
-                          {item.selected !== false && (
-                            <div
-                              style={{
-                                backgroundColor: '#FEF3C7',
-                                border: '1px solid #FDE68A',
-                                borderRadius: '6px',
-                                padding: '7px 10px',
-                                display: 'flex',
-                                flexWrap: 'wrap',
-                                alignItems: 'center',
-                                justifyContent: 'space-between',
-                                gap: '8px',
-                              }}
-                            >
-                              <label
-                                style={{
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '6px',
-                                  fontSize: '11px',
-                                  fontWeight: '700',
-                                  color: '#92400E',
-                                  cursor: 'pointer',
-                                }}
-                              >
-                                <input
-                                  type="checkbox"
-                                  checked={Boolean(
-                                    item.use_commission_discount
-                                  )}
-                                  onChange={(e) =>
-                                    handleUpdateNotifReviewNote(
-                                      item.order_id,
-                                      'use_commission_discount',
-                                      e.target.checked
-                                    )
-                                  }
-                                />
-                                Completar / descontar de comisiones del vendedor
-                                (próx. ciclo)
-                              </label>
-                              {item.use_commission_discount && (
-                                <div
-                                  style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '6px',
-                                  }}
-                                >
-                                  <span
-                                    style={{
-                                      fontSize: '11px',
-                                      fontWeight: '700',
-                                      color: '#92400E',
-                                    }}
-                                  >
-                                    Monto ($):
-                                  </span>
-                                  <input
-                                    type="number"
-                                    step="0.01"
-                                    min="0"
-                                    value={item.commission_discount_usd || ''}
-                                    onChange={(e) =>
-                                      handleUpdateNotifReviewNote(
-                                        item.order_id,
-                                        'commission_discount_usd',
-                                        e.target.value
-                                      )
-                                    }
-                                    style={{
-                                      width: '95px',
-                                      padding: '4px 6px',
-                                      borderRadius: '4px',
-                                      border: '1px solid #F59E0B',
-                                      fontSize: '12px',
-                                      fontWeight: '700',
-                                      backgroundColor: '#FFFFFF',
-                                    }}
-                                  />
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                </div>
-
-                <div
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    gap: '10px',
-                    marginTop: '20px',
-                    paddingTop: '16px',
-                    borderTop: '1px solid #e5e7eb',
-                    flexWrap: 'wrap',
-                  }}
-                >
-                  <button
-                    onClick={() =>
-                      handleDeletePaymentNotification(viewNotifModalData.id)
-                    }
-                    style={{
-                      padding: '8px 16px',
-                      backgroundColor: '#fee2e2',
-                      color: '#dc2626',
-                      border: '1px solid #fecaca',
-                      borderRadius: '6px',
-                      fontWeight: '700',
-                      cursor: 'pointer',
-                      fontSize: '12px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                    }}
-                  >
-                    <Trash2 size={14} /> Desaprobar / Eliminar
-                  </button>
-                  <div style={{ display: 'flex', gap: '10px' }}>
-                    <button
-                      onClick={() => {
-                        setViewNotifModalData(null);
-                        setNotifReviewNotes([]);
-                        setDuplicateWarning(null);
-                      }}
-                      style={{
-                        padding: '8px 16px',
-                        backgroundColor: '#f3f4f6',
-                        color: '#374151',
-                        border: '1px solid #d1d5db',
-                        borderRadius: '6px',
-                        fontWeight: '600',
-                        cursor: 'pointer',
-                        fontSize: '12px',
-                      }}
-                    >
-                      Cerrar
-                    </button>
-                    <button
-                      onClick={() =>
-                        handleApprovePaymentNotification(viewNotifModalData)
-                      }
-                      disabled={loading}
-                      style={{
-                        padding: '8px 16px',
-                        backgroundColor: '#059669',
-                        color: '#ffffff',
-                        border: 'none',
-                        borderRadius: '6px',
-                        fontWeight: '700',
-                        cursor: 'pointer',
-                        fontSize: '12px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                      }}
-                    >
-                      <CheckCircle size={14} />
-                      {loading ? 'Procesando...' : 'Procesar y Aprobar Abono'}
-                    </button>
-                  </div>
+                  ) : (
+                    <span style={{ fontSize: '11px', fontStyle: 'italic' }}>
+                      El registro previo no tiene comprobante adjunto.
+                    </span>
+                  )}
                 </div>
               </div>
+            )}
+
+            {(() => {
+              const isBsMethod =
+                viewNotifModalData.payment_method === 'Pago Móvil' ||
+                viewNotifModalData.payment_method === 'Transferencia Bs';
+              return (
+                <>
+                  <div
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fit, minmax(155px, 1fr))',
+                      gap: '12px',
+                      fontSize: '13px',
+                      backgroundColor: '#F9FAFB',
+                      padding: '12px',
+                      borderRadius: '8px',
+                      border: '1px solid #E5E7EB',
+                      marginBottom: '14px',
+                    }}
+                  >
+                    <div>
+                      <span style={{ color: '#6b7280', fontSize: '11px', display: 'block' }}>
+                        CLIENTE
+                      </span>
+                      <strong>{clientDisplay}</strong>
+                    </div>
+                    <div>
+                      <span style={{ color: '#6b7280', fontSize: '11px', display: 'block' }}>
+                        VENDEDOR
+                      </span>
+                      <strong>{viewNotifModalData.seller?.full_name || 'N/A'}</strong>
+                    </div>
+
+                    <div>
+                      <span style={{ color: '#6b7280', fontSize: '11px', display: 'block' }}>
+                        FECHA PAGO
+                      </span>
+                      {notifEditMode ? (
+                        <input
+                          type="date"
+                          max={getLocalTodayDate()}
+                          value={viewNotifModalData.payment_date || ''}
+                          onChange={(e) =>
+                            setViewNotifModalData({
+                              ...viewNotifModalData,
+                              payment_date: e.target.value,
+                            })
+                          }
+                          style={{
+                            width: '100%',
+                            padding: '5px 6px',
+                            borderRadius: '6px',
+                            border: '1px solid #D1D5DB',
+                            fontSize: '12px',
+                            boxSizing: 'border-box',
+                          }}
+                        />
+                      ) : (
+                        <strong>{viewNotifModalData.payment_date || 'N/A'}</strong>
+                      )}
+                    </div>
+
+                    <div>
+                      <span style={{ color: '#6b7280', fontSize: '11px', display: 'block' }}>
+                        MÉTODO
+                      </span>
+                      {notifEditMode ? (
+                        <select
+                          value={viewNotifModalData.payment_method || ''}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            const nextIsBs =
+                              val === 'Pago Móvil' ||
+                              val === 'Transferencia Bs';
+                            let nextRef = viewNotifModalData.reference_number || '';
+                            if (val === 'Efectivo $') {
+                              nextRef = '';
+                            } else if (val !== 'Zelle') {
+                              nextRef = String(nextRef)
+                                .replace(/\D/g, '')
+                                .slice(0, 4);
+                            }
+                            setViewNotifModalData({
+                              ...viewNotifModalData,
+                              payment_method: val,
+                              reference_number: nextRef,
+                              exchange_rate: nextIsBs
+                                ? viewNotifModalData.exchange_rate || ''
+                                : null,
+                              amount_bs: nextIsBs
+                                ? viewNotifModalData.amount_bs || ''
+                                : null,
+                              origin_bank: nextIsBs
+                                ? viewNotifModalData.origin_bank || ''
+                                : null,
+                              destination_bank: nextIsBs
+                                ? viewNotifModalData.destination_bank || ''
+                                : null,
+                              amount_usd: nextIsBs
+                                ? Number(viewNotifModalData.exchange_rate) > 0 &&
+                                  Number(viewNotifModalData.amount_bs) > 0
+                                  ? (
+                                      Number(viewNotifModalData.amount_bs) /
+                                      Number(viewNotifModalData.exchange_rate)
+                                    ).toFixed(2)
+                                  : ''
+                                : viewNotifModalData.amount_usd,
+                            });
+                          }}
+                          style={{
+                            width: '100%',
+                            padding: '5px 6px',
+                            borderRadius: '6px',
+                            border: '1px solid #D1D5DB',
+                            fontSize: '12px',
+                            backgroundColor: '#FFFFFF',
+                          }}
+                        >
+                          <option value="">-- Método --</option>
+                          <option value="Efectivo $">Efectivo ($)</option>
+                          <option value="Binance">Binance</option>
+                          <option value="Zelle">Zelle</option>
+                          <option value="Pago Móvil">Pago Móvil (Bs)</option>
+                          <option value="Transferencia Bs">
+                            Transferencia Bs
+                          </option>
+                        </select>
+                      ) : (
+                        <strong>{viewNotifModalData.payment_method || 'N/A'}</strong>
+                      )}
+                    </div>
+
+                    {isBsMethod && (
+                      <>
+                        <div>
+                          <span style={{ color: '#6b7280', fontSize: '11px', display: 'block' }}>
+                            TASA (Bs/$)
+                          </span>
+                          {notifEditMode ? (
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0.01"
+                              value={viewNotifModalData.exchange_rate || ''}
+                              onChange={(e) => {
+                                const tasaRaw = e.target.value;
+                                const tasaNum = parseFloat(tasaRaw);
+                                const bsNum = parseFloat(
+                                  viewNotifModalData.amount_bs
+                                );
+                                const calcUsd =
+                                  tasaNum > 0 && bsNum > 0
+                                    ? (bsNum / tasaNum).toFixed(2)
+                                    : '';
+                                setViewNotifModalData({
+                                  ...viewNotifModalData,
+                                  exchange_rate: tasaRaw,
+                                  amount_usd: calcUsd,
+                                });
+                              }}
+                              style={{
+                                width: '100%',
+                                padding: '5px 6px',
+                                borderRadius: '6px',
+                                border: '1px solid #D1D5DB',
+                                fontSize: '12px',
+                                boxSizing: 'border-box',
+                              }}
+                            />
+                          ) : (
+                            <strong style={{ color: '#1E40AF' }}>
+                              {Number(viewNotifModalData.exchange_rate || 0).toFixed(2)} Bs/$
+                            </strong>
+                          )}
+                        </div>
+                        <div>
+                          <span style={{ color: '#6b7280', fontSize: '11px', display: 'block' }}>
+                            MONTO EN Bs
+                          </span>
+                          {notifEditMode ? (
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0.01"
+                              value={viewNotifModalData.amount_bs || ''}
+                              onChange={(e) => {
+                                const bsRaw = e.target.value;
+                                const bsNum = parseFloat(bsRaw);
+                                const tasaNum = parseFloat(
+                                  viewNotifModalData.exchange_rate
+                                );
+                                const calcUsd =
+                                  tasaNum > 0 && bsNum > 0
+                                    ? (bsNum / tasaNum).toFixed(2)
+                                    : '';
+                                setViewNotifModalData({
+                                  ...viewNotifModalData,
+                                  amount_bs: bsRaw,
+                                  amount_usd: calcUsd,
+                                });
+                              }}
+                              style={{
+                                width: '100%',
+                                padding: '5px 6px',
+                                borderRadius: '6px',
+                                border: '1px solid #D1D5DB',
+                                fontSize: '12px',
+                                boxSizing: 'border-box',
+                              }}
+                            />
+                          ) : (
+                            <strong style={{ color: '#1E40AF' }}>
+                              {Number(viewNotifModalData.amount_bs || 0).toFixed(2)} Bs
+                            </strong>
+                          )}
+                        </div>
+                        <div>
+                          <span style={{ color: '#6b7280', fontSize: '11px', display: 'block' }}>
+                            CUENTA ORIGEN
+                          </span>
+                          {notifEditMode ? (
+                            <select
+                              value={viewNotifModalData.origin_bank || ''}
+                              onChange={(e) =>
+                                setViewNotifModalData({
+                                  ...viewNotifModalData,
+                                  origin_bank: e.target.value,
+                                })
+                              }
+                              style={{
+                                width: '100%',
+                                padding: '5px 6px',
+                                borderRadius: '6px',
+                                border: '1px solid #D1D5DB',
+                                fontSize: '11px',
+                                backgroundColor: '#FFFFFF',
+                              }}
+                            >
+                              <option value="">-- Banco origen --</option>
+                              {VENEZUELAN_BANKS.map((b) => (
+                                <option key={`v-orig-${b}`} value={b}>
+                                  {b}
+                                </option>
+                              ))}
+                            </select>
+                          ) : (
+                            <strong>{viewNotifModalData.origin_bank || 'N/A'}</strong>
+                          )}
+                        </div>
+                        <div>
+                          <span style={{ color: '#6b7280', fontSize: '11px', display: 'block' }}>
+                            CUENTA DESTINO
+                          </span>
+                          {notifEditMode ? (
+                            <select
+                              value={viewNotifModalData.destination_bank || ''}
+                              onChange={(e) =>
+                                setViewNotifModalData({
+                                  ...viewNotifModalData,
+                                  destination_bank: e.target.value,
+                                })
+                              }
+                              style={{
+                                width: '100%',
+                                padding: '5px 6px',
+                                borderRadius: '6px',
+                                border: '1px solid #D1D5DB',
+                                fontSize: '11px',
+                                backgroundColor: '#FFFFFF',
+                              }}
+                            >
+                              <option value="">-- Banco destino --</option>
+                              {VENEZUELAN_BANKS.map((b) => (
+                                <option key={`v-dest-${b}`} value={b}>
+                                  {b}
+                                </option>
+                              ))}
+                            </select>
+                          ) : (
+                            <strong>{viewNotifModalData.destination_bank || 'N/A'}</strong>
+                          )}
+                        </div>
+                      </>
+                    )}
+
+                    <div>
+                      <span style={{ color: '#6b7280', fontSize: '11px', display: 'block' }}>
+                        MONTO PAGO ($)
+                      </span>
+                      {notifEditMode && !isBsMethod ? (
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0.01"
+                          value={viewNotifModalData.amount_usd || ''}
+                          onChange={(e) =>
+                            setViewNotifModalData({
+                              ...viewNotifModalData,
+                              amount_usd: e.target.value,
+                            })
+                          }
+                          style={{
+                            width: '100%',
+                            padding: '5px 6px',
+                            borderRadius: '6px',
+                            border: '1px solid #D1D5DB',
+                            fontSize: '12px',
+                            fontWeight: '700',
+                            boxSizing: 'border-box',
+                          }}
+                        />
+                      ) : (
+                        <strong
+                          style={{
+                            fontSize: '15px',
+                            color: duplicateWarning ? '#dc2626' : '#059669',
+                          }}
+                        >
+                          ${abonoActual.toFixed(2)}
+                        </strong>
+                      )}
+                    </div>
+
+                    <div>
+                      <span style={{ color: '#6b7280', fontSize: '11px', display: 'block' }}>
+                        N° REFERENCIA
+                      </span>
+                      {notifEditMode ? (
+                        <input
+                          type="text"
+                          inputMode={
+                            viewNotifModalData.payment_method === 'Zelle'
+                              ? 'text'
+                              : 'numeric'
+                          }
+                          maxLength={4}
+                          value={viewNotifModalData.reference_number || ''}
+                          onChange={(e) => {
+                            const raw = e.target.value;
+                            const formatted =
+                              viewNotifModalData.payment_method === 'Zelle'
+                                ? raw
+                                    .replace(/[^a-zA-Z0-9]/g, '')
+                                    .toUpperCase()
+                                    .slice(0, 4)
+                                : raw.replace(/\D/g, '').slice(0, 4);
+                            setViewNotifModalData({
+                              ...viewNotifModalData,
+                              reference_number: formatted,
+                            });
+                          }}
+                          placeholder={
+                            viewNotifModalData.payment_method === 'Efectivo $'
+                              ? 'Opcional'
+                              : '4 car.'
+                          }
+                          style={{
+                            width: '100%',
+                            padding: '5px 6px',
+                            borderRadius: '6px',
+                            border: '1px solid #D1D5DB',
+                            fontSize: '12px',
+                            fontFamily: 'monospace',
+                            boxSizing: 'border-box',
+                          }}
+                        />
+                      ) : (
+                        <strong
+                          style={{
+                            fontFamily: 'monospace',
+                            color: duplicateWarning ? '#dc2626' : '#111827',
+                          }}
+                        >
+                          {viewNotifModalData.reference_number || 'S/R'}
+                        </strong>
+                      )}
+                    </div>
+                  </div>
+                  {notifEditMode && (
+                    <div style={{ marginBottom: '12px' }}>
+                      <span style={{ color: '#6b7280', fontSize: '11px', display: 'block', marginBottom: '4px' }}>
+                        NOTA / OBSERVACIÓN
+                      </span>
+                      <input
+                        type="text"
+                        value={viewNotifModalData.user_note || ''}
+                        onChange={(e) =>
+                          setViewNotifModalData({
+                            ...viewNotifModalData,
+                            user_note: e.target.value,
+                          })
+                        }
+                        placeholder="Observación del abono..."
+                        style={{
+                          width: '100%',
+                          padding: '6px 8px',
+                          borderRadius: '6px',
+                          border: '1px solid #D1D5DB',
+                          fontSize: '12px',
+                          boxSizing: 'border-box',
+                        }}
+                      />
+                    </div>
+                  )}
+                </>
+              );
+            })()}
+
+            {(viewNotifModalData.user_note || viewNotifModalData.receipt_image_url) && (
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  flexWrap: 'wrap',
+                  gap: '10px',
+                  marginBottom: '14px',
+                  padding: '10px 12px',
+                  backgroundColor: '#FFFBEB',
+                  border: '1px solid #FDE68A',
+                  borderRadius: '8px',
+                  fontSize: '12px',
+                }}
+              >
+                <div>
+                  {viewNotifModalData.user_note && (
+                    <span>
+                      <strong>Nota del vendedor:</strong> "
+                      {viewNotifModalData.user_note}"
+                    </span>
+                  )}
+                </div>
+                {viewNotifModalData.receipt_image_url && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setImagePreviewModal(viewNotifModalData.receipt_image_url)
+                    }
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      padding: '6px 12px',
+                      backgroundColor: '#eff6ff',
+                      color: '#1d4ed8',
+                      border: '1px solid #bfdbfe',
+                      borderRadius: '6px',
+                      fontSize: '12px',
+                      fontWeight: '600',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <ImageIcon size={14} /> Ver Comprobante
+                  </button>
+                )}
+              </div>
+            )}
+
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
+                gap: '8px',
+                padding: '10px 12px',
+                backgroundColor: '#F8FAFC',
+                border: '1px solid #CBD5E1',
+                borderRadius: '8px',
+                marginBottom: '14px',
+                fontSize: '12px',
+              }}
+            >
+              <div>
+                <div style={{ fontSize: '10px', color: '#64748B', fontWeight: '700' }}>
+                  SALDO ANTERIOR
+                </div>
+                <strong style={{ fontSize: '15px', color: '#059669' }}>
+                  ${saldoAnterior.toFixed(2)}
+                </strong>
+              </div>
+              <div>
+                <div style={{ fontSize: '10px', color: '#64748B', fontWeight: '700' }}>
+                  ABONO ACTUAL
+                </div>
+                <strong style={{ fontSize: '15px', color: '#0F172A' }}>
+                  ${abonoActual.toFixed(2)}
+                </strong>
+              </div>
+              <div>
+                <div style={{ fontSize: '10px', color: '#64748B', fontWeight: '700' }}>
+                  TOTAL DISPONIBLE
+                </div>
+                <strong style={{ fontSize: '15px', color: '#1E40AF' }}>
+                  ${totalDisponible.toFixed(2)}
+                </strong>
+              </div>
+              <div>
+                <div style={{ fontSize: '10px', color: '#64748B', fontWeight: '700' }}>
+                  ASIGNADO A NOTAS
+                </div>
+                <strong style={{ fontSize: '15px', color: '#2563EB' }}>
+                  ${totalAsignado.toFixed(2)}
+                </strong>
+              </div>
+              <div>
+                <div style={{ fontSize: '10px', color: '#64748B', fontWeight: '700' }}>
+                  SALDO A GUARDAR
+                </div>
+                <strong
+                  style={{
+                    fontSize: '15px',
+                    color: saldoRestanteCliente > 0 ? '#16A34A' : '#64748B',
+                  }}
+                >
+                  ${saldoRestanteCliente.toFixed(2)}
+                </strong>
+              </div>
             </div>
-          );
-        })()}
+
+            {saldoRestanteCliente > 0.009 && (
+              <div
+                style={{
+                  backgroundColor: '#ECFDF5',
+                  border: '1px solid #6EE7B7',
+                  color: '#065F46',
+                  padding: '8px 12px',
+                  borderRadius: '6px',
+                  fontSize: '12px',
+                  fontWeight: '700',
+                  marginBottom: '12px',
+                }}
+              >
+                ℹ️ Quedará un saldo pendiente/a favor del cliente de{' '}
+                <strong>${saldoRestanteCliente.toFixed(2)}</strong> sin asignar al
+                aprobar este abono.
+              </div>
+            )}
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  flexWrap: 'wrap',
+                  gap: '8px',
+                }}
+              >
+                <div style={{ fontSize: '13px', fontWeight: '800', color: '#111827' }}>
+                  {notifEditMode
+                    ? `Todas las notas abiertas del cliente (${notifReviewNotes.length})`
+                    : `Notas incluidas en la solicitud (${
+                        notifReviewNotes.filter((n) => n.selected !== false).length
+                      })`}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setNotifEditMode((prev) => !prev)}
+                  style={{
+                    padding: '5px 10px',
+                    backgroundColor: notifEditMode ? '#111827' : '#EFF6FF',
+                    color: notifEditMode ? '#FFFFFF' : '#1D4ED8',
+                    border: '1px solid #BFDBFE',
+                    borderRadius: '6px',
+                    fontSize: '11px',
+                    fontWeight: '700',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {notifEditMode
+                    ? '✓ Editando Solicitud'
+                    : '✏️ Editar Solicitud (Ver todas las notas)'}
+                </button>
+              </div>
+              {notifReviewNotes
+                .filter((item) => notifEditMode || item.selected !== false)
+                .map((item) => {
+                const preview = computeAdminNotePreview(
+                  item.total_base_usd,
+                  item.applied_payment_discount,
+                  item.applied_special_discount_usd,
+                  item.previous_total_paid_usd,
+                  item.previous_final_price_usd
+                );
+                const appliedNum = Number(parseFloat(item.applied_amount_usd) || 0);
+                const commNum = item.use_commission_discount
+                  ? Number(parseFloat(item.commission_discount_usd) || 0)
+                  : 0;
+                const remainingAfter = Math.max(
+                  0,
+                  Number((preview.newDebt - appliedNum - commNum).toFixed(2))
+                );
+                const willClose = appliedNum + commNum > 0 && remainingAfter <= 0.009;
+
+                return (
+                  <div
+                    key={item.order_id}
+                    style={{
+                      border: '1px solid #D1D5DB',
+                      borderRadius: '8px',
+                      padding: '12px',
+                      backgroundColor: '#FFFFFF',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '10px',
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        flexWrap: 'wrap',
+                        gap: '8px',
+                      }}
+                    >
+                      <label
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          fontSize: '14px',
+                          fontWeight: '900',
+                          color: '#111827',
+                          cursor: notifEditMode ? 'pointer' : 'default',
+                        }}
+                      >
+                        {notifEditMode && (
+                          <input
+                            type="checkbox"
+                            checked={item.selected !== false}
+                            onChange={(e) =>
+                              handleUpdateNotifReviewNote(
+                                item.order_id,
+                                'selected',
+                                e.target.checked
+                              )
+                            }
+                          />
+                        )}
+                        N.E. #{item.transaction_number}
+                      </label>
+                      <span
+                        style={{
+                          padding: '3px 8px',
+                          borderRadius: '999px',
+                          fontSize: '11px',
+                          fontWeight: '700',
+                          backgroundColor: willClose ? '#DCFCE7' : '#DBEAFE',
+                          color: willClose ? '#166534' : '#1E40AF',
+                        }}
+                      >
+                        {willClose ? '✓ Cerrará la Nota' : 'Quedará Abonada'}
+                      </span>
+                    </div>
+
+                    <div
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
+                        gap: '8px',
+                        fontSize: '12px',
+                        backgroundColor: '#F9FAFB',
+                        padding: '8px',
+                        borderRadius: '6px',
+                      }}
+                    >
+                      <div>
+                        <span style={{ color: '#6B7280' }}>Total Base:</span>{' '}
+                        <strong>${preview.base.toFixed(2)}</strong>
+                      </div>
+                      <div>
+                        <span style={{ color: '#6B7280' }}>Nuevo Final:</span>{' '}
+                        <strong>${preview.newFinal.toFixed(2)}</strong>
+                      </div>
+                      <div>
+                        <span style={{ color: '#6B7280' }}>Ya Abonado:</span>{' '}
+                        <strong style={{ color: '#2563EB' }}>
+                          ${preview.paid.toFixed(2)}
+                        </strong>
+                      </div>
+                      <div>
+                        <span style={{ color: '#6B7280' }}>Deuda Previa:</span>{' '}
+                        <strong style={{ color: '#DC2626' }}>
+                          ${preview.newDebt.toFixed(2)}
+                        </strong>
+                      </div>
+                      <div>
+                        <span style={{ color: '#6B7280' }}>Faltaría:</span>{' '}
+                        <strong
+                          style={{
+                            color: willClose ? '#16A34A' : '#B45309',
+                          }}
+                        >
+                          ${remainingAfter.toFixed(2)}
+                        </strong>
+                      </div>
+                    </div>
+
+                    <div
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
+                        gap: '10px',
+                        alignItems: 'end',
+                      }}
+                    >
+                      <div>
+                        <label
+                          style={{
+                            display: 'block',
+                            fontSize: '11px',
+                            fontWeight: '700',
+                            marginBottom: '4px',
+                          }}
+                        >
+                          % Descuento (Editable Admin)
+                        </label>
+                        <select
+                          value={item.applied_payment_discount}
+                          onChange={(e) =>
+                            handleUpdateNotifReviewNote(
+                              item.order_id,
+                              'applied_payment_discount',
+                              e.target.value
+                            )
+                          }
+                          style={{
+                            width: '100%',
+                            padding: '6px 8px',
+                            fontSize: '12px',
+                            border: '1px solid #F59E0B',
+                            borderRadius: '6px',
+                            backgroundColor: '#FEF3C7',
+                            color: '#78350F',
+                            fontWeight: '700',
+                          }}
+                        >
+                          <option value="53.38">
+                            {globalDiscount53}% Pagará en $
+                          </option>
+                          <option value="23.08">
+                            {globalDiscount23}% Pagará en Bs BCV
+                          </option>
+                          <option value="10">
+                            {globalDiscount10}% Descuento Especial
+                          </option>
+                          <option value="0">
+                            {globalDiscount0}% Sin Descuento
+                          </option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label
+                          style={{
+                            display: 'block',
+                            fontSize: '11px',
+                            fontWeight: '700',
+                            marginBottom: '4px',
+                            color: '#7C3AED',
+                          }}
+                        >
+                          Descuento Especial ($) — Solo Admin
+                        </label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={item.applied_special_discount_usd}
+                          onChange={(e) =>
+                            handleUpdateNotifReviewNote(
+                              item.order_id,
+                              'applied_special_discount_usd',
+                              e.target.value
+                            )
+                          }
+                          placeholder="0.00"
+                          style={{
+                            width: '100%',
+                            padding: '6px 8px',
+                            borderRadius: '6px',
+                            border: '1px solid #DDD6FE',
+                            backgroundColor: '#F5F3FF',
+                            fontSize: '12px',
+                            boxSizing: 'border-box',
+                          }}
+                        />
+                      </div>
+
+                      <div>
+                        <label
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            fontSize: '11px',
+                            fontWeight: '700',
+                            marginBottom: '4px',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={Boolean(item.pay_full_debt)}
+                            onChange={(e) =>
+                              handleUpdateNotifReviewNote(
+                                item.order_id,
+                                'pay_full_debt',
+                                e.target.checked
+                              )
+                            }
+                          />
+                          Abonar toda la deuda
+                        </label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={item.applied_amount_usd}
+                          onChange={(e) =>
+                            handleUpdateNotifReviewNote(
+                              item.order_id,
+                              'applied_amount_usd',
+                              e.target.value
+                            )
+                          }
+                          placeholder="Monto ($)"
+                          style={{
+                            width: '100%',
+                            padding: '6px 8px',
+                            borderRadius: '6px',
+                            border: '1px solid #D1D5DB',
+                            fontSize: '12px',
+                            boxSizing: 'border-box',
+                          }}
+                        />
+                      </div>
+                    </div>
+                    {item.selected !== false && (
+                      <div
+                        style={{
+                          backgroundColor: '#FEF3C7',
+                          border: '1px solid #FDE68A',
+                          borderRadius: '6px',
+                          padding: '7px 10px',
+                          display: 'flex',
+                          flexWrap: 'wrap',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: '8px',
+                        }}
+                      >
+                        <label
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            fontSize: '11px',
+                            fontWeight: '700',
+                            color: '#92400E',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={Boolean(item.use_commission_discount)}
+                            onChange={(e) =>
+                              handleUpdateNotifReviewNote(
+                                item.order_id,
+                                'use_commission_discount',
+                                e.target.checked
+                              )
+                            }
+                          />
+                          Completar / descontar de comisiones del vendedor (próx. ciclo)
+                        </label>
+                        {item.use_commission_discount && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span style={{ fontSize: '11px', fontWeight: '700', color: '#92400E' }}>
+                              Monto ($):
+                            </span>
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              value={item.commission_discount_usd || ''}
+                              onChange={(e) =>
+                                handleUpdateNotifReviewNote(
+                                  item.order_id,
+                                  'commission_discount_usd',
+                                  e.target.value
+                                )
+                              }
+                              style={{
+                                width: '95px',
+                                padding: '4px 6px',
+                                borderRadius: '4px',
+                                border: '1px solid #F59E0B',
+                                fontSize: '12px',
+                                fontWeight: '700',
+                                backgroundColor: '#FFFFFF',
+                              }}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                gap: '10px',
+                marginTop: '20px',
+                paddingTop: '16px',
+                borderTop: '1px solid #e5e7eb',
+                flexWrap: 'wrap',
+              }}
+            >
+              <button
+                onClick={() =>
+                  handleDeletePaymentNotification(viewNotifModalData.id)
+                }
+                style={{
+                  padding: '8px 16px',
+                  backgroundColor: '#fee2e2',
+                  color: '#dc2626',
+                  border: '1px solid #fecaca',
+                  borderRadius: '6px',
+                  fontWeight: '700',
+                  cursor: 'pointer',
+                  fontSize: '12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                }}
+              >
+                <Trash2 size={14} /> Desaprobar / Eliminar
+              </button>
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button
+                  onClick={() => {
+                    setViewNotifModalData(null);
+                    setNotifReviewNotes([]);
+                    setDuplicateWarning(null);
+                  }}
+                  style={{
+                    padding: '8px 16px',
+                    backgroundColor: '#f3f4f6',
+                    color: '#374151',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '6px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    fontSize: '12px',
+                  }}
+                >
+                  Cerrar
+                </button>
+                <button
+                  onClick={() =>
+                    handleApprovePaymentNotification(viewNotifModalData)
+                  }
+                  disabled={loading}
+                  style={{
+                    padding: '8px 16px',
+                    backgroundColor: '#059669',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '6px',
+                    fontWeight: '700',
+                    cursor: 'pointer',
+                    fontSize: '12px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                  }}
+                >
+                  <CheckCircle size={14} />
+                  {loading ? 'Procesando...' : 'Procesar y Aprobar Abono'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+        );
+      })()}
       {/* MODAL EDITAR MONTO ABONADO */}
       {editAbonoModalData && (
         <div
@@ -16472,461 +16229,219 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
         </div>
       )}
       {/* MODAL DE ABONO MANUAL (ACCESO DIRECTO POR CLIENTE Y NOTA) */}
-      {abonoModalNote &&
-        (() => {
-          const {
-            saldoAnterior,
-            abonoActual,
-            totalDisponible,
-            totalAsignado,
-            saldoRestanteCliente,
-          } = getManualAbonoSummary();
+      {abonoModalNote && (() => {
+        const {
+          saldoAnterior,
+          abonoActual,
+          totalDisponible,
+          totalAsignado,
+          saldoRestanteCliente,
+        } = getManualAbonoSummary();
 
-          return (
+        return (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1600,
+            padding: '16px',
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: '#ffffff',
+              borderRadius: '12px',
+              width: '100%',
+              maxWidth: '760px',
+              maxHeight: '90vh',
+              overflowY: 'auto',
+              padding: '24px',
+            }}
+          >
             <div
               style={{
-                position: 'fixed',
-                inset: 0,
-                backgroundColor: 'rgba(0,0,0,0.5)',
                 display: 'flex',
+                justifyContent: 'space-between',
                 alignItems: 'center',
-                justifyContent: 'center',
-                zIndex: 1600,
-                padding: '16px',
+                marginBottom: '12px',
+                borderBottom: '1px solid #E5E7EB',
+                paddingBottom: '10px',
               }}
             >
-              <div
+              <div>
+                <h2 style={{ fontSize: '18px', fontWeight: '900', margin: 0 }}>
+                  Registrar Abono — {abonoModalNote.client?.name || 'Cliente'}
+                </h2>
+                <span style={{ fontSize: '12px', color: '#6B7280' }}>
+                  Nota seleccionada: <strong>N.E. #{abonoModalNote.transaction_number}</strong> | Saldo a favor anterior: <strong style={{ color: '#059669' }}>${saldoAnterior.toFixed(2)}</strong>
+                </span>
+              </div>
+              <button
+                onClick={() => setAbonoModalNote(null)}
                 style={{
-                  backgroundColor: '#ffffff',
-                  borderRadius: '12px',
-                  width: '100%',
-                  maxWidth: '760px',
-                  maxHeight: '90vh',
-                  overflowY: 'auto',
-                  padding: '24px',
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
                 }}
               >
-                <div
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    marginBottom: '12px',
-                    borderBottom: '1px solid #E5E7EB',
-                    paddingBottom: '10px',
-                  }}
-                >
-                  <div>
-                    <h2
-                      style={{ fontSize: '18px', fontWeight: '900', margin: 0 }}
+                <X size={20} />
+              </button>
+            </div>
+
+            <form
+              onSubmit={handleRegisterManualAbono}
+              style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}
+            >
+              {(() => {
+                const isBsMethod =
+                  manualAbonoForm.payment_method === 'Pago Móvil' ||
+                  manualAbonoForm.payment_method === 'Transferencia Bs';
+                const hasMethod = Boolean(manualAbonoForm.payment_method);
+
+                return (
+                  <>
+                    <div
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))',
+                        gap: '10px',
+                      }}
                     >
-                      Registrar Abono —{' '}
-                      {abonoModalNote.client?.name || 'Cliente'}
-                    </h2>
-                    <span style={{ fontSize: '12px', color: '#6B7280' }}>
-                      Nota seleccionada:{' '}
-                      <strong>N.E. #{abonoModalNote.transaction_number}</strong>{' '}
-                      | Saldo a favor anterior:{' '}
-                      <strong style={{ color: '#059669' }}>
-                        ${saldoAnterior.toFixed(2)}
-                      </strong>
-                    </span>
-                  </div>
-                  <button
-                    onClick={() => setAbonoModalNote(null)}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    <X size={20} />
-                  </button>
-                </div>
-
-                <form
-                  onSubmit={handleRegisterManualAbono}
-                  style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '14px',
-                  }}
-                >
-                  {(() => {
-                    const isBsMethod =
-                      manualAbonoForm.payment_method === 'Pago Móvil' ||
-                      manualAbonoForm.payment_method === 'Transferencia Bs';
-                    const hasMethod = Boolean(manualAbonoForm.payment_method);
-
-                    return (
-                      <>
-                        <div
+                      <div>
+                        <label
                           style={{
-                            display: 'grid',
-                            gridTemplateColumns:
-                              'repeat(auto-fit, minmax(170px, 1fr))',
-                            gap: '10px',
+                            display: 'block',
+                            fontSize: '12px',
+                            fontWeight: '700',
+                            marginBottom: '4px',
                           }}
                         >
-                          <div>
-                            <label
-                              style={{
-                                display: 'block',
-                                fontSize: '12px',
-                                fontWeight: '700',
-                                marginBottom: '4px',
-                              }}
-                            >
-                              Fecha del Pago *
-                            </label>
-                            <input
-                              type="date"
-                              required
-                              max={getLocalTodayDate()}
-                              value={manualAbonoForm.payment_date}
-                              onChange={(e) =>
-                                setManualAbonoForm({
-                                  ...manualAbonoForm,
-                                  payment_date: e.target.value,
-                                })
-                              }
-                              style={{
-                                width: '100%',
-                                padding: '8px',
-                                borderRadius: '6px',
-                                border: '1px solid #d1d5db',
-                                boxSizing: 'border-box',
-                              }}
-                            />
-                          </div>
-
-                          <div>
-                            <label
-                              style={{
-                                display: 'block',
-                                fontSize: '12px',
-                                fontWeight: '700',
-                                marginBottom: '4px',
-                              }}
-                            >
-                              Método de Recepción *
-                            </label>
-                            <select
-                              required
-                              value={manualAbonoForm.payment_method}
-                              onChange={(e) => {
-                                const val = e.target.value;
-                                let nextRef = manualAbonoForm.reference_number;
-                                if (val === 'Efectivo $') {
-                                  nextRef = '';
-                                } else if (val !== 'Zelle') {
-                                  nextRef = String(nextRef || '')
-                                    .replace(/\D/g, '')
-                                    .slice(0, 4);
-                                }
-                                const nextIsBs =
-                                  val === 'Pago Móvil' ||
-                                  val === 'Transferencia Bs';
-                                setManualAbonoForm({
-                                  ...manualAbonoForm,
-                                  payment_method: val,
-                                  reference_number: nextRef,
-                                  exchange_rate: nextIsBs
-                                    ? manualAbonoForm.exchange_rate
-                                    : '',
-                                  amount_bs: nextIsBs
-                                    ? manualAbonoForm.amount_bs
-                                    : '',
-                                  origin_bank: nextIsBs
-                                    ? manualAbonoForm.origin_bank
-                                    : '',
-                                  destination_bank: nextIsBs
-                                    ? manualAbonoForm.destination_bank
-                                    : '',
-                                  amount_usd: nextIsBs
-                                    ? ''
-                                    : manualAbonoForm.amount_usd,
-                                });
-                              }}
-                              style={{
-                                width: '100%',
-                                padding: '8px',
-                                borderRadius: '6px',
-                                border: '1px solid #d1d5db',
-                                backgroundColor: '#ffffff',
-                              }}
-                            >
-                              <option value="">-- Seleccionar método --</option>
-                              <option value="Efectivo $">Efectivo ($)</option>
-                              <option value="Binance">Binance</option>
-                              <option value="Zelle">Zelle</option>
-                              <option value="Pago Móvil">
-                                Pago Móvil (Bs)
-                              </option>
-                              <option value="Transferencia Bs">
-                                Transferencia Bs
-                              </option>
-                            </select>
-                          </div>
-                        </div>
-
-                        <div
+                          Fecha del Pago *
+                        </label>
+                        <input
+                          type="date"
+                          required
+                          max={getLocalTodayDate()}
+                          value={manualAbonoForm.payment_date}
+                          onChange={(e) =>
+                            setManualAbonoForm({
+                              ...manualAbonoForm,
+                              payment_date: e.target.value,
+                            })
+                          }
                           style={{
-                            backgroundColor: isBsMethod ? '#FEF3C7' : '#EFF6FF',
-                            border: isBsMethod
-                              ? '1px solid #FDE68A'
-                              : '1px solid #BFDBFE',
-                            color: isBsMethod ? '#92400E' : '#1E40AF',
-                            padding: '8px 10px',
+                            width: '100%',
+                            padding: '8px',
                             borderRadius: '6px',
-                            fontSize: '11px',
-                            fontWeight: '600',
+                            border: '1px solid #d1d5db',
+                            boxSizing: 'border-box',
+                          }}
+                        />
+                      </div>
+
+                      <div>
+                        <label
+                          style={{
+                            display: 'block',
+                            fontSize: '12px',
+                            fontWeight: '700',
+                            marginBottom: '4px',
                           }}
                         >
-                          {!hasMethod
-                            ? 'Seleccione primero el método de recepción para ingresar el monto del pago.'
-                            : isBsMethod
-                            ? 'Pago en Bolívares: Ingrese la tasa del día y el monto en Bs; el sistema calculará automáticamente el equivalente en dólares ($).'
-                            : 'Importante: Para este método, el monto recibido debe ingresarse directamente en dólares ($).'}
-                        </div>
+                          Método de Recepción *
+                        </label>
+                        <select
+                          required
+                          value={manualAbonoForm.payment_method}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            let nextRef = manualAbonoForm.reference_number;
+                            if (val === 'Efectivo $') {
+                              nextRef = '';
+                            } else if (val !== 'Zelle') {
+                              nextRef = String(nextRef || '')
+                                .replace(/\D/g, '')
+                                .slice(0, 4);
+                            }
+                            const nextIsBs =
+                              val === 'Pago Móvil' ||
+                              val === 'Transferencia Bs';
+                            setManualAbonoForm({
+                              ...manualAbonoForm,
+                              payment_method: val,
+                              reference_number: nextRef,
+                              exchange_rate: nextIsBs
+                                ? manualAbonoForm.exchange_rate
+                                : '',
+                              amount_bs: nextIsBs
+                                ? manualAbonoForm.amount_bs
+                                : '',
+                              origin_bank: nextIsBs
+                                ? manualAbonoForm.origin_bank
+                                : '',
+                              destination_bank: nextIsBs
+                                ? manualAbonoForm.destination_bank
+                                : '',
+                              amount_usd: nextIsBs
+                                ? ''
+                                : manualAbonoForm.amount_usd,
+                            });
+                          }}
+                          style={{
+                            width: '100%',
+                            padding: '8px',
+                            borderRadius: '6px',
+                            border: '1px solid #d1d5db',
+                            backgroundColor: '#ffffff',
+                          }}
+                        >
+                          <option value="">-- Seleccionar método --</option>
+                          <option value="Efectivo $">Efectivo ($)</option>
+                          <option value="Binance">Binance</option>
+                          <option value="Zelle">Zelle</option>
+                          <option value="Pago Móvil">Pago Móvil (Bs)</option>
+                          <option value="Transferencia Bs">
+                            Transferencia Bs
+                          </option>
+                        </select>
+                      </div>
+                    </div>
 
-                        {hasMethod && (
-                          <div
-                            style={{
-                              display: 'grid',
-                              gridTemplateColumns:
-                                'repeat(auto-fit, minmax(150px, 1fr))',
-                              gap: '10px',
-                            }}
-                          >
-                            {isBsMethod ? (
-                              <>
-                                <div>
-                                  <label
-                                    style={{
-                                      display: 'block',
-                                      fontSize: '12px',
-                                      fontWeight: '700',
-                                      marginBottom: '4px',
-                                    }}
-                                  >
-                                    Tasa (Bs / $) *
-                                  </label>
-                                  <input
-                                    type="number"
-                                    step="0.01"
-                                    min="0.01"
-                                    required
-                                    value={manualAbonoForm.exchange_rate}
-                                    onChange={(e) => {
-                                      const tasaRaw = e.target.value;
-                                      const tasaNum = parseFloat(tasaRaw);
-                                      const bsNum = parseFloat(
-                                        manualAbonoForm.amount_bs
-                                      );
-                                      const calcUsd =
-                                        tasaNum > 0 && bsNum > 0
-                                          ? (bsNum / tasaNum).toFixed(2)
-                                          : '';
-                                      setManualAbonoForm({
-                                        ...manualAbonoForm,
-                                        exchange_rate: tasaRaw,
-                                        amount_usd: calcUsd,
-                                      });
-                                    }}
-                                    placeholder="Ej: 50.00"
-                                    style={{
-                                      width: '100%',
-                                      padding: '8px',
-                                      borderRadius: '6px',
-                                      border: '1px solid #d1d5db',
-                                      boxSizing: 'border-box',
-                                    }}
-                                  />
-                                </div>
-                                <div>
-                                  <label
-                                    style={{
-                                      display: 'block',
-                                      fontSize: '12px',
-                                      fontWeight: '700',
-                                      marginBottom: '4px',
-                                    }}
-                                  >
-                                    Monto en Bs *
-                                  </label>
-                                  <input
-                                    type="number"
-                                    step="0.01"
-                                    min="0.01"
-                                    required
-                                    value={manualAbonoForm.amount_bs}
-                                    onChange={(e) => {
-                                      const bsRaw = e.target.value;
-                                      const bsNum = parseFloat(bsRaw);
-                                      const tasaNum = parseFloat(
-                                        manualAbonoForm.exchange_rate
-                                      );
-                                      const calcUsd =
-                                        tasaNum > 0 && bsNum > 0
-                                          ? (bsNum / tasaNum).toFixed(2)
-                                          : '';
-                                      setManualAbonoForm({
-                                        ...manualAbonoForm,
-                                        amount_bs: bsRaw,
-                                        amount_usd: calcUsd,
-                                      });
-                                    }}
-                                    placeholder="0.00"
-                                    style={{
-                                      width: '100%',
-                                      padding: '8px',
-                                      borderRadius: '6px',
-                                      border: '1px solid #d1d5db',
-                                      boxSizing: 'border-box',
-                                    }}
-                                  />
-                                </div>
-                                <div>
-                                  <label
-                                    style={{
-                                      display: 'block',
-                                      fontSize: '12px',
-                                      fontWeight: '700',
-                                      marginBottom: '4px',
-                                    }}
-                                  >
-                                    Monto Recibido ($)
-                                  </label>
-                                  <input
-                                    type="number"
-                                    step="0.01"
-                                    readOnly
-                                    value={manualAbonoForm.amount_usd}
-                                    placeholder="0.00"
-                                    style={{
-                                      width: '100%',
-                                      padding: '8px',
-                                      borderRadius: '6px',
-                                      border: '1px solid #d1d5db',
-                                      backgroundColor: '#F3F4F6',
-                                      fontWeight: '800',
-                                      boxSizing: 'border-box',
-                                      cursor: 'not-allowed',
-                                    }}
-                                  />
-                                </div>
-                                <div>
-                                  <label
-                                    style={{
-                                      display: 'block',
-                                      fontSize: '12px',
-                                      fontWeight: '700',
-                                      marginBottom: '4px',
-                                    }}
-                                  >
-                                    Cuenta Origen (Banco) *
-                                  </label>
-                                  <select
-                                    required
-                                    value={manualAbonoForm.origin_bank}
-                                    onChange={(e) =>
-                                      setManualAbonoForm({
-                                        ...manualAbonoForm,
-                                        origin_bank: e.target.value,
-                                      })
-                                    }
-                                    style={{
-                                      width: '100%',
-                                      padding: '8px',
-                                      borderRadius: '6px',
-                                      border: '1px solid #d1d5db',
-                                      backgroundColor: '#ffffff',
-                                    }}
-                                  >
-                                    <option value="">-- Banco origen --</option>
-                                    {VENEZUELAN_BANKS.map((b) => (
-                                      <option key={`m-orig-${b}`} value={b}>
-                                        {b}
-                                      </option>
-                                    ))}
-                                  </select>
-                                </div>
-                                <div>
-                                  <label
-                                    style={{
-                                      display: 'block',
-                                      fontSize: '12px',
-                                      fontWeight: '700',
-                                      marginBottom: '4px',
-                                    }}
-                                  >
-                                    Cuenta Destino (Banco) *
-                                  </label>
-                                  <select
-                                    required
-                                    value={manualAbonoForm.destination_bank}
-                                    onChange={(e) =>
-                                      setManualAbonoForm({
-                                        ...manualAbonoForm,
-                                        destination_bank: e.target.value,
-                                      })
-                                    }
-                                    style={{
-                                      width: '100%',
-                                      padding: '8px',
-                                      borderRadius: '6px',
-                                      border: '1px solid #d1d5db',
-                                      backgroundColor: '#ffffff',
-                                    }}
-                                  >
-                                    <option value="">
-                                      -- Banco destino --
-                                    </option>
-                                    {VENEZUELAN_BANKS.map((b) => (
-                                      <option key={`m-dest-${b}`} value={b}>
-                                        {b}
-                                      </option>
-                                    ))}
-                                  </select>
-                                </div>
-                              </>
-                            ) : (
-                              <div>
-                                <label
-                                  style={{
-                                    display: 'block',
-                                    fontSize: '12px',
-                                    fontWeight: '700',
-                                    marginBottom: '4px',
-                                  }}
-                                >
-                                  Monto Recibido ($) *
-                                </label>
-                                <input
-                                  type="number"
-                                  step="0.01"
-                                  min="0.01"
-                                  required
-                                  value={manualAbonoForm.amount_usd}
-                                  onChange={(e) =>
-                                    setManualAbonoForm({
-                                      ...manualAbonoForm,
-                                      amount_usd: e.target.value,
-                                    })
-                                  }
-                                  placeholder="0.00"
-                                  style={{
-                                    width: '100%',
-                                    padding: '8px',
-                                    borderRadius: '6px',
-                                    border: '1px solid #d1d5db',
-                                    boxSizing: 'border-box',
-                                  }}
-                                />
-                              </div>
-                            )}
+                    <div
+                      style={{
+                        backgroundColor: isBsMethod ? '#FEF3C7' : '#EFF6FF',
+                        border: isBsMethod
+                          ? '1px solid #FDE68A'
+                          : '1px solid #BFDBFE',
+                        color: isBsMethod ? '#92400E' : '#1E40AF',
+                        padding: '8px 10px',
+                        borderRadius: '6px',
+                        fontSize: '11px',
+                        fontWeight: '600',
+                      }}
+                    >
+                      {!hasMethod
+                        ? 'Seleccione primero el método de recepción para ingresar el monto del pago.'
+                        : isBsMethod
+                        ? 'Pago en Bolívares: Ingrese la tasa del día y el monto en Bs; el sistema calculará automáticamente el equivalente en dólares ($).'
+                        : 'Importante: Para este método, el monto recibido debe ingresarse directamente en dólares ($).'}
+                    </div>
 
+                    {hasMethod && (
+                      <div
+                        style={{
+                          display: 'grid',
+                          gridTemplateColumns:
+                            'repeat(auto-fit, minmax(150px, 1fr))',
+                          gap: '10px',
+                        }}
+                      >
+                        {isBsMethod ? (
+                          <>
                             <div>
                               <label
                                 style={{
@@ -16936,47 +16451,31 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                                   marginBottom: '4px',
                                 }}
                               >
-                                {manualAbonoForm.payment_method === 'Efectivo $'
-                                  ? 'N° Referencia (Opcional)'
-                                  : manualAbonoForm.payment_method === 'Zelle'
-                                  ? 'Confirmación Zelle (4 car.) *'
-                                  : 'N° Referencia (4 dígitos) *'}
+                                Tasa (Bs / $) *
                               </label>
                               <input
-                                type="text"
-                                inputMode={
-                                  manualAbonoForm.payment_method === 'Zelle'
-                                    ? 'text'
-                                    : 'numeric'
-                                }
-                                maxLength={4}
-                                required={
-                                  manualAbonoForm.payment_method !==
-                                  'Efectivo $'
-                                }
-                                value={manualAbonoForm.reference_number}
+                                type="number"
+                                step="0.01"
+                                min="0.01"
+                                required
+                                value={manualAbonoForm.exchange_rate}
                                 onChange={(e) => {
-                                  const raw = e.target.value;
-                                  const formatted =
-                                    manualAbonoForm.payment_method === 'Zelle'
-                                      ? raw
-                                          .replace(/[^a-zA-Z0-9]/g, '')
-                                          .toUpperCase()
-                                          .slice(0, 4)
-                                      : raw.replace(/\D/g, '').slice(0, 4);
+                                  const tasaRaw = e.target.value;
+                                  const tasaNum = parseFloat(tasaRaw);
+                                  const bsNum = parseFloat(
+                                    manualAbonoForm.amount_bs
+                                  );
+                                  const calcUsd =
+                                    tasaNum > 0 && bsNum > 0
+                                      ? (bsNum / tasaNum).toFixed(2)
+                                      : '';
                                   setManualAbonoForm({
                                     ...manualAbonoForm,
-                                    reference_number: formatted,
+                                    exchange_rate: tasaRaw,
+                                    amount_usd: calcUsd,
                                   });
                                 }}
-                                placeholder={
-                                  manualAbonoForm.payment_method ===
-                                  'Efectivo $'
-                                    ? 'Opcional'
-                                    : manualAbonoForm.payment_method === 'Zelle'
-                                    ? 'Ej: A1B2'
-                                    : 'Ej: 1234'
-                                }
+                                placeholder="Ej: 50.00"
                                 style={{
                                   width: '100%',
                                   padding: '8px',
@@ -16986,625 +16485,781 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                                 }}
                               />
                             </div>
+                            <div>
+                              <label
+                                style={{
+                                  display: 'block',
+                                  fontSize: '12px',
+                                  fontWeight: '700',
+                                  marginBottom: '4px',
+                                }}
+                              >
+                                Monto en Bs *
+                              </label>
+                              <input
+                                type="number"
+                                step="0.01"
+                                min="0.01"
+                                required
+                                value={manualAbonoForm.amount_bs}
+                                onChange={(e) => {
+                                  const bsRaw = e.target.value;
+                                  const bsNum = parseFloat(bsRaw);
+                                  const tasaNum = parseFloat(
+                                    manualAbonoForm.exchange_rate
+                                  );
+                                  const calcUsd =
+                                    tasaNum > 0 && bsNum > 0
+                                      ? (bsNum / tasaNum).toFixed(2)
+                                      : '';
+                                  setManualAbonoForm({
+                                    ...manualAbonoForm,
+                                    amount_bs: bsRaw,
+                                    amount_usd: calcUsd,
+                                  });
+                                }}
+                                placeholder="0.00"
+                                style={{
+                                  width: '100%',
+                                  padding: '8px',
+                                  borderRadius: '6px',
+                                  border: '1px solid #d1d5db',
+                                  boxSizing: 'border-box',
+                                }}
+                              />
+                            </div>
+                            <div>
+                              <label
+                                style={{
+                                  display: 'block',
+                                  fontSize: '12px',
+                                  fontWeight: '700',
+                                  marginBottom: '4px',
+                                }}
+                              >
+                                Monto Recibido ($)
+                              </label>
+                              <input
+                                type="number"
+                                step="0.01"
+                                readOnly
+                                value={manualAbonoForm.amount_usd}
+                                placeholder="0.00"
+                                style={{
+                                  width: '100%',
+                                  padding: '8px',
+                                  borderRadius: '6px',
+                                  border: '1px solid #d1d5db',
+                                  backgroundColor: '#F3F4F6',
+                                  fontWeight: '800',
+                                  boxSizing: 'border-box',
+                                  cursor: 'not-allowed',
+                                }}
+                              />
+                            </div>
+                            <div>
+                              <label
+                                style={{
+                                  display: 'block',
+                                  fontSize: '12px',
+                                  fontWeight: '700',
+                                  marginBottom: '4px',
+                                }}
+                              >
+                                Cuenta Origen (Banco) *
+                              </label>
+                              <select
+                                required
+                                value={manualAbonoForm.origin_bank}
+                                onChange={(e) =>
+                                  setManualAbonoForm({
+                                    ...manualAbonoForm,
+                                    origin_bank: e.target.value,
+                                  })
+                                }
+                                style={{
+                                  width: '100%',
+                                  padding: '8px',
+                                  borderRadius: '6px',
+                                  border: '1px solid #d1d5db',
+                                  backgroundColor: '#ffffff',
+                                }}
+                              >
+                                <option value="">-- Banco origen --</option>
+                                {VENEZUELAN_BANKS.map((b) => (
+                                  <option key={`m-orig-${b}`} value={b}>
+                                    {b}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                            <div>
+                              <label
+                                style={{
+                                  display: 'block',
+                                  fontSize: '12px',
+                                  fontWeight: '700',
+                                  marginBottom: '4px',
+                                }}
+                              >
+                                Cuenta Destino (Banco) *
+                              </label>
+                              <select
+                                required
+                                value={manualAbonoForm.destination_bank}
+                                onChange={(e) =>
+                                  setManualAbonoForm({
+                                    ...manualAbonoForm,
+                                    destination_bank: e.target.value,
+                                  })
+                                }
+                                style={{
+                                  width: '100%',
+                                  padding: '8px',
+                                  borderRadius: '6px',
+                                  border: '1px solid #d1d5db',
+                                  backgroundColor: '#ffffff',
+                                }}
+                              >
+                                <option value="">-- Banco destino --</option>
+                                {VENEZUELAN_BANKS.map((b) => (
+                                  <option key={`m-dest-${b}`} value={b}>
+                                    {b}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          </>
+                        ) : (
+                          <div>
+                            <label
+                              style={{
+                                display: 'block',
+                                fontSize: '12px',
+                                fontWeight: '700',
+                                marginBottom: '4px',
+                              }}
+                            >
+                              Monto Recibido ($) *
+                            </label>
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0.01"
+                              required
+                              value={manualAbonoForm.amount_usd}
+                              onChange={(e) =>
+                                setManualAbonoForm({
+                                  ...manualAbonoForm,
+                                  amount_usd: e.target.value,
+                                })
+                              }
+                              placeholder="0.00"
+                              style={{
+                                width: '100%',
+                                padding: '8px',
+                                borderRadius: '6px',
+                                border: '1px solid #d1d5db',
+                                boxSizing: 'border-box',
+                              }}
+                            />
                           </div>
                         )}
-                      </>
-                    );
-                  })()}
 
-                  <div>
-                    <label
+                        <div>
+                          <label
+                            style={{
+                              display: 'block',
+                              fontSize: '12px',
+                              fontWeight: '700',
+                              marginBottom: '4px',
+                            }}
+                          >
+                            {manualAbonoForm.payment_method === 'Efectivo $'
+                              ? 'N° Referencia (Opcional)'
+                              : manualAbonoForm.payment_method === 'Zelle'
+                              ? 'Confirmación Zelle (4 car.) *'
+                              : 'N° Referencia (4 dígitos) *'}
+                          </label>
+                          <input
+                            type="text"
+                            inputMode={
+                              manualAbonoForm.payment_method === 'Zelle'
+                                ? 'text'
+                                : 'numeric'
+                            }
+                            maxLength={4}
+                            required={
+                              manualAbonoForm.payment_method !== 'Efectivo $'
+                            }
+                            value={manualAbonoForm.reference_number}
+                            onChange={(e) => {
+                              const raw = e.target.value;
+                              const formatted =
+                                manualAbonoForm.payment_method === 'Zelle'
+                                  ? raw
+                                      .replace(/[^a-zA-Z0-9]/g, '')
+                                      .toUpperCase()
+                                      .slice(0, 4)
+                                  : raw.replace(/\D/g, '').slice(0, 4);
+                              setManualAbonoForm({
+                                ...manualAbonoForm,
+                                reference_number: formatted,
+                              });
+                            }}
+                            placeholder={
+                              manualAbonoForm.payment_method === 'Efectivo $'
+                                ? 'Opcional'
+                                : manualAbonoForm.payment_method === 'Zelle'
+                                ? 'Ej: A1B2'
+                                : 'Ej: 1234'
+                            }
+                            style={{
+                              width: '100%',
+                              padding: '8px',
+                              borderRadius: '6px',
+                              border: '1px solid #d1d5db',
+                              boxSizing: 'border-box',
+                            }}
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
+
+              <div>
+                <label
+                  style={{
+                    display: 'block',
+                    fontSize: '12px',
+                    fontWeight: '700',
+                    marginBottom: '4px',
+                    color: '#dc2626',
+                  }}
+                >
+                  {manualAbonoForm.payment_method === 'Efectivo $'
+                    ? 'Adjuntar Foto de los Billetes *'
+                    : 'Adjuntar Comprobante *'}
+                </label>
+                <input
+                  type="file"
+                  id="manual_abono_file_input"
+                  accept="image/*,.pdf"
+                  onChange={async (e) => {
+                    const selected = e.target.files && e.target.files[0];
+                    if (!selected) {
+                      setManualAbonoFile(null);
+                      return;
+                    }
+                    try {
+                      const buf = await selected.arrayBuffer();
+                      const ext = (selected.name.split('.').pop() || 'jpg').toLowerCase();
+                      const mime =
+                        selected.type ||
+                        (ext === 'pdf'
+                          ? 'application/pdf'
+                          : `image/${ext === 'jpg' ? 'jpeg' : ext}`);
+                      setManualAbonoFile(
+                        new File([buf], selected.name, {
+                          type: mime,
+                          lastModified: selected.lastModified || Date.now(),
+                        })
+                      );
+                    } catch {
+                      alert('No se pudo leer el archivo seleccionado. Intente nuevamente.');
+                    }
+                  }}
+                  style={{ display: 'none' }}
+                />
+                <label
+                  htmlFor="manual_abono_file_input"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '9px 14px',
+                    backgroundColor: manualAbonoFile ? '#F0FDF4' : '#F9FAFB',
+                    color: manualAbonoFile ? '#166534' : '#374151',
+                    border: `1px solid ${
+                      manualAbonoFile ? '#86EFAC' : '#D1D5DB'
+                    }`,
+                    borderRadius: '8px',
+                    fontSize: '12px',
+                    fontWeight: '700',
+                    cursor: 'pointer',
+                    width: '100%',
+                    boxSizing: 'border-box',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Upload
+                    size={14}
+                    style={{ color: manualAbonoFile ? '#16A34A' : '#6B7280' }}
+                  />
+                  <span>
+                    {manualAbonoFile
+                      ? manualAbonoFile.name
+                      : 'Seleccionar archivo'}
+                  </span>
+                </label>
+              </div>
+
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
+                  gap: '8px',
+                  padding: '10px 12px',
+                  backgroundColor: '#F8FAFC',
+                  border: '1px solid #CBD5E1',
+                  borderRadius: '8px',
+                  fontSize: '12px',
+                }}
+              >
+                <div>
+                  <div style={{ fontSize: '10px', color: '#64748B', fontWeight: '700' }}>
+                    SALDO ANTERIOR
+                  </div>
+                  <strong style={{ fontSize: '15px', color: '#059669' }}>
+                    ${saldoAnterior.toFixed(2)}
+                  </strong>
+                </div>
+                <div>
+                  <div style={{ fontSize: '10px', color: '#64748B', fontWeight: '700' }}>
+                    ABONO ACTUAL
+                  </div>
+                  <strong style={{ fontSize: '15px', color: '#0F172A' }}>
+                    ${abonoActual.toFixed(2)}
+                  </strong>
+                </div>
+                <div>
+                  <div style={{ fontSize: '10px', color: '#64748B', fontWeight: '700' }}>
+                    TOTAL DISPONIBLE
+                  </div>
+                  <strong style={{ fontSize: '15px', color: '#1E40AF' }}>
+                    ${totalDisponible.toFixed(2)}
+                  </strong>
+                </div>
+                <div>
+                  <div style={{ fontSize: '10px', color: '#64748B', fontWeight: '700' }}>
+                    ASIGNADO A NOTAS
+                  </div>
+                  <strong style={{ fontSize: '15px', color: '#2563EB' }}>
+                    ${totalAsignado.toFixed(2)}
+                  </strong>
+                </div>
+                <div>
+                  <div style={{ fontSize: '10px', color: '#64748B', fontWeight: '700' }}>
+                    SALDO A GUARDAR
+                  </div>
+                  <strong
+                    style={{
+                      fontSize: '15px',
+                      color: saldoRestanteCliente > 0 ? '#16A34A' : '#64748B',
+                    }}
+                  >
+                    ${saldoRestanteCliente.toFixed(2)}
+                  </strong>
+                </div>
+              </div>
+
+              {saldoRestanteCliente > 0.009 && (
+                <div
+                  style={{
+                    backgroundColor: '#ECFDF5',
+                    border: '1px solid #6EE7B7',
+                    color: '#065F46',
+                    padding: '8px 12px',
+                    borderRadius: '6px',
+                    fontSize: '12px',
+                    fontWeight: '700',
+                  }}
+                >
+                  ℹ️ Quedará un saldo pendiente/a favor del cliente de{' '}
+                  <strong>${saldoRestanteCliente.toFixed(2)}</strong> sin asignar
+                  al guardar este abono.
+                </div>
+              )}
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <div style={{ fontSize: '12px', fontWeight: '800', color: '#111827' }}>
+                  Notas Abiertas del Cliente ({manualAbonoClientNotes.length})
+                </div>
+                {manualAbonoClientNotes.map((nota) => {
+                  const sel = manualAbonoSelections[nota.id] || {
+                    selected: false,
+                    applied_payment_discount: String(nota.payment_discount || '53.38'),
+                    applied_special_discount_usd: String(
+                      Number(nota.special_discount_usd || 0)
+                    ),
+                    pay_full_debt: false,
+                    applied_amount_usd: '',
+                  };
+                  const preview = computeAdminNotePreview(
+                    nota.total_base_usd,
+                    sel.applied_payment_discount,
+                    sel.applied_special_discount_usd,
+                    nota.total_paid_usd,
+                    nota.final_price_usd
+                  );
+                  const appliedNum = Number(parseFloat(sel.applied_amount_usd) || 0);
+                  const commNum = sel.use_commission_discount
+                    ? Number(parseFloat(sel.commission_discount_usd) || 0)
+                    : 0;
+                  const remainingAfter = Math.max(
+                    0,
+                    Number((preview.newDebt - appliedNum - commNum).toFixed(2))
+                  );
+                  const willClose =
+                    sel.selected &&
+                    appliedNum + commNum > 0 &&
+                    remainingAfter <= 0.009;
+
+                  return (
+                    <div
+                      key={nota.id}
                       style={{
-                        display: 'block',
-                        fontSize: '12px',
-                        fontWeight: '700',
-                        marginBottom: '4px',
-                        color: '#dc2626',
-                      }}
-                    >
-                      {manualAbonoForm.payment_method === 'Efectivo $'
-                        ? 'Adjuntar Foto de los Billetes *'
-                        : 'Adjuntar Comprobante *'}
-                    </label>
-                    <input
-                      type="file"
-                      id="manual_abono_file_input"
-                      accept="image/*,.pdf"
-                      onChange={async (e) => {
-                        const selected = e.target.files && e.target.files[0];
-                        if (!selected) {
-                          setManualAbonoFile(null);
-                          return;
-                        }
-                        try {
-                          const buf = await selected.arrayBuffer();
-                          const ext = (
-                            selected.name.split('.').pop() || 'jpg'
-                          ).toLowerCase();
-                          const mime =
-                            selected.type ||
-                            (ext === 'pdf'
-                              ? 'application/pdf'
-                              : `image/${ext === 'jpg' ? 'jpeg' : ext}`);
-                          setManualAbonoFile(
-                            new File([buf], selected.name, {
-                              type: mime,
-                              lastModified: selected.lastModified || Date.now(),
-                            })
-                          );
-                        } catch {
-                          alert(
-                            'No se pudo leer el archivo seleccionado. Intente nuevamente.'
-                          );
-                        }
-                      }}
-                      style={{ display: 'none' }}
-                    />
-                    <label
-                      htmlFor="manual_abono_file_input"
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '8px',
-                        padding: '9px 14px',
-                        backgroundColor: manualAbonoFile
-                          ? '#F0FDF4'
-                          : '#F9FAFB',
-                        color: manualAbonoFile ? '#166534' : '#374151',
-                        border: `1px solid ${
-                          manualAbonoFile ? '#86EFAC' : '#D1D5DB'
-                        }`,
+                        border: sel.selected
+                          ? '2px solid #059669'
+                          : '1px solid #E5E7EB',
                         borderRadius: '8px',
-                        fontSize: '12px',
-                        fontWeight: '700',
-                        cursor: 'pointer',
-                        width: '100%',
-                        boxSizing: 'border-box',
-                        justifyContent: 'center',
+                        padding: '10px',
+                        backgroundColor: sel.selected ? '#F0FDF4' : '#FFFFFF',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '8px',
                       }}
                     >
-                      <Upload
-                        size={14}
-                        style={{
-                          color: manualAbonoFile ? '#16A34A' : '#6B7280',
-                        }}
-                      />
-                      <span>
-                        {manualAbonoFile
-                          ? manualAbonoFile.name
-                          : 'Seleccionar archivo'}
-                      </span>
-                    </label>
-                  </div>
-
-                  <div
-                    style={{
-                      display: 'grid',
-                      gridTemplateColumns:
-                        'repeat(auto-fit, minmax(120px, 1fr))',
-                      gap: '8px',
-                      padding: '10px 12px',
-                      backgroundColor: '#F8FAFC',
-                      border: '1px solid #CBD5E1',
-                      borderRadius: '8px',
-                      fontSize: '12px',
-                    }}
-                  >
-                    <div>
                       <div
                         style={{
-                          fontSize: '10px',
-                          color: '#64748B',
-                          fontWeight: '700',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
                         }}
                       >
-                        SALDO ANTERIOR
-                      </div>
-                      <strong style={{ fontSize: '15px', color: '#059669' }}>
-                        ${saldoAnterior.toFixed(2)}
-                      </strong>
-                    </div>
-                    <div>
-                      <div
-                        style={{
-                          fontSize: '10px',
-                          color: '#64748B',
-                          fontWeight: '700',
-                        }}
-                      >
-                        ABONO ACTUAL
-                      </div>
-                      <strong style={{ fontSize: '15px', color: '#0F172A' }}>
-                        ${abonoActual.toFixed(2)}
-                      </strong>
-                    </div>
-                    <div>
-                      <div
-                        style={{
-                          fontSize: '10px',
-                          color: '#64748B',
-                          fontWeight: '700',
-                        }}
-                      >
-                        TOTAL DISPONIBLE
-                      </div>
-                      <strong style={{ fontSize: '15px', color: '#1E40AF' }}>
-                        ${totalDisponible.toFixed(2)}
-                      </strong>
-                    </div>
-                    <div>
-                      <div
-                        style={{
-                          fontSize: '10px',
-                          color: '#64748B',
-                          fontWeight: '700',
-                        }}
-                      >
-                        ASIGNADO A NOTAS
-                      </div>
-                      <strong style={{ fontSize: '15px', color: '#2563EB' }}>
-                        ${totalAsignado.toFixed(2)}
-                      </strong>
-                    </div>
-                    <div>
-                      <div
-                        style={{
-                          fontSize: '10px',
-                          color: '#64748B',
-                          fontWeight: '700',
-                        }}
-                      >
-                        SALDO A GUARDAR
-                      </div>
-                      <strong
-                        style={{
-                          fontSize: '15px',
-                          color:
-                            saldoRestanteCliente > 0 ? '#16A34A' : '#64748B',
-                        }}
-                      >
-                        ${saldoRestanteCliente.toFixed(2)}
-                      </strong>
-                    </div>
-                  </div>
-
-                  {saldoRestanteCliente > 0.009 && (
-                    <div
-                      style={{
-                        backgroundColor: '#ECFDF5',
-                        border: '1px solid #6EE7B7',
-                        color: '#065F46',
-                        padding: '8px 12px',
-                        borderRadius: '6px',
-                        fontSize: '12px',
-                        fontWeight: '700',
-                      }}
-                    >
-                      ℹ️ Quedará un saldo pendiente/a favor del cliente de{' '}
-                      <strong>${saldoRestanteCliente.toFixed(2)}</strong> sin
-                      asignar al guardar este abono.
-                    </div>
-                  )}
-
-                  <div
-                    style={{
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '8px',
-                    }}
-                  >
-                    <div
-                      style={{
-                        fontSize: '12px',
-                        fontWeight: '800',
-                        color: '#111827',
-                      }}
-                    >
-                      Notas Abiertas del Cliente (
-                      {manualAbonoClientNotes.length})
-                    </div>
-                    {manualAbonoClientNotes.map((nota) => {
-                      const sel = manualAbonoSelections[nota.id] || {
-                        selected: false,
-                        applied_payment_discount: String(
-                          nota.payment_discount || '53.38'
-                        ),
-                        applied_special_discount_usd: String(
-                          Number(nota.special_discount_usd || 0)
-                        ),
-                        pay_full_debt: false,
-                        applied_amount_usd: '',
-                      };
-                      const preview = computeAdminNotePreview(
-                        nota.total_base_usd,
-                        sel.applied_payment_discount,
-                        sel.applied_special_discount_usd,
-                        nota.total_paid_usd,
-                        nota.final_price_usd
-                      );
-                      const appliedNum = Number(
-                        parseFloat(sel.applied_amount_usd) || 0
-                      );
-                      const commNum = sel.use_commission_discount
-                        ? Number(parseFloat(sel.commission_discount_usd) || 0)
-                        : 0;
-                      const remainingAfter = Math.max(
-                        0,
-                        Number(
-                          (preview.newDebt - appliedNum - commNum).toFixed(2)
-                        )
-                      );
-                      const willClose =
-                        sel.selected &&
-                        appliedNum + commNum > 0 &&
-                        remainingAfter <= 0.009;
-
-                      return (
-                        <div
-                          key={nota.id}
+                        <label
                           style={{
-                            border: sel.selected
-                              ? '2px solid #059669'
-                              : '1px solid #E5E7EB',
-                            borderRadius: '8px',
-                            padding: '10px',
-                            backgroundColor: sel.selected
-                              ? '#F0FDF4'
-                              : '#FFFFFF',
                             display: 'flex',
-                            flexDirection: 'column',
+                            alignItems: 'center',
+                            gap: '8px',
+                            fontWeight: '900',
+                            fontSize: '13px',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={Boolean(sel.selected)}
+                            onChange={(e) =>
+                              handleUpdateManualAbonoSelection(
+                                nota,
+                                'selected',
+                                e.target.checked
+                              )
+                            }
+                          />
+                          N.E. #{nota.transaction_number}
+                          {nota.id === abonoModalNote.id && (
+                            <span
+                              style={{
+                                fontSize: '10px',
+                                backgroundColor: '#D1FAE5',
+                                color: '#065F46',
+                                padding: '2px 6px',
+                                borderRadius: '4px',
+                              }}
+                            >
+                              Actual
+                            </span>
+                          )}
+                        </label>
+                        <span style={{ fontSize: '11px', color: '#6B7280' }}>
+                          Total: ${preview.newFinal.toFixed(2)} | Abonado: $
+                          {preview.paid.toFixed(2)} | Deuda:{' '}
+                          <strong style={{ color: '#DC2626' }}>
+                            ${preview.newDebt.toFixed(2)}
+                          </strong>
+                        </span>
+                      </div>
+
+                      <div
+                        style={{
+                          display: 'grid',
+                          gridTemplateColumns:
+                            'repeat(auto-fit, minmax(150px, 1fr))',
+                          gap: '8px',
+                          alignItems: 'end',
+                        }}
+                      >
+                        <div>
+                          <label
+                            style={{
+                              display: 'block',
+                              fontSize: '10px',
+                              fontWeight: '700',
+                              marginBottom: '2px',
+                            }}
+                          >
+                            % Descuento
+                          </label>
+                          <select
+                            value={sel.applied_payment_discount}
+                            onChange={(e) =>
+                              handleUpdateManualAbonoSelection(
+                                nota,
+                                'applied_payment_discount',
+                                e.target.value
+                              )
+                            }
+                            style={{
+                              width: '100%',
+                              padding: '5px 6px',
+                              fontSize: '11px',
+                              border: '1px solid #F59E0B',
+                              borderRadius: '6px',
+                              backgroundColor: '#FEF3C7',
+                              fontWeight: '700',
+                            }}
+                          >
+                            <option value="53.38">
+                              {globalDiscount53}% Pagará en $
+                            </option>
+                            <option value="23.08">
+                              {globalDiscount23}% Pagará en Bs BCV
+                            </option>
+                            <option value="10">
+                              {globalDiscount10}% Descuento Especial
+                            </option>
+                            <option value="0">
+                              {globalDiscount0}% Sin Descuento
+                            </option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label
+                            style={{
+                              display: 'block',
+                              fontSize: '10px',
+                              fontWeight: '700',
+                              marginBottom: '2px',
+                              color: '#7C3AED',
+                            }}
+                          >
+                            Desc. Especial ($)
+                          </label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={sel.applied_special_discount_usd}
+                            onChange={(e) =>
+                              handleUpdateManualAbonoSelection(
+                                nota,
+                                'applied_special_discount_usd',
+                                e.target.value
+                              )
+                            }
+                            style={{
+                              width: '100%',
+                              padding: '5px 6px',
+                              borderRadius: '6px',
+                              border: '1px solid #DDD6FE',
+                              backgroundColor: '#F5F3FF',
+                              fontSize: '11px',
+                              boxSizing: 'border-box',
+                            }}
+                          />
+                        </div>
+
+                        <div>
+                          <label
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              fontSize: '10px',
+                              fontWeight: '700',
+                              marginBottom: '2px',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={Boolean(sel.pay_full_debt)}
+                              onChange={(e) =>
+                                handleUpdateManualAbonoSelection(
+                                  nota,
+                                  'pay_full_debt',
+                                  e.target.checked
+                                )
+                              }
+                            />
+                            Abonar toda la deuda
+                          </label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            disabled={!sel.selected}
+                            value={sel.applied_amount_usd}
+                            onChange={(e) =>
+                              handleUpdateManualAbonoSelection(
+                                nota,
+                                'applied_amount_usd',
+                                e.target.value
+                              )
+                            }
+                            placeholder="Monto ($)"
+                            style={{
+                              width: '100%',
+                              padding: '5px 6px',
+                              borderRadius: '6px',
+                              border: '1px solid #D1D5DB',
+                              fontSize: '11px',
+                              boxSizing: 'border-box',
+                            }}
+                          />
+                        </div>
+
+                        {sel.selected && (
+                          <div style={{ fontSize: '11px', fontWeight: '700' }}>
+                            Faltaría: ${remainingAfter.toFixed(2)}{' '}
+                            <span
+                              style={{
+                                color: willClose ? '#16A34A' : '#2563EB',
+                              }}
+                            >
+                              ({willClose ? 'Cerrará' : 'Abonada'})
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                      {sel.selected && (
+                        <div
+                          style={{
+                            backgroundColor: '#FEF3C7',
+                            border: '1px solid #FDE68A',
+                            borderRadius: '6px',
+                            padding: '6px 8px',
+                            display: 'flex',
+                            flexWrap: 'wrap',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
                             gap: '8px',
                           }}
                         >
-                          <div
+                          <label
                             style={{
                               display: 'flex',
-                              justifyContent: 'space-between',
                               alignItems: 'center',
+                              gap: '6px',
+                              fontSize: '11px',
+                              fontWeight: '700',
+                              color: '#92400E',
+                              cursor: 'pointer',
                             }}
                           >
-                            <label
-                              style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '8px',
-                                fontWeight: '900',
-                                fontSize: '13px',
-                                cursor: 'pointer',
-                              }}
-                            >
+                            <input
+                              type="checkbox"
+                              checked={Boolean(sel.use_commission_discount)}
+                              onChange={(e) =>
+                                handleUpdateManualAbonoSelection(
+                                  nota,
+                                  'use_commission_discount',
+                                  e.target.checked
+                                )
+                              }
+                            />
+                            Completar / descontar de comisiones del vendedor (próx. ciclo)
+                          </label>
+                          {sel.use_commission_discount && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <span style={{ fontSize: '11px', fontWeight: '700', color: '#92400E' }}>
+                                Monto ($):
+                              </span>
                               <input
-                                type="checkbox"
-                                checked={Boolean(sel.selected)}
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                value={sel.commission_discount_usd || ''}
                                 onChange={(e) =>
                                   handleUpdateManualAbonoSelection(
                                     nota,
-                                    'selected',
-                                    e.target.checked
-                                  )
-                                }
-                              />
-                              N.E. #{nota.transaction_number}
-                              {nota.id === abonoModalNote.id && (
-                                <span
-                                  style={{
-                                    fontSize: '10px',
-                                    backgroundColor: '#D1FAE5',
-                                    color: '#065F46',
-                                    padding: '2px 6px',
-                                    borderRadius: '4px',
-                                  }}
-                                >
-                                  Actual
-                                </span>
-                              )}
-                            </label>
-                            <span
-                              style={{ fontSize: '11px', color: '#6B7280' }}
-                            >
-                              Total: ${preview.newFinal.toFixed(2)} | Abonado: $
-                              {preview.paid.toFixed(2)} | Deuda:{' '}
-                              <strong style={{ color: '#DC2626' }}>
-                                ${preview.newDebt.toFixed(2)}
-                              </strong>
-                            </span>
-                          </div>
-
-                          <div
-                            style={{
-                              display: 'grid',
-                              gridTemplateColumns:
-                                'repeat(auto-fit, minmax(150px, 1fr))',
-                              gap: '8px',
-                              alignItems: 'end',
-                            }}
-                          >
-                            <div>
-                              <label
-                                style={{
-                                  display: 'block',
-                                  fontSize: '10px',
-                                  fontWeight: '700',
-                                  marginBottom: '2px',
-                                }}
-                              >
-                                % Descuento
-                              </label>
-                              <select
-                                value={sel.applied_payment_discount}
-                                onChange={(e) =>
-                                  handleUpdateManualAbonoSelection(
-                                    nota,
-                                    'applied_payment_discount',
+                                    'commission_discount_usd',
                                     e.target.value
                                   )
                                 }
                                 style={{
-                                  width: '100%',
-                                  padding: '5px 6px',
-                                  fontSize: '11px',
+                                  width: '90px',
+                                  padding: '4px 6px',
+                                  borderRadius: '4px',
                                   border: '1px solid #F59E0B',
-                                  borderRadius: '6px',
-                                  backgroundColor: '#FEF3C7',
-                                  fontWeight: '700',
-                                }}
-                              >
-                                <option value="53.38">
-                                  {globalDiscount53}% Pagará en $
-                                </option>
-                                <option value="23.08">
-                                  {globalDiscount23}% Pagará en Bs BCV
-                                </option>
-                                <option value="10">
-                                  {globalDiscount10}% Descuento Especial
-                                </option>
-                                <option value="0">
-                                  {globalDiscount0}% Sin Descuento
-                                </option>
-                              </select>
-                            </div>
-
-                            <div>
-                              <label
-                                style={{
-                                  display: 'block',
-                                  fontSize: '10px',
-                                  fontWeight: '700',
-                                  marginBottom: '2px',
-                                  color: '#7C3AED',
-                                }}
-                              >
-                                Desc. Especial ($)
-                              </label>
-                              <input
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                value={sel.applied_special_discount_usd}
-                                onChange={(e) =>
-                                  handleUpdateManualAbonoSelection(
-                                    nota,
-                                    'applied_special_discount_usd',
-                                    e.target.value
-                                  )
-                                }
-                                style={{
-                                  width: '100%',
-                                  padding: '5px 6px',
-                                  borderRadius: '6px',
-                                  border: '1px solid #DDD6FE',
-                                  backgroundColor: '#F5F3FF',
                                   fontSize: '11px',
-                                  boxSizing: 'border-box',
+                                  fontWeight: '700',
+                                  backgroundColor: '#FFFFFF',
                                 }}
                               />
-                            </div>
-
-                            <div>
-                              <label
-                                style={{
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '4px',
-                                  fontSize: '10px',
-                                  fontWeight: '700',
-                                  marginBottom: '2px',
-                                  cursor: 'pointer',
-                                }}
-                              >
-                                <input
-                                  type="checkbox"
-                                  checked={Boolean(sel.pay_full_debt)}
-                                  onChange={(e) =>
-                                    handleUpdateManualAbonoSelection(
-                                      nota,
-                                      'pay_full_debt',
-                                      e.target.checked
-                                    )
-                                  }
-                                />
-                                Abonar toda la deuda
-                              </label>
-                              <input
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                disabled={!sel.selected}
-                                value={sel.applied_amount_usd}
-                                onChange={(e) =>
-                                  handleUpdateManualAbonoSelection(
-                                    nota,
-                                    'applied_amount_usd',
-                                    e.target.value
-                                  )
-                                }
-                                placeholder="Monto ($)"
-                                style={{
-                                  width: '100%',
-                                  padding: '5px 6px',
-                                  borderRadius: '6px',
-                                  border: '1px solid #D1D5DB',
-                                  fontSize: '11px',
-                                  boxSizing: 'border-box',
-                                }}
-                              />
-                            </div>
-
-                            {sel.selected && (
-                              <div
-                                style={{ fontSize: '11px', fontWeight: '700' }}
-                              >
-                                Faltaría: ${remainingAfter.toFixed(2)}{' '}
-                                <span
-                                  style={{
-                                    color: willClose ? '#16A34A' : '#2563EB',
-                                  }}
-                                >
-                                  ({willClose ? 'Cerrará' : 'Abonada'})
-                                </span>
-                              </div>
-                            )}
-                          </div>
-                          {sel.selected && (
-                            <div
-                              style={{
-                                backgroundColor: '#FEF3C7',
-                                border: '1px solid #FDE68A',
-                                borderRadius: '6px',
-                                padding: '6px 8px',
-                                display: 'flex',
-                                flexWrap: 'wrap',
-                                alignItems: 'center',
-                                justifyContent: 'space-between',
-                                gap: '8px',
-                              }}
-                            >
-                              <label
-                                style={{
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '6px',
-                                  fontSize: '11px',
-                                  fontWeight: '700',
-                                  color: '#92400E',
-                                  cursor: 'pointer',
-                                }}
-                              >
-                                <input
-                                  type="checkbox"
-                                  checked={Boolean(sel.use_commission_discount)}
-                                  onChange={(e) =>
-                                    handleUpdateManualAbonoSelection(
-                                      nota,
-                                      'use_commission_discount',
-                                      e.target.checked
-                                    )
-                                  }
-                                />
-                                Completar / descontar de comisiones del vendedor
-                                (próx. ciclo)
-                              </label>
-                              {sel.use_commission_discount && (
-                                <div
-                                  style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '6px',
-                                  }}
-                                >
-                                  <span
-                                    style={{
-                                      fontSize: '11px',
-                                      fontWeight: '700',
-                                      color: '#92400E',
-                                    }}
-                                  >
-                                    Monto ($):
-                                  </span>
-                                  <input
-                                    type="number"
-                                    step="0.01"
-                                    min="0"
-                                    value={sel.commission_discount_usd || ''}
-                                    onChange={(e) =>
-                                      handleUpdateManualAbonoSelection(
-                                        nota,
-                                        'commission_discount_usd',
-                                        e.target.value
-                                      )
-                                    }
-                                    style={{
-                                      width: '90px',
-                                      padding: '4px 6px',
-                                      borderRadius: '4px',
-                                      border: '1px solid #F59E0B',
-                                      fontSize: '11px',
-                                      fontWeight: '700',
-                                      backgroundColor: '#FFFFFF',
-                                    }}
-                                  />
-                                </div>
-                              )}
                             </div>
                           )}
                         </div>
-                      );
-                    })}
-                  </div>
-
-                  <div
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'flex-end',
-                      gap: '10px',
-                      marginTop: '10px',
-                    }}
-                  >
-                    <button
-                      type="button"
-                      disabled={loading || isSubmittingAbono}
-                      onClick={() => setAbonoModalNote(null)}
-                      style={{
-                        padding: '8px 16px',
-                        borderRadius: '6px',
-                        border: '1px solid #d1d5db',
-                        background: '#fff',
-                        cursor:
-                          loading || isSubmittingAbono
-                            ? 'not-allowed'
-                            : 'pointer',
-                      }}
-                    >
-                      Cancelar
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={loading || isSubmittingAbono}
-                      style={{
-                        padding: '8px 16px',
-                        borderRadius: '6px',
-                        border: 'none',
-                        background:
-                          loading || isSubmittingAbono ? '#9ca3af' : '#059669',
-                        color: '#fff',
-                        fontWeight: 'bold',
-                        cursor:
-                          loading || isSubmittingAbono
-                            ? 'not-allowed'
-                            : 'pointer',
-                        opacity: loading || isSubmittingAbono ? 0.7 : 1,
-                      }}
-                    >
-                      {loading || isSubmittingAbono
-                        ? 'Guardando...'
-                        : 'Guardar Abono'}
-                    </button>
-                  </div>
-                </form>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
-            </div>
-          );
-        })()}
+
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'flex-end',
+                  gap: '10px',
+                  marginTop: '10px',
+                }}
+              >
+                <button
+                  type="button"
+                  disabled={loading || isSubmittingAbono}
+                  onClick={() => setAbonoModalNote(null)}
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: '6px',
+                    border: '1px solid #d1d5db',
+                    background: '#fff',
+                    cursor:
+                      loading || isSubmittingAbono ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={loading || isSubmittingAbono}
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: '6px',
+                    border: 'none',
+                    background:
+                      loading || isSubmittingAbono ? '#9ca3af' : '#059669',
+                    color: '#fff',
+                    fontWeight: 'bold',
+                    cursor:
+                      loading || isSubmittingAbono ? 'not-allowed' : 'pointer',
+                    opacity: loading || isSubmittingAbono ? 0.7 : 1,
+                  }}
+                >
+                  {loading || isSubmittingAbono
+                    ? 'Guardando...'
+                    : 'Guardar Abono'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+        );
+      })()}
 
       {/* MODAL ALERTA MONTO > $1,000 EN ABONO MANUAL */}
       {manualAbonoHighAmountModal && (
@@ -17629,37 +17284,18 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
               padding: '20px',
             }}
           >
-            <h3
-              style={{
-                margin: '0 0 10px 0',
-                color: '#B45309',
-                fontSize: '16px',
-              }}
-            >
+            <h3 style={{ margin: '0 0 10px 0', color: '#B45309', fontSize: '16px' }}>
               ⚠️ Verifique el Monto en Dólares ($)
             </h3>
-            <p
-              style={{
-                fontSize: '13px',
-                color: '#374151',
-                margin: '0 0 14px 0',
-              }}
-            >
+            <p style={{ fontSize: '13px', color: '#374151', margin: '0 0 14px 0' }}>
               Ingresó{' '}
               <strong>
-                $
-                {Number(parseFloat(manualAbonoForm.amount_usd) || 0).toFixed(2)}
+                ${Number(parseFloat(manualAbonoForm.amount_usd) || 0).toFixed(2)}
               </strong>
               . Los montos deben expresarse en <strong>dólares ($)</strong> y no
               en bolívares (Bs). ¿Es correcta la cantidad de dólares?
             </p>
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'flex-end',
-                gap: '10px',
-              }}
-            >
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
               <button
                 type="button"
                 onClick={() => setManualAbonoHighAmountModal(false)}
@@ -17738,11 +17374,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
               </h3>
               <button
                 onClick={() => setHistoryDetailModal(null)}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                }}
+                style={{ background: 'none', border: 'none', cursor: 'pointer' }}
               >
                 <X size={20} />
               </button>
@@ -17785,8 +17417,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
                 <>
                   <div>
                     <strong>Tasa (Bs/$):</strong>{' '}
-                    {Number(historyDetailModal.exchange_rate || 0).toFixed(2)}{' '}
-                    Bs/$
+                    {Number(historyDetailModal.exchange_rate || 0).toFixed(2)} Bs/$
                   </div>
                   <div>
                     <strong>Monto en Bs:</strong>{' '}
@@ -17820,19 +17451,11 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
               </div>
             </div>
             {historyDetailModal.user_note && (
-              <p
-                style={{
-                  fontSize: '12px',
-                  fontStyle: 'italic',
-                  color: '#4B5563',
-                }}
-              >
+              <p style={{ fontSize: '12px', fontStyle: 'italic', color: '#4B5563' }}>
                 Observación: "{historyDetailModal.user_note}"
               </p>
             )}
-            <div
-              style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}
-            >
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               <strong style={{ fontSize: '13px' }}>Notas Afectadas:</strong>
               {Array.isArray(historyDetailModal.notes_breakdown) &&
               historyDetailModal.notes_breakdown.length > 0 ? (
@@ -17894,13 +17517,7 @@ ${histItem.capturedHTML || '<p>Factura sin HTML capturado.</p>'}
               padding: '22px',
             }}
           >
-            <h3
-              style={{
-                margin: '0 0 10px 0',
-                fontSize: '16px',
-                color: '#B91C1C',
-              }}
-            >
+            <h3 style={{ margin: '0 0 10px 0', fontSize: '16px', color: '#B91C1C' }}>
               ⚠️ Notas Existentes Detectadas
             </h3>
             <p style={{ fontSize: '13px', color: '#374151', lineHeight: 1.5 }}>
